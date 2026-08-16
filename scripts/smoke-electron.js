@@ -1,0 +1,237 @@
+'use strict';
+
+const fs = require('node:fs');
+const path = require('node:path');
+const { app, BrowserWindow } = require('electron');
+
+app.disableHardwareAcceleration();
+app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.5.0'));
+
+app.whenReady().then(async () => {
+  const window = new BrowserWindow({
+    width: 1180,
+    height: 780,
+    show: false,
+    backgroundColor: '#f3f6fb',
+    titleBarStyle: 'hidden',
+    titleBarOverlay: { color: '#f2f5f9', symbolColor: '#526071', height: 42 },
+    webPreferences: {
+      preload: path.join(__dirname, 'smoke-preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+  await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await new Promise((resolve) => setTimeout(resolve, 700));
+  const captureStablePage = async (output) => {
+    window.webContents.invalidate();
+    await new Promise((resolve) => setTimeout(resolve, 90));
+    await window.webContents.capturePage();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const image = await window.webContents.capturePage();
+    fs.writeFileSync(output, image.toPNG());
+  };
+  const dialogResult = await window.webContents.executeJavaScript(`
+    (() => {
+      const addButton = document.getElementById('addButton');
+      const dialog = document.getElementById('addDialog');
+      const minimizeRemoved = document.getElementById('hideButton') === null;
+
+      addButton.click();
+      const openedForCancel = dialog.open;
+      document.getElementById('cancelAddButton').click();
+      const closedByCancel = !dialog.open;
+
+      addButton.click();
+      const openedForClose = dialog.open;
+      document.getElementById('closeAddDialogButton').click();
+      const closedByClose = !dialog.open;
+
+      document.getElementById('settingsButton').click();
+      const settingsDialog = document.getElementById('settingsDialog');
+      const settingsOpened = settingsDialog.open;
+      settingsDialog.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 0, clientY: 0 }));
+      const settingsClosedByBackdrop = !settingsDialog.open;
+
+      return { minimizeRemoved, openedForCancel, closedByCancel, openedForClose, closedByClose, settingsOpened, settingsClosedByBackdrop };
+    })()
+  `);
+  if (!Object.values(dialogResult).every(Boolean)) {
+    throw new Error(`Dialog close smoke test failed: ${JSON.stringify(dialogResult)}`);
+  }
+  console.log(`DIALOG_SMOKE_OK ${JSON.stringify(dialogResult)}`);
+  const settingsDraftResult = await window.webContents.executeJavaScript(`
+    (async () => {
+      document.getElementById('settingsButton').click();
+      document.querySelector('[data-settings-section="notifications"]').click();
+      const notificationsVisible = !document.querySelector('[data-settings-panel="notifications"]').hidden;
+      document.querySelector('[data-settings-section="storage"]').click();
+      const storageVisible = !document.querySelector('[data-settings-panel="storage"]').hidden;
+      document.querySelector('[data-settings-section="about"]').click();
+      const aboutVisible = !document.querySelector('[data-settings-panel="about"]').hidden;
+      document.querySelector('[data-settings-section="general"]').click();
+      const generalVisible = !document.querySelector('[data-settings-panel="general"]').hidden;
+      const startAtLogin = document.getElementById('startAtLogin');
+      startAtLogin.checked = true;
+      document.getElementById('changeDataDirectoryButton').click();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const draftPreserved = startAtLogin.checked;
+      document.getElementById('settingsDialog').close();
+      return { notificationsVisible, storageVisible, aboutVisible, generalVisible, draftPreserved };
+    })()
+  `);
+  if (!Object.values(settingsDraftResult).every(Boolean)) {
+    throw new Error(`Settings draft smoke test failed: ${JSON.stringify(settingsDraftResult)}`);
+  }
+  console.log(`SETTINGS_DRAFT_SMOKE_OK ${JSON.stringify(settingsDraftResult)}`);
+  const doiCopyResult = await window.webContents.executeJavaScript(`
+    (async () => {
+      const button = document.querySelector('[data-action="copy-doi"]');
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      const toast = document.getElementById('toast');
+      const shownAtTop = toast.classList.contains('show') && toast.textContent === 'DOI 链接复制成功';
+      await new Promise((resolve) => setTimeout(resolve, 1100));
+      const hiddenAfterOneSecond = !toast.classList.contains('show');
+      return { shownAtTop, hiddenAfterOneSecond };
+    })()
+  `);
+  if (!Object.values(doiCopyResult).every(Boolean)) {
+    throw new Error(`DOI copy smoke test failed: ${JSON.stringify(doiCopyResult)}`);
+  }
+  console.log(`DOI_COPY_SMOKE_OK ${JSON.stringify(doiCopyResult)}`);
+  await window.webContents.executeJavaScript(`
+    (() => {
+      const toast = document.getElementById('toast');
+      toast.style.transition = 'none';
+      toast.className = 'toast';
+      toast.style.opacity = '0';
+    })()
+  `);
+  const workspaceResult = await window.webContents.executeJavaScript(`
+    (() => {
+      const cards = () => [...document.querySelectorAll('[data-paper-id]')].filter((card) => !card.hidden);
+      document.getElementById('importantNavButton').click();
+      const importantOnlyUnread = cards().length === 1 && cards()[0].dataset.paperId === 'demo-paper';
+      document.getElementById('archivedNavButton').click();
+      const archiveOnlyArchived = cards().length === 1 && cards()[0].dataset.paperId === 'demo-archived-paper';
+      const search = document.getElementById('paperSearch');
+      search.value = 'WATRES_20416';
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      const productionReferenceSearch = cards().length === 1 && cards()[0].dataset.paperId === 'demo-archived-paper';
+      search.value = '';
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+      document.getElementById('allNavButton').click();
+      const activeExcludesArchived = cards().length === 2 && !cards().some((card) => card.dataset.paperId === 'demo-archived-paper');
+      return { importantOnlyUnread, archiveOnlyArchived, productionReferenceSearch, activeExcludesArchived };
+    })()
+  `);
+  if (!Object.values(workspaceResult).every(Boolean)) {
+    throw new Error(`Workspace view smoke test failed: ${JSON.stringify(workspaceResult)}`);
+  }
+  console.log(`WORKSPACE_VIEW_SMOKE_OK ${JSON.stringify(workspaceResult)}`);
+  if (process.env.PAPERTRAIL_MODAL_OUTPUT) {
+    await window.webContents.executeJavaScript(`
+      document.getElementById('addButton').click();
+      document.getElementById('addModeAuthor').click();
+    `);
+    await new Promise((resolve) => setTimeout(resolve, 240));
+    const addDialogVisual = await window.webContents.executeJavaScript(`
+      (() => {
+        const dialog = document.getElementById('addDialog');
+        const style = getComputedStyle(dialog);
+        return { open: dialog.open, className: dialog.className, opacity: style.opacity, transform: style.transform };
+      })()
+    `);
+    if (!addDialogVisual.open || Number(addDialogVisual.opacity) < 0.99) {
+      throw new Error(`Add dialog visual state failed: ${JSON.stringify(addDialogVisual)}`);
+    }
+    console.log(`ADD_DIALOG_VISUAL_OK ${JSON.stringify(addDialogVisual)}`);
+    await captureStablePage(process.env.PAPERTRAIL_MODAL_OUTPUT);
+    await window.webContents.executeJavaScript(`document.getElementById('addDialog').close()`);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  }
+  if (process.env.PAPERTRAIL_SETTINGS_OUTPUT) {
+    await window.webContents.executeJavaScript(`document.getElementById('settingsButton').click()`);
+    await new Promise((resolve) => setTimeout(resolve, 240));
+    const settingsDialogVisual = await window.webContents.executeJavaScript(`
+      (() => {
+        const dialog = document.getElementById('settingsDialog');
+        const style = getComputedStyle(dialog);
+        return { open: dialog.open, className: dialog.className, opacity: style.opacity, transform: style.transform };
+      })()
+    `);
+    if (!settingsDialogVisual.open || Number(settingsDialogVisual.opacity) < 0.99) {
+      throw new Error(`Settings dialog visual state failed: ${JSON.stringify(settingsDialogVisual)}`);
+    }
+    console.log(`SETTINGS_DIALOG_VISUAL_OK ${JSON.stringify(settingsDialogVisual)}`);
+    await captureStablePage(process.env.PAPERTRAIL_SETTINGS_OUTPUT);
+    await window.webContents.executeJavaScript(`document.getElementById('settingsDialog').close()`);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  }
+  if (process.env.PAPERTRAIL_SMOKE_OUTPUT) {
+    await window.webContents.executeJavaScript(`document.getElementById('allNavButton').click(); window.scrollTo(0, 0)`);
+    await captureStablePage(process.env.PAPERTRAIL_SMOKE_OUTPUT);
+  }
+  if (process.env.PAPERTRAIL_IMPORTANT_OUTPUT) {
+    await window.webContents.executeJavaScript(`document.getElementById('importantNavButton').click(); window.scrollTo(0, 0)`);
+    const importantLayout = await window.webContents.executeJavaScript(`
+      (() => {
+        const rect = (element) => {
+          const value = element.getBoundingClientRect();
+          return { left: Math.round(value.left), width: Math.round(value.width) };
+        };
+        return {
+          viewport: innerWidth,
+          workspace: rect(document.querySelector('.workspace')),
+          stats: rect(document.querySelector('.stats')),
+          articles: [...document.querySelectorAll('.stats article')].map(rect),
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (importantLayout.horizontalOverflow || importantLayout.articles.some((article) => article.left < importantLayout.workspace.left)) {
+      throw new Error(`Important layout overflow: ${JSON.stringify(importantLayout)}`);
+    }
+    console.log(`IMPORTANT_LAYOUT_OK ${JSON.stringify(importantLayout)}`);
+    await captureStablePage(process.env.PAPERTRAIL_IMPORTANT_OUTPUT);
+  }
+  if (process.env.PAPERTRAIL_ARCHIVED_OUTPUT) {
+    await window.webContents.executeJavaScript(`document.getElementById('archivedNavButton').click(); window.scrollTo(0, 0)`);
+    await captureStablePage(process.env.PAPERTRAIL_ARCHIVED_OUTPUT);
+  }
+  if (process.env.PAPERTRAIL_TIMELINE_OUTPUT) {
+    await window.webContents.executeJavaScript(`
+      (() => {
+        document.getElementById('allNavButton').click();
+        const card = document.querySelector('[data-paper-id="demo-production-paper"]');
+        card.querySelector('[data-action="history"]').click();
+        document.querySelector('[data-paper-id="demo-production-paper"]').scrollIntoView({ block: 'start' });
+        window.scrollBy(0, -55);
+      })()
+    `);
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await captureStablePage(process.env.PAPERTRAIL_TIMELINE_OUTPUT);
+  }
+  if (process.env.PAPERTRAIL_NARROW_OUTPUT) {
+    window.setSize(800, 600);
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    await window.webContents.executeJavaScript(`
+      document.getElementById('allNavButton').click();
+      const expanded = document.querySelector('.history-panel:not([hidden])');
+      if (expanded) expanded.closest('[data-paper-id]').querySelector('[data-action="history"]').click();
+      window.scrollTo(0, 0);
+    `);
+    await captureStablePage(process.env.PAPERTRAIL_NARROW_OUTPUT);
+  }
+  if (!process.env.PAPERTRAIL_SMOKE_OUTPUT) {
+    window.webContents.invalidate();
+    await window.webContents.capturePage();
+  }
+  window.destroy();
+  app.quit();
+}).catch((error) => {
+  console.error(`SMOKE_FAILED ${error?.stack || error}`);
+  app.exit(1);
+});

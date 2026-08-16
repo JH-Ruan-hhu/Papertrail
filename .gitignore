@@ -1,0 +1,18 @@
+node_modules/
+outputs/
+work/
+*.log
+
+# Local settings, credentials and manuscript data must never enter Git.
+.env
+.env.*
+!.env.example
+papertrail-data.json
+papertrail-data.json.*
+*.bak
+
+# Windows/editor noise.
+Thumbs.db
+Desktop.ini
+.vscode/
+.idea/

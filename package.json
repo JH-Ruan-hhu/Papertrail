@@ -1,0 +1,60 @@
+{
+  "name": "papertrail-desktop",
+  "version": "0.5.0",
+  "description": "Local-first Elsevier review and accepted-article tracker for Windows",
+  "main": "src/main.js",
+  "author": "PaperTrail contributors",
+  "license": "MIT",
+  "private": true,
+  "packageManager": "pnpm@11.19.0",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder --win nsis portable --x64"
+  },
+  "devDependencies": {
+    "electron": "43.2.0",
+    "electron-builder": "26.11.1"
+  },
+  "build": {
+    "appId": "io.papertrail.desktop",
+    "productName": "PaperTrail",
+    "asar": true,
+    "compression": "maximum",
+    "directories": {
+      "output": "outputs"
+    },
+    "files": [
+      "src/**/*",
+      "build/icon.png",
+      "package.json",
+      "README.md",
+      "LICENSE",
+      "THIRD_PARTY_NOTICES.md"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
+    },
+    "nsis": {
+      "artifactName": "PaperTrail-Setup-${version}-${arch}.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "portable": {
+      "artifactName": "PaperTrail-Portable-${version}-${arch}.${ext}"
+    }
+  }
+}

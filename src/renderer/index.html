@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>PaperTrail</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <div class="window-titlebar">
+      <div class="window-brand"><img src="../../build/icon.png" alt=""><span>PaperTrail</span></div>
+    </div>
+    <div class="app-layout">
+      <aside class="sidebar">
+        <div class="brand" aria-label="PaperTrail">
+          <span class="brand-mark" aria-hidden="true"><img src="../../build/icon.png" alt=""></span>
+          <span><strong>PaperTrail</strong><small>论文进展与待办</small></span>
+        </div>
+
+        <nav class="side-nav" aria-label="主导航">
+          <p class="nav-label">工作区</p>
+          <button class="nav-item active" id="allNavButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M8 9h8M8 13h5"></path></svg>
+            <span>全部稿件</span><b id="navPaperCount">0</b>
+          </button>
+          <button class="nav-item" id="importantNavButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 9.5 8l-5.5.8 4 3.9-.9 5.5L12 15.6l4.9 2.6-.9-5.5 4-3.9-5.5-.8L12 3Z"></path></svg>
+            <span>重要更新</span><b id="notificationCount">0</b>
+          </button>
+          <button class="nav-item" id="archivedNavButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6"></path></svg>
+            <span>已归档</span><b id="archivedCount">0</b>
+          </button>
+        </nav>
+
+        <div class="sidebar-bottom">
+          <div class="privacy-note"><span></span><p><strong>本地加密</strong><small>追踪凭证仅保存在本机</small></p></div>
+          <button class="settings-entry" id="settingsButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path></svg>
+            <span><strong>设置</strong><small>通知、刷新与启动</small></span>
+            <i>›</i>
+          </button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="workspace-header">
+          <div><p class="eyebrow">MANUSCRIPT DESK</p><h1 id="pageTitle">全部稿件</h1><p id="pageSubtitle">集中查看审稿与出版进展</p></div>
+          <div class="header-actions">
+            <button class="button tertiary" id="markAllReadButton" type="button" hidden>全部标记已读</button>
+            <button class="button secondary" id="refreshAllButton" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg><span>刷新全部</span></button>
+            <button class="button primary" id="addButton" type="button"><span class="plus">＋</span><span>添加稿件</span></button>
+          </div>
+        </header>
+
+        <section class="stats" aria-label="稿件统计">
+          <article><span class="stat-icon blue">▤</span><div><small>正在追踪</small><strong id="paperCount">0</strong></div></article>
+          <article><span class="stat-icon violet">↗</span><div><small>未读重要更新</small><strong id="updateCount">0</strong></div></article>
+          <article><span class="stat-icon mint">◷</span><div><small>最近成功同步</small><strong id="lastCheck">尚未成功同步</strong></div></article>
+        </section>
+
+        <section class="content-section">
+          <div class="section-heading"><div><h2>稿件列表</h2><p id="listDescription">按待办与最近变化排序</p></div><span class="live-indicator" id="monitoringStatus"><i></i><span>正在读取监测状态</span></span></div>
+          <div class="list-toolbar">
+            <label class="search-box" for="paperSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input id="paperSearch" type="search" autocomplete="off" placeholder="搜索标题、期刊或生产编号"><kbd>Ctrl K</kbd></label>
+          </div>
+          <div id="paperList" class="paper-list" aria-live="polite"></div>
+          <div id="emptyState" class="empty-state">
+            <div class="empty-symbol" aria-hidden="true"><span>PT</span></div>
+            <h3>还没有追踪中的稿件</h3>
+            <p>可使用 Author Hub 链接添加审稿中的稿件，也可以通过生产稿件编号和通讯作者信息添加已接收文章。</p>
+            <button class="button primary" id="emptyAddButton" type="button">添加第一篇稿件</button>
+          </div>
+        </section>
+
+        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail <b id="footerVersion">0.5.0</b> · 非 Elsevier 官方产品</span></footer>
+      </main>
+    </div>
+
+    <dialog id="addDialog" class="modal add-modal">
+      <form method="dialog" id="addForm">
+        <div class="modal-head">
+          <div><p class="eyebrow">NEW MANUSCRIPT</p><h2>添加稿件</h2><p>选择与你收到的 Elsevier 信息相匹配的方式</p></div>
+          <button class="close-button" id="closeAddDialogButton" type="button" aria-label="关闭">×</button>
+        </div>
+
+        <div class="mode-tabs" role="tablist" aria-label="添加方式">
+          <button class="mode-tab active" id="addModeLink" data-add-mode="link" type="button" role="tab" aria-selected="true"><span class="mode-icon link">↗</span><span><strong>通过追踪链接</strong><small>审稿中的稿件</small></span><i>✓</i></button>
+          <button class="mode-tab" id="addModeAuthor" data-add-mode="author" type="button" role="tab" aria-selected="false"><span class="mode-icon author">A</span><span><strong>通过作者信息</strong><small>已接收的文章</small></span><i>✓</i></button>
+        </div>
+
+        <section class="add-panel" id="linkModePanel" role="tabpanel">
+          <div class="mode-callout"><span>⌁</span><p><strong>粘贴一次，其余自动完成</strong><small>读取标题、期刊、修订版本、当前状态与审稿人事件。</small></p></div>
+          <label for="trackingUrl">Elsevier Author Hub 追踪链接 <em>必填</em></label>
+          <div class="input-shell"><span>↗</span><input id="trackingUrl" type="url" spellcheck="false" autocomplete="off" placeholder="https://track.authorhub.elsevier.com/?uuid=..."></div>
+          <p class="field-help">请粘贴投稿状态邮件中的完整链接；authors.elsevier.com/c/… 阅读分享链接不适用。</p>
+        </section>
+
+        <section class="add-panel" id="authorModePanel" role="tabpanel" hidden>
+          <div class="mode-callout amber"><span>✓</span><p><strong>适用于已经接收的文章</strong><small>需要收到 Elsevier 的 “Production has begun” 邮件；审稿中的 EM 编号无法使用。</small></p></div>
+          <div class="form-grid">
+            <div class="field full"><label for="productionReference">生产稿件编号 / Our reference <em>必填</em></label><input id="productionReference" type="text" autocomplete="off" placeholder="例如 SEPS_102545"></div>
+            <div class="field"><label for="authorLastName">通讯作者 Last Name（姓）<em>必填</em></label><input id="authorLastName" type="text" autocomplete="off" placeholder="例如 Smith"></div>
+            <div class="field"><label for="authorFirstName">通讯作者 First Name（名）<em>选填</em></label><input id="authorFirstName" type="text" autocomplete="off" placeholder="例如 Alex"></div>
+          </div>
+          <p class="field-help">软件会访问 Elsevier 官方 Article Tracking 页面读取出版事件；姓名不会显示在通知正文中。</p>
+        </section>
+
+        <div class="read-preview" aria-label="自动读取内容"><span>读取后自动填充</span><b>标题与期刊</b><b>当前状态与待办</b><b>审稿或出版事件</b></div>
+        <p id="addError" class="form-error" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" id="cancelAddButton" type="button">取消</button><button class="button primary" id="confirmAddButton" type="button">读取并添加</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="settingsDialog" class="modal settings-modal">
+      <form method="dialog" id="settingsForm" class="settings-shell">
+        <aside class="settings-sidebar" aria-label="设置分类">
+          <div class="settings-sidebar-title"><img src="../../build/icon.png" alt=""><div><small>PAPERTRAIL</small><strong>设置</strong></div></div>
+          <nav class="settings-nav" role="tablist" aria-orientation="vertical">
+            <button class="settings-nav-item active" type="button" role="tab" aria-selected="true" data-settings-section="general"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"></path></svg><span>通用</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7M10 19h4"></path></svg><span>消息通知</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="storage"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path></svg><span>存储管理</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="about"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7h.01"></path></svg><span>关于</span></button>
+          </nav>
+        </aside>
+
+        <section class="settings-pane">
+          <div class="settings-content-head">
+            <div><p class="eyebrow">PREFERENCES</p><h2 id="settingsSectionTitle">通用</h2><p id="settingsSectionDescription">刷新频率、后台行为与 Windows 启动方式</p></div>
+            <button class="close-button" id="closeSettingsDialogButton" type="button" aria-label="关闭">×</button>
+          </div>
+
+          <div class="settings-scroll">
+            <section class="settings-panel" data-settings-panel="general" role="tabpanel">
+              <h3>刷新与后台</h3>
+              <div class="settings-group">
+                <div class="setting-row"><div><strong>自动检查</strong><small>在后台按设定间隔刷新稿件</small></div><label class="switch"><input id="autoRefresh" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>启动时刷新</strong><small>冷启动 PaperTrail 后自动检查全部稿件一次</small></div><label class="switch"><input id="refreshOnStartup" type="checkbox"><span></span></label></div>
+                <div class="setting-row stacked"><label for="refreshMinutes"><strong>检查间隔</strong><small>建议至少 6 小时，避免频繁请求</small></label><select id="refreshMinutes"><option value="60">每 1 小时</option><option value="180">每 3 小时</option><option value="360">每 6 小时</option><option value="720">每 12 小时</option><option value="1440">每天</option></select></div>
+              </div>
+              <h3>Windows 行为</h3>
+              <div class="settings-group">
+                <div class="setting-row"><div><strong>关闭时驻留托盘</strong><small>关闭窗口后继续执行后台检查</small></div><label class="switch"><input id="closeToTray" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>登录 Windows 后启动</strong><small>静默启动到系统托盘</small></div><label class="switch"><input id="startAtLogin" type="checkbox"><span></span></label></div>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="notifications" role="tabpanel" hidden>
+              <h3>重要进展</h3>
+              <div class="settings-group">
+                <div class="setting-row"><div><strong>Windows 重要通知</strong><small>状态变化、审稿回复、接收和出版节点出现时弹出</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
+              </div>
+              <div class="settings-note"><strong>只提醒值得关注的变化</strong><p>普通定时检查不会打扰你。点击系统通知可以返回 PaperTrail 并打开对应的 Elsevier 官方页面。</p></div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="storage" role="tabpanel" hidden>
+              <h3>数据位置</h3>
+              <div class="settings-group">
+                <div class="setting-row storage-row"><div class="storage-copy"><strong>当前存储文件夹</strong><small id="dataDirectory" title="">正在读取…</small><small class="storage-help">更换到空文件夹时会复制当前数据，原位置保留备份。</small></div><button class="button tertiary" id="changeDataDirectoryButton" type="button">更改位置</button></div>
+              </div>
+              <h3>旧备份</h3>
+              <div class="settings-group">
+                <div class="setting-row backup-row"><div><strong>迁移后保留的数据</strong><small id="backupSummary" title="">正在读取…</small></div><button class="button tertiary danger-quiet" id="deleteBackupsButton" type="button">删除备份</button></div>
+              </div>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="about" role="tabpanel" hidden>
+              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>PaperTrail</strong><small>论文进展与待办中心 · 当前版本 <span id="currentVersion">0.5.0</span></small></div><span class="local-first-badge">本地优先</span></div>
+              <div class="settings-note"><strong>数据只属于你</strong><p>追踪凭证由 Windows 安全存储加密，稿件与检查历史保存在你选择的本地文件夹中。PaperTrail 不包含账号系统、云同步或行为统计。</p></div>
+              <div class="settings-note"><strong>产品说明</strong><p>PaperTrail 是独立开源工具，并非 Elsevier 官方产品。追踪结果取决于出版商页面当前提供的数据。</p></div>
+            </section>
+          </div>
+
+          <p id="settingsError" class="form-error settings-error" role="alert"></p>
+          <div class="modal-actions settings-actions"><button class="button secondary" id="cancelSettingsButton" type="button">取消</button><button class="button primary" id="saveSettingsButton" type="button">保存设置</button></div>
+        </section>
+      </form>
+    </dialog>
+
+    <dialog id="removeDialog" class="modal confirm-modal">
+      <form method="dialog"><div class="danger-symbol">!</div><h2>永久删除本地记录？</h2><p id="removePaperTitle"></p><p class="field-help">加密凭证、未读更新和完整状态历史将一并删除。建议优先使用“归档”，此操作无法撤销。</p><div class="modal-actions centered"><button class="button secondary" value="cancel" type="submit">取消</button><button class="button danger" id="confirmRemoveButton" type="button">永久删除</button></div></form>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="app.js"></script>
+  </body>
+</html>
