@@ -1,6 +1,6 @@
 {
   "name": "papertrail-desktop",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Local-first Elsevier review and accepted-article tracker for Windows",
   "main": "src/main.js",
   "author": "PaperTrail contributors",
@@ -12,6 +12,9 @@
     "test": "node --test",
     "pack": "electron-builder --dir",
     "dist": "electron-builder --win nsis portable --x64"
+  },
+  "dependencies": {
+    "electron-updater": "6.8.9"
   },
   "devDependencies": {
     "electron": "43.2.0",
@@ -55,6 +58,14 @@
     },
     "portable": {
       "artifactName": "PaperTrail-Portable-${version}-${arch}.${ext}"
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JH-Ruan-hhu",
+        "repo": "Papertrail",
+        "releaseType": "release"
+      }
+    ]
   }
 }

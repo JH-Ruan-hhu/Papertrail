@@ -84,6 +84,22 @@ test('settings expose backup deletion, current version and cold-start refresh', 
   assert.match(preloadJs, /deleteDataBackups/);
 });
 
+test('settings expose a main-process GitHub Release update workflow', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  assert.match(html, /id="updateActionButton"/);
+  assert.match(html, /id="updateProgress"[\s\S]*role="progressbar"/);
+  assert.match(mainJs, /autoUpdater\.autoDownload = false/);
+  assert.match(mainJs, /autoUpdater\.autoInstallOnAppQuit = false/);
+  assert.match(mainJs, /updates:check/);
+  assert.match(mainJs, /updates:download/);
+  assert.match(mainJs, /updates:install/);
+  assert.match(preloadJs, /checkForUpdates/);
+  assert.match(preloadJs, /onUpdateState/);
+  assert.doesNotMatch(preloadJs, /electron-updater/);
+});
+
 test('0.5.x exposes unread, archive, retry and credential-safe export actions', () => {
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');

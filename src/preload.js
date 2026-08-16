@@ -20,6 +20,11 @@ contextBridge.exposeInMainWorld('paperTrail', {
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
   chooseDataDirectory: () => ipcRenderer.invoke('settings:choose-data-directory'),
   deleteDataBackups: () => ipcRenderer.invoke('settings:delete-data-backups'),
+  getUpdateState: () => ipcRenderer.invoke('updates:get-state'),
+  checkForUpdates: () => ipcRenderer.invoke('updates:check'),
+  downloadUpdate: () => ipcRenderer.invoke('updates:download'),
+  installUpdate: () => ipcRenderer.invoke('updates:install'),
+  openUpdateReleasePage: () => ipcRenderer.invoke('updates:open-release-page'),
   copyText: (text) => ipcRenderer.invoke('system:copy-text', text),
   setModalWindowState: (active) => ipcRenderer.invoke('window:set-modal-state', Boolean(active)),
   onPapersChanged: (callback) => {
@@ -31,5 +36,10 @@ contextBridge.exposeInMainWorld('paperTrail', {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on('refresh:state', listener);
     return () => ipcRenderer.removeListener('refresh:state', listener);
+  },
+  onUpdateState: (callback) => {
+    const listener = (_event, state) => callback(state);
+    ipcRenderer.on('updates:state', listener);
+    return () => ipcRenderer.removeListener('updates:state', listener);
   }
 });

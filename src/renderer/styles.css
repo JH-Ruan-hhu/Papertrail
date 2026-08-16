@@ -119,7 +119,7 @@ button { color: inherit; }
 .button.secondary { color: #354259; background: white; border-color: var(--line-strong); box-shadow: 0 3px 10px rgba(38,50,76,.035); }
 .button.secondary:hover:not(:disabled) { border-color: #abb8cd; background: #fafbfe; }
 .button.tertiary { min-height: 36px; padding: 0 13px; color: #415bd0; background: #eef2ff; border-color: #dce3ff; white-space: nowrap; }
-.button.tertiary:hover { color: #2f4bc3; background: #e5ebff; border-color: #cbd6ff; }
+.button.tertiary:hover:not(:disabled) { color: #2f4bc3; background: #e5ebff; border-color: #cbd6ff; }
 .button.danger { color: white; background: var(--red); }
 .plus { font-size: 17px; line-height: 1; }
 
@@ -369,6 +369,16 @@ footer i { width: 6px; height: 6px; display: inline-block; margin-right: 5px; bo
 .settings-about small { margin-top: 4px; color: #7d899c; font-size: 13px; }
 .settings-about-large { min-height: 92px; grid-template-columns: 60px 1fr auto; }
 .settings-about-large img { width: 58px; height: 58px; border-radius: 16px; }
+.update-group { position: relative; }
+.update-row { min-height: 82px; }
+.update-copy { min-width: 0; flex: 1; }
+.update-controls { display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+.update-version-badge { padding: 6px 9px; color: #3554c9; background: #edf1ff; border: 1px solid #dce4ff; border-radius: 999px; font-size: 12px; font-weight: 750; white-space: nowrap; }
+.update-group.is-current .update-version-badge { color: #147d68; background: #eaf8f3; border-color: #d0eee4; }
+.update-group.is-error .update-copy small { color: #ad4a55; }
+.update-group.is-ready { border-color: #ccd8ff; box-shadow: 0 6px 20px rgba(67,94,205,.08); }
+.update-progress { height: 4px; overflow: hidden; background: #edf0f5; }
+.update-progress span { display: block; width: 100%; height: 100%; background: linear-gradient(90deg, #6c8bf4, #4667eb); transform: scaleX(0); transform-origin: left center; transition: transform 180ms var(--ease-out); }
 .settings-note { margin-top: 15px; padding: 17px 18px; color: #56647a; background: #eef4ff; border: 1px solid #dce7fb; border-radius: 13px; }
 .settings-note strong { color: #2c416d; font-size: 15px; }
 .settings-note p { margin: 7px 0 0; font-size: 13.5px; line-height: 1.65; }
@@ -445,6 +455,8 @@ footer i { width: 6px; height: 6px; display: inline-block; margin-right: 5px; bo
   .search-box { width: 100%; }
   .submission-journey li { grid-template-columns: 25px minmax(0, 1fr); }
   .journey-state { grid-column: 2; text-align: left; }
+  .update-row { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .update-controls { width: 100%; justify-content: space-between; }
 }
 
 @media (max-height: 700px) {

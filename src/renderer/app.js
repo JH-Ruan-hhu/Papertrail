@@ -4,6 +4,7 @@ const api = window.paperTrail;
 const state = {
   papers: [],
   settings: null,
+  updateStatus: null,
   refreshingIds: new Set(),
   removeId: null,
   journeyLinkId: null,
@@ -73,6 +74,13 @@ const elements = {
   backupSummary: document.getElementById('backupSummary'),
   currentVersion: document.getElementById('currentVersion'),
   footerVersion: document.getElementById('footerVersion'),
+  updateGroup: document.querySelector('.update-group'),
+  updateStatusTitle: document.getElementById('updateStatusTitle'),
+  updateStatusText: document.getElementById('updateStatusText'),
+  updateVersionBadge: document.getElementById('updateVersionBadge'),
+  updateActionButton: document.getElementById('updateActionButton'),
+  updateProgress: document.getElementById('updateProgress'),
+  updateProgressBar: document.getElementById('updateProgressBar'),
   settingsError: document.getElementById('settingsError'),
   saveSettingsButton: document.getElementById('saveSettingsButton'),
   removeDialog: document.getElementById('removeDialog'),
@@ -480,7 +488,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '0.5.1';
+  const version = settings.appVersion || '0.5.2';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   elements.dataDirectory.textContent = settings.dataDirectory || '系统默认位置';
@@ -490,6 +498,63 @@ function populateSettingsMetadata() {
   elements.deleteBackupsButton.disabled = backupCount === 0;
   elements.currentVersion.textContent = version;
   elements.footerVersion.textContent = version;
+  renderUpdateStatus();
+}
+
+function renderUpdateStatus() {
+  const update = state.updateStatus;
+  if (!update || !elements.updateActionButton) return;
+  const status = update.status || 'idle';
+  const percent = Math.min(100, Math.max(0, Number(update.percent) || 0));
+  const latestVersion = update.latestVersion ? `v${update.latestVersion}` : '';
+  const display = {
+    idle: ['检查 PaperTrail 更新', '检查更新', false],
+    checking: ['正在检查更新', '检查中…', true],
+    available: ['发现新版本', '下载更新', false],
+    'up-to-date': ['已是最新版本', '重新检查', false],
+    downloading: ['正在下载更新', `下载中 ${Math.round(percent)}%`, true],
+    downloaded: ['更新已准备好', '安装并重启', false],
+    error: ['更新检查失败', '重试', false],
+    unavailable: [update.portable ? '便携版更新' : '当前无法检查更新', update.portable ? '打开发布页' : '当前不可用', !update.portable]
+  }[status] || ['检查 PaperTrail 更新', '检查更新', false];
+
+  elements.updateStatusTitle.textContent = display[0];
+  elements.updateStatusText.textContent = update.message || '点击按钮检查新版本。';
+  elements.updateActionButton.textContent = display[1];
+  elements.updateActionButton.disabled = display[2];
+  elements.updateVersionBadge.hidden = !latestVersion;
+  elements.updateVersionBadge.textContent = latestVersion;
+  elements.updateProgress.hidden = !['downloading', 'downloaded'].includes(status);
+  elements.updateProgress.setAttribute('aria-valuenow', String(Math.round(percent)));
+  elements.updateProgressBar.style.transform = `scaleX(${percent / 100})`;
+  elements.updateGroup.classList.toggle('is-current', status === 'up-to-date');
+  elements.updateGroup.classList.toggle('is-ready', ['available', 'downloaded'].includes(status));
+  elements.updateGroup.classList.toggle('is-error', status === 'error');
+}
+
+async function handleUpdateAction() {
+  const status = state.updateStatus?.status || 'idle';
+  elements.settingsError.textContent = '';
+  elements.updateActionButton.disabled = true;
+  try {
+    let result;
+    if (status === 'available') result = await api.downloadUpdate();
+    else if (status === 'downloaded') result = await api.installUpdate();
+    else if (status === 'unavailable' && state.updateStatus?.portable) result = await api.openUpdateReleasePage();
+    else result = await api.checkForUpdates();
+    if (result && typeof result === 'object') {
+      state.updateStatus = result;
+      renderUpdateStatus();
+    }
+  } catch (error) {
+    elements.settingsError.textContent = getErrorMessage(error);
+    try {
+      state.updateStatus = await api.getUpdateState();
+    } catch {
+      // Preserve the visible action error if the updater state cannot be read.
+    }
+    renderUpdateStatus();
+  }
 }
 
 function populateSettings() {
@@ -784,6 +849,7 @@ function bindEvents() {
   elements.cancelSettingsButton.addEventListener('click', () => elements.settingsDialog.close());
   elements.changeDataDirectoryButton.addEventListener('click', changeDataDirectory);
   elements.deleteBackupsButton.addEventListener('click', deleteDataBackups);
+  elements.updateActionButton.addEventListener('click', handleUpdateAction);
   elements.settingsDialog.addEventListener('click', closeOnBackdrop);
   elements.addDialog.addEventListener('click', closeOnBackdrop);
   elements.journeyDialog.addEventListener('click', closeOnBackdrop);
@@ -803,11 +869,19 @@ function bindEvents() {
 async function initialize() {
   bindEvents();
   try {
-    [state.papers, state.settings] = await Promise.all([api.listPapers(), api.getSettings()]);
+    [state.papers, state.settings, state.updateStatus] = await Promise.all([
+      api.listPapers(),
+      api.getSettings(),
+      api.getUpdateState()
+    ]);
     populateSettingsMetadata();
     render();
     api.onPapersChanged((papers) => { state.papers = papers; render(); });
     api.onRefreshState(({ ids }) => { state.refreshingIds = new Set(ids); render(); });
+    api.onUpdateState((updateStatus) => {
+      state.updateStatus = updateStatus;
+      renderUpdateStatus();
+    });
     setInterval(render, 60_000);
   } catch (error) {
     showToast(getErrorMessage(error), 'error');

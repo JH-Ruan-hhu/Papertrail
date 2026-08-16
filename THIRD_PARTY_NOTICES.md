@@ -7,6 +7,6 @@ The Elsevier tracking payload field interpretation was informed by the
 MIT-licensed project `WL661/Elsevier-Tracker`:
 https://github.com/WL661/Elsevier-Tracker
 
-Electron and electron-builder are distributed under the MIT License. Their
-licenses and the licenses of their transitive dependencies are included in the
-packaged application as required by their respective projects.
+Electron, electron-builder, and electron-updater are distributed under the MIT
+License. Their licenses and the licenses of their transitive dependencies are
+included in the packaged application as required by their respective projects.

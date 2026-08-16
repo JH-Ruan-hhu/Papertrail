@@ -5,12 +5,12 @@ const path = require('node:path');
 const { app, BrowserWindow } = require('electron');
 
 app.disableHardwareAcceleration();
-app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.5.1'));
+app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.5.2'));
 
 app.whenReady().then(async () => {
   const window = new BrowserWindow({
-    width: 1180,
-    height: 780,
+    width: Number(process.env.PAPERTRAIL_SMOKE_WIDTH) || 1180,
+    height: Number(process.env.PAPERTRAIL_SMOKE_HEIGHT) || 780,
     show: false,
     backgroundColor: '#f3f6fb',
     titleBarStyle: 'hidden',
@@ -138,6 +138,16 @@ app.whenReady().then(async () => {
       const storageVisible = !document.querySelector('[data-settings-panel="storage"]').hidden;
       document.querySelector('[data-settings-section="about"]').click();
       const aboutVisible = !document.querySelector('[data-settings-panel="about"]').hidden;
+      const updateButton = document.getElementById('updateActionButton');
+      const updateIdle = updateButton.textContent === '检查更新' && !updateButton.disabled;
+      updateButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      const updateAvailable = updateButton.textContent === '下载更新'
+        && document.getElementById('updateVersionBadge').textContent === 'v0.5.3';
+      updateButton.click();
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      const updateDownloaded = updateButton.textContent === '安装并重启'
+        && document.getElementById('updateProgress').getAttribute('aria-valuenow') === '100';
       document.querySelector('[data-settings-section="general"]').click();
       const generalVisible = !document.querySelector('[data-settings-panel="general"]').hidden;
       const startAtLogin = document.getElementById('startAtLogin');
@@ -146,7 +156,7 @@ app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
       const draftPreserved = startAtLogin.checked;
       document.getElementById('settingsDialog').close();
-      return { notificationsVisible, storageVisible, aboutVisible, generalVisible, draftPreserved };
+      return { notificationsVisible, storageVisible, aboutVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, draftPreserved };
     })()
   `);
   if (!Object.values(settingsDraftResult).every(Boolean)) {
@@ -235,6 +245,28 @@ app.whenReady().then(async () => {
     }
     console.log(`SETTINGS_DIALOG_VISUAL_OK ${JSON.stringify(settingsDialogVisual)}`);
     await captureStablePage(process.env.PAPERTRAIL_SETTINGS_OUTPUT);
+    await window.webContents.executeJavaScript(`document.getElementById('settingsDialog').close()`);
+    await new Promise((resolve) => setTimeout(resolve, 80));
+  }
+  if (process.env.PAPERTRAIL_UPDATE_OUTPUT) {
+    await window.webContents.executeJavaScript(`
+      document.getElementById('settingsButton').click();
+      document.querySelector('[data-settings-section="about"]').click();
+    `);
+    await new Promise((resolve) => setTimeout(resolve, 240));
+    const updateDialogVisual = await window.webContents.executeJavaScript(`
+      (() => ({
+        open: document.getElementById('settingsDialog').open,
+        aboutVisible: !document.querySelector('[data-settings-panel="about"]').hidden,
+        updateButton: document.getElementById('updateActionButton').textContent,
+        horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+      }))()
+    `);
+    if (!updateDialogVisual.open || !updateDialogVisual.aboutVisible || updateDialogVisual.horizontalOverflow) {
+      throw new Error(`Update settings visual state failed: ${JSON.stringify(updateDialogVisual)}`);
+    }
+    console.log(`UPDATE_SETTINGS_VISUAL_OK ${JSON.stringify(updateDialogVisual)}`);
+    await captureStablePage(process.env.PAPERTRAIL_UPDATE_OUTPUT);
     await window.webContents.executeJavaScript(`document.getElementById('settingsDialog').close()`);
     await new Promise((resolve) => setTimeout(resolve, 80));
   }

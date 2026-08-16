@@ -34,6 +34,9 @@ Elsevier peer-review submissions and accepted articles in production.
 - Store tracking links with Windows DPAPI through Electron `safeStorage`.
 - Run in the system tray and optionally start at sign-in.
 - Optionally refresh all tracked manuscripts once after a cold start.
+- Check the public GitHub Release feed from Settings, download a newer
+  release on demand, show download progress, and restart into the installer.
+  PaperTrail never checks silently in the background.
 - Move the local data file to a user-selected folder while retaining the old
   file as a removable backup.
 
@@ -75,6 +78,9 @@ npm run dist
 ```
 
 The build produces an NSIS installer and a portable executable.
+For application updates, publish the NSIS installer, its blockmap, and the
+generated `latest.yml` together in the same public GitHub Release. Portable
+builds open the release page instead of attempting an in-place installation.
 
 ## Limitations
 

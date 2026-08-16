@@ -17,6 +17,7 @@ const {
   shell,
   Tray
 } = require('electron');
+const { autoUpdater } = require('electron-updater');
 const { JsonStore } = require('./store');
 const {
   parseTrackingInput,
@@ -46,12 +47,17 @@ const {
   sortPapers,
   buildPaperExport
 } = require('./paper-core');
+const {
+  createInitialUpdateState,
+  nextUpdateState
+} = require('./update-core');
 
 const APP_NAME = 'PaperTrail';
 const MAX_HISTORY = 100;
 const FETCH_TIMEOUT_MS = 20_000;
 const DATA_FILE_NAME = 'papertrail-data.json';
 const STORAGE_POINTER_NAME = 'papertrail-storage.json';
+const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
 const TITLE_BAR_NORMAL = Object.freeze({ color: '#f2f5f9', symbolColor: '#526071', height: 42 });
 const TITLE_BAR_MODAL = Object.freeze({ color: '#747e8b', symbolColor: '#e8edf4', height: 42 });
 
@@ -61,6 +67,8 @@ let store;
 let scheduler;
 let isQuitting = false;
 let coldStartRefreshStarted = false;
+let updateState;
+let updaterInitialized = false;
 const refreshingIds = new Set();
 
 function encryptSecret(value) {
@@ -238,6 +246,99 @@ function setModalTitleBar(active) {
   ) {
     mainWindow.setTitleBarOverlay(active ? TITLE_BAR_MODAL : TITLE_BAR_NORMAL);
   }
+}
+
+function isPortableBuild() {
+  return Boolean(process.env.PORTABLE_EXECUTABLE_FILE || process.env.PORTABLE_EXECUTABLE_DIR);
+}
+
+function updateStateForRenderer() {
+  if (!updateState) {
+    updateState = createInitialUpdateState({
+      currentVersion: app.getVersion(),
+      packaged: app.isPackaged,
+      portable: isPortableBuild()
+    });
+  }
+  return { ...updateState };
+}
+
+function broadcastUpdateState() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('updates:state', updateStateForRenderer());
+  }
+}
+
+function setUpdateState(event, payload) {
+  updateState = nextUpdateState(updateStateForRenderer(), event, payload);
+  broadcastUpdateState();
+  return updateStateForRenderer();
+}
+
+function setupAutoUpdater() {
+  if (updaterInitialized) return;
+  updaterInitialized = true;
+  updateState = createInitialUpdateState({
+    currentVersion: app.getVersion(),
+    packaged: app.isPackaged,
+    portable: isPortableBuild()
+  });
+  if (updateState.status === 'unavailable') return;
+
+  autoUpdater.autoDownload = false;
+  autoUpdater.autoInstallOnAppQuit = false;
+  autoUpdater.allowPrerelease = false;
+  autoUpdater.allowDowngrade = false;
+
+  autoUpdater.on('checking-for-update', () => setUpdateState('checking'));
+  autoUpdater.on('update-available', (info) => setUpdateState('available', info));
+  autoUpdater.on('update-not-available', (info) => setUpdateState('not-available', info));
+  autoUpdater.on('download-progress', (progress) => setUpdateState('download-progress', progress));
+  autoUpdater.on('update-downloaded', (info) => setUpdateState('downloaded', info));
+  autoUpdater.on('error', (error) => setUpdateState('error', { error }));
+}
+
+async function checkForAppUpdate() {
+  const current = updateStateForRenderer();
+  if (current.status === 'unavailable') return current;
+  if (current.status === 'checking' || current.status === 'downloading') return current;
+  try {
+    const result = await autoUpdater.checkForUpdates();
+    if (updateState.status === 'checking' && result?.updateInfo) {
+      setUpdateState(result.isUpdateAvailable ? 'available' : 'not-available', result.updateInfo);
+    }
+    return updateStateForRenderer();
+  } catch (error) {
+    if (updateState.status !== 'error') setUpdateState('error', { error });
+    throw new Error(updateState.message);
+  }
+}
+
+async function downloadAppUpdate() {
+  const current = updateStateForRenderer();
+  if (current.status !== 'available') throw new Error('请先检查并确认存在新版本。');
+  try {
+    setUpdateState('download-start');
+    await autoUpdater.downloadUpdate();
+    return updateStateForRenderer();
+  } catch (error) {
+    if (updateState.status !== 'error') setUpdateState('error', { error });
+    throw new Error(updateState.message);
+  }
+}
+
+function installDownloadedUpdate() {
+  if (updateStateForRenderer().status !== 'downloaded') {
+    throw new Error('更新尚未下载完成。');
+  }
+  isQuitting = true;
+  setImmediate(() => autoUpdater.quitAndInstall(false, true));
+  return true;
+}
+
+async function openUpdateReleasePage() {
+  await shell.openExternal(RELEASES_URL);
+  return true;
 }
 
 async function chooseDataDirectory() {
@@ -812,6 +913,11 @@ function registerIpc() {
   });
   ipcMain.handle('settings:choose-data-directory', () => chooseDataDirectory());
   ipcMain.handle('settings:delete-data-backups', () => deleteDataBackups());
+  ipcMain.handle('updates:get-state', () => updateStateForRenderer());
+  ipcMain.handle('updates:check', () => checkForAppUpdate());
+  ipcMain.handle('updates:download', () => downloadAppUpdate());
+  ipcMain.handle('updates:install', () => installDownloadedUpdate());
+  ipcMain.handle('updates:open-release-page', () => openUpdateReleasePage());
   ipcMain.handle('system:copy-text', (_event, text) => {
     const value = String(text || '').trim();
     if (!value || value.length > 2048) throw new Error('复制内容无效。');
@@ -834,6 +940,7 @@ if (!gotLock) {
       app.setAppUserModelId('io.papertrail.desktop');
       store = new JsonStore(configuredDataFilePath());
       store.load();
+      setupAutoUpdater();
       registerIpc();
       createWindow();
       createTray();

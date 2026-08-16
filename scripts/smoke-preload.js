@@ -135,6 +135,15 @@ const smokePapers = process.env.PAPERTRAIL_EMPTY_SMOKE === '1'
   : (process.env.PAPERTRAIL_JOURNEY_SMOKE === '1'
       ? [journeyMockPaper, previousSubmissionPaper, productionPaper, archivedPaper]
       : [mockPaper, productionPaper, archivedPaper]);
+let smokeUpdateState = {
+  status: 'idle',
+  currentVersion: '0.5.2',
+  latestVersion: null,
+  releaseDate: null,
+  percent: null,
+  portable: false,
+  message: '仅在你点击检查时连接 GitHub Releases。'
+};
 
 contextBridge.exposeInMainWorld('paperTrail', {
   listPapers: async () => smokePapers,
@@ -157,7 +166,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
     notifications: true,
     closeToTray: true,
     startAtLogin: false,
-    appVersion: '0.5.1',
+    appVersion: '0.5.2',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\PaperTrail Data',
     backupCount: 1,
     backupFiles: ['C:\\Users\\Demo\\Documents\\PaperTrail Old\\papertrail-data.json'],
@@ -173,7 +182,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.5.1',
+      appVersion: '0.5.2',
       dataDirectory: 'D:\\Research\\PaperTrail',
       backupCount: 1,
       backupFiles: ['C:\\Users\\Demo\\Documents\\PaperTrail Data\\papertrail-data.json'],
@@ -190,15 +199,38 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.5.1',
+      appVersion: '0.5.2',
       dataDirectory: 'D:\\Research\\PaperTrail',
       backupCount: 0,
       backupFiles: [],
       isDefaultDataDirectory: false
     }
   }),
+  getUpdateState: async () => smokeUpdateState,
+  checkForUpdates: async () => {
+    smokeUpdateState = {
+      ...smokeUpdateState,
+      status: 'available',
+      latestVersion: '0.5.3',
+      releaseDate: '2026-08-17T00:00:00.000Z',
+      message: '发现新版本 0.5.3，可立即下载。'
+    };
+    return smokeUpdateState;
+  },
+  downloadUpdate: async () => {
+    smokeUpdateState = {
+      ...smokeUpdateState,
+      status: 'downloaded',
+      percent: 100,
+      message: '更新已安全下载，点击后将重启并安装。'
+    };
+    return smokeUpdateState;
+  },
+  installUpdate: async () => true,
+  openUpdateReleasePage: async () => true,
   copyText: async () => true,
   setModalWindowState: async () => true,
   onPapersChanged: () => () => {},
-  onRefreshState: () => () => {}
+  onRefreshState: () => () => {},
+  onUpdateState: () => () => {}
 });

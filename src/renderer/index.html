@@ -77,7 +77,7 @@
           </div>
         </section>
 
-        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail <b id="footerVersion">0.5.1</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail <b id="footerVersion">0.5.2</b> · 非 Elsevier 官方产品</span></footer>
       </main>
     </div>
 
@@ -169,7 +169,15 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="about" role="tabpanel" hidden>
-              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>PaperTrail</strong><small>论文进展与待办中心 · 当前版本 <span id="currentVersion">0.5.1</span></small></div><span class="local-first-badge">本地优先</span></div>
+              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>PaperTrail</strong><small>论文进展与待办中心 · 当前版本 <span id="currentVersion">0.5.2</span></small></div><span class="local-first-badge">本地优先</span></div>
+              <h3>版本与更新</h3>
+              <div class="settings-group update-group">
+                <div class="setting-row update-row">
+                  <div class="update-copy"><strong id="updateStatusTitle">检查 PaperTrail 更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
+                  <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button tertiary" id="updateActionButton" type="button">检查更新</button></div>
+                </div>
+                <div class="update-progress" id="updateProgress" role="progressbar" aria-label="更新下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="updateProgressBar"></span></div>
+              </div>
               <div class="settings-note"><strong>数据只属于你</strong><p>追踪凭证由 Windows 安全存储加密，稿件与检查历史保存在你选择的本地文件夹中。PaperTrail 不包含账号系统、云同步或行为统计。</p></div>
               <div class="settings-note"><strong>产品说明</strong><p>PaperTrail 是独立开源工具，并非 Elsevier 官方产品。追踪结果取决于出版商页面当前提供的数据。</p></div>
             </section>
