@@ -84,7 +84,7 @@ test('settings expose backup deletion, current version and cold-start refresh', 
   assert.match(preloadJs, /deleteDataBackups/);
 });
 
-test('0.5.0 exposes unread, archive, retry and credential-safe export actions', () => {
+test('0.5.x exposes unread, archive, retry and credential-safe export actions', () => {
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
@@ -101,6 +101,37 @@ test('0.5.0 exposes unread, archive, retry and credential-safe export actions', 
   assert.match(appJs, /已观察至少/);
   assert.match(appJs, /搜索标题、期刊或生产编号|articleReference/);
   assert.doesNotMatch(appJs, /检查于 \$\{escapeHtml\(relativeTime\(paper\.lastCheckedAt\)\)\}/);
+});
+
+test('keeps search in the list heading and empty refresh visibly unavailable', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8');
+  assert.match(html, /class="section-heading"[\s\S]*id="paperSearch"/);
+  assert.doesNotMatch(html, /class="list-toolbar"/);
+  assert.match(html, />暂无稿件</);
+  assert.match(html, /id="emptyAddButton"[^>]*>添加稿件</);
+  assert.match(appJs, /暂无可刷新的稿件/);
+  assert.match(appJs, /hasRefreshablePapers \? '刷新全部' : '暂无可刷新'/);
+  assert.match(appJs, /classList\.toggle\('spin', anyRefreshing\)/);
+  assert.match(css, /\.button:disabled[^}]*cursor:\s*not-allowed/);
+  assert.match(css, /\.toast[^}]*left:\s*0;[^}]*right:\s*0;/);
+  assert.doesNotMatch(css, /\.toast[^}]*left:\s*var\(--sidebar-width\)/);
+});
+
+test('supports locally linking cross-journal submission journeys', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  assert.match(html, /id="journeyDialog"/);
+  assert.match(html, /仅关联 PaperTrail 本地记录/);
+  assert.match(mainJs, /papers:link-journey/);
+  assert.match(mainJs, /papers:unlink-journey/);
+  assert.match(preloadJs, /linkPaperJourney/);
+  assert.match(preloadJs, /unlinkPaperJourney/);
+  assert.match(appJs, /跨期刊投稿历程/);
+  assert.match(appJs, /投稿历程 \$\{journey\.length\} 次/);
 });
 
 test('interaction polish uses explicit motion and supports reduced motion', () => {

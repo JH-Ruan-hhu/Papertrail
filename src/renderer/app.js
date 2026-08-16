@@ -6,6 +6,7 @@ const state = {
   settings: null,
   refreshingIds: new Set(),
   removeId: null,
+  journeyLinkId: null,
   toastTimer: null,
   addMode: 'link',
   viewMode: 'all',
@@ -52,6 +53,13 @@ const elements = {
   authorFirstName: document.getElementById('authorFirstName'),
   addError: document.getElementById('addError'),
   confirmAddButton: document.getElementById('confirmAddButton'),
+  journeyDialog: document.getElementById('journeyDialog'),
+  closeJourneyDialogButton: document.getElementById('closeJourneyDialogButton'),
+  cancelJourneyButton: document.getElementById('cancelJourneyButton'),
+  confirmJourneyButton: document.getElementById('confirmJourneyButton'),
+  journeyCurrentPaper: document.getElementById('journeyCurrentPaper'),
+  journeyTarget: document.getElementById('journeyTarget'),
+  journeyError: document.getElementById('journeyError'),
   settingsDialog: document.getElementById('settingsDialog'),
   settingsNavButtons: [...document.querySelectorAll('[data-settings-section]')],
   settingsPanels: [...document.querySelectorAll('[data-settings-panel]')],
@@ -212,6 +220,34 @@ function renderProductionHistory(paper) {
   return `<div class="timeline-scroll"><ul class="timeline">${records.join('')}</ul></div>`;
 }
 
+function journeyPapers(paper) {
+  if (!paper.journeyId) return [paper];
+  return state.papers.filter((item) => item.journeyId === paper.journeyId).sort((a, b) => {
+    const timestamp = (item) => {
+      const value = item.submissionDate;
+      if (typeof value === 'number') return value * 1000;
+      return Date.parse(value || item.addedAt || 0) || 0;
+    };
+    return timestamp(a) - timestamp(b);
+  });
+}
+
+function renderSubmissionJourney(paper) {
+  const members = journeyPapers(paper);
+  if (members.length < 2) return '';
+  const rows = members.map((member, index) => {
+    const submitted = member.submissionDate
+      ? formatDate(member.submissionDate, false)
+      : `PaperTrail 添加于 ${formatDate(member.addedAt, false)}`;
+    return `<li class="${member.id === paper.id ? 'is-current' : ''}">
+      <span class="journey-order">${index + 1}</span>
+      <div><small>第 ${index + 1} 次投稿${member.archivedAt ? ' · 已归档' : ''}</small><strong>${escapeHtml(member.journal || '未知期刊')}</strong><p>${escapeHtml(member.title || '未命名稿件')}</p></div>
+      <div class="journey-state"><time>${escapeHtml(submitted)}</time><b>${escapeHtml(member.status?.label || '状态未记录')}</b></div>
+    </li>`;
+  }).join('');
+  return `<section class="submission-journey"><div><h5>跨期刊投稿历程</h5><span>共 ${members.length} 次投稿，本地关联记录</span></div><ol>${rows}</ol></section>`;
+}
+
 function renderReviewMetrics(paper) {
   const count = paper.counts || { invited: 0, accepted: 0, completed: 0 };
   return `<div class="paper-metrics review-metrics">
@@ -243,6 +279,7 @@ function renderPaper(paper) {
   const production = paper.kind === 'production' || paper.source === 'elsevier-production';
   const expanded = state.expandedIds.has(paper.id);
   const unread = Number(paper.unreadCount) || 0;
+  const journey = journeyPapers(paper);
   const sourceLabel = production
     ? `出版追踪 · ${paper.articleReference || 'Accepted article'}`
     : `审稿追踪 · Revision ${paper.latestRevision}`;
@@ -261,7 +298,7 @@ function renderPaper(paper) {
     <div class="paper-main">
       <div class="paper-top">
         <div class="paper-heading"><div class="source-row"><span class="source-icon">${production ? 'P' : 'E'}</span><span class="paper-source">${escapeHtml(sourceLabel)}</span></div><h3 class="paper-title">${escapeHtml(paper.title)}</h3><p class="paper-journal">${escapeHtml(paper.journal)}</p></div>
-        <div class="badge-stack">${unread ? `<span class="unread-badge">${unread} 条未读</span>` : ''}<span class="status-badge tone-${escapeHtml(paper.status.tone)}">${escapeHtml(paper.status.label)}</span></div>
+        <div class="badge-stack">${journey.length > 1 ? `<span class="journey-badge">投稿历程 ${journey.length} 次</span>` : ''}${unread ? `<span class="unread-badge">${unread} 条未读</span>` : ''}<span class="status-badge tone-${escapeHtml(paper.status.tone)}">${escapeHtml(paper.status.label)}</span></div>
       </div>
       ${production ? renderProductionMetrics(paper) : renderReviewMetrics(paper)}
       ${failureDetail}
@@ -270,7 +307,7 @@ function renderPaper(paper) {
       <span class="paper-meta">最后成功同步 ${escapeHtml(relativeTime(paper.lastSuccessfulAt))}${paper.lastAttemptAt && paper.lastAttemptAt !== paper.lastSuccessfulAt ? `<i>·</i> 最近尝试 ${escapeHtml(relativeTime(paper.lastAttemptAt))}` : ''}</span>
       <div class="action-group"><button class="text-button" data-action="history" type="button">${expanded ? '收起进展' : '查看进展'}</button>${unread ? '<button class="text-button unread-action" data-action="mark-read" type="button">标记已读</button>' : ''}${paper.archivedAt ? archivedActions : activeActions}</div>
     </div>
-    <div class="history-panel" ${expanded ? '' : 'hidden'}><div class="history-head"><h4>${historyTitle}</h4><div><button class="text-button" data-action="export-markdown" type="button">导出 Markdown</button><button class="text-button" data-action="export-csv" type="button">导出 CSV</button></div></div>${updateList ? `<section class="important-update-list"><h5>重要更新记录</h5><ul>${updateList}</ul></section>` : ''}${history}</div>
+    <div class="history-panel" ${expanded ? '' : 'hidden'}><div class="history-head"><h4>${historyTitle}</h4><div><button class="text-button" data-action="link-journey" type="button">关联投稿历程</button>${journey.length > 1 ? '<button class="text-button remove" data-action="unlink-journey" type="button">移出历程</button>' : ''}<button class="text-button" data-action="export-markdown" type="button">导出 Markdown</button><button class="text-button" data-action="export-csv" type="button">导出 CSV</button></div></div>${renderSubmissionJourney(paper)}${updateList ? `<section class="important-update-list"><h5>重要更新记录</h5><ul>${updateList}</ul></section>` : ''}${history}</div>
   </article>`;
 }
 
@@ -320,14 +357,14 @@ function render() {
     elements.pageTitle.textContent = '已归档';
     elements.pageSubtitle.textContent = '保留历史和凭证，但暂停自动检查';
     elements.listDescription.textContent = `${visiblePapers.length} 篇已归档稿件`;
-    elements.emptyTitle.textContent = '还没有归档稿件';
+    elements.emptyTitle.textContent = '暂无归档稿件';
     elements.emptyDescription.textContent = '已出版或暂时不需要关注的稿件可以归档，之后仍可恢复追踪。';
   } else {
     elements.pageTitle.textContent = '全部稿件';
     elements.pageSubtitle.textContent = '集中查看论文进展与下一步待办';
     elements.listDescription.textContent = `${visiblePapers.length} 篇稿件，未读或需处理的稿件优先`;
-    elements.emptyTitle.textContent = '还没有追踪中的稿件';
-    elements.emptyDescription.textContent = '可使用 Author Hub 链接添加审稿中的稿件，也可以通过生产稿件编号和通讯作者信息添加已接收文章。';
+    elements.emptyTitle.textContent = '暂无稿件';
+    elements.emptyDescription.textContent = '目前没有正在追踪的稿件。可通过 Author Hub 链接添加审稿记录，或使用生产稿件编号添加已接收文章。';
   }
   if (state.searchQuery && !visiblePapers.length) {
     elements.emptyTitle.textContent = '没有匹配的稿件';
@@ -337,8 +374,16 @@ function render() {
   elements.importantNavButton.classList.toggle('active', state.viewMode === 'important');
   elements.archivedNavButton.classList.toggle('active', state.viewMode === 'archived');
   const anyRefreshing = state.refreshingIds.size > 0;
-  elements.refreshAllButton.disabled = anyRefreshing || !state.papers.some((paper) => !paper.archivedAt);
+  const hasRefreshablePapers = state.papers.some((paper) => !paper.archivedAt);
+  elements.refreshAllButton.disabled = anyRefreshing || !hasRefreshablePapers;
   elements.refreshAllButton.classList.toggle('spin', anyRefreshing);
+  elements.refreshAllButton.querySelector('span').textContent = anyRefreshing
+    ? '刷新中…'
+    : (hasRefreshablePapers ? '刷新全部' : '暂无可刷新');
+  elements.refreshAllButton.title = anyRefreshing
+    ? '正在刷新稿件'
+    : (hasRefreshablePapers ? '刷新全部正在追踪的稿件' : '暂无可刷新的稿件');
+  elements.refreshAllButton.setAttribute('aria-disabled', String(elements.refreshAllButton.disabled));
 }
 
 function setAddMode(mode) {
@@ -362,6 +407,38 @@ function openAddDialog() {
   elements.authorFirstName.value = '';
   setAddMode('link');
   openDialog(elements.addDialog);
+}
+
+function openJourneyDialog(paper) {
+  const currentJourneyIds = new Set(journeyPapers(paper).map((item) => item.id));
+  const candidates = state.papers.filter((item) => !currentJourneyIds.has(item.id));
+  if (!candidates.length) {
+    showToast('暂无其他可关联的稿件记录。', 'error', 1800);
+    return;
+  }
+  state.journeyLinkId = paper.id;
+  elements.journeyError.textContent = '';
+  elements.journeyCurrentPaper.textContent = `${paper.title} · ${paper.journal}`;
+  elements.journeyTarget.innerHTML = candidates.map((item) => (
+    `<option value="${escapeHtml(item.id)}">${escapeHtml(item.title)} · ${escapeHtml(item.journal)}</option>`
+  )).join('');
+  openDialog(elements.journeyDialog);
+}
+
+async function confirmJourneyLink() {
+  if (!state.journeyLinkId || !elements.journeyTarget.value) return;
+  elements.journeyError.textContent = '';
+  elements.confirmJourneyButton.disabled = true;
+  try {
+    state.papers = await api.linkPaperJourney(state.journeyLinkId, elements.journeyTarget.value);
+    elements.journeyDialog.close();
+    render();
+    showToast('投稿记录已关联，可在进展中查看跨期刊历程。');
+  } catch (error) {
+    elements.journeyError.textContent = getErrorMessage(error);
+  } finally {
+    elements.confirmJourneyButton.disabled = false;
+  }
 }
 
 async function addPaper() {
@@ -403,7 +480,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '0.5.0';
+  const version = settings.appVersion || '0.5.1';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   elements.dataDirectory.textContent = settings.dataDirectory || '系统默认位置';
@@ -486,7 +563,7 @@ async function changeDataDirectory() {
 }
 
 function syncModalTitleBar() {
-  const active = [elements.addDialog, elements.settingsDialog, elements.removeDialog]
+  const active = [elements.addDialog, elements.settingsDialog, elements.journeyDialog, elements.removeDialog]
     .some((dialog) => dialog.open);
   api.setModalWindowState(active).catch(() => {});
 }
@@ -579,6 +656,10 @@ async function handlePaperAction(event) {
     openDialog(elements.removeDialog);
     return;
   }
+  if (button.dataset.action === 'link-journey') {
+    openJourneyDialog(paper);
+    return;
+  }
 
   try {
     if (button.dataset.action === 'mark-read') {
@@ -593,6 +674,11 @@ async function handlePaperAction(event) {
     if (button.dataset.action === 'restore') {
       await api.restorePaper(id);
       showToast('已恢复追踪。');
+    }
+    if (button.dataset.action === 'unlink-journey') {
+      state.papers = await api.unlinkPaperJourney(id);
+      render();
+      showToast('已将这条稿件记录移出投稿历程。');
     }
     if (button.dataset.action === 'refresh') {
       await api.refreshPaper(id);
@@ -656,8 +742,11 @@ function bindEvents() {
   elements.addButton.addEventListener('click', openAddDialog);
   elements.emptyAddButton.addEventListener('click', openAddDialog);
   elements.confirmAddButton.addEventListener('click', addPaper);
+  elements.confirmJourneyButton.addEventListener('click', confirmJourneyLink);
   elements.closeAddDialogButton.addEventListener('click', () => elements.addDialog.close());
   elements.cancelAddButton.addEventListener('click', () => elements.addDialog.close());
+  elements.closeJourneyDialogButton.addEventListener('click', () => elements.journeyDialog.close());
+  elements.cancelJourneyButton.addEventListener('click', () => elements.journeyDialog.close());
   elements.addModeLink.addEventListener('click', () => setAddMode('link'));
   elements.addModeAuthor.addEventListener('click', () => setAddMode('author'));
   [elements.trackingUrl, elements.productionReference, elements.authorLastName, elements.authorFirstName].forEach((input) => {
@@ -697,16 +786,18 @@ function bindEvents() {
   elements.deleteBackupsButton.addEventListener('click', deleteDataBackups);
   elements.settingsDialog.addEventListener('click', closeOnBackdrop);
   elements.addDialog.addEventListener('click', closeOnBackdrop);
+  elements.journeyDialog.addEventListener('click', closeOnBackdrop);
   elements.saveSettingsButton.addEventListener('click', saveSettings);
   elements.confirmRemoveButton.addEventListener('click', removeSelectedPaper);
   elements.removeDialog.addEventListener('close', () => { state.removeId = null; });
-  [elements.addDialog, elements.settingsDialog, elements.removeDialog].forEach((dialog) => {
+  [elements.addDialog, elements.settingsDialog, elements.journeyDialog, elements.removeDialog].forEach((dialog) => {
     dialog.addEventListener('close', () => {
       dialog.classList.remove('dialog-entering');
       syncModalTitleBar();
     });
     dialog.addEventListener('cancel', () => setTimeout(syncModalTitleBar, 0));
   });
+  elements.journeyDialog.addEventListener('close', () => { state.journeyLinkId = null; });
 }
 
 async function initialize() {

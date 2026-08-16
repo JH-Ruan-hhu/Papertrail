@@ -11,6 +11,8 @@ const {
   markUpdatesRead,
   unreadCount,
   setArchived,
+  linkJourney,
+  unlinkJourney,
   actionState,
   filterAndSortPapers,
   buildPaperExport
@@ -64,6 +66,7 @@ test('migrates 0.4.x data without treating a failed attempt as a success', () =>
   assert.equal(data.papers[0].failureStreak, 1);
   assert.equal(data.papers[0].nextRetryAt, '2026-01-08T00:15:00.000Z');
   assert.deepEqual(data.papers[0].importantUpdates, []);
+  assert.equal(data.papers[0].journeyId, null);
 });
 
 test('creates unread updates and marking read preserves their content', () => {
@@ -116,6 +119,25 @@ test('archives and restores without removing history or credentials', () => {
   const restored = setArchived(archived, false);
   assert.equal(restored.archivedAt, null);
   assert.equal(restored.history.length, 1);
+});
+
+test('links multiple submissions into one journey and safely unlinks a member', () => {
+  const first = paper({ id: 'first', journeyId: null, snapshot: { ...paper().snapshot, journal: 'Journal A' } });
+  const second = paper({ id: 'second', journeyId: null, snapshot: { ...paper().snapshot, journal: 'Journal B' } });
+  const third = paper({ id: 'third', journeyId: null, snapshot: { ...paper().snapshot, journal: 'Journal C' } });
+  const linkedPair = linkJourney([first, second, third], 'second', 'first');
+  assert.equal(linkedPair.find((item) => item.id === 'first').journeyId, 'first');
+  assert.equal(linkedPair.find((item) => item.id === 'second').journeyId, 'first');
+  assert.equal(linkedPair.find((item) => item.id === 'third').journeyId, null);
+  const linkedAll = linkJourney(linkedPair, 'third', 'second');
+  assert.equal(new Set(linkedAll.map((item) => item.journeyId)).size, 1);
+  const unlinked = unlinkJourney(linkedAll, 'second');
+  assert.equal(unlinked.find((item) => item.id === 'second').journeyId, null);
+  assert.equal(unlinked.find((item) => item.id === 'first').journeyId, 'first');
+  assert.equal(unlinked.find((item) => item.id === 'third').journeyId, 'first');
+  const singletonCleanup = unlinkJourney(unlinked, 'third');
+  assert.equal(singletonCleanup.find((item) => item.id === 'first').journeyId, null);
+  assert.equal(singletonCleanup.find((item) => item.id === 'third').journeyId, null);
 });
 
 test('sorts unread or actionable papers first and searches title, journal and production reference', () => {

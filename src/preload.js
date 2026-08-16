@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
   markAllRead: () => ipcRenderer.invoke('papers:mark-all-read'),
   archivePaper: (id) => ipcRenderer.invoke('papers:archive', id),
   restorePaper: (id) => ipcRenderer.invoke('papers:restore', id),
+  linkPaperJourney: (id, targetId) => ipcRenderer.invoke('papers:link-journey', id, targetId),
+  unlinkPaperJourney: (id) => ipcRenderer.invoke('papers:unlink-journey', id),
   exportPaper: (id, format) => ipcRenderer.invoke('papers:export', id, format),
   removePaper: (id) => ipcRenderer.invoke('papers:remove', id),
   openTrackingPage: (id) => ipcRenderer.invoke('papers:open-tracking', id),

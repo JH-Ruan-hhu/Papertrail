@@ -25,6 +25,8 @@ Elsevier peer-review submissions and accepted articles in production.
   manual refresh is never blocked by this schedule.
 - Prioritize unread or actionable papers, search by title, journal, or production
   reference, and archive completed or paused papers without deleting data.
+- Link local records for the same manuscript across multiple journal
+  submissions and show the chronological cross-journal submission journey.
 - Export a single paper's safe timeline as Markdown or CSV without tracking
   URLs, UUIDs, encrypted secrets, or author-query credentials.
 - Show native Windows notifications for status changes, completed reviews, and
@@ -79,6 +81,10 @@ The build produces an NSIS installer and a portable executable.
 - Author-information lookup is only for articles that have been accepted and
   have entered production. It requires the reference from Elsevier's
   "Production has begun" email and the corresponding author's surname.
+- Searching by an author name alone cannot reveal private or unpublished
+  submissions. Elsevier's Author Search API searches Scopus author profiles and
+  public indexed records, so PaperTrail does not present it as manuscript-status
+  tracking.
 - The tracking endpoint or response fields may change without notice.
 - The app does not bypass login, CAPTCHA, access controls, or publisher policy.
 - A tracking UUID is required; PaperTrail cannot discover submissions from an

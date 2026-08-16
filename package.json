@@ -1,6 +1,6 @@
 {
   "name": "papertrail-desktop",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Local-first Elsevier review and accepted-article tracker for Windows",
   "main": "src/main.js",
   "author": "PaperTrail contributors",

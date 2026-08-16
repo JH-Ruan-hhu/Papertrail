@@ -54,6 +54,9 @@ function migratePaper(paper, index = 0) {
   const archivedAt = validDate(paper.archivedAt)
     ? new Date(paper.archivedAt).toISOString()
     : null;
+  const journeyId = typeof paper.journeyId === 'string' && paper.journeyId.trim()
+    ? paper.journeyId.trim()
+    : null;
   const importantUpdates = Array.isArray(paper.importantUpdates)
     ? paper.importantUpdates.filter(asObject).map((update, updateIndex) => {
       const occurredAt = validDate(update.occurredAt)
@@ -74,6 +77,7 @@ function migratePaper(paper, index = 0) {
     ...paper,
     addedAt,
     archivedAt,
+    journeyId,
     lastAttemptAt,
     lastSuccessfulAt,
     failureStreak,
@@ -172,6 +176,33 @@ function appendImportantUpdates(paper, contents, occurredAt, makeId = (_content,
 
 function setArchived(paper, archived, changedAt = new Date().toISOString()) {
   return { ...paper, archivedAt: archived ? changedAt : null };
+}
+
+function linkJourney(papers, id, targetId) {
+  if (id === targetId) throw new Error('不能将稿件关联到自身。');
+  const paper = (papers || []).find((item) => item.id === id);
+  const target = (papers || []).find((item) => item.id === targetId);
+  if (!paper || !target) throw new Error('找不到需要关联的稿件。');
+  const sourceJourneyId = paper.journeyId || paper.id;
+  const targetJourneyId = target.journeyId || target.id;
+  if (sourceJourneyId === targetJourneyId) return [...papers];
+  return papers.map((item) => (
+    item.id === paper.id || item.journeyId === sourceJourneyId ||
+    item.id === target.id || item.journeyId === targetJourneyId
+      ? { ...item, journeyId: targetJourneyId }
+      : item
+  ));
+}
+
+function unlinkJourney(papers, id) {
+  const paper = (papers || []).find((item) => item.id === id);
+  if (!paper) throw new Error('找不到这篇稿件。');
+  if (!paper.journeyId) return [...papers];
+  const journeyId = paper.journeyId;
+  const unlinked = papers.map((item) => item.id === id ? { ...item, journeyId: null } : item);
+  const remaining = unlinked.filter((item) => item.journeyId === journeyId);
+  if (remaining.length !== 1) return unlinked;
+  return unlinked.map((item) => item.id === remaining[0].id ? { ...item, journeyId: null } : item);
 }
 
 function unreadCount(paper) {
@@ -353,6 +384,8 @@ module.exports = {
   markUpdatesRead,
   appendImportantUpdates,
   setArchived,
+  linkJourney,
+  unlinkJourney,
   unreadCount,
   actionState,
   lastChangedAt,

@@ -117,8 +117,27 @@ const archivedPaper = {
   importantUpdates: []
 };
 
+const previousSubmissionPaper = {
+  ...mockPaper,
+  id: 'demo-previous-submission',
+  journal: 'Environmental Process Letters',
+  status: { raw: 4, label: '等待编辑决定', tone: 'violet' },
+  submissionDate: Math.floor((now - 160 * 86_400_000) / 1000),
+  addedAt: new Date(now - 120 * 86_400_000).toISOString(),
+  archivedAt: new Date(now - 70 * 86_400_000).toISOString(),
+  journeyId: 'demo-submission-journey',
+  unreadCount: 0,
+  importantUpdates: []
+};
+const journeyMockPaper = { ...mockPaper, journeyId: 'demo-submission-journey' };
+const smokePapers = process.env.PAPERTRAIL_EMPTY_SMOKE === '1'
+  ? []
+  : (process.env.PAPERTRAIL_JOURNEY_SMOKE === '1'
+      ? [journeyMockPaper, previousSubmissionPaper, productionPaper, archivedPaper]
+      : [mockPaper, productionPaper, archivedPaper]);
+
 contextBridge.exposeInMainWorld('paperTrail', {
-  listPapers: async () => [mockPaper, productionPaper, archivedPaper],
+  listPapers: async () => smokePapers,
   addPaper: async (payload) => payload?.mode === 'author' ? productionPaper : mockPaper,
   refreshPaper: async () => mockPaper,
   refreshAll: async () => [{ id: mockPaper.id, ok: true, paper: mockPaper }],
@@ -126,6 +145,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
   markAllRead: async () => ({ changed: 1 }),
   archivePaper: async () => mockPaper,
   restorePaper: async () => archivedPaper,
+  linkPaperJourney: async () => [mockPaper, productionPaper, archivedPaper],
+  unlinkPaperJourney: async () => [mockPaper, productionPaper, archivedPaper],
   exportPaper: async () => ({ canceled: false, filePath: 'C:\\Users\\Demo\\Documents\\timeline.md' }),
   removePaper: async () => true,
   openTrackingPage: async () => true,
@@ -136,7 +157,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
     notifications: true,
     closeToTray: true,
     startAtLogin: false,
-    appVersion: '0.5.0',
+    appVersion: '0.5.1',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\PaperTrail Data',
     backupCount: 1,
     backupFiles: ['C:\\Users\\Demo\\Documents\\PaperTrail Old\\papertrail-data.json'],
@@ -152,7 +173,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.5.0',
+      appVersion: '0.5.1',
       dataDirectory: 'D:\\Research\\PaperTrail',
       backupCount: 1,
       backupFiles: ['C:\\Users\\Demo\\Documents\\PaperTrail Data\\papertrail-data.json'],
@@ -169,7 +190,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.5.0',
+      appVersion: '0.5.1',
       dataDirectory: 'D:\\Research\\PaperTrail',
       backupCount: 0,
       backupFiles: [],

@@ -38,6 +38,8 @@ const {
   markUpdatesRead,
   appendImportantUpdates,
   setArchived,
+  linkJourney,
+  unlinkJourney,
   unreadCount,
   actionState,
   lastChangedAt,
@@ -130,6 +132,7 @@ function serializePaper(paper) {
     productionEvents: paper.snapshot.productionEvents || [],
     addedAt: paper.addedAt,
     archivedAt: paper.archivedAt || null,
+    journeyId: paper.journeyId || null,
     lastAttemptAt: paper.lastAttemptAt || null,
     lastSuccessfulAt: paper.lastSuccessfulAt || null,
     failureStreak: Number(paper.failureStreak) || 0,
@@ -721,6 +724,30 @@ function setPaperArchived(id, archived) {
   return serializePaper(updated);
 }
 
+function linkPaperJourney(id, targetId) {
+  const linked = linkJourney(store.listPapers(), id, targetId);
+  for (const next of linked) {
+    const current = store.findPaper(next.id);
+    if (current?.journeyId !== next.journeyId) {
+      store.updatePaper(next.id, (item) => ({ ...item, journeyId: next.journeyId || null }));
+    }
+  }
+  broadcastPapers();
+  return listSerializedPapers();
+}
+
+function unlinkPaperJourney(id) {
+  const unlinked = unlinkJourney(store.listPapers(), id);
+  for (const next of unlinked) {
+    const current = store.findPaper(next.id);
+    if (current?.journeyId !== next.journeyId) {
+      store.updatePaper(next.id, (item) => ({ ...item, journeyId: next.journeyId || null }));
+    }
+  }
+  broadcastPapers();
+  return listSerializedPapers();
+}
+
 async function exportPaper(id, format) {
   const paper = store.findPaper(id);
   if (!paper) throw new Error('找不到这篇稿件。');
@@ -749,13 +776,22 @@ function registerIpc() {
   ipcMain.handle('papers:mark-all-read', () => markAllRead());
   ipcMain.handle('papers:archive', (_event, id) => setPaperArchived(String(id), true));
   ipcMain.handle('papers:restore', (_event, id) => setPaperArchived(String(id), false));
+  ipcMain.handle('papers:link-journey', (_event, id, targetId) => linkPaperJourney(String(id), String(targetId)));
+  ipcMain.handle('papers:unlink-journey', (_event, id) => unlinkPaperJourney(String(id)));
   ipcMain.handle('papers:export', (_event, id, format) => exportPaper(String(id), String(format)));
   ipcMain.handle('papers:remove', (_event, id) => {
     const paperId = String(id);
     const paper = store.findPaper(paperId);
     if (!paper) throw new Error('找不到这篇稿件。');
     if (!paper.archivedAt) throw new Error('请先归档稿件，再永久删除本地记录。');
+    const journeyId = paper.journeyId || null;
     store.removePaper(paperId);
+    if (journeyId) {
+      const remaining = store.listPapers().filter((item) => item.journeyId === journeyId);
+      if (remaining.length === 1) {
+        store.updatePaper(remaining[0].id, (current) => ({ ...current, journeyId: null }));
+      }
+    }
     broadcastPapers();
     return true;
   });

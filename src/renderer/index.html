@@ -61,20 +61,23 @@
         </section>
 
         <section class="content-section">
-          <div class="section-heading"><div><h2>稿件列表</h2><p id="listDescription">按待办与最近变化排序</p></div><span class="live-indicator" id="monitoringStatus"><i></i><span>正在读取监测状态</span></span></div>
-          <div class="list-toolbar">
-            <label class="search-box" for="paperSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input id="paperSearch" type="search" autocomplete="off" placeholder="搜索标题、期刊或生产编号"><kbd>Ctrl K</kbd></label>
+          <div class="section-heading">
+            <div><h2>稿件列表</h2><p id="listDescription">按待办与最近变化排序</p></div>
+            <div class="section-tools">
+              <span class="live-indicator" id="monitoringStatus"><i></i><span>正在读取监测状态</span></span>
+              <label class="search-box" for="paperSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input id="paperSearch" type="search" autocomplete="off" placeholder="搜索标题、期刊或生产编号"><kbd>Ctrl K</kbd></label>
+            </div>
           </div>
           <div id="paperList" class="paper-list" aria-live="polite"></div>
           <div id="emptyState" class="empty-state">
             <div class="empty-symbol" aria-hidden="true"><span>PT</span></div>
-            <h3>还没有追踪中的稿件</h3>
-            <p>可使用 Author Hub 链接添加审稿中的稿件，也可以通过生产稿件编号和通讯作者信息添加已接收文章。</p>
-            <button class="button primary" id="emptyAddButton" type="button">添加第一篇稿件</button>
+            <h3>暂无稿件</h3>
+            <p>目前没有正在追踪的稿件。可通过 Author Hub 链接添加审稿记录，或使用生产稿件编号添加已接收文章。</p>
+            <button class="button primary" id="emptyAddButton" type="button">添加稿件</button>
           </div>
         </section>
 
-        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail <b id="footerVersion">0.5.0</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail <b id="footerVersion">0.5.1</b> · 非 Elsevier 官方产品</span></footer>
       </main>
     </div>
 
@@ -166,7 +169,7 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="about" role="tabpanel" hidden>
-              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>PaperTrail</strong><small>论文进展与待办中心 · 当前版本 <span id="currentVersion">0.5.0</span></small></div><span class="local-first-badge">本地优先</span></div>
+              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>PaperTrail</strong><small>论文进展与待办中心 · 当前版本 <span id="currentVersion">0.5.1</span></small></div><span class="local-first-badge">本地优先</span></div>
               <div class="settings-note"><strong>数据只属于你</strong><p>追踪凭证由 Windows 安全存储加密，稿件与检查历史保存在你选择的本地文件夹中。PaperTrail 不包含账号系统、云同步或行为统计。</p></div>
               <div class="settings-note"><strong>产品说明</strong><p>PaperTrail 是独立开源工具，并非 Elsevier 官方产品。追踪结果取决于出版商页面当前提供的数据。</p></div>
             </section>
@@ -175,6 +178,21 @@
           <p id="settingsError" class="form-error settings-error" role="alert"></p>
           <div class="modal-actions settings-actions"><button class="button secondary" id="cancelSettingsButton" type="button">取消</button><button class="button primary" id="saveSettingsButton" type="button">保存设置</button></div>
         </section>
+      </form>
+    </dialog>
+
+    <dialog id="journeyDialog" class="modal journey-modal">
+      <form method="dialog">
+        <div class="modal-head">
+          <div><p class="eyebrow">SUBMISSION JOURNEY</p><h2>关联投稿历程</h2><p>把同一论文在不同期刊的本地记录串联起来</p></div>
+          <button class="close-button" id="closeJourneyDialogButton" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="journey-current"><small>当前稿件</small><strong id="journeyCurrentPaper"></strong></div>
+        <label class="journey-target-label" for="journeyTarget">选择同一论文的另一条稿件记录</label>
+        <select id="journeyTarget"></select>
+        <p class="field-help">仅关联 PaperTrail 本地记录，不会合并或暴露各期刊的追踪凭证。关联后，“查看进展”会展示完整的跨期刊投稿顺序。</p>
+        <p id="journeyError" class="form-error" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" id="cancelJourneyButton" type="button">取消</button><button class="button primary" id="confirmJourneyButton" type="button">确认关联</button></div>
       </form>
     </dialog>
 

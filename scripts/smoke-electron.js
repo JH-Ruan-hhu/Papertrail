@@ -5,7 +5,7 @@ const path = require('node:path');
 const { app, BrowserWindow } = require('electron');
 
 app.disableHardwareAcceleration();
-app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.5.0'));
+app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.5.1'));
 
 app.whenReady().then(async () => {
   const window = new BrowserWindow({
@@ -32,6 +32,74 @@ app.whenReady().then(async () => {
     const image = await window.webContents.capturePage();
     fs.writeFileSync(output, image.toPNG());
   };
+  if (process.env.PAPERTRAIL_EMPTY_SMOKE === '1') {
+    const emptyResult = await window.webContents.executeJavaScript(`
+      (() => {
+        const refresh = document.getElementById('refreshAllButton');
+        const search = document.getElementById('paperSearch');
+        const heading = document.querySelector('.section-heading');
+        showToast('全部稿件刷新完成。');
+        const toastRect = document.getElementById('toast').getBoundingClientRect();
+        return {
+          emptyTitle: document.querySelector('#emptyState h3').textContent === '暂无稿件',
+          addLabel: document.getElementById('emptyAddButton').textContent === '添加稿件',
+          refreshDisabled: refresh.disabled,
+          refreshNotSpinning: !refresh.classList.contains('spin'),
+          refreshLabel: refresh.querySelector('span').textContent === '暂无可刷新',
+          refreshHint: refresh.title === '暂无可刷新的稿件',
+          refreshCursor: getComputedStyle(refresh).cursor === 'not-allowed',
+          searchInsideHeading: heading.contains(search),
+          toastCentered: Math.abs((toastRect.left + toastRect.width / 2) - innerWidth / 2) <= 1,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!Object.entries(emptyResult).every(([key, value]) => key === 'horizontalOverflow' ? value === false : value === true)) {
+      throw new Error(`Empty dashboard smoke test failed: ${JSON.stringify(emptyResult)}`);
+    }
+    console.log(`EMPTY_DASHBOARD_SMOKE_OK ${JSON.stringify(emptyResult)}`);
+    if (process.env.PAPERTRAIL_EMPTY_OUTPUT) {
+      await captureStablePage(process.env.PAPERTRAIL_EMPTY_OUTPUT);
+    }
+    window.destroy();
+    app.quit();
+    return;
+  }
+  if (process.env.PAPERTRAIL_JOURNEY_SMOKE === '1') {
+    const journeyResult = await window.webContents.executeJavaScript(`
+      (() => {
+        const card = document.querySelector('[data-paper-id="demo-paper"]');
+        card.querySelector('[data-action="history"]').click();
+        const expandedCard = document.querySelector('[data-paper-id="demo-paper"]');
+        const rows = expandedCard.querySelectorAll('.submission-journey li');
+        const badge = expandedCard.querySelector('.journey-badge');
+        const linkButton = expandedCard.querySelector('[data-action="link-journey"]');
+        linkButton.click();
+        const dialog = document.getElementById('journeyDialog');
+        const result = {
+          journeyRows: rows.length === 2,
+          currentRow: expandedCard.querySelectorAll('.submission-journey li.is-current').length === 1,
+          badgeLabel: badge?.textContent === '投稿历程 2 次',
+          dialogOpened: dialog.open,
+          candidateOptions: document.getElementById('journeyTarget').options.length === 2,
+          localOnlyCopy: dialog.textContent.includes('仅关联 PaperTrail 本地记录'),
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+        dialog.close();
+        return result;
+      })()
+    `);
+    if (!Object.entries(journeyResult).every(([key, value]) => key === 'horizontalOverflow' ? value === false : value === true)) {
+      throw new Error(`Journey smoke test failed: ${JSON.stringify(journeyResult)}`);
+    }
+    console.log(`JOURNEY_SMOKE_OK ${JSON.stringify(journeyResult)}`);
+    if (process.env.PAPERTRAIL_JOURNEY_OUTPUT) {
+      await captureStablePage(process.env.PAPERTRAIL_JOURNEY_OUTPUT);
+    }
+    window.destroy();
+    app.quit();
+    return;
+  }
   const dialogResult = await window.webContents.executeJavaScript(`
     (() => {
       const addButton = document.getElementById('addButton');
