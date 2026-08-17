@@ -150,6 +150,25 @@ test('supports locally linking cross-journal submission journeys', () => {
   assert.match(appJs, /投稿历程 \$\{journey\.length\} 次/);
 });
 
+test('0.6 exposes local deadlines, revision rounds, manuscript details and detailed review events', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  assert.match(html, /id="workflowDialog"/);
+  assert.match(html, /id="detailManuscriptId"/);
+  assert.match(html, /版权\/许可文件截止日期/);
+  assert.match(html, /id="revisionNumber"/);
+  assert.match(mainJs, /tasks:save/);
+  assert.match(mainJs, /revisions:save/);
+  assert.match(mainJs, /runDeadlineReminders/);
+  assert.match(preloadJs, /updatePaperDetails/);
+  assert.match(preloadJs, /completeTask/);
+  assert.match(appJs, /出版商时间：/);
+  assert.match(appJs, /本地首次观察：/);
+  assert.match(appJs, /未识别事件/);
+});
+
 test('interaction polish uses explicit motion and supports reduced motion', () => {
   const css = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'renderer', 'styles.css'),

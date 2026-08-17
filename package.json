@@ -1,7 +1,7 @@
 {
   "name": "papertrail-desktop",
-  "version": "0.5.2",
-  "description": "Local-first Elsevier review and accepted-article tracker for Windows",
+  "version": "0.6.0",
+  "description": "Local-first manuscript progress and deadline tracker for Windows",
   "main": "src/main.js",
   "author": "PaperTrail contributors",
   "license": "MIT",

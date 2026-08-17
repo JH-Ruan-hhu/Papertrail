@@ -8,7 +8,8 @@ const {
   snapshotFingerprint,
   describeChanges,
   maskTrackingUrl,
-  getStageStartedAt
+  getStageStartedAt,
+  mergeObservedReviewEvents
 } = require('../src/tracker-core');
 
 const UUID = '3e1fe3f4-b6b2-451e-a9f1-145410724c1d';
@@ -56,6 +57,18 @@ test('normalizes reviewer events for the latest revision', () => {
   assert.equal(snapshot.title, 'A manuscript');
   assert.equal(snapshot.status.label, '审稿中');
   assert.deepEqual(snapshot.counts, { invited: 2, accepted: 1, completed: 0 });
+  assert.equal(snapshot.events.length, 4);
+});
+
+test('preserves unknown reviewer events and their first local observation time', () => {
+  const current = normalizeTrackerPayload({
+    Status: 3, LatestRevisionNumber: 1,
+    ReviewEvents: [{ Revision: 1, Event: 'NEW_UNKNOWN_EVENT', Id: 9, Date: 1700000050 }]
+  });
+  const first = mergeObservedReviewEvents([], current.events, '2026-01-01T00:00:00.000Z');
+  const second = mergeObservedReviewEvents(first, current.events, '2026-01-02T00:00:00.000Z');
+  assert.equal(second[0].type, 'NEW_UNKNOWN_EVENT');
+  assert.equal(second[0].observedAt, '2026-01-01T00:00:00.000Z');
 });
 
 test('shows an explicit label for an unknown Elsevier status code', () => {
@@ -83,7 +96,8 @@ test('fingerprint ignores cosmetic metadata but detects progress changes', () =>
   assert.notEqual(snapshotFingerprint(previous), snapshotFingerprint(changed));
   assert.deepEqual(describeChanges(previous, changed), [
     '状态：编辑处理中 → 审稿中',
-    '邀请审稿人：0 → 1'
+    '邀请审稿人：0 → 1',
+    'R0：审稿人已获邀请'
   ]);
 });
 

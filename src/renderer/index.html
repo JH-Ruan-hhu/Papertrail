@@ -77,7 +77,7 @@
           </div>
         </section>
 
-        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail <b id="footerVersion">0.5.2</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail <b id="footerVersion">0.6.0</b> · 非 Elsevier 官方产品</span></footer>
       </main>
     </div>
 
@@ -152,9 +152,9 @@
             <section class="settings-panel" data-settings-panel="notifications" role="tabpanel" hidden>
               <h3>重要进展</h3>
               <div class="settings-group">
-                <div class="setting-row"><div><strong>Windows 重要通知</strong><small>状态变化、审稿回复、接收和出版节点出现时弹出</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>Windows 重要通知</strong><small>状态变化、审稿回复、截止任务、接收和出版节点出现时弹出</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
               </div>
-              <div class="settings-note"><strong>只提醒值得关注的变化</strong><p>普通定时检查不会打扰你。点击系统通知可以返回 PaperTrail 并打开对应的 Elsevier 官方页面。</p></div>
+              <div class="settings-note"><strong>只提醒值得关注的变化</strong><p>普通定时检查不会打扰你。稿件进展通知可打开对应官方页面；截止任务通知只会带你返回 PaperTrail。</p></div>
             </section>
 
             <section class="settings-panel" data-settings-panel="storage" role="tabpanel" hidden>
@@ -169,7 +169,7 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="about" role="tabpanel" hidden>
-              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>PaperTrail</strong><small>论文进展与待办中心 · 当前版本 <span id="currentVersion">0.5.2</span></small></div><span class="local-first-badge">本地优先</span></div>
+              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>PaperTrail</strong><small>论文进展与待办中心 · 当前版本 <span id="currentVersion">0.6.0</span></small></div><span class="local-first-badge">本地优先</span></div>
               <h3>版本与更新</h3>
               <div class="settings-group update-group">
                 <div class="setting-row update-row">
@@ -202,6 +202,58 @@
         <p id="journeyError" class="form-error" role="alert"></p>
         <div class="modal-actions"><button class="button secondary" id="cancelJourneyButton" type="button">取消</button><button class="button primary" id="confirmJourneyButton" type="button">确认关联</button></div>
       </form>
+    </dialog>
+
+    <dialog id="workflowDialog" class="modal workflow-modal">
+      <div class="workflow-shell">
+        <div class="modal-head workflow-head">
+          <div><p class="eyebrow">MANUSCRIPT WORKSPACE</p><h2>稿件资料与待办</h2><p id="workflowPaperTitle"></p></div>
+          <button class="close-button" id="closeWorkflowDialogButton" type="button" aria-label="关闭">×</button>
+        </div>
+        <div class="workflow-scroll">
+          <section class="workflow-section">
+            <div class="workflow-section-head"><div><h3>补充信息</h3><p>仅保存在本机，不会发送给出版社。</p></div><button class="button tertiary" id="saveDetailsButton" type="button">保存资料</button></div>
+            <div class="form-grid details-grid">
+              <div class="field"><label for="detailManuscriptId">Manuscript ID</label><input id="detailManuscriptId" type="text" maxlength="200" placeholder="例如 WR-26-00123"></div>
+              <div class="field"><label for="detailHandlingEditor">处理编辑姓名</label><input id="detailHandlingEditor" type="text" maxlength="200" placeholder="例如 Dr. Smith"></div>
+              <div class="field full"><label for="detailCurrentContact">当前投稿联系人</label><input id="detailCurrentContact" type="text" maxlength="300" placeholder="通讯作者、编辑部联系人或其他说明"></div>
+              <div class="field full"><label for="detailDispositionNote">拒稿 / 转投 / 接收备注</label><textarea id="detailDispositionNote" rows="2" maxlength="4000" placeholder="记录关键决定与转投原因"></textarea></div>
+              <div class="field full"><label for="detailNotes">自定义备注</label><textarea id="detailNotes" rows="3" maxlength="10000" placeholder="记录只需自己掌握的信息"></textarea></div>
+            </div>
+          </section>
+
+          <section class="workflow-section">
+            <div class="workflow-section-head"><div><h3>截止日期</h3><p>到期前 48 小时提醒；逾期后再提醒一次。</p></div></div>
+            <div id="taskList" class="workflow-list"></div>
+            <div class="workflow-editor" aria-label="编辑截止任务">
+              <input id="taskId" type="hidden">
+              <div class="field"><label for="taskType">任务类型</label><select id="taskType"><option value="revision">修回截止日期</option><option value="proof">校样截止日期</option><option value="copyright">版权/许可文件截止日期</option><option value="followup">建议催稿日期</option></select></div>
+              <div class="field grow"><label for="taskTitle">任务名称</label><input id="taskTitle" type="text" maxlength="300" placeholder="可留空使用默认名称"></div>
+              <div class="field"><label for="taskDueAt">截止时间</label><input id="taskDueAt" type="datetime-local"></div>
+              <button class="button primary compact-button" id="saveTaskButton" type="button">添加任务</button>
+              <button class="button tertiary compact-button" id="cancelTaskEditButton" type="button" hidden>取消编辑</button>
+            </div>
+          </section>
+
+          <section class="workflow-section">
+            <div class="workflow-section-head"><div><h3>修回轮次</h3><p>记录 R0、R1、R2 的决定、截止与实际提交时间。</p></div></div>
+            <div id="revisionList" class="workflow-list"></div>
+            <div class="revision-editor" aria-label="编辑修回轮次">
+              <input id="revisionId" type="hidden">
+              <div class="field"><label for="revisionNumber">轮次</label><input id="revisionNumber" type="number" min="0" max="99" value="0"></div>
+              <div class="field"><label for="revisionDecision">决定类型</label><input id="revisionDecision" type="text" maxlength="200" placeholder="大修、小修、拒稿重投等"></div>
+              <div class="field"><label for="revisionStatus">状态</label><select id="revisionStatus"><option value="pending-revision">待修回</option><option value="submitted">已提交</option><option value="waiting-decision">等待决定</option><option value="completed">已完成</option></select></div>
+              <div class="field"><label for="revisionRequestedAt">要求修回日期</label><input id="revisionRequestedAt" type="date"></div>
+              <div class="field"><label for="revisionDueAt">截止日期</label><input id="revisionDueAt" type="date"></div>
+              <div class="field"><label for="revisionSubmittedAt">实际提交日期</label><input id="revisionSubmittedAt" type="date"></div>
+              <div class="field revision-note"><label for="revisionNotes">备注</label><input id="revisionNotes" type="text" maxlength="4000" placeholder="本轮主要修改内容"></div>
+              <div class="revision-editor-actions"><button class="button primary compact-button" id="saveRevisionButton" type="button">添加轮次</button><button class="button tertiary compact-button" id="cancelRevisionEditButton" type="button" hidden>取消编辑</button></div>
+            </div>
+          </section>
+        </div>
+        <p id="workflowError" class="form-error workflow-error" role="alert"></p>
+        <div class="modal-actions"><button class="button secondary" id="closeWorkflowFooterButton" type="button">完成</button></div>
+      </div>
     </dialog>
 
     <dialog id="removeDialog" class="modal confirm-modal">

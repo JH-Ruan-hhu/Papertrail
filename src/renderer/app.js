@@ -8,6 +8,7 @@ const state = {
   refreshingIds: new Set(),
   removeId: null,
   journeyLinkId: null,
+  workflowPaperId: null,
   toastTimer: null,
   addMode: 'link',
   viewMode: 'all',
@@ -61,6 +62,35 @@ const elements = {
   journeyCurrentPaper: document.getElementById('journeyCurrentPaper'),
   journeyTarget: document.getElementById('journeyTarget'),
   journeyError: document.getElementById('journeyError'),
+  workflowDialog: document.getElementById('workflowDialog'),
+  workflowPaperTitle: document.getElementById('workflowPaperTitle'),
+  closeWorkflowDialogButton: document.getElementById('closeWorkflowDialogButton'),
+  closeWorkflowFooterButton: document.getElementById('closeWorkflowFooterButton'),
+  workflowError: document.getElementById('workflowError'),
+  saveDetailsButton: document.getElementById('saveDetailsButton'),
+  detailManuscriptId: document.getElementById('detailManuscriptId'),
+  detailHandlingEditor: document.getElementById('detailHandlingEditor'),
+  detailCurrentContact: document.getElementById('detailCurrentContact'),
+  detailDispositionNote: document.getElementById('detailDispositionNote'),
+  detailNotes: document.getElementById('detailNotes'),
+  taskList: document.getElementById('taskList'),
+  taskId: document.getElementById('taskId'),
+  taskType: document.getElementById('taskType'),
+  taskTitle: document.getElementById('taskTitle'),
+  taskDueAt: document.getElementById('taskDueAt'),
+  saveTaskButton: document.getElementById('saveTaskButton'),
+  cancelTaskEditButton: document.getElementById('cancelTaskEditButton'),
+  revisionList: document.getElementById('revisionList'),
+  revisionId: document.getElementById('revisionId'),
+  revisionNumber: document.getElementById('revisionNumber'),
+  revisionDecision: document.getElementById('revisionDecision'),
+  revisionStatus: document.getElementById('revisionStatus'),
+  revisionRequestedAt: document.getElementById('revisionRequestedAt'),
+  revisionDueAt: document.getElementById('revisionDueAt'),
+  revisionSubmittedAt: document.getElementById('revisionSubmittedAt'),
+  revisionNotes: document.getElementById('revisionNotes'),
+  saveRevisionButton: document.getElementById('saveRevisionButton'),
+  cancelRevisionEditButton: document.getElementById('cancelRevisionEditButton'),
   settingsDialog: document.getElementById('settingsDialog'),
   settingsNavButtons: [...document.querySelectorAll('[data-settings-section]')],
   settingsPanels: [...document.querySelectorAll('[data-settings-panel]')],
@@ -200,6 +230,23 @@ function renderMonitoringStatus() {
 }
 
 function renderReviewHistory(paper) {
+  const eventLabels = {
+    REVIEWER_INVITED: '审稿人已获邀请',
+    REVIEWER_ACCEPTED: '审稿人已接受邀请',
+    REVIEWER_COMPLETED: '审稿意见已返回'
+  };
+  const reviewEvents = [...(paper.reviewEvents || [])].sort((a, b) => (Number(b.date) || 0) - (Number(a.date) || 0));
+  const eventRecords = reviewEvents.map((event) => {
+    const label = eventLabels[event.type] || `未识别事件（${event.type || 'UNKNOWN'}）`;
+    const publisherTime = event.date ? formatDate(event.date) : '出版商未提供时间';
+    return `<li class="review-event"><time>${escapeHtml(publisherTime)}</time><span class="timeline-dot review"></span><div><b>R${escapeHtml(event.revision)} · ${escapeHtml(label)}</b><small>出版商时间：${escapeHtml(publisherTime)} · 本地首次观察：${escapeHtml(formatDate(event.observedAt))}</small></div></li>`;
+  });
+  const revisionLabels = { 'pending-revision': '待修回', submitted: '已提交', 'waiting-decision': '等待决定', completed: '已完成' };
+  const revisionRecords = [...(paper.revisionRounds || [])].sort((a, b) => b.round - a.round).map((round) => {
+    const date = round.submittedAt || round.requestedAt || round.dueAt;
+    const details = [round.requestedAt ? `要求修回 ${formatDate(round.requestedAt, false)}` : '', round.dueAt ? `截止 ${formatDate(round.dueAt, false)}` : '', round.submittedAt ? `提交 ${formatDate(round.submittedAt, false)}` : ''].filter(Boolean).join(' · ');
+    return `<li class="revision-event"><time>${escapeHtml(formatDate(date, false))}</time><span class="timeline-dot revision"></span><div><b>R${round.round} · ${escapeHtml(round.decisionType)} · ${escapeHtml(revisionLabels[round.status] || round.status)}</b><small>${escapeHtml(details || '日期未记录')}${round.notes ? ` · ${escapeHtml(round.notes)}` : ''}</small></div></li>`;
+  });
   const history = [...(paper.history || [])].reverse();
   const records = history.map((item) => {
     const description = Array.isArray(item.changes) && item.changes.length
@@ -210,14 +257,47 @@ function renderReviewHistory(paper) {
   if (paper.submissionDate) {
     records.push(`<li><time>${escapeHtml(formatDate(paper.submissionDate, false))}</time><span class="timeline-dot submission"></span><b>稿件首次提交至期刊</b></li>`);
   }
-  if (!records.length) return '<p class="paper-meta">暂无历史记录</p>';
-  return `<div class="timeline-scroll"><ul class="timeline">${records.join('')}</ul></div>`;
+  const allRecords = [...revisionRecords, ...eventRecords, ...records];
+  if (!allRecords.length) return '<p class="paper-meta">暂无历史记录</p>';
+  return `<div class="timeline-scroll"><ul class="timeline">${allRecords.join('')}</ul></div>`;
+}
+
+function taskState(task) {
+  if (task.completedAt) return { state: 'completed', label: '已完成' };
+  const diff = Date.parse(task.dueAt) - Date.now();
+  if (diff < 0) return { state: 'overdue', label: '已逾期' };
+  if (diff <= 48 * 60 * 60_000) return { state: 'due-soon', label: '即将到期' };
+  return { state: 'upcoming', label: '待完成' };
+}
+
+function renderUrgentTask(paper) {
+  const task = paper.urgentTask;
+  if (!task) return '';
+  const urgency = task.urgency || taskState(task);
+  return `<div class="deadline-strip ${escapeHtml(urgency.state)}"><span>${escapeHtml(urgency.label)}</span><strong>${escapeHtml(task.title)}</strong><time>${escapeHtml(formatDate(task.dueAt))}</time><button type="button" data-action="manage">管理待办</button></div>`;
+}
+
+function renderLocalDetails(paper) {
+  const details = paper.details || {};
+  const rows = [
+    ['Manuscript ID', details.manuscriptId],
+    ['处理编辑', details.handlingEditor],
+    ['当前投稿联系人', details.currentContact],
+    ['关键决定备注', details.dispositionNote],
+    ['自定义备注', details.notes]
+  ].filter(([, value]) => value);
+  if (!rows.length) return '';
+  return `<section class="local-details"><h5>本地补充信息</h5><dl>${rows.map(([label, value]) => `<div><dt>${escapeHtml(label)}</dt><dd>${escapeHtml(value)}</dd></div>`).join('')}</dl></section>`;
 }
 
 function renderProductionHistory(paper) {
-  const records = (paper.productionEvents || []).map((event) => (
-    `<li><time>${escapeHtml(event.dateText || '—')}</time><span class="timeline-dot production"></span><b>${escapeHtml(event.label)}</b></li>`
+  const revisionLabels = { 'pending-revision': '待修回', submitted: '已提交', 'waiting-decision': '等待决定', completed: '已完成' };
+  const records = [...(paper.revisionRounds || [])].sort((a, b) => b.round - a.round).map((round) => (
+    `<li class="revision-event"><time>${escapeHtml(formatDate(round.submittedAt || round.requestedAt || round.dueAt, false))}</time><span class="timeline-dot revision"></span><div><b>R${round.round} · ${escapeHtml(round.decisionType)} · ${escapeHtml(revisionLabels[round.status] || round.status)}</b><small>${round.dueAt ? `截止 ${escapeHtml(formatDate(round.dueAt, false))}` : '日期未记录'}${round.notes ? ` · ${escapeHtml(round.notes)}` : ''}</small></div></li>`
   ));
+  records.push(...(paper.productionEvents || []).map((event) => (
+    `<li><time>${escapeHtml(event.dateText || '—')}</time><span class="timeline-dot production"></span><b>${escapeHtml(event.label)}</b></li>`
+  )));
   if (paper.acceptedDate) {
     records.push(`<li><time>${escapeHtml(paper.acceptedDate)}</time><span class="timeline-dot production"></span><b>文章已接收，进入出版准备阶段</b></li>`);
   }
@@ -299,8 +379,8 @@ function renderPaper(paper) {
   const failureDetail = paper.lastError
     ? `<p class="paper-error"><strong>最近同步失败</strong> · 尝试于 ${escapeHtml(relativeTime(paper.lastAttemptAt))} · ${escapeHtml(paper.lastError)}<br><span>上次成功：${escapeHtml(relativeTime(paper.lastSuccessfulAt))}；连续失败 ${paper.failureStreak} 次${paper.nextRetryAt ? `；${escapeHtml(futureTime(paper.nextRetryAt))}自动重试` : ''}</span></p>`
     : '';
-  const activeActions = `<button class="text-button ${refreshing ? 'spin' : ''}" data-action="refresh" type="button" ${refreshing ? 'disabled' : ''}>${refreshing ? '刷新中…' : '刷新'}</button><button class="text-button" data-action="open" type="button">打开官方页面</button><button class="text-button" data-action="archive" type="button">归档</button>`;
-  const archivedActions = '<button class="text-button" data-action="restore" type="button">恢复追踪</button><button class="text-button" data-action="open" type="button">打开官方页面</button><button class="text-button remove" data-action="remove" type="button">永久删除</button>';
+  const activeActions = `<button class="text-button manage-action" data-action="manage" type="button">资料与待办</button><button class="text-button ${refreshing ? 'spin' : ''}" data-action="refresh" type="button" ${refreshing ? 'disabled' : ''}>${refreshing ? '刷新中…' : '刷新'}</button><button class="text-button" data-action="open" type="button">打开官方页面</button><button class="text-button" data-action="archive" type="button">归档</button>`;
+  const archivedActions = '<button class="text-button manage-action" data-action="manage" type="button">资料与待办</button><button class="text-button" data-action="restore" type="button">恢复追踪</button><button class="text-button" data-action="open" type="button">打开官方页面</button><button class="text-button remove" data-action="remove" type="button">永久删除</button>';
   return `<article class="paper-card ${production ? 'production-card' : ''} ${paper.archivedAt ? 'archived-card' : ''} ${unread ? 'unread-card' : ''}" data-paper-id="${escapeHtml(paper.id)}">
     <div class="paper-accent"></div>
     <div class="paper-main">
@@ -309,27 +389,29 @@ function renderPaper(paper) {
         <div class="badge-stack">${journey.length > 1 ? `<span class="journey-badge">投稿历程 ${journey.length} 次</span>` : ''}${unread ? `<span class="unread-badge">${unread} 条未读</span>` : ''}<span class="status-badge tone-${escapeHtml(paper.status.tone)}">${escapeHtml(paper.status.label)}</span></div>
       </div>
       ${production ? renderProductionMetrics(paper) : renderReviewMetrics(paper)}
+      ${renderUrgentTask(paper)}
       ${failureDetail}
     </div>
     <div class="paper-actions">
       <span class="paper-meta">最后成功同步 ${escapeHtml(relativeTime(paper.lastSuccessfulAt))}${paper.lastAttemptAt && paper.lastAttemptAt !== paper.lastSuccessfulAt ? `<i>·</i> 最近尝试 ${escapeHtml(relativeTime(paper.lastAttemptAt))}` : ''}</span>
       <div class="action-group"><button class="text-button" data-action="history" type="button">${expanded ? '收起进展' : '查看进展'}</button>${unread ? '<button class="text-button unread-action" data-action="mark-read" type="button">标记已读</button>' : ''}${paper.archivedAt ? archivedActions : activeActions}</div>
     </div>
-    <div class="history-panel" ${expanded ? '' : 'hidden'}><div class="history-head"><h4>${historyTitle}</h4><div><button class="text-button" data-action="link-journey" type="button">关联投稿历程</button>${journey.length > 1 ? '<button class="text-button remove" data-action="unlink-journey" type="button">移出历程</button>' : ''}<button class="text-button" data-action="export-markdown" type="button">导出 Markdown</button><button class="text-button" data-action="export-csv" type="button">导出 CSV</button></div></div>${renderSubmissionJourney(paper)}${updateList ? `<section class="important-update-list"><h5>重要更新记录</h5><ul>${updateList}</ul></section>` : ''}${history}</div>
+    <div class="history-panel" ${expanded ? '' : 'hidden'}><div class="history-head"><h4>${historyTitle}</h4><div><button class="text-button" data-action="manage" type="button">编辑资料与待办</button><button class="text-button" data-action="link-journey" type="button">关联投稿历程</button>${journey.length > 1 ? '<button class="text-button remove" data-action="unlink-journey" type="button">移出历程</button>' : ''}<button class="text-button" data-action="export-markdown" type="button">导出 Markdown</button><button class="text-button" data-action="export-csv" type="button">导出 CSV</button></div></div>${renderSubmissionJourney(paper)}${renderLocalDetails(paper)}${updateList ? `<section class="important-update-list"><h5>重要更新记录</h5><ul>${updateList}</ul></section>` : ''}${history}</div>
   </article>`;
 }
 
 function matchesSearch(paper) {
   const query = state.searchQuery.trim().toLocaleLowerCase('zh-CN');
   if (!query) return true;
-  return [paper.title, paper.journal, paper.articleReference]
+  return [paper.title, paper.journal, paper.articleReference, paper.details?.manuscriptId, paper.details?.handlingEditor, paper.details?.currentContact]
     .some((value) => String(value || '').toLocaleLowerCase('zh-CN').includes(query));
 }
 
 function sortPapers(papers) {
   return [...papers].sort((a, b) => {
-    const aPriority = (Number(a.unreadCount) || 0) > 0 || a.needsAction ? 1 : 0;
-    const bPriority = (Number(b.unreadCount) || 0) > 0 || b.needsAction ? 1 : 0;
+    const urgencyRank = (paper) => ({ overdue: 3, 'due-soon': 2, upcoming: 1 }[paper.urgentTask?.urgency?.state] || 0);
+    const aPriority = urgencyRank(a) * 10 + ((Number(a.unreadCount) || 0) > 0 || a.needsAction ? 1 : 0);
+    const bPriority = urgencyRank(b) * 10 + ((Number(b.unreadCount) || 0) > 0 || b.needsAction ? 1 : 0);
     if (aPriority !== bPriority) return bPriority - aPriority;
     const changed = Date.parse(b.lastChangedAt || 0) - Date.parse(a.lastChangedAt || 0);
     if (changed) return changed;
@@ -449,6 +531,180 @@ async function confirmJourneyLink() {
   }
 }
 
+function workflowPaper() {
+  return state.papers.find((paper) => paper.id === state.workflowPaperId) || null;
+}
+
+function toDateTimeInput(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
+}
+
+function toDateInput(value) {
+  return toDateTimeInput(value).slice(0, 10);
+}
+
+function inputDateToIso(value, dateOnly = false) {
+  if (!value) return null;
+  const date = new Date(dateOnly ? `${value}T00:00:00` : value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function revisionStatusLabel(status) {
+  return ({ 'pending-revision': '待修回', submitted: '已提交', 'waiting-decision': '等待决定', completed: '已完成' })[status] || status;
+}
+
+function resetTaskEditor() {
+  elements.taskId.value = '';
+  elements.taskType.value = 'revision';
+  elements.taskTitle.value = '';
+  elements.taskDueAt.value = '';
+  elements.saveTaskButton.textContent = '添加任务';
+  elements.cancelTaskEditButton.hidden = true;
+}
+
+function resetRevisionEditor() {
+  elements.revisionId.value = '';
+  elements.revisionNumber.value = '0';
+  elements.revisionDecision.value = '';
+  elements.revisionStatus.value = 'pending-revision';
+  elements.revisionRequestedAt.value = '';
+  elements.revisionDueAt.value = '';
+  elements.revisionSubmittedAt.value = '';
+  elements.revisionNotes.value = '';
+  elements.saveRevisionButton.textContent = '添加轮次';
+  elements.cancelRevisionEditButton.hidden = true;
+}
+
+function renderWorkflowDialog() {
+  const paper = workflowPaper();
+  if (!paper) return;
+  elements.workflowPaperTitle.textContent = `${paper.title} · ${paper.journal}`;
+  const details = paper.details || {};
+  elements.detailManuscriptId.value = details.manuscriptId || '';
+  elements.detailHandlingEditor.value = details.handlingEditor || '';
+  elements.detailCurrentContact.value = details.currentContact || '';
+  elements.detailDispositionNote.value = details.dispositionNote || '';
+  elements.detailNotes.value = details.notes || '';
+  elements.taskList.innerHTML = (paper.tasks || []).length ? [...paper.tasks].sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt)).map((task) => {
+    const status = taskState(task);
+    return `<article class="workflow-list-item task-${escapeHtml(status.state)}" data-task-id="${escapeHtml(task.id)}"><div><span class="workflow-state">${escapeHtml(status.label)}</span><strong>${escapeHtml(task.title)}</strong><small>截止 ${escapeHtml(formatDate(task.dueAt))}${task.completedAt ? ` · 完成于 ${escapeHtml(formatDate(task.completedAt))}` : ''}</small></div><div><button type="button" data-workflow-action="toggle-task">${task.completedAt ? '重新打开' : '完成'}</button><button type="button" data-workflow-action="edit-task">编辑</button><button class="danger-link" type="button" data-workflow-action="delete-task">删除</button></div></article>`;
+  }).join('') : '<p class="workflow-empty">尚未创建截止任务。</p>';
+  elements.revisionList.innerHTML = (paper.revisionRounds || []).length ? [...paper.revisionRounds].sort((a, b) => a.round - b.round).map((round) => (
+    `<article class="workflow-list-item" data-revision-id="${escapeHtml(round.id)}"><div><span class="workflow-state revision">R${round.round}</span><strong>${escapeHtml(round.decisionType)}</strong><small>${escapeHtml(revisionStatusLabel(round.status))}${round.dueAt ? ` · 截止 ${escapeHtml(formatDate(round.dueAt, false))}` : ''}${round.submittedAt ? ` · 提交 ${escapeHtml(formatDate(round.submittedAt, false))}` : ''}</small></div><div><button type="button" data-workflow-action="edit-revision">编辑</button><button class="danger-link" type="button" data-workflow-action="delete-revision">删除</button></div></article>`
+  )).join('') : '<p class="workflow-empty">尚未记录修回轮次。</p>';
+}
+
+function openWorkflowDialog(paper) {
+  state.workflowPaperId = paper.id;
+  elements.workflowError.textContent = '';
+  resetTaskEditor();
+  resetRevisionEditor();
+  renderWorkflowDialog();
+  openDialog(elements.workflowDialog);
+}
+
+function replacePaper(updated) {
+  state.papers = state.papers.map((paper) => paper.id === updated.id ? updated : paper);
+  render();
+  renderWorkflowDialog();
+}
+
+async function saveWorkflowDetails() {
+  const paper = workflowPaper();
+  if (!paper) return;
+  elements.workflowError.textContent = '';
+  try {
+    replacePaper(await api.updatePaperDetails(paper.id, {
+      manuscriptId: elements.detailManuscriptId.value,
+      handlingEditor: elements.detailHandlingEditor.value,
+      currentContact: elements.detailCurrentContact.value,
+      dispositionNote: elements.detailDispositionNote.value,
+      notes: elements.detailNotes.value
+    }));
+    showToast('稿件补充信息已保存。');
+  } catch (error) {
+    elements.workflowError.textContent = getErrorMessage(error);
+  }
+}
+
+async function saveWorkflowTask() {
+  const paper = workflowPaper();
+  const dueAt = inputDateToIso(elements.taskDueAt.value);
+  if (!paper || !dueAt) {
+    elements.workflowError.textContent = '请选择有效的截止时间。';
+    elements.taskDueAt.focus();
+    return;
+  }
+  elements.workflowError.textContent = '';
+  const editing = Boolean(elements.taskId.value);
+  try {
+    replacePaper(await api.saveTask(paper.id, {
+      id: elements.taskId.value || undefined,
+      type: elements.taskType.value,
+      title: elements.taskTitle.value,
+      dueAt
+    }));
+    resetTaskEditor();
+    showToast(editing ? '截止任务已更新。' : '截止任务已添加。');
+  } catch (error) {
+    elements.workflowError.textContent = getErrorMessage(error);
+  }
+}
+
+async function saveWorkflowRevision() {
+  const paper = workflowPaper();
+  if (!paper) return;
+  elements.workflowError.textContent = '';
+  try {
+    replacePaper(await api.saveRevision(paper.id, {
+      id: elements.revisionId.value || undefined,
+      round: Number(elements.revisionNumber.value),
+      decisionType: elements.revisionDecision.value,
+      status: elements.revisionStatus.value,
+      requestedAt: inputDateToIso(elements.revisionRequestedAt.value, true),
+      dueAt: inputDateToIso(elements.revisionDueAt.value, true),
+      submittedAt: inputDateToIso(elements.revisionSubmittedAt.value, true),
+      notes: elements.revisionNotes.value
+    }));
+    resetRevisionEditor();
+    showToast('修回轮次已保存。');
+  } catch (error) {
+    elements.workflowError.textContent = getErrorMessage(error);
+  }
+}
+
+async function handleWorkflowAction(event) {
+  const button = event.target.closest('[data-workflow-action]');
+  const paper = workflowPaper();
+  if (!button || !paper) return;
+  const taskId = button.closest('[data-task-id]')?.dataset.taskId;
+  const revisionId = button.closest('[data-revision-id]')?.dataset.revisionId;
+  try {
+    if (button.dataset.workflowAction === 'edit-task') {
+      const task = paper.tasks.find((item) => item.id === taskId);
+      elements.taskId.value = task.id; elements.taskType.value = task.type; elements.taskTitle.value = task.title; elements.taskDueAt.value = toDateTimeInput(task.dueAt);
+      elements.saveTaskButton.textContent = '保存修改'; elements.cancelTaskEditButton.hidden = false; return;
+    }
+    if (button.dataset.workflowAction === 'toggle-task') {
+      const task = paper.tasks.find((item) => item.id === taskId);
+      replacePaper(await api.completeTask(paper.id, taskId, !task.completedAt));
+    }
+    if (button.dataset.workflowAction === 'delete-task') replacePaper(await api.deleteTask(paper.id, taskId));
+    if (button.dataset.workflowAction === 'edit-revision') {
+      const round = paper.revisionRounds.find((item) => item.id === revisionId);
+      elements.revisionId.value = round.id; elements.revisionNumber.value = String(round.round); elements.revisionDecision.value = round.decisionType; elements.revisionStatus.value = round.status;
+      elements.revisionRequestedAt.value = toDateInput(round.requestedAt); elements.revisionDueAt.value = toDateInput(round.dueAt); elements.revisionSubmittedAt.value = toDateInput(round.submittedAt); elements.revisionNotes.value = round.notes || '';
+      elements.saveRevisionButton.textContent = '保存修改'; elements.cancelRevisionEditButton.hidden = false; return;
+    }
+    if (button.dataset.workflowAction === 'delete-revision') replacePaper(await api.deleteRevision(paper.id, revisionId));
+  } catch (error) {
+    elements.workflowError.textContent = getErrorMessage(error);
+  }
+}
+
 async function addPaper() {
   let payload;
   if (state.addMode === 'link') {
@@ -488,7 +744,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '0.5.2';
+  const version = settings.appVersion || '0.6.0';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   elements.dataDirectory.textContent = settings.dataDirectory || '系统默认位置';
@@ -628,7 +884,7 @@ async function changeDataDirectory() {
 }
 
 function syncModalTitleBar() {
-  const active = [elements.addDialog, elements.settingsDialog, elements.journeyDialog, elements.removeDialog]
+  const active = [elements.addDialog, elements.settingsDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog]
     .some((dialog) => dialog.open);
   api.setModalWindowState(active).catch(() => {});
 }
@@ -725,6 +981,10 @@ async function handlePaperAction(event) {
     openJourneyDialog(paper);
     return;
   }
+  if (button.dataset.action === 'manage') {
+    openWorkflowDialog(paper);
+    return;
+  }
 
   try {
     if (button.dataset.action === 'mark-read') {
@@ -808,10 +1068,18 @@ function bindEvents() {
   elements.emptyAddButton.addEventListener('click', openAddDialog);
   elements.confirmAddButton.addEventListener('click', addPaper);
   elements.confirmJourneyButton.addEventListener('click', confirmJourneyLink);
+  elements.saveDetailsButton.addEventListener('click', saveWorkflowDetails);
+  elements.saveTaskButton.addEventListener('click', saveWorkflowTask);
+  elements.cancelTaskEditButton.addEventListener('click', resetTaskEditor);
+  elements.saveRevisionButton.addEventListener('click', saveWorkflowRevision);
+  elements.cancelRevisionEditButton.addEventListener('click', resetRevisionEditor);
+  elements.workflowDialog.addEventListener('click', handleWorkflowAction);
   elements.closeAddDialogButton.addEventListener('click', () => elements.addDialog.close());
   elements.cancelAddButton.addEventListener('click', () => elements.addDialog.close());
   elements.closeJourneyDialogButton.addEventListener('click', () => elements.journeyDialog.close());
   elements.cancelJourneyButton.addEventListener('click', () => elements.journeyDialog.close());
+  elements.closeWorkflowDialogButton.addEventListener('click', () => elements.workflowDialog.close());
+  elements.closeWorkflowFooterButton.addEventListener('click', () => elements.workflowDialog.close());
   elements.addModeLink.addEventListener('click', () => setAddMode('link'));
   elements.addModeAuthor.addEventListener('click', () => setAddMode('author'));
   [elements.trackingUrl, elements.productionReference, elements.authorLastName, elements.authorFirstName].forEach((input) => {
@@ -853,10 +1121,11 @@ function bindEvents() {
   elements.settingsDialog.addEventListener('click', closeOnBackdrop);
   elements.addDialog.addEventListener('click', closeOnBackdrop);
   elements.journeyDialog.addEventListener('click', closeOnBackdrop);
+  elements.workflowDialog.addEventListener('click', closeOnBackdrop);
   elements.saveSettingsButton.addEventListener('click', saveSettings);
   elements.confirmRemoveButton.addEventListener('click', removeSelectedPaper);
   elements.removeDialog.addEventListener('close', () => { state.removeId = null; });
-  [elements.addDialog, elements.settingsDialog, elements.journeyDialog, elements.removeDialog].forEach((dialog) => {
+  [elements.addDialog, elements.settingsDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog].forEach((dialog) => {
     dialog.addEventListener('close', () => {
       dialog.classList.remove('dialog-entering');
       syncModalTitleBar();
@@ -864,6 +1133,7 @@ function bindEvents() {
     dialog.addEventListener('cancel', () => setTimeout(syncModalTitleBar, 0));
   });
   elements.journeyDialog.addEventListener('close', () => { state.journeyLinkId = null; });
+  elements.workflowDialog.addEventListener('close', () => { state.workflowPaperId = null; });
 }
 
 async function initialize() {

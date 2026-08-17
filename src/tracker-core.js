@@ -104,6 +104,18 @@ function countReviewEvents(events, latestRevision) {
   return counts;
 }
 
+function reviewEventKey(event) {
+  return [event?.id || 'unknown', event?.type || 'UNKNOWN', Number(event?.revision) || 0, Number(event?.date) || 0].join(':');
+}
+
+function mergeObservedReviewEvents(previousEvents, currentEvents, observedAt) {
+  const previous = new Map((previousEvents || []).map((event) => [reviewEventKey(event), event]));
+  return (currentEvents || []).map((event) => ({
+    ...event,
+    observedAt: previous.get(reviewEventKey(event))?.observedAt || observedAt
+  }));
+}
+
 function normalizeTrackerPayload(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     throw new Error('Elsevier 返回了无法识别的数据。');
@@ -134,7 +146,8 @@ function snapshotFingerprint(snapshot) {
     latestRevision: snapshot.latestRevision,
     counts: snapshot.counts,
     doi: snapshot.doi || null,
-    productionEvents: (snapshot.productionEvents || []).map((event) => [event.id, event.dateText])
+    productionEvents: (snapshot.productionEvents || []).map((event) => [event.id, event.dateText]),
+    reviewEvents: (snapshot.events || []).map(reviewEventKey).sort()
   });
 }
 
@@ -161,6 +174,16 @@ function describeChanges(previous, current) {
       const labels = { invited: '邀请审稿人', accepted: '接受审稿', completed: '完成审稿' };
       changes.push(`${labels[key]}：${before} → ${after}`);
     }
+  }
+  const previousEvents = new Set((previous.events || []).map(reviewEventKey));
+  const eventLabels = {
+    REVIEWER_INVITED: '审稿人已获邀请',
+    REVIEWER_ACCEPTED: '审稿人已接受邀请',
+    REVIEWER_COMPLETED: '审稿意见已返回'
+  };
+  for (const event of current.events || []) {
+    if (previousEvents.has(reviewEventKey(event))) continue;
+    changes.push(`R${event.revision}：${eventLabels[event.type] || `未识别审稿事件（${event.type || 'UNKNOWN'}）`}`);
   }
   return changes;
 }
@@ -192,6 +215,8 @@ module.exports = {
   TRACKER_API_ORIGIN,
   parseTrackingInput,
   normalizeTrackerPayload,
+  reviewEventKey,
+  mergeObservedReviewEvents,
   snapshotFingerprint,
   describeChanges,
   maskTrackingUrl,

@@ -25,7 +25,8 @@ const {
   snapshotFingerprint,
   describeChanges,
   maskTrackingUrl,
-  getStageStartedAt
+  getStageStartedAt,
+  mergeObservedReviewEvents
 } = require('./tracker-core');
 const {
   buildProductionTrackingUrl,
@@ -45,7 +46,16 @@ const {
   actionState,
   lastChangedAt,
   sortPapers,
-  buildPaperExport
+  buildPaperExport,
+  paperTaskSummary,
+  updatePaperDetails,
+  saveTask,
+  completeTask,
+  deleteTask,
+  tasksNeedingNotification,
+  markTaskReminded,
+  saveRevisionRound,
+  deleteRevisionRound
 } = require('./paper-core');
 const {
   createInitialUpdateState,
@@ -89,7 +99,8 @@ function paperKey(uuid) {
   return crypto.createHash('sha256').update(uuid).digest('hex');
 }
 
-function compactSnapshot(snapshot) {
+function compactSnapshot(snapshot, observedAt = new Date().toISOString(), previousSnapshot = null) {
+  const events = mergeObservedReviewEvents(previousSnapshot?.events, snapshot.events, observedAt);
   return {
     kind: snapshot.kind || 'review',
     title: snapshot.title,
@@ -105,7 +116,8 @@ function compactSnapshot(snapshot) {
     acceptedDate: snapshot.acceptedDate || null,
     doi: snapshot.doi || null,
     statusComment: snapshot.statusComment || null,
-    productionEvents: Array.isArray(snapshot.productionEvents) ? snapshot.productionEvents.slice(0, 100) : []
+    productionEvents: Array.isArray(snapshot.productionEvents) ? snapshot.productionEvents.slice(0, 100) : [],
+    events: events.slice(-500)
   };
 }
 
@@ -116,6 +128,7 @@ function serializePaper(paper) {
     paper.addedAt
   );
   const action = actionState(paper);
+  const urgentTask = paperTaskSummary(paper);
   return {
     id: paper.id,
     source: paper.source,
@@ -138,6 +151,11 @@ function serializePaper(paper) {
     doi: paper.snapshot.doi || null,
     statusComment: paper.snapshot.statusComment || null,
     productionEvents: paper.snapshot.productionEvents || [],
+    reviewEvents: paper.snapshot.events || [],
+    details: paper.details || {},
+    tasks: paper.tasks || [],
+    revisionRounds: paper.revisionRounds || [],
+    urgentTask,
     addedAt: paper.addedAt,
     archivedAt: paper.archivedAt || null,
     journeyId: paper.journeyId || null,
@@ -527,8 +545,8 @@ async function addReviewPaper(trackingInput) {
     throw new Error('这篇稿件已经在追踪列表中。');
   }
 
-  const snapshot = compactSnapshot(await fetchTrackerSnapshot(parsed.canonicalUrl));
   const now = new Date().toISOString();
+  const snapshot = compactSnapshot(await fetchTrackerSnapshot(parsed.canonicalUrl), now);
   const paper = {
     id: crypto.randomUUID(),
     paperKey: key,
@@ -543,6 +561,9 @@ async function addReviewPaper(trackingInput) {
     nextRetryAt: null,
     lastError: null,
     snapshot,
+    details: {},
+    tasks: [],
+    revisionRounds: [],
     importantUpdates: [],
     history: [{
       checkedAt: now,
@@ -564,8 +585,8 @@ async function addProductionPaper(authorInput) {
     throw new Error('这篇文章已经在追踪列表中。');
   }
 
-  const snapshot = compactSnapshot(await fetchProductionSnapshot(parsed.url));
   const now = new Date().toISOString();
+  const snapshot = compactSnapshot(await fetchProductionSnapshot(parsed.url), now);
   const paper = {
     id: crypto.randomUUID(),
     paperKey: key,
@@ -581,6 +602,9 @@ async function addProductionPaper(authorInput) {
     nextRetryAt: null,
     lastError: null,
     snapshot,
+    details: {},
+    tasks: [],
+    revisionRounds: [],
     importantUpdates: [],
     history: [{
       checkedAt: now,
@@ -617,12 +641,13 @@ async function refreshPaper(id, { notify = true } = {}) {
   paper = store.updatePaper(id, (current) => ({ ...current, lastAttemptAt: attemptedAt }));
   try {
     const trackingUrl = decryptSecret(paper.trackingSecret);
-    const latest = compactSnapshot(await (
+    const rawLatest = await (
       paper.source === 'elsevier-production'
         ? fetchProductionSnapshot(trackingUrl)
         : fetchTrackerSnapshot(trackingUrl)
-    ));
+    );
     const successfulAt = new Date().toISOString();
+    const latest = compactSnapshot(rawLatest, successfulAt, paper.snapshot);
     const previousFingerprint = snapshotFingerprint(paper.snapshot);
     const latestFingerprint = snapshotFingerprint(latest);
     const changes = describeChanges(paper.snapshot, latest);
@@ -802,6 +827,69 @@ async function runScheduledRefresh() {
   }
 }
 
+function deadlineNotificationBody(task, urgency) {
+  const due = new Intl.DateTimeFormat('zh-CN', {
+    month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+  }).format(new Date(task.dueAt));
+  return urgency.state === 'overdue'
+    ? `${task.title}已逾期，截止时间为 ${due}`
+    : `${task.title}将在 ${due} 到期`;
+}
+
+function runDeadlineReminders() {
+  if (!store.getSettings().notifications || !Notification.isSupported()) return [];
+  const now = new Date().toISOString();
+  const reminders = tasksNeedingNotification(store.listPapers(), now);
+  for (const { paper, task, urgency } of reminders) {
+    const notification = new Notification({
+      title: `${urgency.state === 'overdue' ? '任务已逾期' : '任务即将到期'} · ${paper.snapshot.title}`,
+      body: deadlineNotificationBody(task, urgency),
+      silent: false,
+      icon: path.join(__dirname, '..', 'build', 'icon.png')
+    });
+    notification.on('click', showMainWindow);
+    notification.show();
+    store.updatePaper(paper.id, (current) => markTaskReminded(current, task.id, urgency.state, now));
+  }
+  if (reminders.length) broadcastPapers();
+  return reminders;
+}
+
+async function runScheduledWork() {
+  runDeadlineReminders();
+  await runScheduledRefresh();
+}
+
+function mutatePaper(id, mutation) {
+  const updated = store.updatePaper(id, mutation);
+  broadcastPapers();
+  return serializePaper(updated);
+}
+
+function savePaperDetails(id, details) {
+  return mutatePaper(id, (paper) => updatePaperDetails(paper, details));
+}
+
+function savePaperTask(id, input) {
+  return mutatePaper(id, (paper) => saveTask(paper, input, new Date().toISOString(), () => crypto.randomUUID()));
+}
+
+function setPaperTaskCompleted(id, taskId, completed) {
+  return mutatePaper(id, (paper) => completeTask(paper, taskId, completed));
+}
+
+function removePaperTask(id, taskId) {
+  return mutatePaper(id, (paper) => deleteTask(paper, taskId));
+}
+
+function savePaperRevision(id, input) {
+  return mutatePaper(id, (paper) => saveRevisionRound(paper, input, new Date().toISOString(), () => crypto.randomUUID()));
+}
+
+function removePaperRevision(id, revisionId) {
+  return mutatePaper(id, (paper) => deleteRevisionRound(paper, revisionId));
+}
+
 function markPaperRead(id) {
   const updated = store.updatePaper(id, (paper) => markUpdatesRead(paper));
   broadcastPapers();
@@ -880,6 +968,12 @@ function registerIpc() {
   ipcMain.handle('papers:link-journey', (_event, id, targetId) => linkPaperJourney(String(id), String(targetId)));
   ipcMain.handle('papers:unlink-journey', (_event, id) => unlinkPaperJourney(String(id)));
   ipcMain.handle('papers:export', (_event, id, format) => exportPaper(String(id), String(format)));
+  ipcMain.handle('papers:update-details', (_event, id, details) => savePaperDetails(String(id), details));
+  ipcMain.handle('tasks:save', (_event, id, input) => savePaperTask(String(id), input));
+  ipcMain.handle('tasks:complete', (_event, id, taskId, completed) => setPaperTaskCompleted(String(id), String(taskId), Boolean(completed)));
+  ipcMain.handle('tasks:delete', (_event, id, taskId) => removePaperTask(String(id), String(taskId)));
+  ipcMain.handle('revisions:save', (_event, id, input) => savePaperRevision(String(id), input));
+  ipcMain.handle('revisions:delete', (_event, id, revisionId) => removePaperRevision(String(id), String(revisionId)));
   ipcMain.handle('papers:remove', (_event, id) => {
     const paperId = String(id);
     const paper = store.findPaper(paperId);
@@ -945,7 +1039,8 @@ if (!gotLock) {
       createWindow();
       createTray();
       updateLoginItemSetting(store.getSettings().startAtLogin);
-      scheduler = setInterval(runScheduledRefresh, 60_000);
+      scheduler = setInterval(() => runScheduledWork().catch(() => {}), 60_000);
+      setTimeout(runDeadlineReminders, 1500);
     } catch (error) {
       dialog.showErrorBox('PaperTrail 无法安全打开数据', error?.message || '数据文件损坏或格式不受支持。');
       isQuitting = true;

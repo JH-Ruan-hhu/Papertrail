@@ -113,3 +113,18 @@ test('refuses corrupt data without overwriting it', (t) => {
   assert.throws(() => store.load(), /无法解析，未写入任何内容/);
   assert.equal(fs.readFileSync(filePath, 'utf8'), '{broken-json');
 });
+
+test('does not overwrite the original file when workflow migration fails', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'papertrail-store-migration-failure-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, 'papertrail-data.json');
+  const original = JSON.stringify({
+    version: 2,
+    settings: {},
+    papers: [{ ...validPaper(), tasks: [{ id: 'broken', type: 'revision', dueAt: 'not-a-date' }] }]
+  });
+  fs.writeFileSync(filePath, original, 'utf8');
+  const store = new JsonStore(filePath);
+  assert.throws(() => store.load(), /截止任务缺少有效截止时间/);
+  assert.equal(fs.readFileSync(filePath, 'utf8'), original);
+});

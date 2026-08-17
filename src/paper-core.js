@@ -1,7 +1,22 @@
 'use strict';
 
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
+const TASK_REMINDER_LEAD_MS = 48 * 60 * 60_000;
+const TASK_TYPES = Object.freeze(['revision', 'proof', 'copyright', 'followup']);
+const TASK_TYPE_LABELS = Object.freeze({
+  revision: '修回截止日期',
+  proof: '校样截止日期',
+  copyright: '版权/许可文件截止日期',
+  followup: '建议催稿日期'
+});
+const REVISION_STATUSES = Object.freeze(['pending-revision', 'submitted', 'waiting-decision', 'completed']);
+const REVISION_STATUS_LABELS = Object.freeze({
+  'pending-revision': '待修回',
+  submitted: '已提交',
+  'waiting-decision': '等待决定',
+  completed: '已完成'
+});
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -14,6 +29,80 @@ function validDate(value) {
 function latestDate(values, fallback = null) {
   const timestamps = values.filter(validDate).map((value) => Date.parse(value));
   return timestamps.length ? new Date(Math.max(...timestamps)).toISOString() : fallback;
+}
+
+function isoDate(value, fallback = null) {
+  return validDate(value) ? new Date(value).toISOString() : fallback;
+}
+
+function cleanText(value, maxLength = 2000) {
+  return String(value || '').trim().slice(0, maxLength);
+}
+
+function normalizeDetails(value) {
+  const details = asObject(value) || {};
+  return {
+    manuscriptId: cleanText(details.manuscriptId, 200) || null,
+    handlingEditor: cleanText(details.handlingEditor, 200) || null,
+    currentContact: cleanText(details.currentContact, 300) || null,
+    dispositionNote: cleanText(details.dispositionNote, 4000) || null,
+    notes: cleanText(details.notes, 10_000) || null
+  };
+}
+
+function normalizeTask(task, index = 0, fallbackAt = new Date(0).toISOString()) {
+  if (!asObject(task)) throw new Error(`第 ${index + 1} 条截止任务格式无效。`);
+  const type = TASK_TYPES.includes(task.type) ? task.type : null;
+  if (!type) throw new Error(`第 ${index + 1} 条截止任务类型无效。`);
+  const dueAt = isoDate(task.dueAt);
+  if (!dueAt) throw new Error(`第 ${index + 1} 条截止任务缺少有效截止时间。`);
+  const createdAt = isoDate(task.createdAt, fallbackAt);
+  const completedAt = isoDate(task.completedAt);
+  const reminderStage = ['due-soon', 'overdue'].includes(task.reminderStage) ? task.reminderStage : null;
+  return {
+    id: cleanText(task.id, 200) || `task-${index + 1}`,
+    type,
+    title: cleanText(task.title, 300) || TASK_TYPE_LABELS[type],
+    dueAt,
+    completedAt,
+    createdAt,
+    updatedAt: isoDate(task.updatedAt, createdAt),
+    reminderStage,
+    lastRemindedAt: isoDate(task.lastRemindedAt)
+  };
+}
+
+function normalizeRevisionRound(round, index = 0, fallbackAt = new Date(0).toISOString()) {
+  if (!asObject(round)) throw new Error(`第 ${index + 1} 条修回轮次格式无效。`);
+  const number = Number(round.round);
+  if (!Number.isInteger(number) || number < 0 || number > 99) {
+    throw new Error(`第 ${index + 1} 条修回轮次编号无效。`);
+  }
+  const status = REVISION_STATUSES.includes(round.status) ? round.status : 'pending-revision';
+  const createdAt = isoDate(round.createdAt, fallbackAt);
+  return {
+    id: cleanText(round.id, 200) || `revision-${number}`,
+    round: number,
+    decisionType: cleanText(round.decisionType, 200) || '未记录',
+    requestedAt: isoDate(round.requestedAt),
+    dueAt: isoDate(round.dueAt),
+    submittedAt: isoDate(round.submittedAt),
+    status,
+    notes: cleanText(round.notes, 4000) || null,
+    createdAt,
+    updatedAt: isoDate(round.updatedAt, createdAt)
+  };
+}
+
+function normalizeReviewEvents(snapshot, observedAt) {
+  if (!Array.isArray(snapshot.events)) return [];
+  return snapshot.events.filter(asObject).slice(0, 500).map((event, index) => ({
+    id: cleanText(event.id, 200) || `event-${index + 1}`,
+    type: cleanText(event.type, 200) || 'UNKNOWN',
+    revision: Number.isFinite(Number(event.revision)) ? Number(event.revision) : 0,
+    date: Number.isFinite(Number(event.date)) ? Number(event.date) : null,
+    observedAt: isoDate(event.observedAt, observedAt)
+  }));
 }
 
 function migratePaper(paper, index = 0) {
@@ -73,6 +162,18 @@ function migratePaper(paper, index = 0) {
     })
     : [];
 
+  const snapshot = {
+    ...paper.snapshot,
+    events: normalizeReviewEvents(paper.snapshot, lastSuccessfulAt)
+  };
+  const details = normalizeDetails(paper.details);
+  const tasks = Array.isArray(paper.tasks)
+    ? paper.tasks.map((task, taskIndex) => normalizeTask(task, taskIndex, addedAt))
+    : [];
+  const revisionRounds = Array.isArray(paper.revisionRounds)
+    ? paper.revisionRounds.map((round, roundIndex) => normalizeRevisionRound(round, roundIndex, addedAt))
+    : [];
+
   return {
     ...paper,
     addedAt,
@@ -83,8 +184,12 @@ function migratePaper(paper, index = 0) {
     failureStreak,
     nextRetryAt,
     lastError,
+    snapshot,
     history,
-    importantUpdates
+    importantUpdates,
+    details,
+    tasks,
+    revisionRounds
   };
 }
 
@@ -209,6 +314,108 @@ function unreadCount(paper) {
   return (paper.importantUpdates || []).filter((update) => !update.isRead).length;
 }
 
+function taskUrgency(task, now = new Date().toISOString(), leadMs = TASK_REMINDER_LEAD_MS) {
+  if (task.completedAt) return { rank: 0, state: 'completed', label: '已完成' };
+  const due = Date.parse(task.dueAt);
+  const current = Date.parse(now);
+  if (!Number.isFinite(due) || !Number.isFinite(current)) return { rank: 0, state: 'invalid', label: '日期无效' };
+  if (due < current) return { rank: 3, state: 'overdue', label: '已逾期' };
+  if (due - current <= leadMs) return { rank: 2, state: 'due-soon', label: '即将到期' };
+  return { rank: 1, state: 'upcoming', label: '待完成' };
+}
+
+function paperTaskSummary(paper, now = new Date().toISOString()) {
+  const tasks = (paper.tasks || []).filter((task) => !task.completedAt).map((task) => ({
+    ...task,
+    urgency: taskUrgency(task, now)
+  })).sort((a, b) => b.urgency.rank - a.urgency.rank || Date.parse(a.dueAt) - Date.parse(b.dueAt));
+  return tasks[0] || null;
+}
+
+function updatePaperDetails(paper, details) {
+  return { ...paper, details: normalizeDetails(details) };
+}
+
+function saveTask(paper, input, now = new Date().toISOString(), makeId = () => `task-${Date.now()}`) {
+  const current = (paper.tasks || []).find((task) => task.id === input?.id);
+  const normalized = normalizeTask({
+    ...current,
+    ...input,
+    id: current?.id || makeId(),
+    createdAt: current?.createdAt || now,
+    updatedAt: now,
+    reminderStage: current?.dueAt === isoDate(input?.dueAt) && !current?.completedAt ? current.reminderStage : null,
+    lastRemindedAt: current?.dueAt === isoDate(input?.dueAt) && !current?.completedAt ? current.lastRemindedAt : null
+  }, 0, now);
+  const tasks = current
+    ? (paper.tasks || []).map((task) => task.id === current.id ? normalized : task)
+    : [...(paper.tasks || []), normalized];
+  return { ...paper, tasks };
+}
+
+function completeTask(paper, id, completed = true, now = new Date().toISOString()) {
+  let found = false;
+  const tasks = (paper.tasks || []).map((task) => {
+    if (task.id !== id) return task;
+    found = true;
+    return { ...task, completedAt: completed ? now : null, updatedAt: now, reminderStage: null, lastRemindedAt: null };
+  });
+  if (!found) throw new Error('找不到这条截止任务。');
+  return { ...paper, tasks };
+}
+
+function deleteTask(paper, id) {
+  const tasks = (paper.tasks || []).filter((task) => task.id !== id);
+  if (tasks.length === (paper.tasks || []).length) throw new Error('找不到这条截止任务。');
+  return { ...paper, tasks };
+}
+
+function tasksNeedingNotification(papers, now = new Date().toISOString(), leadMs = TASK_REMINDER_LEAD_MS) {
+  const reminders = [];
+  for (const paper of papers || []) {
+    if (paper.archivedAt) continue;
+    for (const task of paper.tasks || []) {
+      const urgency = taskUrgency(task, now, leadMs);
+      if (!['due-soon', 'overdue'].includes(urgency.state)) continue;
+      if (task.reminderStage === urgency.state) continue;
+      reminders.push({ paper, task, urgency });
+    }
+  }
+  return reminders;
+}
+
+function markTaskReminded(paper, id, stage, remindedAt = new Date().toISOString()) {
+  return {
+    ...paper,
+    tasks: (paper.tasks || []).map((task) => task.id === id
+      ? { ...task, reminderStage: stage, lastRemindedAt: remindedAt }
+      : task)
+  };
+}
+
+function saveRevisionRound(paper, input, now = new Date().toISOString(), makeId = () => `revision-${Date.now()}`) {
+  const current = (paper.revisionRounds || []).find((round) => round.id === input?.id);
+  const normalized = normalizeRevisionRound({
+    ...current,
+    ...input,
+    id: current?.id || makeId(),
+    createdAt: current?.createdAt || now,
+    updatedAt: now
+  }, 0, now);
+  const duplicate = (paper.revisionRounds || []).find((round) => round.round === normalized.round && round.id !== normalized.id);
+  if (duplicate) throw new Error(`R${normalized.round} 已经存在。`);
+  const revisionRounds = current
+    ? (paper.revisionRounds || []).map((round) => round.id === current.id ? normalized : round)
+    : [...(paper.revisionRounds || []), normalized];
+  return { ...paper, revisionRounds: revisionRounds.sort((a, b) => a.round - b.round) };
+}
+
+function deleteRevisionRound(paper, id) {
+  const revisionRounds = (paper.revisionRounds || []).filter((round) => round.id !== id);
+  if (revisionRounds.length === (paper.revisionRounds || []).length) throw new Error('找不到这条修回轮次。');
+  return { ...paper, revisionRounds };
+}
+
 function latestProductionEvent(snapshot) {
   const events = Array.isArray(snapshot?.productionEvents) ? snapshot.productionEvents : [];
   return [...events].sort((a, b) => {
@@ -219,8 +426,22 @@ function latestProductionEvent(snapshot) {
 }
 
 function actionState(paper) {
+  const urgentTask = paperTaskSummary(paper);
+  if (urgentTask?.urgency.state === 'overdue') {
+    return { category: 'overdue', label: `${urgentTask.title}已逾期`, tone: 'red', needsAction: true, canArchive: false };
+  }
+  if (urgentTask?.urgency.state === 'due-soon') {
+    return { category: 'deadline', label: `${urgentTask.title}即将到期`, tone: 'amber', needsAction: true, canArchive: false };
+  }
   if (paper.lastError) {
     return { category: 'failure', label: '同步失败，请检查连接或稍后重试', tone: 'red', needsAction: false, canArchive: false };
+  }
+  const latestRound = [...(paper.revisionRounds || [])].sort((a, b) => b.round - a.round)[0];
+  if (latestRound?.status === 'pending-revision') {
+    return { category: 'action', label: `R${latestRound.round} 待修回`, tone: 'amber', needsAction: true, canArchive: false };
+  }
+  if (['submitted', 'waiting-decision'].includes(latestRound?.status)) {
+    return { category: 'waiting', label: `R${latestRound.round} 已提交，等待决定`, tone: 'blue', needsAction: false, canArchive: false };
   }
   const snapshot = paper.snapshot || paper;
   if (snapshot.kind === 'production' || paper.source === 'elsevier-production') {
@@ -273,6 +494,8 @@ function lastChangedAt(paper) {
   return latestDate([
     ...(paper.importantUpdates || []).map((update) => update.occurredAt),
     ...(paper.history || []).map((entry) => entry.checkedAt),
+    ...(paper.tasks || []).map((task) => task.updatedAt),
+    ...(paper.revisionRounds || []).map((round) => round.updatedAt),
     paper.lastSuccessfulAt,
     paper.addedAt
   ], paper.addedAt);
@@ -284,15 +507,20 @@ function matchesPaperSearch(paper, query) {
   return [
     paper.title || paper.snapshot?.title,
     paper.journal || paper.snapshot?.journal,
-    paper.articleReference || paper.snapshot?.articleReference
+    paper.articleReference || paper.snapshot?.articleReference,
+    paper.details?.manuscriptId,
+    paper.details?.handlingEditor,
+    paper.details?.currentContact
   ]
     .some((value) => String(value || '').toLocaleLowerCase('zh-CN').includes(needle));
 }
 
 function sortPapers(papers) {
   return [...papers].sort((a, b) => {
-    const aPriority = unreadCount(a) > 0 || a.needsAction || actionState(a).needsAction ? 1 : 0;
-    const bPriority = unreadCount(b) > 0 || b.needsAction || actionState(b).needsAction ? 1 : 0;
+    const aTask = paperTaskSummary(a);
+    const bTask = paperTaskSummary(b);
+    const aPriority = (aTask?.urgency.rank || 0) * 10 + (unreadCount(a) > 0 || a.needsAction || actionState(a).needsAction ? 1 : 0);
+    const bPriority = (bTask?.urgency.rank || 0) * 10 + (unreadCount(b) > 0 || b.needsAction || actionState(b).needsAction ? 1 : 0);
     if (aPriority !== bPriority) return bPriority - aPriority;
     const changed = Date.parse(lastChangedAt(b) || 0) - Date.parse(lastChangedAt(a) || 0);
     if (changed) return changed;
@@ -320,6 +548,7 @@ function redactSensitive(value) {
 
 function exportRows(paper) {
   const snapshot = paper.snapshot || paper;
+  const details = normalizeDetails(paper.details);
   const status = actionState(paper).label;
   const rows = [
     ['基本信息', '', `标题：${snapshot.title || '未命名稿件'}`],
@@ -327,6 +556,11 @@ function exportRows(paper) {
     ['基本信息', '', `当前状态：${status}`]
   ];
   if (snapshot.articleReference) rows.push(['关键日期', '', `生产编号：${snapshot.articleReference}`]);
+  if (details.manuscriptId) rows.push(['补充信息', '', `Manuscript ID：${details.manuscriptId}`]);
+  if (details.handlingEditor) rows.push(['补充信息', '', `处理编辑：${details.handlingEditor}`]);
+  if (details.currentContact) rows.push(['补充信息', '', `当前投稿联系人：${details.currentContact}`]);
+  if (details.dispositionNote) rows.push(['备注', '', `拒稿/转投/接收备注：${details.dispositionNote}`]);
+  if (details.notes) rows.push(['备注', '', `自定义备注：${details.notes}`]);
   if (snapshot.doi) rows.push(['基本信息', '', `DOI：${snapshot.doi}`]);
   if (snapshot.submissionDate) rows.push(['关键日期', snapshot.submissionDate, '首次投稿']);
   if (snapshot.acceptedDate) rows.push(['关键日期', snapshot.acceptedDate, '文章接收']);
@@ -336,6 +570,33 @@ function exportRows(paper) {
       ? entry.changes.join('；')
       : entry.status?.label || '状态记录';
     rows.push(['状态历史', entry.checkedAt || '', details]);
+  }
+  for (const round of paper.revisionRounds || []) {
+    const dates = [
+      round.requestedAt ? `要求修回 ${round.requestedAt}` : '',
+      round.dueAt ? `截止 ${round.dueAt}` : '',
+      round.submittedAt ? `实际提交 ${round.submittedAt}` : ''
+    ].filter(Boolean).join('；');
+    rows.push([
+      '修回轮次',
+      round.requestedAt || round.submittedAt || round.dueAt || '',
+      `R${round.round} · ${round.decisionType} · ${REVISION_STATUS_LABELS[round.status] || round.status}${dates ? `；${dates}` : ''}${round.notes ? `；备注：${round.notes}` : ''}`
+    ]);
+  }
+  for (const task of paper.tasks || []) {
+    rows.push([
+      '截止任务',
+      task.dueAt,
+      `${task.title} · ${task.completedAt ? `已完成（${task.completedAt}）` : taskUrgency(task).label}`
+    ]);
+  }
+  for (const event of snapshot.events || []) {
+    const publisherTime = event.date ? new Date(Number(event.date) * 1000).toISOString() : '未提供';
+    rows.push([
+      '审稿事件',
+      publisherTime === '未提供' ? event.observedAt || '' : publisherTime,
+      `R${event.revision} · ${event.type || 'UNKNOWN'} · 出版商时间：${publisherTime} · 本地首次观察：${event.observedAt || '未记录'}`
+    ]);
   }
   for (const event of snapshot.productionEvents || []) {
     rows.push(['出版事件', event.dateText || '', event.label || event.sourceLabel || '出版进展']);
@@ -354,11 +615,15 @@ function buildPaperExport(paper, format) {
   }
   if (format !== 'markdown') throw new Error('不支持的导出格式。');
   const snapshot = paper.snapshot || paper;
+  const details = normalizeDetails(paper.details);
   const lines = [
     `# ${redactSensitive(snapshot.title || '未命名稿件')}`,
     '',
     `- 期刊：${redactSensitive(snapshot.journal || '未知期刊')}`,
     `- 当前状态：${redactSensitive(actionState(paper).label)}`,
+    `- Manuscript ID：${redactSensitive(details.manuscriptId || '未填写')}`,
+    `- 处理编辑：${redactSensitive(details.handlingEditor || '未填写')}`,
+    `- 当前投稿联系人：${redactSensitive(details.currentContact || '未填写')}`,
     `- 生产编号：${redactSensitive(snapshot.articleReference || '不适用')}`,
     `- DOI：${redactSensitive(snapshot.doi || '尚未分配')}`,
     `- 最近成功同步：${redactSensitive(paper.lastSuccessfulAt || '尚未记录')}`,
@@ -375,6 +640,11 @@ function buildPaperExport(paper, format) {
 module.exports = {
   DATA_VERSION,
   RETRY_DELAYS_MS,
+  TASK_REMINDER_LEAD_MS,
+  TASK_TYPES,
+  TASK_TYPE_LABELS,
+  REVISION_STATUSES,
+  REVISION_STATUS_LABELS,
   migratePaper,
   migrateData,
   retryDelayMs,
@@ -387,6 +657,16 @@ module.exports = {
   linkJourney,
   unlinkJourney,
   unreadCount,
+  taskUrgency,
+  paperTaskSummary,
+  updatePaperDetails,
+  saveTask,
+  completeTask,
+  deleteTask,
+  tasksNeedingNotification,
+  markTaskReminded,
+  saveRevisionRound,
+  deleteRevisionRound,
   actionState,
   lastChangedAt,
   matchesPaperSearch,
