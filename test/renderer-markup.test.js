@@ -190,36 +190,58 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
   assert.match(appJs, /setTimeout\(finishEntering, 60\)/);
 });
 
-test('research workbench exposes home, 24-hour schedule, metadata notes and quick capture', () => {
+test('research workbench exposes home, weekly schedule board, metadata notes and quick capture', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const scheduleWidgetHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.html'), 'utf8');
+  const scheduleWidgetJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.js'), 'utf8');
   assert.match(indexHtml, /data-workbench-page="home"/);
   assert.match(indexHtml, /data-workbench-page="schedule"/);
   assert.match(indexHtml, /data-workbench-page="attendance"/);
   assert.match(indexHtml, /data-workbench-page="notes"/);
-  assert.match(indexHtml, /data-workbench-page="literature"/);
   assert.match(indexHtml, /data-workbench-page="submissions"/);
   assert.doesNotMatch(indexHtml, /id="bingWallpaper"/);
   assert.match(indexHtml, /id="homeDayOverview"/);
-  assert.match(indexHtml, /id="timelineHours"/);
+  assert.match(indexHtml, /id="scheduleBoard"/);
   assert.match(indexHtml, /id="attendanceGanttRows"/);
   assert.match(indexHtml, /id="startFocusButton"/);
   assert.match(indexHtml, /id="focusUsageList"/);
   assert.match(indexHtml, /data-focus-minutes="50"/);
-  assert.match(indexHtml, /id="recommendLiteratureButton"/);
   assert.match(indexHtml, /id="quickNoteButton"/);
+  assert.match(indexHtml, /id="createStickyNoteButton"/);
+  assert.match(indexHtml, /id="openScheduleWidgetButton"/);
+  assert.match(indexHtml, /id="stickyNoteShortcut"/);
   assert.match(indexHtml, /class="home-content-grid"/);
   assert.match(indexHtml, /id="notesGrid"/);
   assert.match(indexHtml, /id="noteMetadataPanel"/);
   assert.match(indexHtml, /#1 · 多屏星空提醒/);
   assert.match(mainJs, /globalShortcut\.register/);
+  assert.match(mainJs, /registerWorkbenchShortcuts/);
+  assert.match(mainJs, /active \? TITLE_BAR_MODAL : TITLE_BAR_NORMAL/);
+  assert.match(mainJs, /function attachWindowToDesktop/);
+  assert.match(mainJs, /SHELLDLL_DefView/);
+  assert.match(mainJs, /width = 360/);
+  assert.match(mainJs, /height = 480/);
+  assert.match(mainJs, /alwaysOnTop: false/);
+  assert.match(mainJs, /skipTaskbar: true/);
   assert.match(mainJs, /showDeadlineWindow/);
   assert.match(mainJs, /new Notification/);
   assert.match(preloadJs, /showCapture/);
+  assert.match(preloadJs, /createStickyNote/);
+  assert.match(preloadJs, /showScheduleWidget/);
+  assert.match(scheduleWidgetHtml, /id="widgetScheduleList"/);
+  assert.match(scheduleWidgetHtml, /id="closeWidgetButton"/);
+  assert.match(scheduleWidgetJs, /schedulesForToday/);
+  assert.match(scheduleWidgetJs, /completeSchedule/);
   assert.match(preloadJs, /startFocus/);
-  assert.match(preloadJs, /recommendLiterature/);
   assert.match(preloadJs, /onFocusChanged/);
+  assert.match(workbenchJs, /schedule-board-column/);
+  assert.doesNotMatch(indexHtml, /文献推荐|data-workbench-page="literature"/);
+  assert.doesNotMatch(mainJs, /OpenAlex|literature:recommend|recommendLatestLiterature/);
+  assert.doesNotMatch(preloadJs, /recommendLiterature|literature:recommend/);
+  assert.doesNotMatch(workbenchJs, /recommendLiterature|literatureResults/);
 });
 
 test('quick capture preserves Chinese IME composition and closes empty on blur', () => {

@@ -7,11 +7,17 @@ const confirmAccept = document.getElementById('yanjiConfirmAccept');
 const confirmCancel = document.getElementById('yanjiConfirmCancel');
 let settleConfirm = null;
 
+function syncConfirmModalState() {
+  const active = [...document.querySelectorAll('dialog')].some((dialog) => dialog.open);
+  window.paperTrail?.setModalWindowState(active).catch(() => {});
+}
+
 function finishConfirm(accepted) {
   if (!settleConfirm) return;
   const settle = settleConfirm;
   settleConfirm = null;
   if (confirmDialog.open) confirmDialog.close();
+  syncConfirmModalState();
   settle(Boolean(accepted));
 }
 
@@ -28,6 +34,7 @@ window.yanjiConfirm = ({
   confirmAccept.textContent = String(confirmText);
   confirmAccept.classList.toggle('danger', tone === 'danger');
   confirmDialog.showModal();
+  syncConfirmModalState();
   requestAnimationFrame(() => confirmCancel.focus());
 });
 

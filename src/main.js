@@ -80,7 +80,10 @@ const DATA_FILE_NAME = 'papertrail-data.json';
 const STORAGE_POINTER_NAME = 'papertrail-storage.json';
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
-const TITLE_BAR_NORMAL = Object.freeze({ color: '#f5f5f5', symbolColor: '#4d4d4d', height: 38 });
+const DEFAULT_QUICK_CAPTURE_SHORTCUT = 'CommandOrControl+Shift+Space';
+const DEFAULT_STICKY_NOTE_SHORTCUT = 'CommandOrControl+Alt+N';
+const TITLE_BAR_NORMAL = Object.freeze({ color: '#eaf5fb', symbolColor: '#35566b', height: 38 });
+const TITLE_BAR_MODAL = Object.freeze({ color: '#9dabb6', symbolColor: '#f5fbfe', height: 38 });
 
 let mainWindow;
 let tray;
@@ -91,6 +94,7 @@ let coldStartRefreshStarted = false;
 let updateState;
 let updaterInitialized = false;
 let quickCaptureWindow;
+let scheduleWidgetWindow;
 let quickCaptureHasContent = false;
 let focusTimer;
 let focusSampler;
@@ -334,7 +338,7 @@ function setModalTitleBar(active) {
     !mainWindow.isDestroyed() &&
     typeof mainWindow.setTitleBarOverlay === 'function'
   ) {
-    mainWindow.setTitleBarOverlay(TITLE_BAR_NORMAL);
+    mainWindow.setTitleBarOverlay(active ? TITLE_BAR_MODAL : TITLE_BAR_NORMAL);
   }
 }
 
@@ -539,6 +543,9 @@ function broadcastWorkspace() {
   for (const window of stickyWindows.values()) {
     if (!window.isDestroyed()) window.webContents.send('workspace:changed', workspace);
   }
+  if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
+    scheduleWidgetWindow.webContents.send('workspace:changed', workspace);
+  }
   return workspace;
 }
 
@@ -607,123 +614,6 @@ function saveMetadataFields(input) {
 
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function cleanLiteratureText(value, limit = 2_000) {
-  return String(value || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
-}
-
-function reconstructOpenAlexAbstract(index) {
-  if (!index || typeof index !== 'object' || Array.isArray(index)) return '';
-  const words = [];
-  for (const [word, positions] of Object.entries(index)) {
-    if (!Array.isArray(positions)) continue;
-    for (const position of positions) if (Number.isInteger(position) && position >= 0 && position < 20_000) words[position] = word;
-  }
-  return cleanLiteratureText(words.filter(Boolean).join(' '), 8_000);
-}
-
-function summarizeLiteratureAbstract(abstract, work) {
-  const cleaned = cleanLiteratureText(abstract, 8_000);
-  if (cleaned) {
-    const sentences = cleaned.match(/[^.!?。！？]+[.!?。！？]?/g) || [cleaned];
-    return cleanLiteratureText(sentences.slice(0, 2).join(' '), 520);
-  }
-  const topics = (work.topics || []).slice(0, 3).map((topic) => cleanLiteratureText(topic.display_name, 80)).filter(Boolean);
-  const topicText = topics.length ? `，主题涉及 ${topics.join('、')}` : '';
-  return `这是一篇发表于 ${cleanLiteratureText(work.publication_date, 20) || '近期'} 的研究${topicText}。OpenAlex 当前未提供可复述摘要，请打开原文核对研究问题、方法与结论。`;
-}
-
-async function fetchOpenAlexJson(url) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 18_000);
-  try {
-    const response = await net.fetch(url, {
-      headers: { Accept: 'application/json', 'User-Agent': 'Yanji-Research-Workbench/0.9 (https://github.com/JH-Ruan-hhu/Papertrail)' },
-      signal: controller.signal
-    });
-    if (!response.ok) {
-      if (response.status === 429) throw new Error('OpenAlex 请求较多，请稍后再试。');
-      if (response.status === 401 || response.status === 403) throw new Error('OpenAlex 当前要求访问凭据，暂时无法获取推荐。');
-      throw new Error(`OpenAlex 返回错误（${response.status}）。`);
-    }
-    return response.json();
-  } catch (error) {
-    if (error?.name === 'AbortError') throw new Error('文献检索超时，请检查网络后重试。');
-    throw error;
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function safeArticleUrl(work) {
-  const candidate = work.doi || work.primary_location?.landing_page_url || work.open_access?.oa_url || '';
-  try {
-    const url = new URL(candidate);
-    return ['https:', 'http:'].includes(url.protocol) ? url.toString() : '';
-  } catch {
-    return '';
-  }
-}
-
-async function recommendLatestLiterature(input) {
-  const query = cleanLiteratureText(input?.query, 200);
-  const journal = cleanLiteratureText(input?.journal, 200);
-  const minimumImpact = Math.max(0, Math.min(100, Number(input?.minimumImpact) || 0));
-  const years = [1, 2, 5].includes(Number(input?.years)) ? Number(input.years) : 2;
-  if (query.length < 2) throw new Error('请至少输入 2 个字符的推荐关键词。');
-  const from = new Date();
-  from.setFullYear(from.getFullYear() - years);
-  const fromDate = localDateKey(from);
-  let resolvedSource = null;
-  if (journal) {
-    const sourceUrl = new URL('https://api.openalex.org/sources');
-    sourceUrl.searchParams.set('search', journal);
-    sourceUrl.searchParams.set('per-page', '5');
-    const sources = (await fetchOpenAlexJson(sourceUrl.toString())).results || [];
-    const normalized = journal.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
-    resolvedSource = sources.find((source) => [source.display_name, ...(source.alternate_titles || [])].some((name) => cleanLiteratureText(name, 200).toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '') === normalized)) || sources[0] || null;
-    if (!resolvedSource) throw new Error(`没有找到期刊“${journal}”，请检查名称后重试。`);
-  }
-  const filters = [`from_publication_date:${fromDate}`, `to_publication_date:${localDateKey(new Date())}`, 'type:article', 'is_retracted:false'];
-  if (resolvedSource?.id) filters.push(`primary_location.source.id:${resolvedSource.id.split('/').pop()}`);
-  const worksUrl = new URL('https://api.openalex.org/works');
-  worksUrl.searchParams.set('search', query);
-  worksUrl.searchParams.set('filter', filters.join(','));
-  worksUrl.searchParams.set('sort', 'publication_date:desc');
-  worksUrl.searchParams.set('per-page', '40');
-  const works = (await fetchOpenAlexJson(worksUrl.toString())).results || [];
-  const sourceIds = [...new Set(works.map((work) => work.primary_location?.source?.id).filter(Boolean).map((id) => id.split('/').pop()))];
-  const sourceMap = new Map();
-  if (sourceIds.length) {
-    const sourcesUrl = new URL('https://api.openalex.org/sources');
-    sourcesUrl.searchParams.set('filter', `openalex:${sourceIds.join('|')}`);
-    sourcesUrl.searchParams.set('per-page', '100');
-    const sourceDetails = (await fetchOpenAlexJson(sourcesUrl.toString())).results || [];
-    sourceDetails.forEach((source) => sourceMap.set(source.id?.split('/').pop(), source));
-  }
-  const items = [];
-  for (const work of works) {
-    const sourceId = work.primary_location?.source?.id?.split('/').pop();
-    const source = sourceMap.get(sourceId) || work.primary_location?.source || {};
-    const impactProxy = Number(source.summary_stats?.['2yr_mean_citedness']);
-    if (minimumImpact && (!Number.isFinite(impactProxy) || impactProxy < minimumImpact)) continue;
-    const abstract = reconstructOpenAlexAbstract(work.abstract_inverted_index);
-    items.push({
-      id: cleanLiteratureText(work.id, 120),
-      title: cleanLiteratureText(work.display_name || work.title, 500) || '未命名文章',
-      publicationDate: cleanLiteratureText(work.publication_date, 20),
-      journal: cleanLiteratureText(source.display_name || work.primary_location?.source?.display_name, 300) || '来源未知',
-      impactProxy: Number.isFinite(impactProxy) ? impactProxy : null,
-      authors: (work.authorships || []).slice(0, 6).map((entry) => cleanLiteratureText(entry.author?.display_name, 120)).filter(Boolean),
-      summary: summarizeLiteratureAbstract(abstract, work),
-      citedByCount: Math.max(0, Number(work.cited_by_count) || 0),
-      isOpenAccess: Boolean(work.open_access?.is_oa),
-      url: safeArticleUrl(work)
-    });
-    if (items.length === 3) break;
-  }
-  return { items, fromDate, journal: resolvedSource?.display_name || journal || null, metric: 'OpenAlex 2yr_mean_citedness' };
 }
 
 function saveWorkspaceAttendance(input) {
@@ -1089,15 +979,26 @@ function toggleQuickCapture() {
   window.webContents.send('capture:focus');
 }
 
-function registerQuickCaptureShortcut(accelerator = store?.getSettings().quickCaptureShortcut) {
+function registerWorkbenchShortcuts(settings = store?.getSettings(), { allowFallback = false } = {}) {
   globalShortcut.unregisterAll();
-  const shortcut = String(accelerator || 'CommandOrControl+Shift+Space');
-  if (!globalShortcut.register(shortcut, toggleQuickCapture)) {
-    const fallback = 'CommandOrControl+Shift+Space';
-    if (shortcut !== fallback && globalShortcut.register(fallback, toggleQuickCapture)) return fallback;
-    return null;
+  const registrations = [
+    ['quickCaptureShortcut', DEFAULT_QUICK_CAPTURE_SHORTCUT, toggleQuickCapture],
+    ['stickyNoteShortcut', DEFAULT_STICKY_NOTE_SHORTCUT, createNewStickyNote]
+  ];
+  const registered = {};
+  for (const [key, fallback, handler] of registrations) {
+    const requested = String(settings?.[key] || fallback).trim();
+    let shortcut = requested;
+    if (!globalShortcut.register(shortcut, handler)) {
+      if (!allowFallback || requested === fallback || !globalShortcut.register(fallback, handler)) {
+        globalShortcut.unregisterAll();
+        return null;
+      }
+      shortcut = fallback;
+    }
+    registered[key] = shortcut;
   }
-  return shortcut;
+  return registered;
 }
 
 function openStickyNote(noteId) {
@@ -1118,7 +1019,7 @@ function openStickyNote(noteId) {
     frame: false,
     alwaysOnTop: true,
     skipTaskbar: false,
-    backgroundColor: '#fff7c7',
+    backgroundColor: '#f5fbff',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1131,6 +1032,212 @@ function openStickyNote(noteId) {
   window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id } });
   window.on('closed', () => stickyWindows.delete(id));
   return true;
+}
+
+function createNewStickyNote() {
+  const now = new Date();
+  const note = saveWorkspaceNote({
+    title: `便笺 ${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(now)}`,
+    content: ''
+  });
+  openStickyNote(note.id);
+  return note;
+}
+
+function nativeWindowHandleValue(window) {
+  const handle = window.getNativeWindowHandle();
+  if (handle.length >= 8) return handle.readBigUInt64LE(0).toString();
+  return BigInt(handle.readUInt32LE(0)).toString();
+}
+
+async function attachWindowToDesktop(window) {
+  if (process.platform !== 'win32') return false;
+  const script = String.raw`
+$ChildHandle = [UInt64]::Parse($env:YANJI_DESKTOP_CHILD_HANDLE)
+$source = @'
+using System;
+using System.Runtime.InteropServices;
+
+public static class YanjiDesktopHost {
+  private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+  [StructLayout(LayoutKind.Sequential)]
+  private struct RECT { public int Left, Top, Right, Bottom; }
+
+  [StructLayout(LayoutKind.Sequential)]
+  private struct POINT { public int X, Y; }
+
+  [DllImport("user32.dll")]
+  private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
+
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr childAfter, string className, string title);
+
+  [DllImport("user32.dll")]
+  private static extern IntPtr GetShellWindow();
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern IntPtr SetParent(IntPtr child, IntPtr parent);
+
+  [DllImport("user32.dll")]
+  private static extern IntPtr GetParent(IntPtr child);
+
+  [DllImport("user32.dll")]
+  private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+
+  [DllImport("user32.dll")]
+  private static extern bool ScreenToClient(IntPtr hWnd, ref POINT point);
+
+  [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
+  private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int index);
+
+  [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
+  private static extern IntPtr GetWindowLong32(IntPtr hWnd, int index);
+
+  [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
+  private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int index, IntPtr value);
+
+  [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
+  private static extern IntPtr SetWindowLong32(IntPtr hWnd, int index, IntPtr value);
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
+
+  private static IntPtr GetStyle(IntPtr hWnd) {
+    return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, -16) : GetWindowLong32(hWnd, -16);
+  }
+
+  private static void SetStyle(IntPtr hWnd, IntPtr value) {
+    if (IntPtr.Size == 8) SetWindowLongPtr64(hWnd, -16, value);
+    else SetWindowLong32(hWnd, -16, value);
+  }
+
+  private static IntPtr FindIconHost() {
+    IntPtr host = IntPtr.Zero;
+    EnumWindows(delegate(IntPtr candidate, IntPtr state) {
+      if (FindWindowEx(candidate, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero) {
+        host = candidate;
+        return false;
+      }
+      return true;
+    }, IntPtr.Zero);
+    return host != IntPtr.Zero ? host : GetShellWindow();
+  }
+
+  public static int Attach(UInt64 childValue) {
+    IntPtr child = new IntPtr(unchecked((long)childValue));
+    IntPtr host = FindIconHost();
+    if (child == IntPtr.Zero) return 11;
+    if (host == IntPtr.Zero) return 12;
+
+    RECT rect;
+    if (!GetWindowRect(child, out rect)) return 2;
+    POINT origin = new POINT { X = rect.Left, Y = rect.Top };
+    ScreenToClient(host, ref origin);
+
+    long style = GetStyle(child).ToInt64();
+    style = (style & ~0x80000000L) | 0x40000000L;
+    SetStyle(child, new IntPtr(style));
+    SetParent(child, host);
+    if (GetParent(child) != host) return 3;
+
+    const uint flags = 0x0010 | 0x0020 | 0x0040;
+    return SetWindowPos(child, IntPtr.Zero, origin.X, origin.Y, rect.Right - rect.Left, rect.Bottom - rect.Top, flags) ? 0 : 4;
+  }
+}
+'@
+Add-Type -TypeDefinition $source
+$attachResult = [YanjiDesktopHost]::Attach($ChildHandle)
+Write-Output "YANJI_DESKTOP_RESULT=$attachResult"
+if ($attachResult -eq 0) { Write-Output 'YANJI_DESKTOP_ATTACHED'; exit 0 }
+exit 1
+`;
+  const result = await new Promise((resolve) => {
+    const child = spawn('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-WindowStyle',
+      'Hidden',
+      '-Command',
+      script
+    ], {
+      windowsHide: true,
+      env: { ...process.env, YANJI_DESKTOP_CHILD_HANDLE: nativeWindowHandleValue(window) },
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(value);
+    };
+    const timeout = setTimeout(() => {
+      child.kill();
+      finish({ status: null, signal: 'TIMEOUT', stdout, stderr, error: new Error('desktop attach timed out') });
+    }, 8_000);
+    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+    child.on('error', (error) => finish({ status: null, signal: null, stdout, stderr, error }));
+    child.on('close', (status, signal) => finish({ status, signal, stdout, stderr }));
+  });
+  const attached = result.status === 0 && result.stdout.includes('YANJI_DESKTOP_ATTACHED');
+  if (!attached && process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
+    console.warn(`DESKTOP_WIDGET_NATIVE_DIAGNOSTIC ${JSON.stringify({ handle: nativeWindowHandleValue(window), status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr, error: result.error?.message })}`);
+  }
+  return attached;
+}
+
+async function showScheduleWidget() {
+  if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
+    scheduleWidgetWindow.showInactive();
+    return { attached: Boolean(scheduleWidgetWindow.yanjiDesktopAttached) };
+  }
+  const { workArea } = screen.getPrimaryDisplay();
+  const width = 360;
+  const height = 480;
+  const window = new BrowserWindow({
+    width,
+    height,
+    x: workArea.x + workArea.width - width - 24,
+    y: workArea.y + 24,
+    show: false,
+    frame: false,
+    transparent: false,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    fullscreenable: false,
+    alwaysOnTop: false,
+    skipTaskbar: true,
+    hasShadow: false,
+    backgroundColor: '#eaf5fb',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      devTools: !app.isPackaged
+    }
+  });
+  scheduleWidgetWindow = window;
+  window.on('closed', () => {
+    if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
+  });
+  await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'));
+  window.yanjiDesktopAttached = await attachWindowToDesktop(window);
+  if (window.yanjiDesktopAttached) {
+    await new Promise((resolve) => setTimeout(resolve, 80));
+    window.setResizable(true);
+    window.setSize(width, height);
+    window.setResizable(false);
+  } else {
+    window.setSize(width, height);
+  }
+  window.showInactive();
+  return { attached: window.yanjiDesktopAttached };
 }
 
 function showScheduleNotification(schedule) {
@@ -1488,10 +1595,11 @@ function validateSettings(patch) {
   for (const key of ['autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin', 'autoCheckUpdates']) {
     if (key in patch) allowed[key] = Boolean(patch[key]);
   }
-  if ('quickCaptureShortcut' in patch) {
-    const shortcut = String(patch.quickCaptureShortcut || '').trim();
+  for (const key of ['quickCaptureShortcut', 'stickyNoteShortcut']) {
+    if (!(key in patch)) continue;
+    const shortcut = String(patch[key] || '').trim();
     if (!shortcut || shortcut.length > 100) throw new Error('快捷键格式不正确。');
-    allowed.quickCaptureShortcut = shortcut;
+    allowed[key] = shortcut;
   }
   if ('refreshMinutes' in patch) {
     const minutes = Number(patch.refreshMinutes);
@@ -1519,7 +1627,7 @@ function createWindow() {
     minWidth: 800,
     minHeight: 600,
     show: false,
-    backgroundColor: '#f3f6fb',
+    backgroundColor: '#edf7fc',
     title: APP_NAME,
     icon: path.join(__dirname, '..', 'build', 'icon.png'),
     autoHideMenuBar: true,
@@ -1741,9 +1849,20 @@ function registerIpc() {
   ipcMain.handle('schedules:save', (_event, input) => saveWorkspaceSchedule(input));
   ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
   ipcMain.handle('schedules:complete', (_event, id, completed) => setWorkspaceScheduleCompleted(String(id), Boolean(completed)));
+  ipcMain.handle('schedule-widget:show', () => showScheduleWidget());
+  ipcMain.handle('schedule-widget:close', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+    return true;
+  });
+  ipcMain.handle('schedule-widget:open-main', () => {
+    showMainWindow();
+    mainWindow?.webContents.send('workspace:navigate', 'schedule');
+    return true;
+  });
   ipcMain.handle('notes:save', (_event, input) => saveWorkspaceNote(input));
   ipcMain.handle('notes:delete', (_event, id) => deleteWorkspaceNote(String(id)));
   ipcMain.handle('notes:open-sticky', (_event, id) => openStickyNote(String(id)));
+  ipcMain.handle('notes:create-sticky', () => createNewStickyNote());
   ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
   ipcMain.handle('attendance:clock', (_event, action) => clockWorkspaceAttendance(String(action || '')));
   ipcMain.handle('attendance:save', (_event, input) => saveWorkspaceAttendance(input));
@@ -1751,7 +1870,6 @@ function registerIpc() {
   ipcMain.handle('focus:get-state', () => focusSessionsForRenderer());
   ipcMain.handle('focus:start', (_event, input) => startFocusSession(input));
   ipcMain.handle('focus:stop', () => finishFocusSession('stopped'));
-  ipcMain.handle('literature:recommend', (_event, input) => recommendLatestLiterature(input));
   ipcMain.handle('capture:show', () => {
     toggleQuickCapture();
     return true;
@@ -1831,14 +1949,13 @@ function registerIpc() {
   ipcMain.handle('settings:get', () => settingsForRenderer());
   ipcMain.handle('settings:update', (_event, patch) => {
     const validated = validateSettings(patch);
-    if ('quickCaptureShortcut' in validated) {
-      const previousShortcut = store.getSettings().quickCaptureShortcut;
-      const registered = registerQuickCaptureShortcut(validated.quickCaptureShortcut);
+    if ('quickCaptureShortcut' in validated || 'stickyNoteShortcut' in validated) {
+      const previousSettings = store.getSettings();
+      const registered = registerWorkbenchShortcuts({ ...previousSettings, ...validated });
       if (!registered) {
-        registerQuickCaptureShortcut(previousShortcut);
-        throw new Error('这个快捷键已被其他软件占用，请更换后重试。');
+        registerWorkbenchShortcuts(previousSettings, { allowFallback: true });
+        throw new Error('快捷键无效、重复或已被其他软件占用，请更换后重试。');
       }
-      validated.quickCaptureShortcut = registered;
     }
     const updated = store.updateSettings(validated);
     updateLoginItemSetting(updated.startAtLogin);
@@ -1870,12 +1987,16 @@ function registerIpc() {
   });
 }
 
+if (process.env.YANJI_QA_USER_DATA) {
+  app.setPath('userData', path.resolve(process.env.YANJI_QA_USER_DATA));
+}
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
   app.on('second-instance', showMainWindow);
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     try {
       app.setAppUserModelId('io.papertrail.desktop');
       store = new JsonStore(configuredDataFilePath());
@@ -1886,9 +2007,11 @@ if (!gotLock) {
       createWindow();
       createTray();
       updateLoginItemSetting(store.getSettings().startAtLogin);
-      const registeredShortcut = registerQuickCaptureShortcut();
-      if (registeredShortcut && registeredShortcut !== store.getSettings().quickCaptureShortcut) {
-        store.updateSettings({ quickCaptureShortcut: registeredShortcut });
+      const registeredShortcuts = registerWorkbenchShortcuts(store.getSettings(), { allowFallback: true });
+      if (registeredShortcuts) {
+        const current = store.getSettings();
+        const changed = Object.fromEntries(Object.entries(registeredShortcuts).filter(([key, value]) => current[key] !== value));
+        if (Object.keys(changed).length) store.updateSettings(changed);
       }
       scheduler = setInterval(() => runScheduledWork().catch(() => {}), 60_000);
       setTimeout(runDeadlineReminders, 1500);
@@ -1898,7 +2021,30 @@ if (!gotLock) {
       if (store.getSettings().autoCheckUpdates) {
         setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
       }
+      if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
+        const result = await showScheduleWidget();
+        const bounds = scheduleWidgetWindow.getBounds();
+        const [contentWidth, contentHeight] = scheduleWidgetWindow.getContentSize();
+        console.log(`DESKTOP_WIDGET_ATTACH_OK ${JSON.stringify({ attached: result.attached, contentWidth, contentHeight, outerWidth: bounds.width, outerHeight: bounds.height, alwaysOnTop: scheduleWidgetWindow.isAlwaysOnTop(), skipTaskbar: true })}`);
+        if (!result.attached || bounds.width !== 360 || bounds.height !== 480 || scheduleWidgetWindow.isAlwaysOnTop()) {
+          throw new Error('桌面日程组件没有按 3:4 非置顶桌面层模式打开。');
+        }
+        try {
+          const image = await scheduleWidgetWindow.webContents.capturePage();
+          fs.writeFileSync(path.resolve(process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT), image.toPNG());
+        } catch (error) {
+          console.warn(`DESKTOP_WIDGET_CAPTURE_SKIPPED ${error?.message || error}`);
+        }
+        isQuitting = true;
+        setTimeout(() => app.quit(), 120);
+      }
     } catch (error) {
+      if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
+        console.error(`DESKTOP_WIDGET_ATTACH_FAILED ${error?.stack || error}`);
+        isQuitting = true;
+        app.exit(1);
+        return;
+      }
       dialog.showErrorBox('研迹无法安全打开数据', error?.message || '数据文件损坏或格式不受支持。');
       isQuitting = true;
       app.quit();

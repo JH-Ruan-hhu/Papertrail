@@ -20,9 +20,9 @@ app.whenReady().then(async () => {
     width: Number(process.env.PAPERTRAIL_SMOKE_WIDTH) || 1180,
     height: Number(process.env.PAPERTRAIL_SMOKE_HEIGHT) || 780,
     show: false,
-    backgroundColor: '#fafafa',
+    backgroundColor: '#edf7fc',
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#f5f5f5', symbolColor: '#666666', height: 42 },
+    titleBarOverlay: { color: '#eaf5fb', symbolColor: '#35566b', height: 42 },
     webPreferences: {
       preload: path.join(__dirname, 'smoke-preload.js'),
       contextIsolation: true,
@@ -366,15 +366,24 @@ app.whenReady().then(async () => {
       (() => {
         document.querySelector('[data-workbench-page="schedule"]').click();
         window.scrollTo(0, 0);
+        const shellRect = document.querySelector('.schedule-board-shell').getBoundingClientRect();
+        const cards = [...document.querySelectorAll('#scheduleBoard .schedule-board-card')];
+        const intersectsBoard = cards.some((card) => {
+          const rect = card.getBoundingClientRect();
+          const style = getComputedStyle(card);
+          return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0
+            && rect.width > 0 && rect.height > 0 && rect.right > shellRect.left && rect.left < shellRect.right;
+        });
         return {
           pageVisible: !document.querySelector('[data-page="schedule"]').hidden,
-          hourLabels: document.querySelectorAll('#timelineHours span').length,
-          timelineEvents: document.querySelectorAll('#timelineTrack .timeline-event').length,
+          dayColumns: document.querySelectorAll('#scheduleBoard .schedule-board-column').length,
+          scheduleCards: cards.length,
+          intersectsBoard,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!scheduleResult.pageVisible || scheduleResult.hourLabels !== 24 || scheduleResult.timelineEvents < 2 || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 7 || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
@@ -464,29 +473,6 @@ app.whenReady().then(async () => {
     await new Promise((resolve) => setTimeout(resolve, 240));
     await captureStablePage(process.env.WORKBENCH_NOTES_OUTPUT);
   }
-  if (process.env.WORKBENCH_LITERATURE_OUTPUT) {
-    const literatureResult = await window.webContents.executeJavaScript(`
-      (async () => {
-        document.querySelector('[data-workbench-page="literature"]').click();
-        document.getElementById('literatureQuery').value = 'PFAS groundwater';
-        document.getElementById('recommendLiteratureButton').click();
-        await new Promise((resolve) => setTimeout(resolve, 80));
-        const cards = document.querySelectorAll('#literatureResults .literature-card');
-        return {
-          pageVisible: !document.querySelector('[data-page="literature"]').hidden,
-          cards: cards.length,
-          summaries: document.querySelectorAll('#literatureResults .literature-summary').length,
-          metricNote: document.querySelector('.literature-metric-note').textContent.includes('并非 Clarivate JCR'),
-          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
-        };
-      })()
-    `);
-    if (!literatureResult.pageVisible || literatureResult.cards !== 3 || literatureResult.summaries !== 3 || !literatureResult.metricNote || literatureResult.horizontalOverflow) {
-      throw new Error(`Workbench literature smoke failed: ${JSON.stringify(literatureResult)}`);
-    }
-    console.log(`WORKBENCH_LITERATURE_OK ${JSON.stringify(literatureResult)}`);
-    await captureStablePage(process.env.WORKBENCH_LITERATURE_OUTPUT);
-  }
   if (process.env.WORKBENCH_CAPTURE_OUTPUT) {
     window.setSize(720, 290);
     await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'capture.html'));
@@ -519,6 +505,43 @@ app.whenReady().then(async () => {
     if (!Object.values(captureResult).every(Boolean)) throw new Error(`Workbench capture smoke failed: ${JSON.stringify(captureResult)}`);
     console.log(`WORKBENCH_CAPTURE_OK ${JSON.stringify(captureResult)}`);
     await captureStablePage(process.env.WORKBENCH_CAPTURE_OUTPUT);
+  }
+  if (process.env.WORKBENCH_SCHEDULE_WIDGET_OUTPUT) {
+    window.setSize(360, 480);
+    await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.html'));
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    const widgetResult = await window.webContents.executeJavaScript(`
+      (() => ({
+        threeByFour: Math.abs((innerWidth / innerHeight) - 0.75) < 0.03,
+        scheduleCards: document.querySelectorAll('#widgetScheduleList .widget-item').length,
+        dateLoaded: Boolean(document.getElementById('dateDay').textContent),
+        progressLoaded: document.getElementById('widgetProgress').textContent.includes(' / '),
+        closeButtonNamed: document.getElementById('closeWidgetButton').getAttribute('aria-label') === '从桌面移除当日日程',
+        paleBlue: getComputedStyle(document.documentElement).backgroundColor === 'rgb(234, 245, 251)',
+        horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+      }))()
+    `);
+    if (!widgetResult.threeByFour || widgetResult.scheduleCards < 2 || !widgetResult.dateLoaded || !widgetResult.progressLoaded || !widgetResult.closeButtonNamed || !widgetResult.paleBlue || widgetResult.horizontalOverflow) {
+      throw new Error(`Workbench schedule widget smoke failed: ${JSON.stringify(widgetResult)}`);
+    }
+    console.log(`WORKBENCH_SCHEDULE_WIDGET_OK ${JSON.stringify(widgetResult)}`);
+    await captureStablePage(process.env.WORKBENCH_SCHEDULE_WIDGET_OUTPUT);
+  }
+  if (process.env.WORKBENCH_STICKY_OUTPUT) {
+    window.setSize(380, 440);
+    await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'sticky.html'), { query: { id: 'note-1' } });
+    await new Promise((resolve) => setTimeout(resolve, 160));
+    const stickyResult = await window.webContents.executeJavaScript(`
+      (() => ({
+        titleLoaded: document.getElementById('noteTitle').value === 'PFAS 方法学想法',
+        contentLoaded: document.getElementById('noteContent').value.includes('回收率与基质效应'),
+        closeButtonNamed: document.getElementById('closeButton').getAttribute('aria-label') === '关闭便笺',
+        paleBlue: getComputedStyle(document.body).backgroundColor === 'rgb(245, 251, 255)'
+      }))()
+    `);
+    if (!Object.values(stickyResult).every(Boolean)) throw new Error(`Workbench sticky smoke failed: ${JSON.stringify(stickyResult)}`);
+    console.log(`WORKBENCH_STICKY_OK ${JSON.stringify(stickyResult)}`);
+    await captureStablePage(process.env.WORKBENCH_STICKY_OUTPUT);
   }
   if (!process.env.PAPERTRAIL_SMOKE_OUTPUT) {
     window.webContents.invalidate();

@@ -827,6 +827,7 @@ function populateSettings() {
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
   document.getElementById('quickCaptureShortcut').value = settings.quickCaptureShortcut || 'CommandOrControl+Shift+Space';
+  document.getElementById('stickyNoteShortcut').value = settings.stickyNoteShortcut || 'CommandOrControl+Alt+N';
   populateSettingsMetadata();
 }
 
@@ -930,8 +931,7 @@ async function changeDataDirectory() {
 }
 
 function syncModalTitleBar() {
-  const active = [elements.addDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog]
-    .some((dialog) => dialog.open);
+  const active = [...document.querySelectorAll('dialog')].some((dialog) => dialog.open);
   api.setModalWindowState(active).catch(() => {});
 }
 
@@ -971,8 +971,12 @@ async function saveSettings() {
       closeToTray: document.getElementById('closeToTray').checked,
       startAtLogin: document.getElementById('startAtLogin').checked,
       autoCheckUpdates: document.getElementById('autoCheckUpdates').checked,
-      quickCaptureShortcut: document.getElementById('quickCaptureShortcut').value
+      quickCaptureShortcut: document.getElementById('quickCaptureShortcut').value,
+      stickyNoteShortcut: document.getElementById('stickyNoteShortcut').value
     });
+    const formatShortcut = (value) => String(value || '').replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
+    document.getElementById('shortcutTip').textContent = formatShortcut(state.settings.quickCaptureShortcut);
+    document.getElementById('stickyShortcutTip').textContent = formatShortcut(state.settings.stickyNoteShortcut);
     render();
     showToast('设置已保存。');
   } catch (error) {

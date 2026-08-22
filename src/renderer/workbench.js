@@ -7,11 +7,10 @@ const wb = {
   selectedDate: new Date(),
   attendanceWeekStart: null,
   editingNote: null,
-  usageRange: 'day',
-  literatureResults: []
+  usageRange: 'day'
 };
 
-const pageTitles = Object.freeze({ home: '主页', schedule: '日程', attendance: '打卡', notes: '笔记', literature: '文献推荐', submissions: '投稿管理', settings: '设置' });
+const pageTitles = Object.freeze({ home: '主页', schedule: '日程', attendance: '打卡', notes: '笔记', submissions: '投稿管理', settings: '设置' });
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
 const UI_ICON_PATHS = Object.freeze({
   check: '<path d="m6 12 4 4 8-9"/>',
@@ -115,7 +114,24 @@ function renderClock() {
 }
 
 function schedulesForDay(date) {
-  return wb.workspace.schedules.filter((schedule) => sameDay(schedule.startAt, date));
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = addDays(dayStart, 1);
+  return wb.workspace.schedules
+    .filter((schedule) => Date.parse(schedule.startAt) < dayEnd.getTime() && Date.parse(schedule.endAt) > dayStart.getTime())
+    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
+}
+
+function scheduleTimeForDay(schedule, date) {
+  const dayStart = new Date(date);
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = addDays(dayStart, 1);
+  const start = new Date(Math.max(Date.parse(schedule.startAt), dayStart.getTime()));
+  const end = new Date(Math.min(Date.parse(schedule.endAt), dayEnd.getTime()));
+  return {
+    label: `${Date.parse(schedule.startAt) < dayStart.getTime() ? '00:00' : formatTime(start)}–${Date.parse(schedule.endAt) > dayEnd.getTime() ? '24:00' : formatTime(end)}`,
+    spansDay: !sameDay(schedule.startAt, new Date(schedule.endAt))
+  };
 }
 
 function renderHome() {
@@ -188,38 +204,33 @@ function renderHomeAttendance() {
 
 function renderTimeline() {
   const selected = wb.selectedDate;
-  document.getElementById('timelineDate').textContent = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' }).format(selected);
-  const distance = Math.round((dateFromKey(localDateKey(selected)) - dateFromKey(localDateKey(new Date()))) / 86_400_000);
-  document.getElementById('timelineDateSubtitle').textContent = distance === 0 ? '今天' : distance === 1 ? '明天' : distance === -1 ? '昨天' : distance > 0 ? `${distance} 天后` : `${Math.abs(distance)} 天前`;
-  document.getElementById('timelineHours').innerHTML = Array.from({ length: 24 }, (_, hour) => `<span>${String(hour).padStart(2, '0')}:00</span>`).join('');
-  const events = schedulesForDay(selected);
-  const track = document.getElementById('timelineTrack');
-  track.innerHTML = `<div class="timeline-grid">${Array.from({ length: 24 }, () => '<i></i>').join('')}</div>${events.map((item, index) => {
-    const start = new Date(item.startAt);
-    const end = new Date(item.endAt);
-    const startMinutes = start.getHours() * 60 + start.getMinutes();
-    const duration = Math.max(30, Math.min(1440 - startMinutes, (end - start) / 60_000));
-    const left = startMinutes / 1440 * 100;
-    const width = duration / 1440 * 100;
-    return `<button class="timeline-event tone-${item.priority} ${item.completedAt ? 'completed' : ''}" style="left:${left}%;width:${width}%;top:${18 + (index % 4) * 66}px" data-edit-schedule="${wbEscape(item.id)}" type="button"><strong>${wbEscape(item.title)}</strong><span>${formatTime(item.startAt)}–${formatTime(item.endAt)}</span></button>`;
-  }).join('')}`;
-  const currentLine = track.querySelector('.current-time-line');
-  if (currentLine) currentLine.remove();
-  if (sameDay(new Date(), selected)) {
-    const now = new Date();
-    const line = document.createElement('div');
-    line.className = 'current-time-line';
-    line.style.left = `${(now.getHours() * 60 + now.getMinutes()) / 1440 * 100}%`;
-    track.append(line);
+  const weekStart = startOfWeek(selected);
+  const weekEnd = addDays(weekStart, 6);
+  document.getElementById('timelineDate').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(weekStart)} — ${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(weekEnd)}`;
+  document.getElementById('timelineDateSubtitle').textContent = localDateKey(weekStart) === localDateKey(startOfWeek(new Date())) ? '本周 · 点击日期查看当天完整清单' : '点击日期查看当天完整清单';
+  document.getElementById('scheduleBoard').innerHTML = Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(weekStart, index);
+    const dateKey = localDateKey(date);
+    const events = schedulesForDay(date);
+    const cards = events.map((item) => {
+      const timing = scheduleTimeForDay(item, date);
+      return `<article class="schedule-board-card tone-${item.priority} ${item.completedAt ? 'completed' : ''}"><button class="schedule-card-main" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${timing.label}</time><strong>${wbEscape(item.title)}</strong><span>${priorityLabels[item.priority]}${item.deadline ? ' · Deadline' : ''}${timing.spansDay ? ' · 跨日' : ''}</span></button><button class="schedule-board-check" data-complete-schedule="${wbEscape(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button" aria-label="${item.completedAt ? '恢复' : '完成'}${wbEscape(item.title)}">${item.completedAt ? uiIcon('check') : '完成'}</button></article>`;
+    }).join('');
+    return `<section class="schedule-board-column ${sameDay(date, new Date()) ? 'today' : ''} ${sameDay(date, selected) ? 'selected' : ''}" data-board-date="${dateKey}"><button class="schedule-board-heading" data-select-schedule-date="${dateKey}" type="button"><span>${new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date)}</span><strong>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}</strong><b>${events.length}</b></button><div class="schedule-board-cards">${cards || '<p class="schedule-board-empty">暂无安排</p>'}</div><button class="schedule-board-add" data-add-schedule-date="${dateKey}" type="button">＋ 新建日程</button></section>`;
+  }).join('');
+  const boardShell = document.querySelector('.schedule-board-shell');
+  const selectedColumn = document.querySelector('#scheduleBoard .schedule-board-column.selected');
+  if (boardShell && selectedColumn) {
+    boardShell.scrollLeft = Math.max(0, selectedColumn.offsetLeft - (boardShell.clientWidth - selectedColumn.clientWidth) / 2);
   }
+  const events = schedulesForDay(selected);
+  document.getElementById('agendaTitle').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(selected)}清单`;
   document.getElementById('agendaSummary').textContent = `${events.length} 项安排`;
-  document.getElementById('agendaList').innerHTML = events.length ? events.map((item) => `<article class="agenda-row ${item.completedAt ? 'completed' : ''}"><button class="agenda-check" data-complete-schedule="${wbEscape(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button">${item.completedAt ? uiIcon('check') : ''}</button><time>${formatTime(item.startAt)}<small>${formatTime(item.endAt)}</small></time><span class="priority-bar ${item.priority}"></span><div><strong>${wbEscape(item.title)}</strong><small>${item.deadline ? 'Deadline · ' : ''}${priorityLabels[item.priority]}优先级</small></div><button class="agenda-edit" data-edit-schedule="${wbEscape(item.id)}" type="button">编辑</button></article>`).join('') : '<div class="workbench-empty large"><span>24</span><p>这一天还没有安排。时间轴是空的，也是可以自由决定的。</p></div>';
-  requestAnimationFrame(() => {
-    const earliestHour = events.length
-      ? Math.min(...events.map((item) => new Date(item.startAt).getHours()))
-      : (sameDay(new Date(), selected) ? new Date().getHours() : 9);
-    document.getElementById('timelineScroll').scrollLeft = Math.max(0, (earliestHour - 1) * 90);
-  });
+  document.getElementById('agendaList').innerHTML = events.length ? events.map((item) => {
+    const timing = scheduleTimeForDay(item, selected);
+    const [start, end] = timing.label.split('–');
+    return `<article class="agenda-row ${item.completedAt ? 'completed' : ''}"><button class="agenda-check" data-complete-schedule="${wbEscape(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button">${item.completedAt ? uiIcon('check') : ''}</button><time>${start}<small>${end}</small></time><span class="priority-bar ${item.priority}"></span><div><strong>${wbEscape(item.title)}</strong><small>${item.deadline ? 'Deadline · ' : ''}${priorityLabels[item.priority]}优先级${timing.spansDay ? ' · 跨日' : ''}</small></div><button class="agenda-edit" data-edit-schedule="${wbEscape(item.id)}" type="button">编辑</button></article>`;
+  }).join('') : '<div class="workbench-empty large"><p>这一天还没有安排，可以直接在上方日期列中新建日程。</p></div>';
 }
 
 function averageClock(records, key) {
@@ -537,41 +548,6 @@ async function saveMetadataManager() {
   }
 }
 
-function renderLiteratureResults(response) {
-  const items = Array.isArray(response?.items) ? response.items.slice(0, 3) : [];
-  wb.literatureResults = items;
-  document.getElementById('literatureResultTitle').textContent = items.length ? `找到 ${items.length} 篇最新相关文章` : '没有找到符合全部条件的文章';
-  document.getElementById('literatureResultMeta').textContent = response?.fromDate ? `${response.fromDate} 起 · 按发布日期倒序` : '按发布日期倒序';
-  const cards = items.map((item, index) => `<article class="literature-card"><header><span>0${index + 1}</span><time>${wbEscape(item.publicationDate || '日期未知')}</time></header><h2>${wbEscape(item.title)}</h2><p class="literature-journal">${wbEscape(item.journal || '来源未知')}${item.impactProxy == null ? '' : ` · 2 年影响指标 ${Number(item.impactProxy).toFixed(1)}`}</p><p class="literature-authors">${wbEscape(item.authors?.join('、') || '作者信息暂缺')}</p><div class="literature-summary"><strong>摘要要点</strong><p>${wbEscape(item.summary || '当前记录未提供摘要。')}</p></div><footer><span>${item.citedByCount || 0} 次被引${item.isOpenAccess ? ' · 开放获取' : ''}</span><button class="text-button icon-button" data-literature-url="${wbEscape(item.url || '')}" type="button" ${item.url ? '' : 'disabled'}>打开文章 ${uiIcon('external')}</button></footer></article>`);
-  while (cards.length < 3) cards.push(`<article class="literature-card empty"><span>0${cards.length + 1}</span><p>当前筛选条件下暂无更多文章。可以扩大年份范围或降低影响指标。</p></article>`);
-  document.getElementById('literatureResults').innerHTML = cards.join('');
-}
-
-async function recommendLiterature() {
-  const query = document.getElementById('literatureQuery').value.trim();
-  if (query.length < 2) return showWorkbenchToast('请至少输入 2 个字符的推荐关键词。', 'error');
-  const button = document.getElementById('recommendLiteratureButton');
-  button.disabled = true;
-  button.textContent = '正在检索…';
-  document.getElementById('literatureResultTitle').textContent = '正在查找最新文献';
-  try {
-    const response = await workbenchApi.recommendLiterature({
-      query,
-      journal: document.getElementById('literatureJournal').value.trim(),
-      minimumImpact: Number(document.getElementById('literatureImpact').value) || 0,
-      years: Number(document.getElementById('literatureYears').value) || 2
-    });
-    renderLiteratureResults(response);
-  } catch (exception) {
-    document.getElementById('literatureResultTitle').textContent = '文献检索暂时不可用';
-    document.getElementById('literatureResultMeta').textContent = '请检查网络后重试';
-    showWorkbenchToast(exception.message || '无法获取最新文献。', 'error');
-  } finally {
-    button.disabled = false;
-    button.textContent = '查找最新文献';
-  }
-}
-
 async function refreshWorkspace(workspace = null) {
   wb.workspace = workspace || await workbenchApi.getWorkspace();
   wb.workspace.attendance ||= [];
@@ -589,8 +565,8 @@ function bindWorkbenchEvents() {
   document.getElementById('quickNoteButton').addEventListener('click', () => openNoteEditor());
   document.getElementById('addScheduleButton').addEventListener('click', () => openScheduleEditor());
   document.getElementById('scheduleTodayButton').addEventListener('click', () => { wb.selectedDate = new Date(); renderTimeline(); });
-  document.getElementById('previousDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, -1); renderTimeline(); });
-  document.getElementById('nextDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, 1); renderTimeline(); });
+  document.getElementById('previousDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, -7); renderTimeline(); });
+  document.getElementById('nextDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, 7); renderTimeline(); });
   document.getElementById('saveScheduleButton').addEventListener('click', saveScheduleFromEditor);
   document.getElementById('deleteScheduleButton').addEventListener('click', async () => {
     const id = document.getElementById('scheduleId').value;
@@ -720,28 +696,39 @@ function bindWorkbenchEvents() {
   document.getElementById('noteDialog').addEventListener('click', (event) => {
     if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget);
   });
-  document.getElementById('recommendLiteratureButton').addEventListener('click', recommendLiterature);
-  document.getElementById('literatureQuery').addEventListener('keydown', (event) => { if (event.key === 'Enter') recommendLiterature(); });
-  document.querySelectorAll('[data-literature-years]').forEach((button) => button.addEventListener('click', () => {
-    document.getElementById('literatureYears').value = button.dataset.literatureYears;
-    document.querySelectorAll('[data-literature-years]').forEach((item) => item.classList.toggle('active', item === button));
-  }));
   document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => closeWorkbenchDialog(document.getElementById(button.dataset.closeDialog))));
   document.body.addEventListener('click', async (event) => {
-    const literatureTarget = event.target.closest('[data-literature-url]');
-    if (literatureTarget?.dataset.literatureUrl) return workbenchApi.openExternal(literatureTarget.dataset.literatureUrl);
+    const selectedDateTarget = event.target.closest('[data-select-schedule-date]');
+    if (selectedDateTarget) {
+      wb.selectedDate = dateFromKey(selectedDateTarget.dataset.selectScheduleDate);
+      return renderTimeline();
+    }
+    const addForDateTarget = event.target.closest('[data-add-schedule-date]');
+    if (addForDateTarget) {
+      wb.selectedDate = dateFromKey(addForDateTarget.dataset.addScheduleDate);
+      return openScheduleEditor();
+    }
     const attendanceTarget = event.target.closest('[data-edit-attendance]');
     if (attendanceTarget?.dataset.editAttendance) return openAttendanceEditor(wb.workspace.attendance.find((item) => item.id === attendanceTarget.dataset.editAttendance));
-    const scheduleTarget = event.target.closest('[data-edit-schedule]');
-    if (scheduleTarget) return openScheduleEditor(wb.workspace.schedules.find((item) => item.id === scheduleTarget.dataset.editSchedule));
     const completeTarget = event.target.closest('[data-complete-schedule]');
     if (completeTarget) return workbenchApi.completeSchedule(completeTarget.dataset.completeSchedule, completeTarget.dataset.completed !== 'true');
+    const scheduleTarget = event.target.closest('[data-edit-schedule]');
+    if (scheduleTarget) return openScheduleEditor(wb.workspace.schedules.find((item) => item.id === scheduleTarget.dataset.editSchedule));
     const stickyTarget = event.target.closest('[data-sticky-note]');
     if (stickyTarget) { event.stopPropagation(); return workbenchApi.openStickyNote(stickyTarget.dataset.stickyNote); }
     const noteTarget = event.target.closest('[data-edit-note]');
     if (noteTarget) return openNoteEditor(wb.workspace.notes.find((item) => item.id === noteTarget.dataset.editNote));
   });
   document.getElementById('openQuickCaptureButton').addEventListener('click', () => workbenchApi.showCapture());
+  document.getElementById('createStickyNoteButton').addEventListener('click', () => workbenchApi.createStickyNote());
+  document.getElementById('openScheduleWidgetButton').addEventListener('click', async () => {
+    try {
+      const result = await workbenchApi.showScheduleWidget();
+      showWorkbenchToast(result?.attached ? '当日日程已放到桌面图标层。' : '桌面层连接失败，已打开普通桌面卡片。', result?.attached ? 'success' : 'error');
+    } catch (error) {
+      showWorkbenchToast(error?.message || '无法打开桌面日程。', 'error');
+    }
+  });
 }
 
 async function initializeWorkbench() {
@@ -750,6 +737,7 @@ async function initializeWorkbench() {
   setInterval(renderClock, 15_000);
   const settings = await workbenchApi.getSettings().catch(() => null);
   if (settings?.quickCaptureShortcut) document.getElementById('shortcutTip').textContent = settings.quickCaptureShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
+  if (settings?.stickyNoteShortcut) document.getElementById('stickyShortcutTip').textContent = settings.stickyNoteShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
   await refreshWorkspace();
   workbenchApi.onWorkspaceChanged(refreshWorkspace);
   workbenchApi.onWorkspaceNavigate(switchWorkbenchPage);

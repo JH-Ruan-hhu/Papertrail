@@ -196,9 +196,13 @@ contextBridge.exposeInMainWorld('paperTrail', {
   saveSchedule: async (input) => input,
   deleteSchedule: async () => true,
   completeSchedule: async () => true,
+  showScheduleWidget: async () => ({ attached: true }),
+  closeScheduleWidget: async () => { document.body.dataset.closeRequested = 'true'; return true; },
+  openScheduleWidgetMain: async () => { document.body.dataset.openMainRequested = 'true'; return true; },
   saveNote: async (input) => input,
   deleteNote: async () => true,
   openStickyNote: async () => true,
+  createStickyNote: async () => ({ id: 'new-sticky-note', title: '便笺', content: '' }),
   saveMetadataFields: async (fields) => fields,
   clockAttendance: async () => smokeWorkspace.attendance[0],
   saveAttendance: async (input) => input,
@@ -212,10 +216,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
     smokeWorkspace.focusSessions = smokeWorkspace.focusSessions.map((session) => session.status === 'active' ? { ...session, status: 'stopped', endedAt: new Date().toISOString() } : session);
     return smokeWorkspace.focusSessions;
   },
-  recommendLiterature: async () => ({
-    fromDate: '2024-08-22',
-    items: [0, 1, 2].map((index) => ({ id: `work-${index}`, title: `PFAS 最新研究 ${index + 1}`, publicationDate: `2026-08-${20 - index}`, journal: 'Water Research', impactProxy: 11.4, authors: ['Researcher A', 'Researcher B'], summary: '该研究评估了 PFAS 在水环境中的迁移与去除路径，并报告了可复核的实验结果。', citedByCount: 8 - index, isOpenAccess: true, url: `https://doi.org/10.1000/mock${index}` }))
-  }),
   openExternal: async () => true,
   showCapture: async () => true,
   hideCapture: async () => { document.body.dataset.hideRequested = 'true'; return true; },
@@ -242,6 +242,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
     startAtLogin: false,
     autoCheckUpdates: true,
     quickCaptureShortcut: 'CommandOrControl+Shift+Space',
+    stickyNoteShortcut: 'CommandOrControl+Alt+N',
     appVersion: '0.9.0',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\Yanji Data',
     backupCount: 1,

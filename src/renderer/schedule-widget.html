@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>当日日程</title>
+    <link rel="stylesheet" href="schedule-widget.css">
+  </head>
+  <body>
+    <header class="widget-header">
+      <div>
+        <span class="widget-kicker">TODAY</span>
+        <strong>当日日程</strong>
+      </div>
+      <button id="closeWidgetButton" type="button" aria-label="从桌面移除当日日程" title="从桌面移除">×</button>
+    </header>
+    <main>
+      <section class="date-card" aria-label="今天日期">
+        <div><strong id="dateDay"></strong><span id="dateWeekday"></span></div>
+        <p id="dateFull"></p>
+      </section>
+      <section class="schedule-list" id="widgetScheduleList" aria-live="polite"></section>
+    </main>
+    <footer>
+      <div><strong id="widgetProgress">0 / 0</strong><span>今日完成</span></div>
+      <button id="openMainButton" type="button">打开日程</button>
+    </footer>
+    <script src="schedule-widget.js"></script>
+  </body>
+</html>

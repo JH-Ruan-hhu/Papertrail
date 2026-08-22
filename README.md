@@ -8,7 +8,7 @@ publisher-neutral.
 
 ## Version 0.9 workbench features
 
-- Use a cohesive warm-neutral desktop shell with consistent line icons,
+- Use a cohesive pale-blue desktop shell with consistent line icons,
   compact spacing, a small top-right clock, and responsive narrow-window
   layouts.
 - Open Settings as a normal workspace page with horizontal categories; scrolling
@@ -23,9 +23,6 @@ publisher-neutral.
 - Keep today's priorities at the top of Home beside focus controls. The
   four-day schedule and latest notes share the next row, with quick-create
   actions for both schedules and notes.
-- Search OpenAlex for the latest articles by topic, optionally narrow to a
-  journal or a minimum public two-year mean-citedness metric, and review three
-  article cards with abstract-grounded summaries.
 - Show high-priority deadlines on every connected display with a low-stimulus
   star-field treatment; reduced-motion preferences disable decorative motion.
 - Add multiple reusable options to note select metadata through a tag editor.
@@ -46,14 +43,20 @@ publisher-neutral.
 - Review yesterday, today, tomorrow, and the day after tomorrow from the home
   page, create a schedule quickly, and see the latest notes without changing
   pages.
-- Plan a day on a horizontally scrollable 24-hour timeline with multi-hour
-  events, completion state, and three Zotero-like priority choices.
+- Review a complete week on a horizontally scrollable date-column board. Each
+  event card shows its time range, priority, deadline, completion state, and
+  cross-midnight status; selecting a date opens its full agenda below.
+- Put today's schedule on the Windows desktop as a fixed 360 × 480 (3:4)
+  component. It is attached to the desktop-icon host instead of floating above
+  applications, stays out of the taskbar, and updates when schedules change.
 - Mark an event as a deadline. High-priority deadlines use a full-screen red
   acknowledgement, medium priority uses a centered always-on-top amber alert
   plus a Windows notification, and low priority uses a Windows notification.
 - Open the keyboard-first capture bar globally with `Ctrl+Shift+Space`, switch
   between schedule and note with Tab, and recognize Chinese expressions such as
   明天、后天、早上、下午 and 3点到5点.
+- Create a new always-on-top sticky note globally with `Ctrl+Alt+N`. Both global
+  shortcuts can be changed independently in Settings.
 - Create local notes with reusable text, select, and checkbox metadata fields.
   Metadata stays collapsed during normal writing. Any saved note can open as an
   always-on-top sticky note.
@@ -144,10 +147,9 @@ The renderer remains sandboxed with `contextIsolation` enabled and a restrictive
 Content Security Policy. Exports are generated in the main process from an
 explicit allow-list of paper metadata and are redacted again before writing.
 Deadlines, revision-round details, contacts, schedules, notes, attendance, and
-application-use totals are never included in publisher requests. Literature
-queries are sent to OpenAlex only when the user requests recommendations; they
-do not include local notes or manuscript credentials. There is no account
-system, cloud sync, collaboration service, analytics, or telemetry.
+application-use totals are never included in publisher requests. There is no
+general article-discovery network request, account system, cloud sync,
+collaboration service, analytics, or telemetry.
 
 ## Development
 
@@ -183,9 +185,6 @@ generated `latest.yml` together in the same public GitHub Release.
   but do not yet have automatic status connectors.
 - Deadline reminders require Yanji to be running (the window may remain in
   the system tray) and Windows notifications to be enabled.
-- Literature recommendations depend on current OpenAlex metadata. The displayed
-  two-year mean citedness is a public impact-factor-style proxy, not the licensed
-  Clarivate Journal Impact Factor; some records do not include an abstract.
 - The app does not bypass login, CAPTCHA, access controls, or publisher policy.
 - A tracking UUID is required; Yanji cannot discover submissions from an
   Editorial Manager account automatically.

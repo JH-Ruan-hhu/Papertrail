@@ -12,7 +12,8 @@ const DEFAULT_SETTINGS = Object.freeze({
   closeToTray: true,
   startAtLogin: false,
   autoCheckUpdates: true,
-  quickCaptureShortcut: 'CommandOrControl+Shift+Space'
+  quickCaptureShortcut: 'CommandOrControl+Shift+Space',
+  stickyNoteShortcut: 'CommandOrControl+Alt+N'
 });
 
 class JsonStore {

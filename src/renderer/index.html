@@ -27,9 +27,6 @@
           <button class="nav-item" data-workbench-page="notes" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h4M9 12h6M9 16h6"/></svg><span>笔记</span><b id="navNoteCount">0</b>
           </button>
-          <button class="nav-item" data-workbench-page="literature" type="button">
-            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h9a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M17 7.5h2a2 2 0 0 1 2 2v10h-4M8.5 9h5M8.5 12.5h5"/></svg><span>文献推荐</span>
-          </button>
           <button class="nav-item" data-workbench-page="submissions" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v12H4zM8 7.5v-3h8v3"/><path d="M8 12h8M8 15.5h5"/></svg><span>投稿管理</span><b id="navPaperCount">0</b>
           </button>
@@ -37,6 +34,7 @@
 
         <div class="sidebar-bottom">
           <button class="quick-capture-tip" id="openQuickCaptureButton" type="button"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m5 18 1-4L16.5 3.5a2.1 2.1 0 0 1 3 3L9 17z"/><path d="m13.5 6.5 4 4"/></svg><p><strong>即写即走</strong><small id="shortcutTip">Ctrl + Shift + Space</small></p></button>
+          <button class="quick-capture-tip sticky-create-tip" id="createStickyNoteButton" type="button"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4M8 9h8M8 13h5"/></svg><p><strong>新建悬浮便笺</strong><small id="stickyShortcutTip">Ctrl + Alt + N</small></p></button>
           <button class="settings-entry" id="settingsButton" data-workbench-page="settings" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg><span><strong>设置</strong><small>通用、通知、存储与更新</small></span>
           </button>
@@ -116,21 +114,18 @@
 
         <section class="workbench-page schedule-page" data-page="schedule" hidden>
           <header class="page-head-row">
-            <div><p class="eyebrow">24-HOUR TIMELINE</p><h1>日程</h1><p>在完整的一天里安排实验、写作和生活</p></div>
-            <div class="page-actions"><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
+            <div><p class="eyebrow">WEEKLY SCHEDULE</p><h1>日程</h1><p>按日期浏览完整安排，也可把当日清单放到桌面</p></div>
+            <div class="page-actions"><button class="button secondary" id="openScheduleWidgetButton" type="button" title="以 3×4 桌面组件显示当日日程">放到桌面</button><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
           </header>
-          <div class="timeline-datebar">
-            <button id="previousDayButton" type="button" aria-label="前一天">‹</button>
+          <div class="timeline-datebar schedule-weekbar">
+            <button id="previousDayButton" type="button" aria-label="上一周">‹</button>
             <div><strong id="timelineDate"></strong><span id="timelineDateSubtitle"></span></div>
-            <button id="nextDayButton" type="button" aria-label="后一天">›</button>
+            <button id="nextDayButton" type="button" aria-label="下一周">›</button>
           </div>
-          <section class="timeline-shell">
-            <div class="timeline-scroll" id="timelineScroll">
-              <div class="timeline-hours" id="timelineHours"></div>
-              <div class="timeline-track" id="timelineTrack"></div>
-            </div>
+          <section class="schedule-board-shell" aria-label="一周日程看板">
+            <div class="schedule-board" id="scheduleBoard"></div>
           </section>
-          <section class="schedule-agenda"><div class="panel-heading"><div><p class="eyebrow">AGENDA</p><h2>当天清单</h2></div><span id="agendaSummary"></span></div><div id="agendaList" class="agenda-list"></div></section>
+          <section class="schedule-agenda"><div class="panel-heading"><div><p class="eyebrow">AGENDA</p><h2 id="agendaTitle">当天清单</h2></div><span id="agendaSummary"></span></div><div id="agendaList" class="agenda-list"></div></section>
         </section>
 
         <section class="workbench-page notes-page" data-page="notes" hidden>
@@ -140,23 +135,6 @@
           </header>
           <div class="notes-toolbar"><label class="search-box" for="noteSearch"><input id="noteSearch" type="search" placeholder="搜索标题、正文或元数据"></label><span>点击“置顶”，将笔记悬浮在其他页面之上</span></div>
           <div id="notesGrid" class="notes-grid"></div>
-        </section>
-
-        <section class="workbench-page literature-page" data-page="literature" hidden>
-          <header class="page-head-row">
-            <div><p class="eyebrow">FRESH READING</p><h1><span class="heading-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h9a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M17 7.5h2a2 2 0 0 1 2 2v10h-4"/></svg></span>文献推荐</h1><p>按发布日期倒序寻找与你当前课题最接近的新文章</p></div>
-          </header>
-          <section class="literature-search-panel">
-            <div class="literature-search-main"><label for="literatureQuery">推荐关键词</label><div class="literature-query-shell"><input id="literatureQuery" type="search" autocomplete="off" placeholder="例如 PFAS adsorption groundwater"><button class="button primary" id="recommendLiteratureButton" type="button">查找最新文献</button></div></div>
-            <div class="literature-filters">
-              <label for="literatureJournal"><span>限定期刊（可选）</span><input id="literatureJournal" type="text" autocomplete="off" placeholder="例如 Water Research"></label>
-              <label for="literatureImpact"><span>最低影响指标（可选）</span><input id="literatureImpact" type="number" min="0" max="100" step="0.1" placeholder="例如 5"></label>
-              <fieldset><legend>最新范围</legend><div class="literature-year-options"><button class="active" data-literature-years="2" type="button">近 2 年</button><button data-literature-years="1" type="button">近 1 年</button><button data-literature-years="5" type="button">近 5 年</button></div><input id="literatureYears" type="hidden" value="2"></fieldset>
-            </div>
-            <p class="literature-metric-note">影响指标采用 OpenAlex 的期刊 2 年平均被引（公开近似指标，并非 Clarivate JCR Impact Factor）。</p>
-          </section>
-          <div class="literature-result-head"><strong id="literatureResultTitle">等待输入研究主题</strong><span id="literatureResultMeta">每次展示 3 篇</span></div>
-          <div id="literatureResults" class="literature-grid"><div class="literature-empty"><span class="empty-line-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h9a3 3 0 0 1 3 3v12H8a3 3 0 0 1-3-3z"/><path d="M9 9h5M9 12.5h5"/></svg></span><p>输入关键词后，这里会展示三篇最新相关文章及摘要要点。</p></div></div>
         </section>
 
         <section class="workbench-page submissions-page" data-page="submissions" hidden>
@@ -268,6 +246,7 @@
                 <div class="setting-row"><div><strong>关闭时驻留托盘</strong><small>关闭窗口后继续执行后台检查</small></div><label class="switch"><input id="closeToTray" type="checkbox"><span></span></label></div>
                 <div class="setting-row"><div><strong>登录 Windows 后启动</strong><small>静默启动到系统托盘</small></div><label class="switch"><input id="startAtLogin" type="checkbox"><span></span></label></div>
                 <div class="setting-row stacked"><label for="quickCaptureShortcut"><strong>即写即走快捷键</strong><small>全局唤醒屏幕中央快捷输入窗</small></label><input id="quickCaptureShortcut" type="text" value="CommandOrControl+Shift+Space" spellcheck="false"></div>
+                <div class="setting-row stacked"><label for="stickyNoteShortcut"><strong>新建悬浮便笺快捷键</strong><small>全局新建一张自动保存、保持置顶的便笺</small></label><input id="stickyNoteShortcut" type="text" value="CommandOrControl+Alt+N" spellcheck="false"></div>
               </div>
             </section>
 
@@ -294,7 +273,7 @@
 
             <section class="settings-panel" data-settings-panel="about" role="tabpanel">
               <h2>关于</h2>
-              <div class="settings-about settings-about-large" aria-label="软件版本信息"><div><strong>研迹 · 科研工作台</strong><small>日程、打卡、笔记、文献推荐与投稿管理 · 当前版本 <span id="currentVersion">0.9.0</span></small></div><span class="local-first-badge">本地优先</span></div>
+              <div class="settings-about settings-about-large" aria-label="软件版本信息"><div><strong>研迹 · 科研工作台</strong><small>日程、打卡、笔记与投稿管理 · 当前版本 <span id="currentVersion">0.9.0</span></small></div><span class="local-first-badge">本地优先</span></div>
               <h3>版本与更新</h3>
               <div class="settings-group update-group">
                 <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>

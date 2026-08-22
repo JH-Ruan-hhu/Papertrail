@@ -34,12 +34,14 @@ test('persists settings and papers atomically', (t) => {
   const store = new JsonStore(filePath);
   store.load();
   assert.equal(store.getSettings().refreshOnStartup, true);
-  store.updateSettings({ refreshMinutes: 720 });
+  assert.equal(store.getSettings().stickyNoteShortcut, 'CommandOrControl+Alt+N');
+  store.updateSettings({ refreshMinutes: 720, stickyNoteShortcut: 'CommandOrControl+Alt+B' });
   store.addPaper(validPaper());
 
   const reloaded = new JsonStore(filePath);
   reloaded.load();
   assert.equal(reloaded.getSettings().refreshMinutes, 720);
+  assert.equal(reloaded.getSettings().stickyNoteShortcut, 'CommandOrControl+Alt+B');
   assert.equal(reloaded.findPaper('paper-1').paperKey, 'key-paper-1');
   assert.equal(fs.existsSync(`${filePath}.tmp`), false);
 });
