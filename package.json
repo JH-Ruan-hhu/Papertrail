@@ -1,12 +1,12 @@
 {
   "name": "papertrail-desktop",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "Yanji contributors",
   "license": "MIT",
   "private": true,
-  "packageManager": "pnpm@11.19.0",
+  "packageManager": "npm@11.17.0",
   "scripts": {
     "start": "electron .",
     "test": "node --test",

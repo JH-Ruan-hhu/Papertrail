@@ -1050,10 +1050,12 @@ function nativeWindowHandleValue(window) {
   return BigInt(handle.readUInt32LE(0)).toString();
 }
 
-async function attachWindowToDesktop(window) {
+async function attachWindowToDesktop(window, targetSize) {
   if (process.platform !== 'win32') return false;
   const script = String.raw`
 $ChildHandle = [UInt64]::Parse($env:YANJI_DESKTOP_CHILD_HANDLE)
+$TargetWidth = [Int32]::Parse($env:YANJI_DESKTOP_CHILD_WIDTH)
+$TargetHeight = [Int32]::Parse($env:YANJI_DESKTOP_CHILD_HEIGHT)
 $source = @'
 using System;
 using System.Runtime.InteropServices;
@@ -1112,6 +1114,15 @@ public static class YanjiDesktopHost {
     else SetWindowLong32(hWnd, -16, value);
   }
 
+  private static IntPtr GetExtendedStyle(IntPtr hWnd) {
+    return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, -20) : GetWindowLong32(hWnd, -20);
+  }
+
+  private static void SetExtendedStyle(IntPtr hWnd, IntPtr value) {
+    if (IntPtr.Size == 8) SetWindowLongPtr64(hWnd, -20, value);
+    else SetWindowLong32(hWnd, -20, value);
+  }
+
   private static IntPtr FindIconHost() {
     IntPtr host = IntPtr.Zero;
     EnumWindows(delegate(IntPtr candidate, IntPtr state) {
@@ -1124,11 +1135,12 @@ public static class YanjiDesktopHost {
     return host != IntPtr.Zero ? host : GetShellWindow();
   }
 
-  public static int Attach(UInt64 childValue) {
+  public static int Attach(UInt64 childValue, int targetWidth, int targetHeight) {
     IntPtr child = new IntPtr(unchecked((long)childValue));
     IntPtr host = FindIconHost();
     if (child == IntPtr.Zero) return 11;
     if (host == IntPtr.Zero) return 12;
+    if (targetWidth <= 0 || targetHeight <= 0) return 13;
 
     RECT rect;
     if (!GetWindowRect(child, out rect)) return 2;
@@ -1136,18 +1148,22 @@ public static class YanjiDesktopHost {
     ScreenToClient(host, ref origin);
 
     long style = GetStyle(child).ToInt64();
-    style = (style & ~0x80000000L) | 0x40000000L;
+    const long nativeFrame = 0x00C00000L | 0x00040000L | 0x00080000L | 0x00020000L | 0x00010000L;
+    style = (style & ~0x80000000L & ~nativeFrame) | 0x40000000L;
     SetStyle(child, new IntPtr(style));
+    long extendedStyle = GetExtendedStyle(child).ToInt64();
+    const long extendedFrame = 0x00000100L | 0x00000200L | 0x00020000L;
+    SetExtendedStyle(child, new IntPtr(extendedStyle & ~extendedFrame));
     SetParent(child, host);
     if (GetParent(child) != host) return 3;
 
     const uint flags = 0x0010 | 0x0020 | 0x0040;
-    return SetWindowPos(child, IntPtr.Zero, origin.X, origin.Y, rect.Right - rect.Left, rect.Bottom - rect.Top, flags) ? 0 : 4;
+    return SetWindowPos(child, IntPtr.Zero, origin.X, origin.Y, targetWidth, targetHeight, flags) ? 0 : 4;
   }
 }
 '@
 Add-Type -TypeDefinition $source
-$attachResult = [YanjiDesktopHost]::Attach($ChildHandle)
+$attachResult = [YanjiDesktopHost]::Attach($ChildHandle, $TargetWidth, $TargetHeight)
 Write-Output "YANJI_DESKTOP_RESULT=$attachResult"
 if ($attachResult -eq 0) { Write-Output 'YANJI_DESKTOP_ATTACHED'; exit 0 }
 exit 1
@@ -1162,7 +1178,12 @@ exit 1
       script
     ], {
       windowsHide: true,
-      env: { ...process.env, YANJI_DESKTOP_CHILD_HANDLE: nativeWindowHandleValue(window) },
+      env: {
+        ...process.env,
+        YANJI_DESKTOP_CHILD_HANDLE: nativeWindowHandleValue(window),
+        YANJI_DESKTOP_CHILD_WIDTH: String(targetSize.width),
+        YANJI_DESKTOP_CHILD_HEIGHT: String(targetSize.height)
+      },
       stdio: ['ignore', 'pipe', 'pipe']
     });
     let stdout = '';
@@ -1205,6 +1226,7 @@ async function showScheduleWidget() {
     y: workArea.y + 24,
     show: false,
     frame: false,
+    thickFrame: false,
     transparent: false,
     resizable: false,
     maximizable: false,
@@ -1227,12 +1249,9 @@ async function showScheduleWidget() {
     if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
   });
   await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'));
-  window.yanjiDesktopAttached = await attachWindowToDesktop(window);
+  window.yanjiDesktopAttached = await attachWindowToDesktop(window, { width, height });
   if (window.yanjiDesktopAttached) {
     await new Promise((resolve) => setTimeout(resolve, 80));
-    window.setResizable(true);
-    window.setSize(width, height);
-    window.setResizable(false);
   } else {
     window.setSize(width, height);
   }
@@ -2026,7 +2045,7 @@ if (!gotLock) {
         const bounds = scheduleWidgetWindow.getBounds();
         const [contentWidth, contentHeight] = scheduleWidgetWindow.getContentSize();
         console.log(`DESKTOP_WIDGET_ATTACH_OK ${JSON.stringify({ attached: result.attached, contentWidth, contentHeight, outerWidth: bounds.width, outerHeight: bounds.height, alwaysOnTop: scheduleWidgetWindow.isAlwaysOnTop(), skipTaskbar: true })}`);
-        if (!result.attached || bounds.width !== 360 || bounds.height !== 480 || scheduleWidgetWindow.isAlwaysOnTop()) {
+        if (!result.attached || contentWidth !== 360 || contentHeight !== 480 || scheduleWidgetWindow.isAlwaysOnTop()) {
           throw new Error('桌面日程组件没有按 3:4 非置顶桌面层模式打开。');
         }
         try {

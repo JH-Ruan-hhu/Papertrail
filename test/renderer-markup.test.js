@@ -226,6 +226,9 @@ test('research workbench exposes home, weekly schedule board, metadata notes and
   assert.match(mainJs, /height = 480/);
   assert.match(mainJs, /alwaysOnTop: false/);
   assert.match(mainJs, /skipTaskbar: true/);
+  assert.match(mainJs, /thickFrame: false/);
+  assert.match(mainJs, /nativeFrame = 0x00C00000L \| 0x00040000L/);
+  assert.doesNotMatch(mainJs, /scheduleWidgetWindow[\s\S]*setResizable\(true\)/);
   assert.match(mainJs, /showDeadlineWindow/);
   assert.match(mainJs, /new Notification/);
   assert.match(preloadJs, /showCapture/);

@@ -27,6 +27,16 @@ test('parses Chinese relative date, day part and a multi-hour range', () => {
   assert.ok(parsed.matches.some((match) => match.text.includes('3点到5点')));
 });
 
+test('removes the connector between a relative date and its clock phrase', () => {
+  const parsed = parseNaturalLanguageSchedule('明天的下午四点去污水厂采样', new Date(2026, 7, 22, 10, 0));
+  const start = new Date(parsed.startAt);
+  assert.equal(parsed.valid, true);
+  assert.equal(parsed.title, '去污水厂采样');
+  assert.equal(start.getDate(), 23);
+  assert.equal(start.getHours(), 16);
+  assert.equal(start.getMinutes(), 0);
+});
+
 test('marks urgent deadline text and gives a one-hour default duration', () => {
   const parsed = parseNaturalLanguageSchedule('后天早上九点截止提交初稿 紧急', new Date(2026, 7, 22, 10, 0));
   assert.equal(parsed.priority, 'high');

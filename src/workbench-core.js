@@ -161,7 +161,8 @@ function parseNaturalLanguageSchedule(input, base = new Date()) {
     .replace(/[＃#][123]\b/g, ' ')
     .replace(/\b(deadline|ddl)\b/ig, ' ')
     .replace(/\s+/g, ' ')
-    .trim();
+    .trim()
+    .replace(/^的\s*/, '');
   if (!title) title = '新日程';
 
   const matches = [];

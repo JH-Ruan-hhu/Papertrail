@@ -1,7 +1,7 @@
 :root {
   font-family: "Segoe UI Variable", "Microsoft YaHei UI", sans-serif;
   color: #294b61;
-  background: #eaf5fb;
+  background: #edf7fb;
 }
 
 * { box-sizing: border-box; }
@@ -12,15 +12,18 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
+  background: #edf7fb;
 }
 
 body {
   display: grid;
   grid-template-rows: 58px 1fr 58px;
-  border: 1px solid rgba(109, 157, 183, .48);
-  border-radius: 18px;
-  background: linear-gradient(155deg, rgba(248, 253, 255, .98), rgba(224, 241, 249, .98));
-  box-shadow: inset 0 1px rgba(255, 255, 255, .82);
+  border: 1px solid rgba(130, 177, 199, .38);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 88% 5%, rgba(184, 222, 239, .34), transparent 32%),
+    linear-gradient(155deg, #f9fdff, #e7f4fa);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .9);
 }
 
 button { font: inherit; }
@@ -96,9 +99,10 @@ main {
   gap: 8px;
   overflow-y: auto;
   padding-right: 3px;
-  scrollbar-width: thin;
-  scrollbar-color: #9fc3d6 transparent;
+  scrollbar-width: none;
 }
+
+.schedule-list::-webkit-scrollbar { display: none; }
 
 .widget-item {
   position: relative;
@@ -159,8 +163,9 @@ main {
   display: grid;
   place-items: center;
   padding: 24px;
-  border: 1px dashed rgba(120, 168, 193, .48);
+  border: 1px dashed rgba(120, 168, 193, .34);
   border-radius: 15px;
+  background: rgba(255, 255, 255, .24);
   color: #7993a2;
   text-align: center;
   font-size: 13px;

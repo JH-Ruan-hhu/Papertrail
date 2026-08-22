@@ -8,6 +8,12 @@ publisher-neutral.
 
 ## Version 1.0 workbench features
 
+Version 1.0.1 polishes the pale-blue shell by hiding visible root scrollbars,
+removing the selected-navigation edge shadow, and eliminating native black
+frames from the 3:4 desktop schedule widget. Quick Capture also understands
+connectors such as `明天的下午四点去污水厂采样` without leaving `的` in the
+saved schedule title.
+
 - Use a cohesive pale-blue desktop shell with consistent line icons,
   compact spacing, a small top-right clock, and responsive narrow-window
   layouts.
