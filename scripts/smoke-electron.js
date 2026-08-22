@@ -13,16 +13,16 @@ const path = require('node:path');
 const { app, BrowserWindow } = require('electron');
 
 app.disableHardwareAcceleration();
-app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.5.2'));
+app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.8.0'));
 
 app.whenReady().then(async () => {
   const window = new BrowserWindow({
     width: Number(process.env.PAPERTRAIL_SMOKE_WIDTH) || 1180,
     height: Number(process.env.PAPERTRAIL_SMOKE_HEIGHT) || 780,
     show: false,
-    backgroundColor: '#f3f6fb',
+    backgroundColor: '#fafafa',
     titleBarStyle: 'hidden',
-    titleBarOverlay: { color: '#f2f5f9', symbolColor: '#526071', height: 42 },
+    titleBarOverlay: { color: '#f5f5f5', symbolColor: '#666666', height: 42 },
     webPreferences: {
       preload: path.join(__dirname, 'smoke-preload.js'),
       contextIsolation: true,
@@ -90,7 +90,7 @@ app.whenReady().then(async () => {
           badgeLabel: badge?.textContent === '投稿历程 2 次',
           dialogOpened: dialog.open,
           candidateOptions: document.getElementById('journeyTarget').options.length === 2,
-          localOnlyCopy: dialog.textContent.includes('仅关联 PaperTrail 本地记录'),
+          localOnlyCopy: dialog.textContent.includes('仅关联研迹中的本地记录'),
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
         dialog.close();
@@ -151,7 +151,7 @@ app.whenReady().then(async () => {
       updateButton.click();
       await new Promise((resolve) => setTimeout(resolve, 40));
       const updateAvailable = updateButton.textContent === '下载更新'
-        && document.getElementById('updateVersionBadge').textContent === 'v0.5.3';
+        && document.getElementById('updateVersionBadge').textContent === 'v0.8.1';
       updateButton.click();
       await new Promise((resolve) => setTimeout(resolve, 40));
       const updateDownloaded = updateButton.textContent === '安装并重启'
@@ -241,14 +241,15 @@ app.whenReady().then(async () => {
   if (process.env.PAPERTRAIL_SETTINGS_OUTPUT) {
     await window.webContents.executeJavaScript(`document.getElementById('settingsButton').click()`);
     await new Promise((resolve) => setTimeout(resolve, 240));
-    const settingsDialogVisual = await window.webContents.executeJavaScript(`
+      const settingsDialogVisual = await window.webContents.executeJavaScript(`
       (() => {
         const dialog = document.getElementById('settingsDialog');
         const style = getComputedStyle(dialog);
-        return { open: dialog.open, className: dialog.className, opacity: style.opacity, transform: style.transform };
+        const rect = dialog.getBoundingClientRect();
+        return { open: dialog.open, className: dialog.className, opacity: style.opacity, transform: style.transform, top: rect.top, right: innerWidth - rect.right };
       })()
     `);
-    if (!settingsDialogVisual.open || Number(settingsDialogVisual.opacity) < 0.99) {
+    if (!settingsDialogVisual.open || Number(settingsDialogVisual.opacity) < 0.99 || settingsDialogVisual.top < 50 || settingsDialogVisual.right < 20) {
       throw new Error(`Settings dialog visual state failed: ${JSON.stringify(settingsDialogVisual)}`);
     }
     console.log(`SETTINGS_DIALOG_VISUAL_OK ${JSON.stringify(settingsDialogVisual)}`);
@@ -353,6 +354,54 @@ app.whenReady().then(async () => {
     await new Promise((resolve) => setTimeout(resolve, 240));
     await captureStablePage(process.env.WORKBENCH_SCHEDULE_OUTPUT);
   }
+  if (process.env.WORKBENCH_HOME_OUTPUT) {
+    const homeResult = await window.webContents.executeJavaScript(`
+      (() => {
+        document.querySelector('[data-workbench-page="home"]').click();
+        window.scrollTo(0, 0);
+        const schedule = document.querySelector('.home-schedule-panel').getBoundingClientRect();
+        const notes = document.querySelector('.latest-notes-panel').getBoundingClientRect();
+        return {
+          pageVisible: !document.querySelector('[data-page="home"]').hidden,
+          focusFirst: Boolean(document.querySelector('.home-top-grid #todayFocusList')),
+          dailyTime: Boolean(document.getElementById('homeFeatureClock').textContent.trim()),
+          dailyQuote: Boolean(document.getElementById('dailyQuote').textContent.trim()),
+          fourDayCards: document.querySelectorAll('#homeDayOverview .day-card').length,
+          notesRight: notes.left > schedule.left,
+          aligned: Math.abs(notes.top - schedule.top) <= 1,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!Object.entries(homeResult).every(([key, value]) => key === 'fourDayCards' ? value === 4 : key === 'horizontalOverflow' ? value === false : value === true)) {
+      throw new Error(`Workbench home smoke failed: ${JSON.stringify(homeResult)}`);
+    }
+    console.log(`WORKBENCH_HOME_OK ${JSON.stringify(homeResult)}`);
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    await captureStablePage(process.env.WORKBENCH_HOME_OUTPUT);
+  }
+  if (process.env.WORKBENCH_ATTENDANCE_OUTPUT) {
+    const attendanceResult = await window.webContents.executeJavaScript(`
+      (() => {
+        document.querySelector('[data-workbench-page="attendance"]').click();
+        window.scrollTo(0, 0);
+        return {
+          pageVisible: !document.querySelector('[data-page="attendance"]').hidden,
+          ganttRows: document.querySelectorAll('#attendanceGanttRows .attendance-gantt-row').length,
+          ganttBars: document.querySelectorAll('#attendanceGanttRows .attendance-bar').length,
+          focusTimer: document.getElementById('focusTimeRemaining').textContent === '50:00',
+          appRows: document.querySelectorAll('#focusUsageList .focus-usage-row').length,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!attendanceResult.pageVisible || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 1 || !attendanceResult.focusTimer || attendanceResult.appRows < 1 || attendanceResult.horizontalOverflow) {
+      throw new Error(`Workbench attendance smoke failed: ${JSON.stringify(attendanceResult)}`);
+    }
+    console.log(`WORKBENCH_ATTENDANCE_OK ${JSON.stringify(attendanceResult)}`);
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    await captureStablePage(process.env.WORKBENCH_ATTENDANCE_OUTPUT);
+  }
   if (process.env.WORKBENCH_NOTES_OUTPUT) {
     const notesResult = await window.webContents.executeJavaScript(`
       (() => {
@@ -372,6 +421,39 @@ app.whenReady().then(async () => {
     console.log(`WORKBENCH_NOTES_OK ${JSON.stringify(notesResult)}`);
     await new Promise((resolve) => setTimeout(resolve, 240));
     await captureStablePage(process.env.WORKBENCH_NOTES_OUTPUT);
+  }
+  if (process.env.WORKBENCH_CAPTURE_OUTPUT) {
+    window.setSize(720, 290);
+    await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'capture.html'));
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    const captureResult = await window.webContents.executeJavaScript(`
+      (async () => {
+        const editor = document.getElementById('captureEditor');
+        editor.dispatchEvent(new CompositionEvent('compositionstart', { bubbles: true, data: 'liu' }));
+        editor.value = 'liu';
+        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: 'liu', isComposing: true }));
+        editor.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', isComposing: true }));
+        const compositionPreserved = editor.value === 'liu' && document.body.dataset.hideRequested !== 'true';
+        editor.value = '明天下午 3 点到 5 点组会 #1';
+        editor.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '明天' }));
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        const priorityRendered = document.getElementById('parseResult').textContent.includes('最高优先级');
+        const highlighted = document.querySelectorAll('#captureHighlights mark').length >= 2;
+        editor.value = '';
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        window.dispatchEvent(new Event('blur'));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const emptyBlurClosed = document.body.dataset.hideRequested === 'true';
+        editor.value = '明天下午 3 点到 5 点组会 #1';
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        return { compositionPreserved, priorityRendered, highlighted, emptyBlurClosed };
+      })()
+    `);
+    if (!Object.values(captureResult).every(Boolean)) throw new Error(`Workbench capture smoke failed: ${JSON.stringify(captureResult)}`);
+    console.log(`WORKBENCH_CAPTURE_OK ${JSON.stringify(captureResult)}`);
+    await captureStablePage(process.env.WORKBENCH_CAPTURE_OUTPUT);
   }
   if (!process.env.PAPERTRAIL_SMOKE_OUTPUT) {
     window.webContents.invalidate();

@@ -1,12 +1,14 @@
 'use strict';
 
 const {
+  normalizeAttendance,
+  normalizeFocusSession,
   normalizeMetadataField,
   normalizeNote,
   normalizeSchedule
 } = require('./workbench-core');
 
-const DATA_VERSION = 4;
+const DATA_VERSION = 6;
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
 const TASK_REMINDER_LEAD_MS = 48 * 60 * 60_000;
 const TASK_TYPES = Object.freeze(['revision', 'proof', 'copyright', 'followup']);
@@ -205,13 +207,15 @@ function migrateData(parsed, defaultSettings) {
     throw new Error('数据文件版本号无效。');
   }
   if (Number(parsed.version || 1) > DATA_VERSION) {
-    throw new Error(`数据文件来自更高版本（v${parsed.version}），当前 PaperTrail 无法安全打开。`);
+    throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
   }
   if (parsed.settings != null && !asObject(parsed.settings)) throw new Error('设置数据格式无效。');
   if (parsed.papers != null && !Array.isArray(parsed.papers)) throw new Error('稿件列表格式无效。');
   if (parsed.schedules != null && !Array.isArray(parsed.schedules)) throw new Error('日程列表格式无效。');
   if (parsed.notes != null && !Array.isArray(parsed.notes)) throw new Error('笔记列表格式无效。');
   if (parsed.metadataFields != null && !Array.isArray(parsed.metadataFields)) throw new Error('笔记元数据字段格式无效。');
+  if (parsed.attendance != null && !Array.isArray(parsed.attendance)) throw new Error('打卡记录格式无效。');
+  if (parsed.focusSessions != null && !Array.isArray(parsed.focusSessions)) throw new Error('专注记录格式无效。');
 
   const settings = { ...defaultSettings, ...(parsed.settings || {}) };
   const papers = (parsed.papers || []).map(migratePaper).map((paper) => (
@@ -222,13 +226,17 @@ function migrateData(parsed, defaultSettings) {
   const schedules = (parsed.schedules || []).map((schedule, index) => normalizeSchedule(schedule, index));
   const notes = (parsed.notes || []).map((note, index) => normalizeNote(note, index));
   const metadataFields = (parsed.metadataFields || []).map(normalizeMetadataField);
+  const attendance = (parsed.attendance || []).map((record, index) => normalizeAttendance(record, index));
+  const focusSessions = (parsed.focusSessions || []).map((session, index) => normalizeFocusSession(session, index));
   const data = {
     version: DATA_VERSION,
     settings,
     papers,
     schedules,
     notes,
-    metadataFields
+    metadataFields,
+    attendance,
+    focusSessions
   };
   return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) };
 }
@@ -579,7 +587,7 @@ function exportRows(paper) {
   if (snapshot.doi) rows.push(['基本信息', '', `DOI：${snapshot.doi}`]);
   if (snapshot.submissionDate) rows.push(['关键日期', snapshot.submissionDate, '首次投稿']);
   if (snapshot.acceptedDate) rows.push(['关键日期', snapshot.acceptedDate, '文章接收']);
-  if (paper.lastSuccessfulAt) rows.push(['关键日期', paper.lastSuccessfulAt, 'PaperTrail 最近成功同步']);
+  if (paper.lastSuccessfulAt) rows.push(['关键日期', paper.lastSuccessfulAt, '研迹最近成功同步']);
   for (const entry of paper.history || []) {
     const details = Array.isArray(entry.changes) && entry.changes.length
       ? entry.changes.join('；')

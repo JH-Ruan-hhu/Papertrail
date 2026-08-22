@@ -2,6 +2,8 @@
 
 const SCHEDULE_PRIORITIES = Object.freeze(['high', 'medium', 'low']);
 const METADATA_TYPES = Object.freeze(['text', 'select', 'checkbox']);
+const ATTENDANCE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const FOCUS_STATUSES = Object.freeze(['active', 'completed', 'stopped']);
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -143,9 +145,10 @@ function parseNaturalLanguageSchedule(input, base = new Date()) {
     end = new Date(start.getTime() + 60 * 60_000);
   }
 
-  let priority = 'low';
-  if (/!!!|紧急|最高|红色/.test(original)) priority = 'high';
-  else if (/!!|重要|黄色/.test(original)) priority = 'medium';
+  const priorityTag = original.match(/[＃#]([123])\b/);
+  let priority = priorityTag ? ({ 1: 'high', 2: 'medium', 3: 'low' })[priorityTag[1]] : 'low';
+  if (!priorityTag && /!!!|紧急|最高|红色/.test(original)) priority = 'high';
+  else if (!priorityTag && /!!|重要|黄色/.test(original)) priority = 'medium';
   const deadline = /deadline|截止|到期|ddl/i.test(original);
 
   const tokens = [resolvedDate.token, dayPart, timeToken].filter(Boolean);
@@ -155,13 +158,14 @@ function parseNaturalLanguageSchedule(input, base = new Date()) {
   }
   title = title
     .replace(/!!!|!!/g, ' ')
+    .replace(/[＃#][123]\b/g, ' ')
     .replace(/\b(deadline|ddl)\b/ig, ' ')
     .replace(/\s+/g, ' ')
     .trim();
   if (!title) title = '新日程';
 
   const matches = [];
-  for (const token of [...new Set(tokens)]) {
+  for (const token of [...new Set([...tokens, priorityTag?.[0]].filter(Boolean))]) {
     const index = original.indexOf(token);
     if (index >= 0) matches.push({ start: index, end: index + token.length, text: token });
   }
@@ -236,6 +240,68 @@ function normalizeNote(value, index = 0, fallbackAt = new Date(0).toISOString())
   };
 }
 
+function normalizeAttendance(value, index = 0, fallbackAt = new Date(0).toISOString()) {
+  if (!asObject(value)) throw new Error(`第 ${index + 1} 条打卡记录格式无效。`);
+  const clockInAt = isoDate(value.clockInAt);
+  const clockOutAt = isoDate(value.clockOutAt);
+  const derivedDate = clockInAt
+    ? `${new Date(clockInAt).getFullYear()}-${String(new Date(clockInAt).getMonth() + 1).padStart(2, '0')}-${String(new Date(clockInAt).getDate()).padStart(2, '0')}`
+    : '';
+  const date = ATTENDANCE_DATE_PATTERN.test(String(value.date || '')) ? String(value.date) : derivedDate;
+  if (!date || !clockInAt) throw new Error(`第 ${index + 1} 条打卡记录缺少有效日期或上班时间。`);
+  if (clockOutAt && Date.parse(clockOutAt) <= Date.parse(clockInAt)) {
+    throw new Error(`第 ${index + 1} 条打卡记录的下班时间必须晚于上班时间。`);
+  }
+  const createdAt = isoDate(value.createdAt, fallbackAt);
+  return {
+    id: cleanText(value.id, 200) || `attendance-${index + 1}`,
+    date,
+    clockInAt,
+    clockOutAt,
+    createdAt,
+    updatedAt: isoDate(value.updatedAt, createdAt)
+  };
+}
+
+function normalizeFocusSession(value, index = 0, fallbackAt = new Date(0).toISOString()) {
+  if (!asObject(value)) throw new Error(`第 ${index + 1} 条专注记录格式无效。`);
+  const startedAt = isoDate(value.startedAt);
+  if (!startedAt) throw new Error(`第 ${index + 1} 条专注记录缺少有效开始时间。`);
+  const plannedMinutes = Math.max(5, Math.min(180, Math.round(Number(value.plannedMinutes) || 25)));
+  const endedAt = isoDate(value.endedAt);
+  if (endedAt && Date.parse(endedAt) < Date.parse(startedAt)) throw new Error(`第 ${index + 1} 条专注记录的结束时间无效。`);
+  const appUsage = {};
+  if (asObject(value.appUsage)) {
+    for (const [name, seconds] of Object.entries(value.appUsage).slice(0, 100)) {
+      const safeName = cleanText(name, 100);
+      const safeSeconds = Math.max(0, Math.min(31_536_000, Math.round(Number(seconds) || 0)));
+      if (safeName && safeSeconds) appUsage[safeName] = safeSeconds;
+    }
+  }
+  const restore = asObject(value.notificationRestore);
+  const notificationRestore = restore ? {
+    existed: Boolean(restore.existed),
+    value: Number.isInteger(Number(restore.value)) ? Number(restore.value) : null,
+    changed: Boolean(restore.changed)
+  } : null;
+  const createdAt = isoDate(value.createdAt, fallbackAt);
+  return {
+    id: cleanText(value.id, 200) || `focus-${index + 1}`,
+    startedAt,
+    endedAt,
+    plannedMinutes,
+    status: FOCUS_STATUSES.includes(value.status) ? value.status : (endedAt ? 'completed' : 'active'),
+    appUsage,
+    suppressNotifications: value.suppressNotifications !== false,
+    notificationsSuppressed: Boolean(value.notificationsSuppressed),
+    notificationRestore,
+    notificationRestoredAt: isoDate(value.notificationRestoredAt),
+    notificationError: cleanText(value.notificationError, 500) || null,
+    createdAt,
+    updatedAt: isoDate(value.updatedAt, createdAt)
+  };
+}
+
 function saveSchedule(list, input, now = new Date().toISOString(), makeId = () => `schedule-${Date.now()}`) {
   const existing = input?.id ? list.find((item) => item.id === String(input.id)) : null;
   const candidate = normalizeSchedule({
@@ -265,13 +331,46 @@ function saveNote(list, input, now = new Date().toISOString(), makeId = () => `n
     : [candidate, ...list];
 }
 
+function saveAttendance(list, input, now = new Date().toISOString(), makeId = () => `attendance-${Date.now()}`) {
+  const existing = (input?.id ? list.find((item) => item.id === String(input.id)) : null)
+    || list.find((item) => item.date === String(input?.date || ''));
+  const candidate = normalizeAttendance({
+    ...existing,
+    ...input,
+    id: existing?.id || makeId(),
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  }, 0, now);
+  return existing
+    ? list.map((item) => item.id === candidate.id ? candidate : item)
+    : [candidate, ...list];
+}
+
+function saveFocusSession(list, input, now = new Date().toISOString(), makeId = () => `focus-${Date.now()}`) {
+  const existing = input?.id ? list.find((item) => item.id === String(input.id)) : null;
+  const candidate = normalizeFocusSession({
+    ...existing,
+    ...input,
+    id: existing?.id || makeId(),
+    createdAt: existing?.createdAt || now,
+    updatedAt: now
+  }, 0, now);
+  return existing
+    ? list.map((item) => item.id === candidate.id ? candidate : item)
+    : [candidate, ...list];
+}
+
 module.exports = {
   METADATA_TYPES,
   SCHEDULE_PRIORITIES,
+  normalizeAttendance,
+  normalizeFocusSession,
   normalizeMetadataField,
   normalizeNote,
   normalizeSchedule,
   parseNaturalLanguageSchedule,
+  saveAttendance,
+  saveFocusSession,
   saveNote,
   saveSchedule
 };

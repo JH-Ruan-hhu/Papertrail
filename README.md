@@ -1,10 +1,30 @@
 # 研迹 · Research Workbench
 
 研迹 is a local-first Windows research workbench that brings daily planning,
-quick capture, structured notes, and the complete PaperTrail manuscript tracker
+quick capture, attendance, structured notes, and a complete manuscript tracker
 into one desktop app. The manuscript connectors cover Elsevier Author Hub and
 Elsevier accepted-article production pages; local workflow records remain
 publisher-neutral.
+
+## Version 0.8 workbench features
+
+- Use a quiet, text-first desktop shell inspired by WeChat: a compact Windows
+  title area, a small top-right clock, and no decorative navigation icons.
+- Clock in and out from Home, correct records manually, and review each week on
+  a 24-hour Gantt chart with total time and average start/end times.
+- Run a 25, 50, or 90 minute focus session from the attendance page. Yanji can
+  temporarily pause application toast notifications, restore the previous
+  Windows policy afterward, and summarize foreground-app time without reading
+  window content.
+- Keep today's priorities at the top of Home beside a compact clock and a daily
+  quotation. The four-day schedule and latest notes share the next row.
+- Keep Chinese IME composition stable in Quick Capture by separating the real
+  textarea from the recognized-time highlight layer. Empty capture windows
+  close automatically when they lose focus.
+- Add `#1`, `#2`, or `#3` in Quick Capture for red, yellow, or green priority;
+  schedules without a tag default to green.
+- Use the app's own confirmation dialog for destructive actions instead of the
+  browser or Windows legacy confirmation box.
 
 ## Version 0.7 workbench features
 
@@ -49,13 +69,13 @@ publisher-neutral.
 - Store a Manuscript ID, handling editor, current submission contact,
   rejection/transfer/acceptance note, and free-form local notes.
 - Preserve individual reviewer events, including unknown event types, and show
-  publisher-provided event time separately from PaperTrail's first local
+  publisher-provided event time separately from Yanji's first local
   observation time.
 - Display accepted-article production milestones, DOI, author information, and
   proof/publication events from Elsevier's official Article Tracking page.
 - Reveal the complete DOI link on hover and copy it with one click.
 - Keep a local change history and report stage duration conservatively as the
-  time observed by PaperTrail, not an invented publisher-side start date.
+  time observed by Yanji, not an invented publisher-side start date.
 - Show a scrollable manuscript timeline from the initial submission date through
   review records, acceptance, proofing, and publication when those dates are
   available from Elsevier.
@@ -79,20 +99,21 @@ publisher-neutral.
 - Optionally refresh all tracked manuscripts once after a cold start.
 - Check the public GitHub Release feed from Settings, download a newer
   release on demand, show download progress, and restart into the installer.
-  PaperTrail never checks silently in the background.
+  Yanji never checks silently in the background.
 - Move the local data file to a user-selected folder while retaining the old
   file as a removable backup.
 
-## Version 0.7 data model
+## Version 0.8 data model
 
-PaperTrail stores `lastAttemptAt`, `lastSuccessfulAt`, `failureStreak`, and
+Yanji stores `lastAttemptAt`, `lastSuccessfulAt`, `failureStreak`, and
 `nextRetryAt` separately. Important updates contain their own occurrence time,
 content, and read state. Archived papers keep their encrypted credential,
 history, DOI, and production events but are excluded from automatic refresh.
 
-Schema version 4 adds `schedules`, `notes`, and reusable `metadataFields` while
-retaining version 3 manuscript details, tasks, revision rounds, and observed
-review events. Older data files are migrated locally on first successful load.
+Schema version 6 includes `schedules`, `notes`, reusable `metadataFields`,
+`attendance`, and `focusSessions` while retaining manuscript details, tasks,
+revision rounds, and observed review events. Older data files are migrated
+locally on first successful load.
 Existing encrypted credentials, history, unread updates, archives, and
 submission journeys are retained. Invalid JSON, unsupported future schema
 versions, and structurally damaged records are rejected without overwriting the
@@ -101,7 +122,7 @@ original file.
 ## Privacy and security
 
 Tracking URLs contain a UUID that should be treated like a private access link.
-PaperTrail never exposes that UUID to the renderer. The full link is encrypted
+Yanji never exposes that UUID to the renderer. The full link is encrypted
 in Electron's user-data directory and only decrypted in the main process when a
 refresh is requested. No analytics or cloud sync is included.
 
@@ -139,16 +160,16 @@ generated `latest.yml` together in the same public GitHub Release.
   "Production has begun" email and the corresponding author's surname.
 - Searching by an author name alone cannot reveal private or unpublished
   submissions. Elsevier's Author Search API searches Scopus author profiles and
-  public indexed records, so PaperTrail does not present it as manuscript-status
+  public indexed records, so Yanji does not present it as manuscript-status
   tracking.
 - The tracking endpoint or response fields may change without notice.
 - Automatic online tracking currently supports Elsevier only. Other publishers
   can be represented through local workflow metadata and submission journeys,
   but do not yet have automatic status connectors.
-- Deadline reminders require PaperTrail to be running (the window may remain in
+- Deadline reminders require Yanji to be running (the window may remain in
   the system tray) and Windows notifications to be enabled.
 - The app does not bypass login, CAPTCHA, access controls, or publisher policy.
-- A tracking UUID is required; PaperTrail cannot discover submissions from an
+- A tracking UUID is required; Yanji cannot discover submissions from an
   Editorial Manager account automatically.
 - `authors.elsevier.com/c/...` article Share Links provide reading access after
   publication and cannot be used to query manuscript-review status.

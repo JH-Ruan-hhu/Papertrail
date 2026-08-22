@@ -12,9 +12,16 @@ contextBridge.exposeInMainWorld('paperTrail', {
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
   openStickyNote: (id) => ipcRenderer.invoke('notes:open-sticky', id),
   saveMetadataFields: (fields) => ipcRenderer.invoke('metadata:save-fields', fields),
+  clockAttendance: (action) => ipcRenderer.invoke('attendance:clock', action),
+  saveAttendance: (input) => ipcRenderer.invoke('attendance:save', input),
+  deleteAttendance: (id) => ipcRenderer.invoke('attendance:delete', id),
+  getFocusState: () => ipcRenderer.invoke('focus:get-state'),
+  startFocus: (input) => ipcRenderer.invoke('focus:start', input),
+  stopFocus: () => ipcRenderer.invoke('focus:stop'),
   getBingWallpaper: () => ipcRenderer.invoke('wallpaper:get'),
   showCapture: () => ipcRenderer.invoke('capture:show'),
   hideCapture: () => ipcRenderer.invoke('capture:hide'),
+  setCaptureContentState: (hasContent) => ipcRenderer.send('capture:content-state', Boolean(hasContent)),
   submitCapture: (input) => ipcRenderer.invoke('capture:submit', input),
   closeSticky: () => ipcRenderer.invoke('sticky:close'),
   setStickyAlwaysOnTop: (enabled) => ipcRenderer.invoke('sticky:set-always-on-top', enabled),
@@ -40,8 +47,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
   openTrackingPage: (id) => ipcRenderer.invoke('papers:open-tracking', id),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
-  chooseDataDirectory: () => ipcRenderer.invoke('settings:choose-data-directory'),
-  deleteDataBackups: () => ipcRenderer.invoke('settings:delete-data-backups'),
+  chooseDataDirectory: (request) => ipcRenderer.invoke('settings:choose-data-directory', request),
+  deleteDataBackups: (confirmed = false) => ipcRenderer.invoke('settings:delete-data-backups', Boolean(confirmed)),
   getUpdateState: () => ipcRenderer.invoke('updates:get-state'),
   checkForUpdates: () => ipcRenderer.invoke('updates:check'),
   downloadUpdate: () => ipcRenderer.invoke('updates:download'),
@@ -73,6 +80,11 @@ contextBridge.exposeInMainWorld('paperTrail', {
     const listener = (_event, page) => callback(page);
     ipcRenderer.on('workspace:navigate', listener);
     return () => ipcRenderer.removeListener('workspace:navigate', listener);
+  },
+  onFocusChanged: (callback) => {
+    const listener = (_event, sessions) => callback(sessions);
+    ipcRenderer.on('focus:changed', listener);
+    return () => ipcRenderer.removeListener('focus:changed', listener);
   },
   onCaptureFocus: (callback) => {
     const listener = () => callback();

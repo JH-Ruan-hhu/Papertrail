@@ -304,7 +304,7 @@ function renderProductionHistory(paper) {
   if (paper.submissionDate) {
     records.push(`<li><time>${escapeHtml(formatDate(paper.submissionDate, false))}</time><span class="timeline-dot submission"></span><b>稿件首次提交至期刊</b></li>`);
   }
-  records.push('<li class="timeline-note"><time>接收前</time><span class="timeline-dot muted"></span><b>Elsevier 出版页面不提供完整审稿节点；从投稿阶段添加 Author Hub 追踪链接后，PaperTrail 会在本机持续记录这些变化。</b></li>');
+  records.push('<li class="timeline-note"><time>接收前</time><span class="timeline-dot muted"></span><b>Elsevier 出版页面不提供完整审稿节点；从投稿阶段添加 Author Hub 追踪链接后，研迹会在本机持续记录这些变化。</b></li>');
   return `<div class="timeline-scroll"><ul class="timeline">${records.join('')}</ul></div>`;
 }
 
@@ -326,7 +326,7 @@ function renderSubmissionJourney(paper) {
   const rows = members.map((member, index) => {
     const submitted = member.submissionDate
       ? formatDate(member.submissionDate, false)
-      : `PaperTrail 添加于 ${formatDate(member.addedAt, false)}`;
+      : `研迹添加于 ${formatDate(member.addedAt, false)}`;
     return `<li class="${member.id === paper.id ? 'is-current' : ''}">
       <span class="journey-order">${index + 1}</span>
       <div><small>第 ${index + 1} 次投稿${member.archivedAt ? ' · 已归档' : ''}</small><strong>${escapeHtml(member.journal || '未知期刊')}</strong><p>${escapeHtml(member.title || '未命名稿件')}</p></div>
@@ -744,7 +744,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '0.7.0';
+  const version = settings.appVersion || '0.8.0';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   const expirations = Array.isArray(settings.backupExpiresAt) ? settings.backupExpiresAt : [];
@@ -768,7 +768,7 @@ function renderUpdateStatus() {
   const percent = Math.min(100, Math.max(0, Number(update.percent) || 0));
   const latestVersion = update.latestVersion ? `v${update.latestVersion}` : '';
   const display = {
-    idle: ['检查 PaperTrail 更新', '检查更新', false],
+    idle: ['检查研迹更新', '检查更新', false],
     checking: ['正在检查更新', '检查中…', true],
     available: ['发现新版本', '下载更新', false],
     'up-to-date': ['已是最新版本', '重新检查', false],
@@ -776,7 +776,7 @@ function renderUpdateStatus() {
     downloaded: ['更新已准备好', '安装并重启', false],
     error: ['更新检查失败', '重试', false],
     unavailable: [update.portable ? '便携版更新' : '当前无法检查更新', update.portable ? '打开发布页' : '当前不可用', !update.portable]
-  }[status] || ['检查 PaperTrail 更新', '检查更新', false];
+  }[status] || ['检查研迹更新', '检查更新', false];
 
   elements.updateStatusTitle.textContent = display[0];
   elements.updateStatusText.textContent = update.message || '点击按钮检查新版本。';
@@ -873,7 +873,17 @@ async function deleteDataBackups() {
   elements.settingsError.textContent = '';
   elements.deleteBackupsButton.disabled = true;
   try {
-    const result = await api.deleteDataBackups();
+    let result = await api.deleteDataBackups();
+    if (result?.requiresConfirmation) {
+      const accepted = await window.yanjiConfirm({
+        title: '删除旧数据备份',
+        message: `将删除 ${result.backupCount} 份迁移备份，当前使用的数据不受影响。此操作无法撤销。`,
+        confirmText: '删除备份',
+        tone: 'danger'
+      });
+      if (!accepted) return;
+      result = await api.deleteDataBackups(true);
+    }
     if (result?.settings) {
       state.settings = result.settings;
       populateSettingsMetadata();
@@ -884,6 +894,8 @@ async function deleteDataBackups() {
   } catch (error) {
     elements.settingsError.textContent = getErrorMessage(error);
     populateSettingsMetadata();
+  } finally {
+    elements.deleteBackupsButton.disabled = false;
   }
 }
 
@@ -891,7 +903,16 @@ async function changeDataDirectory() {
   elements.settingsError.textContent = '';
   elements.changeDataDirectoryButton.disabled = true;
   try {
-    const result = await api.chooseDataDirectory();
+    let result = await api.chooseDataDirectory();
+    if (result?.requiresConfirmation) {
+      const accepted = await window.yanjiConfirm({
+        title: '使用已有数据',
+        message: '所选文件夹中已有研迹数据。切换后，当前数据仍会保留在原文件夹中。',
+        confirmText: '切换数据'
+      });
+      if (!accepted) return;
+      result = await api.chooseDataDirectory({ selectedDirectory: result.selectedDirectory, confirmedExisting: true });
+    }
     if (result?.settings) {
       state.settings = result.settings;
       populateSettingsMetadata();

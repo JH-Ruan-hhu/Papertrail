@@ -35,6 +35,7 @@ content.addEventListener('input', queueSave);
 pinButton.addEventListener('click', async () => {
   pinned = !pinned;
   pinButton.classList.toggle('active', pinned);
+  pinButton.textContent = pinned ? '取消置顶' : '置顶';
   await api.setStickyAlwaysOnTop(pinned);
 });
 document.getElementById('closeButton').addEventListener('click', () => api.closeSticky());

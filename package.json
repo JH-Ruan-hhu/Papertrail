@@ -1,9 +1,9 @@
 {
   "name": "papertrail-desktop",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
-  "author": "PaperTrail contributors",
+  "author": "Yanji contributors",
   "license": "MIT",
   "private": true,
   "packageManager": "pnpm@11.19.0",
@@ -22,7 +22,7 @@
   },
   "build": {
     "appId": "io.papertrail.desktop",
-    "productName": "PaperTrail",
+    "productName": "研迹",
     "asar": true,
     "compression": "maximum",
     "directories": {
@@ -46,7 +46,7 @@
       ]
     },
     "nsis": {
-      "artifactName": "PaperTrail-Setup-${version}-${arch}.${ext}",
+      "artifactName": "Yanji-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,

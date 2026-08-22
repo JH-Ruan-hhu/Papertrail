@@ -3,6 +3,8 @@
 const { contextBridge } = require('electron');
 
 const now = Date.now();
+const todayAt = (hour, minute = 0) => new Date(new Date().setHours(hour, minute, 0, 0)).toISOString();
+const todayKey = new Date().toLocaleDateString('en-CA');
 const mockPaper = {
   id: 'demo-paper',
   source: 'elsevier',
@@ -165,11 +167,17 @@ let smokeWorkspace = {
   notes: [
     { id: 'note-1', title: 'PFAS 方法学想法', content: '下一轮实验需要同步核对回收率与基质效应。', metadata: { topic: '实验' }, pinned: false, createdAt: new Date(now - 7200_000).toISOString(), updatedAt: new Date(now - 3600_000).toISOString() }
   ],
-  metadataFields: [{ id: 'topic', name: '类型', type: 'select', options: ['实验', '文献', '写作'] }]
+  metadataFields: [{ id: 'topic', name: '类型', type: 'select', options: ['实验', '文献', '写作'] }],
+  attendance: [
+    { id: 'attendance-today', date: todayKey, clockInAt: todayAt(8, 45), clockOutAt: todayAt(17, 35), createdAt: todayAt(8, 45), updatedAt: todayAt(17, 35) }
+  ],
+  focusSessions: [
+    { id: 'focus-today', startedAt: todayAt(10, 0), endedAt: todayAt(10, 50), plannedMinutes: 50, status: 'completed', appUsage: { WINWORD: 1260, chrome: 980, Zotero: 510 }, suppressNotifications: true, notificationsSuppressed: true, notificationRestore: null, notificationRestoredAt: todayAt(10, 50), notificationError: null, createdAt: todayAt(10, 0), updatedAt: todayAt(10, 50) }
+  ]
 };
 let smokeUpdateState = {
   status: 'idle',
-  currentVersion: '0.5.2',
+  currentVersion: '0.8.0',
   latestVersion: null,
   releaseDate: null,
   percent: null,
@@ -179,7 +187,11 @@ let smokeUpdateState = {
 
 contextBridge.exposeInMainWorld('paperTrail', {
   getWorkspace: async () => smokeWorkspace,
-  parseSchedule: async () => ({ valid: true, title: '组会', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: 'low', deadline: false, matches: [] }),
+  parseSchedule: async (input) => {
+    const text = String(input || '');
+    const matches = ['明天', '下午 3 点到 5 点', '#1'].map((token) => ({ start: text.indexOf(token), end: text.indexOf(token) + token.length, text: token })).filter((match) => match.start >= 0);
+    return { valid: true, title: '组会', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: /#1/.test(text) ? 'high' : 'low', deadline: false, matches };
+  },
   saveSchedule: async (input) => input,
   deleteSchedule: async () => true,
   completeSchedule: async () => true,
@@ -187,8 +199,22 @@ contextBridge.exposeInMainWorld('paperTrail', {
   deleteNote: async () => true,
   openStickyNote: async () => true,
   saveMetadataFields: async (fields) => fields,
+  clockAttendance: async () => smokeWorkspace.attendance[0],
+  saveAttendance: async (input) => input,
+  deleteAttendance: async () => true,
+  getFocusState: async () => smokeWorkspace.focusSessions,
+  startFocus: async (input) => {
+    smokeWorkspace.focusSessions = [{ id: 'focus-active', startedAt: new Date().toISOString(), endedAt: null, plannedMinutes: input.plannedMinutes, status: 'active', appUsage: {}, suppressNotifications: input.suppressNotifications, notificationsSuppressed: input.suppressNotifications, notificationRestore: null, notificationRestoredAt: null, notificationError: null }, ...smokeWorkspace.focusSessions];
+    return smokeWorkspace.focusSessions;
+  },
+  stopFocus: async () => {
+    smokeWorkspace.focusSessions = smokeWorkspace.focusSessions.map((session) => session.status === 'active' ? { ...session, status: 'stopped', endedAt: new Date().toISOString() } : session);
+    return smokeWorkspace.focusSessions;
+  },
   getBingWallpaper: async () => null,
   showCapture: async () => true,
+  hideCapture: async () => { document.body.dataset.hideRequested = 'true'; return true; },
+  setCaptureContentState: () => {},
   listPapers: async () => smokePapers,
   addPaper: async (payload) => payload?.mode === 'author' ? productionPaper : mockPaper,
   refreshPaper: async () => mockPaper,
@@ -212,10 +238,10 @@ contextBridge.exposeInMainWorld('paperTrail', {
     autoCheckUpdates: true,
     bingWallpaper: true,
     quickCaptureShortcut: 'CommandOrControl+Shift+Space',
-    appVersion: '0.5.2',
-    dataDirectory: 'C:\\Users\\Demo\\Documents\\PaperTrail Data',
+    appVersion: '0.8.0',
+    dataDirectory: 'C:\\Users\\Demo\\Documents\\Yanji Data',
     backupCount: 1,
-    backupFiles: ['C:\\Users\\Demo\\Documents\\PaperTrail Old\\papertrail-data.json'],
+    backupFiles: ['C:\\Users\\Demo\\Documents\\Yanji Old\\papertrail-data.json'],
     isDefaultDataDirectory: false
   }),
   updateSettings: async (settings) => settings,
@@ -228,10 +254,10 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.5.2',
-      dataDirectory: 'D:\\Research\\PaperTrail',
+      appVersion: '0.8.0',
+      dataDirectory: 'D:\\Research\\Yanji',
       backupCount: 1,
-      backupFiles: ['C:\\Users\\Demo\\Documents\\PaperTrail Data\\papertrail-data.json'],
+      backupFiles: ['C:\\Users\\Demo\\Documents\\Yanji Data\\papertrail-data.json'],
       isDefaultDataDirectory: false
     }
   }),
@@ -245,8 +271,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.5.2',
-      dataDirectory: 'D:\\Research\\PaperTrail',
+      appVersion: '0.8.0',
+      dataDirectory: 'D:\\Research\\Yanji',
       backupCount: 0,
       backupFiles: [],
       isDefaultDataDirectory: false
@@ -257,9 +283,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
     smokeUpdateState = {
       ...smokeUpdateState,
       status: 'available',
-      latestVersion: '0.5.3',
+      latestVersion: '0.8.1',
       releaseDate: '2026-08-17T00:00:00.000Z',
-      message: '发现新版本 0.5.3，可立即下载。'
+      message: '发现新版本 0.8.1，可立即下载。'
     };
     return smokeUpdateState;
   },
@@ -281,4 +307,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   onUpdateState: () => () => {}
   ,onWorkspaceChanged: () => () => {}
   ,onWorkspaceNavigate: () => () => {}
+  ,onFocusChanged: () => () => {}
+  ,onCaptureFocus: () => () => {}
 });

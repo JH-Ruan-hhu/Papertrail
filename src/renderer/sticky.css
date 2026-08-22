@@ -1,14 +1,13 @@
-:root { font-family: "Segoe UI Variable", "Microsoft YaHei UI", sans-serif; color: #3e371f; background: #fff4b8; }
+:root { font-family: "Segoe UI Variable", "Microsoft YaHei UI", sans-serif; color: #191919; background: #fff; }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; overflow: hidden; }
-body { display: grid; grid-template-rows: 42px 1fr 32px; border: 1px solid #e0c866; background: linear-gradient(145deg, #fff8ce, #ffef9e); }
+body { display: grid; grid-template-rows: 38px 1fr 30px; border: 1px solid #d9d9d9; background: #fff; }
 header, footer { display: flex; align-items: center; justify-content: space-between; padding: 0 12px; }
-header { color: #77662e; border-bottom: 1px solid rgba(126,104,39,.16); -webkit-app-region: drag; }
-header button { padding: 5px 8px; border: 0; border-radius: 6px; color: #7b6b35; background: transparent; font: inherit; font-size: 12px; cursor: pointer; -webkit-app-region: no-drag; }
-header button.active { background: rgba(118,91,12,.12); }
-#closeButton { font-size: 20px; }
+header { color: #666; background: #f5f5f5; border-bottom: 1px solid #e6e6e6; -webkit-app-region: drag; }
+header button { padding: 4px 7px; border: 0; border-radius: 4px; color: #666; background: transparent; font: inherit; font-size: 12px; cursor: pointer; -webkit-app-region: no-drag; }
+header button.active { color: #079447; background: #e9f8ef; }
 main { display: grid; grid-template-rows: auto 1fr; min-height: 0; padding: 16px; }
 input, textarea { width: 100%; border: 0; outline: 0; color: inherit; background: transparent; font: inherit; }
 input { padding-bottom: 10px; font-size: 18px; font-weight: 650; }
 textarea { resize: none; font-size: 15px; line-height: 1.7; }
-footer { color: #8b7d4f; border-top: 1px solid rgba(126,104,39,.12); font-size: 11px; }
+footer { color: #999; border-top: 1px solid #eee; font-size: 11px; }

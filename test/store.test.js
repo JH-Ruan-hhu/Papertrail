@@ -56,6 +56,52 @@ test('updates and removes a paper', (t) => {
   assert.equal(store.listPapers().length, 0);
 });
 
+test('persists attendance records in the local store', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'yanji-attendance-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, 'data.json');
+  const store = new JsonStore(filePath);
+  store.load();
+  store.setAttendance([{
+    id: 'attendance-1',
+    date: '2026-08-22',
+    clockInAt: '2026-08-22T01:00:00.000Z',
+    clockOutAt: '2026-08-22T09:00:00.000Z',
+    createdAt: '2026-08-22T01:00:00.000Z',
+    updatedAt: '2026-08-22T09:00:00.000Z'
+  }]);
+  const reloaded = new JsonStore(filePath);
+  reloaded.load();
+  assert.equal(reloaded.listAttendance().length, 1);
+  assert.equal(reloaded.listAttendance()[0].date, '2026-08-22');
+});
+
+test('persists focus sessions and foreground app usage', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'yanji-focus-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, 'data.json');
+  const store = new JsonStore(filePath);
+  store.load();
+  store.setFocusSessions([{
+    id: 'focus-1',
+    startedAt: '2026-08-22T01:00:00.000Z',
+    endedAt: '2026-08-22T01:50:00.000Z',
+    plannedMinutes: 50,
+    status: 'completed',
+    appUsage: { WINWORD: 1800 },
+    suppressNotifications: true,
+    notificationsSuppressed: true,
+    notificationRestore: null,
+    notificationRestoredAt: '2026-08-22T01:50:00.000Z',
+    notificationError: null,
+    createdAt: '2026-08-22T01:00:00.000Z',
+    updatedAt: '2026-08-22T01:50:00.000Z'
+  }]);
+  const reloaded = new JsonStore(filePath);
+  reloaded.load();
+  assert.equal(reloaded.listFocusSessions()[0].appUsage.WINWORD, 1800);
+});
+
 test('copies current data to a new storage location without deleting the original', (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'papertrail-store-move-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));

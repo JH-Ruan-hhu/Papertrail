@@ -25,7 +25,9 @@ class JsonStore {
       papers: [],
       schedules: [],
       notes: [],
-      metadataFields: []
+      metadataFields: [],
+      attendance: [],
+      focusSessions: []
     };
   }
 
@@ -40,13 +42,13 @@ class JsonStore {
     try {
       parsed = JSON.parse(fs.readFileSync(this.filePath, 'utf8'));
     } catch (error) {
-      throw new Error(`PaperTrail 数据文件无法解析，未写入任何内容。请检查或恢复备份：${error.message}`);
+      throw new Error(`研迹数据文件无法解析，未写入任何内容。请检查或恢复备份：${error.message}`);
     }
     let migrated;
     try {
       migrated = migrateData(parsed, DEFAULT_SETTINGS);
     } catch (error) {
-      throw new Error(`PaperTrail 数据结构损坏或不受支持，未写入任何内容：${error.message}`);
+      throw new Error(`研迹数据结构损坏或不受支持，未写入任何内容：${error.message}`);
     }
     this.data = migrated.data;
     if (migrated.changed) this.save();
@@ -64,7 +66,7 @@ class JsonStore {
     const targetPath = path.resolve(filePath);
     if (targetPath === path.resolve(this.filePath)) return targetPath;
     if (fs.existsSync(targetPath)) {
-      throw new Error('所选位置已经存在 PaperTrail 数据文件。');
+      throw new Error('所选位置已经存在研迹数据文件。');
     }
     const copy = new JsonStore(targetPath);
     copy.data = JSON.parse(JSON.stringify(this.data));
@@ -144,6 +146,26 @@ class JsonStore {
     this.data.metadataFields = fields;
     this.save();
     return this.data.metadataFields;
+  }
+
+  listAttendance() {
+    return this.data.attendance;
+  }
+
+  setAttendance(attendance) {
+    this.data.attendance = attendance;
+    this.save();
+    return this.data.attendance;
+  }
+
+  listFocusSessions() {
+    return this.data.focusSessions;
+  }
+
+  setFocusSessions(focusSessions) {
+    this.data.focusSessions = focusSessions;
+    this.save();
+    return this.data.focusSessions;
   }
 }
 

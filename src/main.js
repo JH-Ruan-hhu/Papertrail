@@ -3,6 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const { spawn, spawnSync } = require('node:child_process');
 const {
   app,
   BrowserWindow,
@@ -38,6 +39,8 @@ const { importantChanges } = require('./notification-core');
 const {
   normalizeMetadataField,
   parseNaturalLanguageSchedule,
+  saveAttendance,
+  saveFocusSession,
   saveNote,
   saveSchedule
 } = require('./workbench-core');
@@ -76,8 +79,7 @@ const DATA_FILE_NAME = 'papertrail-data.json';
 const STORAGE_POINTER_NAME = 'papertrail-storage.json';
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
-const TITLE_BAR_NORMAL = Object.freeze({ color: '#f2f5f9', symbolColor: '#526071', height: 42 });
-const TITLE_BAR_MODAL = Object.freeze({ color: '#747e8b', symbolColor: '#e8edf4', height: 42 });
+const TITLE_BAR_NORMAL = Object.freeze({ color: '#f5f5f5', symbolColor: '#4d4d4d', height: 38 });
 
 let mainWindow;
 let tray;
@@ -88,6 +90,14 @@ let coldStartRefreshStarted = false;
 let updateState;
 let updaterInitialized = false;
 let quickCaptureWindow;
+let quickCaptureHasContent = false;
+let focusTimer;
+let focusSampler;
+let focusRecoveryProcess;
+let focusSamplerBuffer = '';
+let focusUsageLive = {};
+let focusLastSampleAt = 0;
+let focusLastPersistAt = 0;
 let bingWallpaperCache;
 let lastBackupCleanupAt = 0;
 const stickyWindows = new Map();
@@ -322,7 +332,7 @@ function setModalTitleBar(active) {
     !mainWindow.isDestroyed() &&
     typeof mainWindow.setTitleBarOverlay === 'function'
   ) {
-    mainWindow.setTitleBarOverlay(active ? TITLE_BAR_MODAL : TITLE_BAR_NORMAL);
+    mainWindow.setTitleBarOverlay(TITLE_BAR_NORMAL);
   }
 }
 
@@ -419,18 +429,22 @@ async function openUpdateReleasePage() {
   return true;
 }
 
-async function chooseDataDirectory() {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择 PaperTrail 数据存储文件夹',
-    defaultPath: path.dirname(store.filePath),
-    buttonLabel: '使用此文件夹',
-    properties: ['openDirectory', 'createDirectory']
-  });
-  if (result.canceled || !result.filePaths[0]) {
-    return { canceled: true, settings: settingsForRenderer() };
+async function chooseDataDirectory(request = {}) {
+  let selectedDirectory;
+  if (request?.confirmedExisting && request?.selectedDirectory) {
+    selectedDirectory = path.resolve(String(request.selectedDirectory));
+  } else {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: '选择研迹数据存储文件夹',
+      defaultPath: path.dirname(store.filePath),
+      buttonLabel: '使用此文件夹',
+      properties: ['openDirectory', 'createDirectory']
+    });
+    if (result.canceled || !result.filePaths[0]) {
+      return { canceled: true, settings: settingsForRenderer() };
+    }
+    selectedDirectory = path.resolve(result.filePaths[0]);
   }
-
-  const selectedDirectory = path.resolve(result.filePaths[0]);
   const targetFile = path.join(selectedDirectory, DATA_FILE_NAME);
   if (path.resolve(targetFile) === path.resolve(store.filePath)) {
     return { canceled: false, settings: settingsForRenderer() };
@@ -438,20 +452,15 @@ async function chooseDataDirectory() {
 
   const previousDataFile = path.resolve(store.filePath);
   let nextStore;
+  if (fs.existsSync(targetFile) && !request?.confirmedExisting) {
+    return {
+      canceled: false,
+      requiresConfirmation: true,
+      selectedDirectory,
+      settings: settingsForRenderer()
+    };
+  }
   if (fs.existsSync(targetFile)) {
-    const choice = await dialog.showMessageBox(mainWindow, {
-      type: 'question',
-      title: '发现已有 PaperTrail 数据',
-      message: '所选文件夹中已有 PaperTrail 数据，是否切换到这份数据？',
-      detail: '当前使用的数据不会被删除，仍会保留在原文件夹中。',
-      buttons: ['使用已有数据', '取消'],
-      defaultId: 1,
-      cancelId: 1,
-      noLink: true
-    });
-    if (choice.response !== 0) {
-      return { canceled: true, settings: settingsForRenderer() };
-    }
     nextStore = new JsonStore(targetFile);
     nextStore.load();
   } else {
@@ -468,23 +477,18 @@ async function chooseDataDirectory() {
   return { canceled: false, settings: settingsForRenderer() };
 }
 
-async function deleteDataBackups() {
+async function deleteDataBackups(confirmed = false) {
   const backupFiles = knownBackupFiles();
   if (!backupFiles.length) {
     return { canceled: false, deletedCount: 0, settings: settingsForRenderer() };
   }
-  const choice = await dialog.showMessageBox(mainWindow, {
-    type: 'warning',
-    title: '删除旧数据备份',
-    message: `确定删除 ${backupFiles.length} 份旧数据备份吗？`,
-    detail: `${backupFiles.join('\n')}\n\n当前正在使用的数据不会被删除，此操作无法撤销。`,
-    buttons: ['取消', '删除备份'],
-    defaultId: 0,
-    cancelId: 0,
-    noLink: true
-  });
-  if (choice.response !== 1) {
-    return { canceled: true, deletedCount: 0, settings: settingsForRenderer() };
+  if (!confirmed) {
+    return {
+      canceled: false,
+      requiresConfirmation: true,
+      backupCount: backupFiles.length,
+      settings: settingsForRenderer()
+    };
   }
 
   const failed = [];
@@ -513,7 +517,9 @@ function workspaceForRenderer() {
   return {
     schedules: [...store.listSchedules()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)),
     notes: [...store.listNotes()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
-    metadataFields: store.listMetadataFields()
+    metadataFields: store.listMetadataFields(),
+    attendance: [...store.listAttendance()].sort((a, b) => b.date.localeCompare(a.date)),
+    focusSessions: focusSessionsForRenderer()
   };
 }
 
@@ -594,6 +600,271 @@ function saveMetadataFields(input) {
   return fields;
 }
 
+function localDateKey(date = new Date()) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function saveWorkspaceAttendance(input) {
+  const attendance = saveAttendance(
+    store.listAttendance(),
+    input,
+    new Date().toISOString(),
+    () => crypto.randomUUID()
+  );
+  store.setAttendance(attendance);
+  broadcastWorkspace();
+  return attendance.find((item) => item.id === String(input?.id || ''))
+    || attendance.find((item) => item.date === String(input?.date || ''))
+    || attendance[0];
+}
+
+function clockWorkspaceAttendance(action) {
+  const now = new Date();
+  const records = store.listAttendance();
+  const openRecord = records.find((item) => !item.clockOutAt);
+  const todayRecord = records.find((item) => item.date === localDateKey(now));
+  if (action === 'in') {
+    if (openRecord) return openRecord;
+    if (todayRecord) throw new Error('今天已经完成打卡，可在打卡页面修改记录。');
+    return saveWorkspaceAttendance({ date: localDateKey(now), clockInAt: now.toISOString(), clockOutAt: null });
+  }
+  if (action === 'out') {
+    if (!openRecord) throw new Error('当前没有进行中的上班记录。');
+    return saveWorkspaceAttendance({ ...openRecord, clockOutAt: now.toISOString() });
+  }
+  throw new Error('不支持的打卡操作。');
+}
+
+function deleteWorkspaceAttendance(id) {
+  const attendance = store.listAttendance();
+  if (!attendance.some((item) => item.id === id)) throw new Error('找不到这条打卡记录。');
+  store.setAttendance(attendance.filter((item) => item.id !== id));
+  broadcastWorkspace();
+  return true;
+}
+
+const TOAST_POLICY_KEY = 'HKCU\\Software\\Policies\\Microsoft\\Windows\\CurrentVersion\\PushNotifications';
+const TOAST_POLICY_VALUE = 'NoToastApplicationNotification';
+
+function activeFocusSession() {
+  return store.listFocusSessions().find((session) => session.status === 'active' && !session.endedAt) || null;
+}
+
+function focusSessionsForRenderer() {
+  const active = activeFocusSession();
+  return [...store.listFocusSessions()]
+    .map((session) => session.id === active?.id ? { ...session, appUsage: { ...focusUsageLive } } : session)
+    .sort((a, b) => Date.parse(b.startedAt) - Date.parse(a.startedAt));
+}
+
+function broadcastFocus() {
+  const focusSessions = focusSessionsForRenderer();
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('focus:changed', focusSessions);
+  return focusSessions;
+}
+
+function runWindowsCommand(file, args) {
+  return new Promise((resolve) => {
+    const child = spawn(file, args, { windowsHide: true });
+    let stdout = '';
+    let stderr = '';
+    child.stdout?.on('data', (chunk) => { stdout += chunk.toString(); });
+    child.stderr?.on('data', (chunk) => { stderr += chunk.toString(); });
+    child.on('error', (error) => resolve({ code: -1, stdout, stderr, error }));
+    child.on('close', (code) => resolve({ code: Number(code), stdout, stderr }));
+  });
+}
+
+function parseToastPolicyOutput(output) {
+  const match = String(output || '').match(/NoToastApplicationNotification\s+REG_DWORD\s+0x([0-9a-f]+)/i);
+  return match ? { existed: true, value: Number.parseInt(match[1], 16) } : { existed: false, value: null };
+}
+
+async function readToastPolicy() {
+  const result = await runWindowsCommand('reg.exe', ['query', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE]);
+  return result.code === 0 ? parseToastPolicyOutput(result.stdout) : { existed: false, value: null };
+}
+
+async function suppressWindowsToasts() {
+  if (process.platform !== 'win32') return { supported: false, restore: null };
+  const previous = await readToastPolicy();
+  if (previous.existed && previous.value === 1) {
+    return { supported: true, restore: { ...previous, changed: false } };
+  }
+  const result = await runWindowsCommand('reg.exe', ['add', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/t', 'REG_DWORD', '/d', '1', '/f']);
+  if (result.code !== 0) throw new Error('Windows 勿扰设置未能启用，请检查当前账户策略权限。');
+  return { supported: true, restore: { ...previous, changed: true } };
+}
+
+async function restoreWindowsToasts(session) {
+  const restore = session?.notificationRestore;
+  if (process.platform !== 'win32' || !restore?.changed || session.notificationRestoredAt) return;
+  const current = await readToastPolicy();
+  if (!current.existed || current.value !== 1) return;
+  const args = restore.existed
+    ? ['add', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/t', 'REG_DWORD', '/d', String(restore.value ?? 0), '/f']
+    : ['delete', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/f'];
+  const result = await runWindowsCommand('reg.exe', args);
+  if (result.code !== 0) throw new Error('Windows 通知设置未能自动恢复，请在“系统 > 通知”中检查。');
+}
+
+function restoreWindowsToastsSync(session) {
+  const restore = session?.notificationRestore;
+  if (process.platform !== 'win32' || !restore?.changed || session.notificationRestoredAt) return true;
+  const query = spawnSync('reg.exe', ['query', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE], { windowsHide: true, encoding: 'utf8' });
+  const current = query.status === 0 ? parseToastPolicyOutput(query.stdout) : { existed: false, value: null };
+  if (!current.existed || current.value !== 1) return true;
+  const args = restore.existed
+    ? ['add', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/t', 'REG_DWORD', '/d', String(restore.value ?? 0), '/f']
+    : ['delete', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/f'];
+  return spawnSync('reg.exe', args, { windowsHide: true }).status === 0;
+}
+
+function startFocusRecovery(session) {
+  const restore = session?.notificationRestore;
+  if (process.platform !== 'win32' || !restore?.changed) return;
+  const remainingSeconds = Math.max(1, Math.ceil((Date.parse(session.startedAt) + session.plannedMinutes * 60_000 - Date.now()) / 1000));
+  const restoreCommand = restore.existed
+    ? `Set-ItemProperty -LiteralPath '${TOAST_POLICY_KEY.replace('HKCU\\', 'HKCU:\\')}' -Name '${TOAST_POLICY_VALUE}' -Type DWord -Value ${Number(restore.value ?? 0)}`
+    : `Remove-ItemProperty -LiteralPath '${TOAST_POLICY_KEY.replace('HKCU\\', 'HKCU:\\')}' -Name '${TOAST_POLICY_VALUE}' -ErrorAction SilentlyContinue`;
+  const script = `Start-Sleep -Seconds ${remainingSeconds}; $current = (Get-ItemProperty -LiteralPath '${TOAST_POLICY_KEY.replace('HKCU\\', 'HKCU:\\')}' -Name '${TOAST_POLICY_VALUE}' -ErrorAction SilentlyContinue).'${TOAST_POLICY_VALUE}'; if ($current -eq 1) { ${restoreCommand} }`;
+  focusRecoveryProcess = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
+    windowsHide: true,
+    detached: true,
+    stdio: 'ignore'
+  });
+  focusRecoveryProcess.unref();
+}
+
+function persistFocusUsage() {
+  const active = activeFocusSession();
+  if (!active) return;
+  const sessions = saveFocusSession(store.listFocusSessions(), { ...active, appUsage: focusUsageLive }, new Date().toISOString());
+  store.setFocusSessions(sessions);
+  focusLastPersistAt = Date.now();
+}
+
+function handleFocusSample(line) {
+  const [pidText, ...nameParts] = String(line || '').trim().split('|');
+  const pid = Number(pidText);
+  const processName = nameParts.join('|').trim();
+  const now = Date.now();
+  const elapsedSeconds = focusLastSampleAt ? Math.max(1, Math.min(10, Math.round((now - focusLastSampleAt) / 1000))) : 5;
+  focusLastSampleAt = now;
+  if (!pid || !processName || app.getAppMetrics().some((metric) => metric.pid === pid)) return;
+  focusUsageLive[processName] = (focusUsageLive[processName] || 0) + elapsedSeconds;
+  if (now - focusLastPersistAt >= 30_000) persistFocusUsage();
+  broadcastFocus();
+}
+
+function startFocusSampler() {
+  if (process.platform !== 'win32' || focusSampler) return;
+  const script = `Add-Type @'\nusing System;\nusing System.Runtime.InteropServices;\npublic static class YanjiFocusNative {\n  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();\n  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);\n}\n'@\nwhile ($true) {\n  $handle = [YanjiFocusNative]::GetForegroundWindow()\n  [uint32]$foregroundPid = 0\n  [void][YanjiFocusNative]::GetWindowThreadProcessId($handle, [ref]$foregroundPid)\n  try { $process = Get-Process -Id $foregroundPid -ErrorAction Stop; Write-Output (\"$foregroundPid|\" + $process.ProcessName) } catch {}\n  Start-Sleep -Seconds 5\n}`;
+  focusSamplerBuffer = '';
+  focusLastSampleAt = 0;
+  focusSampler = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
+    windowsHide: true,
+    stdio: ['ignore', 'pipe', 'ignore']
+  });
+  focusSampler.stdout.on('data', (chunk) => {
+    focusSamplerBuffer += chunk.toString();
+    const lines = focusSamplerBuffer.split(/\r?\n/);
+    focusSamplerBuffer = lines.pop() || '';
+    lines.forEach(handleFocusSample);
+  });
+  focusSampler.on('close', () => { focusSampler = null; });
+}
+
+function stopFocusRuntime() {
+  if (focusTimer) clearInterval(focusTimer);
+  focusTimer = null;
+  if (focusSampler) focusSampler.kill();
+  focusSampler = null;
+  if (focusRecoveryProcess) focusRecoveryProcess.kill();
+  focusRecoveryProcess = null;
+  focusSamplerBuffer = '';
+  focusLastSampleAt = 0;
+}
+
+function startFocusRuntime(session) {
+  stopFocusRuntime();
+  focusUsageLive = { ...(session.appUsage || {}) };
+  focusLastPersistAt = Date.now();
+  startFocusSampler();
+  startFocusRecovery(session);
+  focusTimer = setInterval(() => {
+    const active = activeFocusSession();
+    if (!active) return stopFocusRuntime();
+    const target = Date.parse(active.startedAt) + active.plannedMinutes * 60_000;
+    if (Date.now() >= target) finishFocusSession('completed').catch(() => {});
+    else broadcastFocus();
+  }, 1000);
+}
+
+async function startFocusSession(input) {
+  if (activeFocusSession()) throw new Error('已有一段专注正在进行。');
+  const plannedMinutes = Math.max(5, Math.min(180, Math.round(Number(input?.plannedMinutes) || 50)));
+  const now = new Date().toISOString();
+  let sessions = saveFocusSession(store.listFocusSessions(), {
+    startedAt: now,
+    plannedMinutes,
+    status: 'active',
+    appUsage: {},
+    suppressNotifications: input?.suppressNotifications !== false
+  }, now, () => crypto.randomUUID());
+  store.setFocusSessions(sessions);
+  let session = sessions[0];
+  if (session.suppressNotifications) {
+    try {
+      const suppression = await suppressWindowsToasts();
+      session = { ...session, notificationsSuppressed: suppression.supported, notificationRestore: suppression.restore, notificationError: suppression.supported ? null : '当前系统不支持自动勿扰。' };
+    } catch (error) {
+      session = { ...session, notificationsSuppressed: false, notificationError: error.message || 'Windows 勿扰设置未能启用。' };
+    }
+    sessions = saveFocusSession(store.listFocusSessions(), session, new Date().toISOString());
+    store.setFocusSessions(sessions);
+    session = sessions.find((item) => item.id === session.id);
+  }
+  startFocusRuntime(session);
+  broadcastWorkspace();
+  return focusSessionsForRenderer();
+}
+
+async function finishFocusSession(status = 'stopped') {
+  const active = activeFocusSession();
+  if (!active) return focusSessionsForRenderer();
+  persistFocusUsage();
+  stopFocusRuntime();
+  let notificationError = active.notificationError;
+  let notificationRestoredAt = active.notificationRestoredAt;
+  try {
+    await restoreWindowsToasts(active);
+    notificationRestoredAt = new Date().toISOString();
+  } catch (error) {
+    notificationError = error.message || 'Windows 通知设置未能自动恢复。';
+  }
+  const sessions = saveFocusSession(store.listFocusSessions(), {
+    ...active,
+    appUsage: focusUsageLive,
+    status: status === 'completed' ? 'completed' : 'stopped',
+    endedAt: new Date().toISOString(),
+    notificationRestoredAt,
+    notificationError
+  }, new Date().toISOString());
+  store.setFocusSessions(sessions);
+  focusUsageLive = {};
+  broadcastWorkspace();
+  return focusSessionsForRenderer();
+}
+
+function resumeFocusRuntime() {
+  const active = activeFocusSession();
+  if (!active) return;
+  const target = Date.parse(active.startedAt) + active.plannedMinutes * 60_000;
+  if (Date.now() >= target) finishFocusSession('completed').catch(() => {});
+  else startFocusRuntime(active);
+}
+
 async function getBingWallpaper() {
   if (!store.getSettings().bingWallpaper) return null;
   const today = new Date().toISOString().slice(0, 10);
@@ -638,6 +909,13 @@ function createQuickCaptureWindow() {
     }
   });
   quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'));
+  quickCaptureWindow.on('blur', () => {
+    setTimeout(() => {
+      if (quickCaptureWindow && !quickCaptureWindow.isDestroyed() && quickCaptureWindow.isVisible() && !quickCaptureHasContent) {
+        quickCaptureWindow.hide();
+      }
+    }, 0);
+  });
   quickCaptureWindow.on('closed', () => { quickCaptureWindow = null; });
   return quickCaptureWindow;
 }
@@ -1110,7 +1388,7 @@ function createTray() {
   tray = new Tray(icon);
   tray.setToolTip(APP_NAME);
   tray.setContextMenu(Menu.buildFromTemplate([
-    { label: '打开 PaperTrail', click: showMainWindow },
+    { label: '打开研迹', click: showMainWindow },
     { label: '刷新全部稿件', click: () => refreshAll().catch(() => {}) },
     { type: 'separator' },
     {
@@ -1266,7 +1544,7 @@ async function exportPaper(id, format) {
   if (!paper) throw new Error('找不到这篇稿件。');
   if (!['markdown', 'csv'].includes(format)) throw new Error('不支持的导出格式。');
   const extension = format === 'markdown' ? 'md' : 'csv';
-  const safeTitle = String(paper.snapshot?.title || 'PaperTrail-timeline')
+  const safeTitle = String(paper.snapshot?.title || 'Yanji-timeline')
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
     .slice(0, 80);
   const result = await dialog.showSaveDialog(mainWindow, {
@@ -1290,14 +1568,24 @@ function registerIpc() {
   ipcMain.handle('notes:delete', (_event, id) => deleteWorkspaceNote(String(id)));
   ipcMain.handle('notes:open-sticky', (_event, id) => openStickyNote(String(id)));
   ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
+  ipcMain.handle('attendance:clock', (_event, action) => clockWorkspaceAttendance(String(action || '')));
+  ipcMain.handle('attendance:save', (_event, input) => saveWorkspaceAttendance(input));
+  ipcMain.handle('attendance:delete', (_event, id) => deleteWorkspaceAttendance(String(id)));
+  ipcMain.handle('focus:get-state', () => focusSessionsForRenderer());
+  ipcMain.handle('focus:start', (_event, input) => startFocusSession(input));
+  ipcMain.handle('focus:stop', () => finishFocusSession('stopped'));
   ipcMain.handle('wallpaper:get', () => getBingWallpaper());
   ipcMain.handle('capture:show', () => {
     toggleQuickCapture();
     return true;
   });
   ipcMain.handle('capture:hide', (event) => {
+    quickCaptureHasContent = false;
     BrowserWindow.fromWebContents(event.sender)?.hide();
     return true;
+  });
+  ipcMain.on('capture:content-state', (_event, hasContent) => {
+    quickCaptureHasContent = Boolean(hasContent);
   });
   ipcMain.handle('capture:submit', (_event, input) => {
     if (input?.mode === 'note') {
@@ -1377,8 +1665,8 @@ function registerIpc() {
     updateLoginItemSetting(updated.startAtLogin);
     return settingsForRenderer();
   });
-  ipcMain.handle('settings:choose-data-directory', () => chooseDataDirectory());
-  ipcMain.handle('settings:delete-data-backups', () => deleteDataBackups());
+  ipcMain.handle('settings:choose-data-directory', (_event, request) => chooseDataDirectory(request));
+  ipcMain.handle('settings:delete-data-backups', (_event, confirmed) => deleteDataBackups(Boolean(confirmed)));
   ipcMain.handle('updates:get-state', () => updateStateForRenderer());
   ipcMain.handle('updates:check', () => checkForAppUpdate());
   ipcMain.handle('updates:download', () => downloadAppUpdate());
@@ -1419,11 +1707,12 @@ if (!gotLock) {
       scheduler = setInterval(() => runScheduledWork().catch(() => {}), 60_000);
       setTimeout(runDeadlineReminders, 1500);
       setTimeout(runWorkspaceReminders, 1800);
+      resumeFocusRuntime();
       if (store.getSettings().autoCheckUpdates) {
         setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
       }
     } catch (error) {
-      dialog.showErrorBox('PaperTrail 无法安全打开数据', error?.message || '数据文件损坏或格式不受支持。');
+      dialog.showErrorBox('研迹无法安全打开数据', error?.message || '数据文件损坏或格式不受支持。');
       isQuitting = true;
       app.quit();
     }
@@ -1434,6 +1723,20 @@ app.on('activate', showMainWindow);
 app.on('before-quit', () => {
   isQuitting = true;
   if (scheduler) clearInterval(scheduler);
+  const active = store && activeFocusSession();
+  if (active) {
+    persistFocusUsage();
+    stopFocusRuntime();
+    const restored = restoreWindowsToastsSync(active);
+    store.setFocusSessions(saveFocusSession(store.listFocusSessions(), {
+      ...active,
+      appUsage: focusUsageLive,
+      status: 'stopped',
+      endedAt: new Date().toISOString(),
+      notificationRestoredAt: restored ? new Date().toISOString() : active.notificationRestoredAt,
+      notificationError: restored ? active.notificationError : '退出时未能恢复 Windows 通知设置。'
+    }, new Date().toISOString()));
+  }
   globalShortcut.unregisterAll();
 });
 app.on('window-all-closed', () => {

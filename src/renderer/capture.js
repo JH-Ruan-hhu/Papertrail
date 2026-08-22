@@ -3,22 +3,25 @@
 const api = window.paperTrail;
 const editor = document.getElementById('captureEditor');
 const result = document.getElementById('parseResult');
+const highlights = document.getElementById('captureHighlights');
 const tabs = [...document.querySelectorAll('[data-mode]')];
 const card = document.querySelector('.capture-card');
 let mode = 'schedule';
 let parseSequence = 0;
 let parsedSchedule = null;
+let composing = false;
+let parseTimer = null;
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
 
 function plainText() {
-  return editor.innerText.replace(/\u00a0/g, ' ').replace(/\n$/, '');
+  return editor.value.replace(/\u00a0/g, ' ');
 }
 
 function formatWhen(schedule) {
-  if (!schedule?.valid) return '输入自然语言，时间会自动识别';
+  if (!schedule?.valid) return '自动识别时间；#1 红、#2 黄、#3 绿，默认绿色';
   const start = new Date(schedule.startAt);
   const end = new Date(schedule.endAt);
   const date = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(start);
@@ -29,16 +32,10 @@ function formatWhen(schedule) {
 
 function placeCaretAtEnd() {
   editor.focus();
-  const range = document.createRange();
-  range.selectNodeContents(editor);
-  range.collapse(false);
-  const selection = window.getSelection();
-  selection.removeAllRanges();
-  selection.addRange(range);
+  editor.setSelectionRange(editor.value.length, editor.value.length);
 }
 
-function applyHighlights(text, matches) {
-  if (!matches?.length) return;
+function renderHighlights(text, matches = []) {
   let cursor = 0;
   let html = '';
   for (const match of matches) {
@@ -48,8 +45,18 @@ function applyHighlights(text, matches) {
     cursor = match.end;
   }
   html += escapeHtml(text.slice(cursor));
-  editor.innerHTML = html;
-  placeCaretAtEnd();
+  highlights.innerHTML = `${html}${text.endsWith('\n') ? '<br>' : ''}`;
+}
+
+function syncScroll() {
+  highlights.scrollTop = editor.scrollTop;
+  highlights.scrollLeft = editor.scrollLeft;
+}
+
+function queueParse(delay = 120) {
+  clearTimeout(parseTimer);
+  if (composing) return;
+  parseTimer = setTimeout(parseInput, delay);
 }
 
 async function parseInput() {
@@ -58,7 +65,8 @@ async function parseInput() {
   result.classList.remove('error');
   if (mode !== 'schedule' || !text.trim()) {
     parsedSchedule = null;
-    result.textContent = mode === 'note' ? '笔记保留原文，不解析时间' : '输入自然语言，时间会自动识别';
+    renderHighlights(text);
+    result.textContent = mode === 'note' ? '笔记保留原文，不解析时间' : '自动识别时间；#1 红、#2 黄、#3 绿，默认绿色';
     return;
   }
   try {
@@ -66,7 +74,7 @@ async function parseInput() {
     if (sequence !== parseSequence) return;
     parsedSchedule = parsed;
     result.textContent = formatWhen(parsed);
-    if (!editor.querySelector('mark')) applyHighlights(text, parsed.matches);
+    renderHighlights(text, parsed.matches);
   } catch (error) {
     result.textContent = error.message || '暂时无法解析时间';
     result.classList.add('error');
@@ -76,15 +84,15 @@ async function parseInput() {
 function setMode(nextMode) {
   mode = nextMode;
   tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.mode === mode));
-  editor.dataset.placeholder = mode === 'schedule'
-    ? '例如：明天下午 3 点到 5 点组会 !!'
+  editor.placeholder = mode === 'schedule'
+    ? '例如：明天下午 3 点到 5 点组会 #1'
     : '随手记录想法…（Ctrl + Enter 保存）';
   document.getElementById('submitHint').innerHTML = mode === 'schedule'
     ? '<kbd>Enter</kbd> 创建'
     : '<kbd>Ctrl Enter</kbd> 保存';
-  editor.textContent = plainText();
+  renderHighlights(plainText());
   placeCaretAtEnd();
-  parseInput();
+  queueParse(0);
 }
 
 async function submit() {
@@ -94,7 +102,9 @@ async function submit() {
     result.classList.remove('error');
     result.textContent = '正在保存…';
     await api.submitCapture({ mode, content });
-    editor.textContent = '';
+    editor.value = '';
+    renderHighlights('');
+    api.setCaptureContentState(false);
     parsedSchedule = null;
     await api.hideCapture();
   } catch (error) {
@@ -105,18 +115,25 @@ async function submit() {
 
 tabs.forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
 editor.addEventListener('input', () => {
-  if (editor.querySelector('mark')) {
-    const text = plainText();
-    editor.textContent = text;
-    placeCaretAtEnd();
-  }
-  parseInput();
+  const text = plainText();
+  api.setCaptureContentState(Boolean(text.trim()));
+  renderHighlights(text, composing ? [] : parsedSchedule?.matches);
+  queueParse();
 });
-editor.addEventListener('paste', (event) => {
-  event.preventDefault();
-  document.execCommand('insertText', false, event.clipboardData.getData('text/plain'));
+editor.addEventListener('compositionstart', () => {
+  composing = true;
+  parseSequence += 1;
+  clearTimeout(parseTimer);
+  renderHighlights(plainText());
 });
+editor.addEventListener('compositionend', () => {
+  composing = false;
+  renderHighlights(plainText());
+  queueParse(0);
+});
+editor.addEventListener('scroll', syncScroll, { passive: true });
 document.addEventListener('keydown', (event) => {
+  if (event.isComposing || composing || event.keyCode === 229) return;
   if (event.key === 'Tab') {
     event.preventDefault();
     setMode(mode === 'schedule' ? 'note' : 'schedule');
@@ -137,4 +154,9 @@ document.addEventListener('keydown', (event) => {
   }
 });
 api.onCaptureFocus(() => placeCaretAtEnd());
+window.addEventListener('blur', () => {
+  if (!plainText().trim()) api.hideCapture();
+});
+api.setCaptureContentState(false);
+renderHighlights('');
 placeCaretAtEnd();

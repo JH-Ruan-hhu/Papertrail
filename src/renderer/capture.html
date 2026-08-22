@@ -16,9 +16,12 @@
         </div>
         <span><kbd>Tab</kbd> 切换</span>
       </header>
-      <div id="captureEditor" class="capture-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="例如：明天下午 3 点到 5 点组会 !!"></div>
+      <div class="capture-input-shell">
+        <div id="captureHighlights" class="capture-highlights" aria-hidden="true"></div>
+        <textarea id="captureEditor" class="capture-editor" rows="3" spellcheck="false" aria-label="即写即走输入框" placeholder="例如：明天下午 3 点到 5 点组会 #1"></textarea>
+      </div>
       <footer>
-        <div id="parseResult" class="parse-result">输入自然语言，时间会自动识别</div>
+        <div id="parseResult" class="parse-result">自动识别时间；#1 红、#2 黄、#3 绿，默认绿色</div>
         <div><span id="submitHint"><kbd>Enter</kbd> 创建</span><span><kbd>Esc</kbd> 关闭</span></div>
       </footer>
     </main>

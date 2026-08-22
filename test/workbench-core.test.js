@@ -3,8 +3,12 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  normalizeAttendance,
+  normalizeFocusSession,
   normalizeMetadataField,
   parseNaturalLanguageSchedule,
+  saveAttendance,
+  saveFocusSession,
   saveNote,
   saveSchedule
 } = require('../src/workbench-core');
@@ -31,6 +35,20 @@ test('marks urgent deadline text and gives a one-hour default duration', () => {
   assert.equal(Date.parse(parsed.endAt) - Date.parse(parsed.startAt), 60 * 60_000);
 });
 
+test('uses compact priority tags and defaults untagged capture to green', () => {
+  const now = new Date(2026, 7, 22, 10, 0);
+  const high = parseNaturalLanguageSchedule('今天下午六点处理样品 #1', now);
+  const medium = parseNaturalLanguageSchedule('明天上午九点写稿 ＃2', now);
+  const low = parseNaturalLanguageSchedule('后天下午三点复盘 #3', now);
+  const defaultLow = parseNaturalLanguageSchedule('今天下午四点读文献', now);
+  assert.equal(high.priority, 'high');
+  assert.equal(medium.priority, 'medium');
+  assert.equal(low.priority, 'low');
+  assert.equal(defaultLow.priority, 'low');
+  assert.equal(high.title, '处理样品');
+  assert.ok(high.matches.some((match) => match.text === '#1'));
+});
+
 test('creates and updates schedules without losing reminder state unnecessarily', () => {
   const now = '2026-08-22T01:00:00.000Z';
   const initial = saveSchedule([], {
@@ -52,4 +70,42 @@ test('notes preserve typed metadata and metadata fields support custom selects',
   const notes = saveNote([], { content: '今天完成质控', metadata: { method: 'LC-MS/MS', reviewed: true } }, '2026-08-22T02:00:00.000Z', () => 'note-1');
   assert.equal(notes[0].title, '今天完成质控');
   assert.equal(notes[0].metadata.reviewed, true);
+});
+
+test('attendance creates one record per day and validates clock order', () => {
+  const created = saveAttendance([], {
+    date: '2026-08-22',
+    clockInAt: '2026-08-22T01:00:00.000Z',
+    clockOutAt: '2026-08-22T09:30:00.000Z'
+  }, '2026-08-22T10:00:00.000Z', () => 'attendance-1');
+  const updated = saveAttendance(created, {
+    date: '2026-08-22',
+    clockInAt: '2026-08-22T01:15:00.000Z',
+    clockOutAt: '2026-08-22T10:00:00.000Z'
+  }, '2026-08-22T11:00:00.000Z');
+  assert.equal(updated.length, 1);
+  assert.equal(updated[0].id, 'attendance-1');
+  assert.equal(updated[0].clockInAt, '2026-08-22T01:15:00.000Z');
+  assert.throws(() => normalizeAttendance({
+    date: '2026-08-22',
+    clockInAt: '2026-08-22T09:00:00.000Z',
+    clockOutAt: '2026-08-22T08:00:00.000Z'
+  }), /下班时间必须晚于上班时间/);
+});
+
+test('focus sessions retain local app usage and validate their time range', () => {
+  const sessions = saveFocusSession([], {
+    startedAt: '2026-08-22T01:00:00.000Z',
+    endedAt: '2026-08-22T01:25:00.000Z',
+    plannedMinutes: 25,
+    status: 'completed',
+    appUsage: { chrome: 600, WINWORD: 420 }
+  }, '2026-08-22T01:25:00.000Z', () => 'focus-1');
+  assert.equal(sessions[0].id, 'focus-1');
+  assert.equal(sessions[0].appUsage.chrome, 600);
+  assert.equal(sessions[0].plannedMinutes, 25);
+  assert.throws(() => normalizeFocusSession({
+    startedAt: '2026-08-22T02:00:00.000Z',
+    endedAt: '2026-08-22T01:00:00.000Z'
+  }), /结束时间无效/);
 });

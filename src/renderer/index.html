@@ -8,80 +8,113 @@
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
-    <div class="window-titlebar">
-      <div class="window-brand"><img src="../../build/icon.png" alt=""><span>研迹 · 科研工作台</span></div>
-    </div>
+    <div class="window-titlebar"><time id="topbarClock" aria-label="当前时间"></time></div>
     <div class="app-layout">
       <aside class="sidebar">
-        <div class="brand" aria-label="研迹科研工作台">
-          <span class="brand-mark" aria-hidden="true"><img src="../../build/icon.png" alt=""></span>
-          <span><strong>研迹</strong><small>Research Workbench</small></span>
-        </div>
+        <div class="brand" aria-label="研迹科研工作台"><strong>研迹</strong><small>科研工作台</small></div>
 
         <nav class="side-nav" aria-label="主导航">
           <p class="nav-label">工作区</p>
           <button class="nav-item active" data-workbench-page="home" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8v9H6v-9"></path><path d="M10 20v-6h4v6"></path></svg>
             <span>主页</span>
           </button>
           <button class="nav-item" data-workbench-page="schedule" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18"></path></svg>
             <span>日程</span><b id="navScheduleCount">0</b>
           </button>
+          <button class="nav-item" data-workbench-page="attendance" type="button">
+            <span>打卡</span><b id="navAttendanceCount">0</b>
+          </button>
           <button class="nav-item" data-workbench-page="notes" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM8 8h8M8 12h8M8 16h5"></path></svg>
             <span>笔记</span><b id="navNoteCount">0</b>
           </button>
           <button class="nav-item" data-workbench-page="submissions" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h5"></path><path d="m15 17 2 2 4-4"></path></svg>
             <span>投稿管理</span><b id="navPaperCount">0</b>
           </button>
         </nav>
 
         <div class="sidebar-bottom">
-          <button class="quick-capture-tip" id="openQuickCaptureButton" type="button"><span>⌨</span><p><strong>即写即走</strong><small id="shortcutTip">Ctrl + Shift + Space</small></p></button>
-          <div class="privacy-note"><span></span><p><strong>本地优先</strong><small>数据与凭证仅保存在本机</small></p></div>
+          <button class="quick-capture-tip" id="openQuickCaptureButton" type="button"><p><strong>即写即走</strong><small id="shortcutTip">Ctrl + Shift + Space</small></p></button>
           <button class="settings-entry" id="settingsButton" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path></svg>
             <span><strong>设置</strong><small>通用、通知、存储与更新</small></span>
-            <i>›</i>
           </button>
         </div>
       </aside>
 
       <main class="workspace">
-        <header class="workbench-topbar">
-          <div><strong id="workbenchPageTitle">主页</strong><span id="topbarDate"></span></div>
-          <div><span class="topbar-local"><i></i> 本地数据</span><time id="topbarClock"></time></div>
-        </header>
-
         <section class="workbench-page home-page" data-page="home">
-          <section class="home-hero">
-            <img id="bingWallpaper" alt="Bing 每日壁纸">
-            <div class="home-hero-shade"></div>
-            <div class="home-hero-content">
-              <div><p id="homeGreeting">早上好</p><h1 id="heroDate"></h1><span id="wallpaperCredit">Bing 每日壁纸</span></div>
-              <div class="hero-clock"><strong id="heroClock"></strong><span>把注意力留给今天最重要的事</span></div>
-            </div>
-          </section>
-
-          <section class="home-toolbar">
-            <div><p class="eyebrow">OVERVIEW</p><h2>接下来四天</h2><span>昨天复盘，今天执行，未来提前安排</span></div>
-            <button class="button primary" id="quickScheduleButton" type="button"><span class="plus">＋</span> 快速写日程</button>
-          </section>
-
-          <div class="day-overview" id="homeDayOverview"></div>
-
-          <div class="home-lower-grid">
-            <section class="focus-panel">
-              <div class="panel-heading"><div><p class="eyebrow">TODAY FOCUS</p><h2>今日重点</h2></div><button class="text-button" data-go-page="schedule" type="button">打开时间轴 →</button></div>
+          <div class="home-top-grid">
+            <section class="focus-panel home-focus-panel">
+              <div class="panel-heading"><div><h2>今日重点</h2><p>把注意力留给真正重要的事</p></div><button class="text-button" data-go-page="schedule" type="button">打开时间轴</button></div>
               <div id="todayFocusList" class="focus-list"></div>
             </section>
+            <section class="home-daily-panel">
+              <img id="bingWallpaper" alt="Bing 每日壁纸">
+              <div class="home-daily-shade"></div>
+              <div class="home-daily-content">
+                <div><p id="homeGreeting">早上好</p><time id="homeFeatureClock">--:--</time><strong id="heroDate"></strong></div>
+                <blockquote id="dailyQuote">今天，也向前走一点。</blockquote>
+                <small id="wallpaperCredit">Bing 每日壁纸</small>
+              </div>
+            </section>
+          </div>
+
+          <div class="home-content-grid">
+            <section class="home-schedule-panel">
+              <div class="panel-heading"><div><h2>接下来四天</h2><p>昨天复盘，今天执行，未来提前安排</p></div><button class="button primary" id="quickScheduleButton" type="button">快速写日程</button></div>
+              <div class="day-overview" id="homeDayOverview"></div>
+            </section>
             <section class="latest-notes-panel">
-              <div class="panel-heading"><div><p class="eyebrow">LATEST NOTES</p><h2>最新笔记</h2></div><button class="text-button" data-go-page="notes" type="button">查看全部 →</button></div>
+              <div class="panel-heading"><div><h2>最新笔记</h2><p>最近写下的研究想法</p></div><button class="text-button" data-go-page="notes" type="button">查看全部</button></div>
               <div id="latestNotes" class="latest-notes"></div>
             </section>
           </div>
+
+          <section class="home-attendance-panel">
+            <div><span class="section-kicker">今日打卡</span><strong id="homeAttendanceStatus">尚未打卡</strong><small id="homeAttendanceDetail">开始今天的工作时记录上班时间</small></div>
+            <div class="home-attendance-track" aria-hidden="true"><span id="homeAttendanceBar"></span></div>
+            <div class="home-attendance-actions"><time id="homeAttendanceDuration">--</time><button class="button primary" id="homeClockButton" type="button">上班打卡</button><button class="button secondary" data-go-page="attendance" type="button">查看记录</button></div>
+          </section>
+
+        </section>
+
+        <section class="workbench-page attendance-page" data-page="attendance" hidden>
+          <header class="page-head-row">
+            <div><h1>打卡</h1><p>用甘特图回看每天实际投入工作的时间</p></div>
+            <div class="page-actions"><button class="button secondary" id="attendanceTodayButton" type="button">本周</button><button class="button primary" id="addAttendanceButton" type="button">补录打卡</button></div>
+          </header>
+          <div class="attendance-focus-grid">
+            <section class="focus-timer-panel">
+              <div class="panel-heading"><div><h2>专注计时</h2><p id="focusTodaySummary">今日 0 分钟</p></div><label class="focus-duration"><span>时长</span><select id="focusDuration"><option value="25">25 分钟</option><option value="50" selected>50 分钟</option><option value="90">90 分钟</option></select></label></div>
+              <div class="focus-timer-body">
+                <div class="focus-ring" id="focusRing"><div><time id="focusTimeRemaining">50:00</time><span id="focusTimerCaption">准备专注</span></div></div>
+                <div class="focus-timer-actions">
+                  <label class="focus-notification-option"><input id="focusSuppressNotifications" type="checkbox" checked><span>专注时暂停其他软件通知</span></label>
+                  <p id="focusNotificationStatus">仅在计时期间生效，结束后自动恢复</p>
+                  <div><button class="button primary" id="startFocusButton" type="button">开始专注</button><button class="button secondary" id="stopFocusButton" type="button" hidden>结束专注</button></div>
+                </div>
+              </div>
+            </section>
+            <section class="focus-usage-panel">
+              <div class="panel-heading"><div><h2>应用使用</h2><p>专注期间的前台应用</p></div><span id="focusUsageTotal">0 分钟</span></div>
+              <div id="focusUsageList" class="focus-usage-list"><p class="focus-usage-empty">开始专注后自动统计</p></div>
+              <small class="focus-privacy">只记录应用名称与大致时长，不读取窗口内容。</small>
+            </section>
+          </div>
+          <div class="attendance-weekbar">
+            <button id="previousAttendanceWeek" type="button">上一周</button>
+            <strong id="attendanceWeekTitle"></strong>
+            <button id="nextAttendanceWeek" type="button">下一周</button>
+          </div>
+          <section class="attendance-summary" aria-label="本周打卡统计">
+            <article><small>打卡天数</small><strong id="attendanceDays">0 天</strong></article>
+            <article><small>累计工作</small><strong id="attendanceTotal">0 小时</strong></article>
+            <article><small>平均上班</small><strong id="attendanceAverageStart">--</strong></article>
+            <article><small>平均下班</small><strong id="attendanceAverageEnd">--</strong></article>
+          </section>
+          <section class="attendance-gantt-shell">
+            <div class="attendance-gantt-hours" id="attendanceGanttHours"></div>
+            <div class="attendance-gantt-rows" id="attendanceGanttRows"></div>
+          </section>
         </section>
 
         <section class="workbench-page schedule-page" data-page="schedule" hidden>
@@ -108,7 +141,7 @@
             <div><p class="eyebrow">LOCAL KNOWLEDGE</p><h1>笔记</h1><p>随手记录，也能用元数据建立自己的研究秩序</p></div>
             <div class="page-actions"><button class="button secondary" id="manageMetadataButton" type="button">管理元数据</button><button class="button primary" id="addNoteButton" type="button"><span class="plus">＋</span> 新建笔记</button></div>
           </header>
-          <div class="notes-toolbar"><label class="search-box" for="noteSearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input id="noteSearch" type="search" placeholder="搜索标题、正文或元数据"></label><span>点击图钉，将笔记悬浮在所有页面之上</span></div>
+          <div class="notes-toolbar"><label class="search-box" for="noteSearch"><input id="noteSearch" type="search" placeholder="搜索标题、正文或元数据"></label><span>点击“置顶”，将笔记悬浮在其他页面之上</span></div>
           <div id="notesGrid" class="notes-grid"></div>
         </section>
 
@@ -122,15 +155,15 @@
           <div><p class="eyebrow">MANUSCRIPT DESK</p><h1 id="pageTitle">全部稿件</h1><p id="pageSubtitle">集中查看审稿与出版进展</p></div>
           <div class="header-actions">
             <button class="button tertiary" id="markAllReadButton" type="button" hidden>全部标记已读</button>
-            <button class="button secondary" id="refreshAllButton" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5"></path><path d="M19 12a7 7 0 1 0-2 5"></path></svg><span>刷新全部</span></button>
+            <button class="button secondary" id="refreshAllButton" type="button"><span>刷新全部</span></button>
             <button class="button primary" id="addButton" type="button"><span class="plus">＋</span><span>添加稿件</span></button>
           </div>
         </header>
 
         <section class="stats" aria-label="稿件统计">
-          <article><span class="stat-icon blue">▤</span><div><small>正在追踪</small><strong id="paperCount">0</strong></div></article>
-          <article><span class="stat-icon violet">↗</span><div><small>未读重要更新</small><strong id="updateCount">0</strong></div></article>
-          <article><span class="stat-icon mint">◷</span><div><small>最近成功同步</small><strong id="lastCheck">尚未成功同步</strong></div></article>
+          <article><div><small>正在追踪</small><strong id="paperCount">0</strong></div></article>
+          <article><div><small>未读重要更新</small><strong id="updateCount">0</strong></div></article>
+          <article><div><small>最近成功同步</small><strong id="lastCheck">尚未成功同步</strong></div></article>
         </section>
 
         <section class="content-section">
@@ -138,19 +171,18 @@
             <div><h2>稿件列表</h2><p id="listDescription">按待办与最近变化排序</p></div>
             <div class="section-tools">
               <span class="live-indicator" id="monitoringStatus"><i></i><span>正在读取监测状态</span></span>
-              <label class="search-box" for="paperSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input id="paperSearch" type="search" autocomplete="off" placeholder="搜索标题、期刊或生产编号"><kbd>Ctrl K</kbd></label>
+              <label class="search-box" for="paperSearch"><input id="paperSearch" type="search" autocomplete="off" placeholder="搜索标题、期刊或生产编号"><kbd>Ctrl K</kbd></label>
             </div>
           </div>
           <div id="paperList" class="paper-list" aria-live="polite"></div>
           <div id="emptyState" class="empty-state">
-            <div class="empty-symbol" aria-hidden="true"><span>PT</span></div>
             <h3>暂无稿件</h3>
             <p>目前没有正在追踪的稿件。可通过 Author Hub 链接添加审稿记录，或使用生产稿件编号添加已接收文章。</p>
             <button class="button primary" id="emptyAddButton" type="button">添加稿件</button>
           </div>
         </section>
 
-        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail 模块 <b id="footerVersion">0.7.0</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">0.8.0</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -159,7 +191,7 @@
       <form method="dialog" id="addForm">
         <div class="modal-head">
           <div><p class="eyebrow">NEW MANUSCRIPT</p><h2>添加稿件</h2><p>选择与你收到的 Elsevier 信息相匹配的方式</p></div>
-          <button class="close-button" id="closeAddDialogButton" type="button" aria-label="关闭">×</button>
+          <button class="close-button" id="closeAddDialogButton" type="button">关闭</button>
         </div>
 
         <div class="mode-tabs" role="tablist" aria-label="添加方式">
@@ -193,19 +225,19 @@
     <dialog id="settingsDialog" class="modal settings-modal">
       <form method="dialog" id="settingsForm" class="settings-shell">
         <aside class="settings-sidebar" aria-label="设置分类">
-          <div class="settings-sidebar-title"><img src="../../build/icon.png" alt=""><div><small>PAPERTRAIL</small><strong>设置</strong></div></div>
+          <div class="settings-sidebar-title"><div><small>研迹</small><strong>设置</strong></div></div>
           <nav class="settings-nav" role="tablist" aria-orientation="vertical">
-            <button class="settings-nav-item active" type="button" role="tab" aria-selected="true" data-settings-section="general"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h10M18 7h2M4 17h2M10 17h10M14 4v6M6 14v6"></path></svg><span>通用</span></button>
-            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="notifications"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 7h18s-3 0-3-7M10 19h4"></path></svg><span>消息通知</span></button>
-            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="storage"><svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path></svg><span>存储管理</span></button>
-            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="about"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 11v6M12 7h.01"></path></svg><span>关于</span></button>
+            <button class="settings-nav-item active" type="button" role="tab" aria-selected="true" data-settings-section="general"><span>通用</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="notifications"><span>消息通知</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="storage"><span>存储管理</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="about"><span>关于</span></button>
           </nav>
         </aside>
 
         <section class="settings-pane">
           <div class="settings-content-head">
             <div><p class="eyebrow">PREFERENCES</p><h2 id="settingsSectionTitle">通用</h2><p id="settingsSectionDescription">刷新频率、后台行为与 Windows 启动方式</p></div>
-            <button class="close-button" id="closeSettingsDialogButton" type="button" aria-label="关闭">×</button>
+            <button class="close-button" id="closeSettingsDialogButton" type="button">关闭</button>
           </div>
 
           <div class="settings-scroll">
@@ -213,7 +245,7 @@
               <h3>刷新与后台</h3>
               <div class="settings-group">
                 <div class="setting-row"><div><strong>自动检查</strong><small>在后台按设定间隔刷新稿件</small></div><label class="switch"><input id="autoRefresh" type="checkbox"><span></span></label></div>
-                <div class="setting-row"><div><strong>启动时刷新</strong><small>冷启动 PaperTrail 后自动检查全部稿件一次</small></div><label class="switch"><input id="refreshOnStartup" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>启动时刷新</strong><small>冷启动研迹后自动检查全部稿件一次</small></div><label class="switch"><input id="refreshOnStartup" type="checkbox"><span></span></label></div>
                 <div class="setting-row stacked"><label for="refreshMinutes"><strong>检查间隔</strong><small>建议至少 6 小时，避免频繁请求</small></label><select id="refreshMinutes"><option value="60">每 1 小时</option><option value="180">每 3 小时</option><option value="360">每 6 小时</option><option value="720">每 12 小时</option><option value="1440">每天</option></select></div>
               </div>
               <h3>Windows 行为</h3>
@@ -230,7 +262,7 @@
               <div class="settings-group">
                 <div class="setting-row"><div><strong>Windows 重要通知</strong><small>状态变化、审稿回复、截止任务、接收和出版节点出现时弹出</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
               </div>
-              <div class="settings-note"><strong>只提醒值得关注的变化</strong><p>普通定时检查不会打扰你。稿件进展通知可打开对应官方页面；截止任务通知只会带你返回 PaperTrail。</p></div>
+              <div class="settings-note"><strong>只提醒值得关注的变化</strong><p>普通定时检查不会打扰你。稿件进展通知可打开对应官方页面；截止任务通知只会带你返回研迹。</p></div>
             </section>
 
             <section class="settings-panel" data-settings-panel="storage" role="tabpanel">
@@ -245,18 +277,18 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="about" role="tabpanel">
-              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>研迹 · 科研工作台</strong><small>日程、笔记与投稿管理 · 当前版本 <span id="currentVersion">0.7.0</span></small></div><span class="local-first-badge">本地优先</span></div>
+              <div class="settings-about settings-about-large" aria-label="软件版本信息"><div><strong>研迹 · 科研工作台</strong><small>日程、打卡、笔记与投稿管理 · 当前版本 <span id="currentVersion">0.8.0</span></small></div><span class="local-first-badge">本地优先</span></div>
               <h3>版本与更新</h3>
               <div class="settings-group update-group">
                 <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>
                 <div class="setting-row update-row">
-                  <div class="update-copy"><strong id="updateStatusTitle">检查 PaperTrail 更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
+                  <div class="update-copy"><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
                   <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button tertiary" id="updateActionButton" type="button">检查更新</button></div>
                 </div>
                 <div class="update-progress" id="updateProgress" role="progressbar" aria-label="更新下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="updateProgressBar"></span></div>
               </div>
-              <div class="settings-note"><strong>数据只属于你</strong><p>追踪凭证由 Windows 安全存储加密，稿件与检查历史保存在你选择的本地文件夹中。PaperTrail 不包含账号系统、云同步或行为统计。</p></div>
-              <div class="settings-note"><strong>产品说明</strong><p>PaperTrail 是独立开源工具，并非 Elsevier 官方产品。追踪结果取决于出版商页面当前提供的数据。</p></div>
+              <div class="settings-note"><strong>数据只属于你</strong><p>追踪凭证由 Windows 安全存储加密，日程、打卡、笔记与稿件历史保存在你选择的本地文件夹中。研迹目前不包含账号系统或云同步。</p></div>
+              <div class="settings-note"><strong>产品说明</strong><p>研迹是独立开源工具，并非 Elsevier 官方产品。投稿追踪结果取决于出版商页面当前提供的数据。</p></div>
             </section>
           </div>
 
@@ -270,12 +302,12 @@
       <form method="dialog">
         <div class="modal-head">
           <div><p class="eyebrow">SUBMISSION JOURNEY</p><h2>关联投稿历程</h2><p>把同一论文在不同期刊的本地记录串联起来</p></div>
-          <button class="close-button" id="closeJourneyDialogButton" type="button" aria-label="关闭">×</button>
+          <button class="close-button" id="closeJourneyDialogButton" type="button">关闭</button>
         </div>
         <div class="journey-current"><small>当前稿件</small><strong id="journeyCurrentPaper"></strong></div>
         <label class="journey-target-label" for="journeyTarget">选择同一论文的另一条稿件记录</label>
         <select id="journeyTarget"></select>
-        <p class="field-help">仅关联 PaperTrail 本地记录，不会合并或暴露各期刊的追踪凭证。关联后，“查看进展”会展示完整的跨期刊投稿顺序。</p>
+        <p class="field-help">仅关联研迹中的本地记录，不会合并或暴露各期刊的追踪凭证。关联后，“查看进展”会展示完整的跨期刊投稿顺序。</p>
         <p id="journeyError" class="form-error" role="alert"></p>
         <div class="modal-actions"><button class="button secondary" id="cancelJourneyButton" type="button">取消</button><button class="button primary" id="confirmJourneyButton" type="button">确认关联</button></div>
       </form>
@@ -285,7 +317,7 @@
       <div class="workflow-shell">
         <div class="modal-head workflow-head">
           <div><p class="eyebrow">MANUSCRIPT WORKSPACE</p><h2>稿件资料与待办</h2><p id="workflowPaperTitle"></p></div>
-          <button class="close-button" id="closeWorkflowDialogButton" type="button" aria-label="关闭">×</button>
+          <button class="close-button" id="closeWorkflowDialogButton" type="button">关闭</button>
         </div>
         <div class="workflow-scroll">
           <section class="workflow-section">
@@ -339,14 +371,14 @@
 
     <dialog id="scheduleDialog" class="modal workbench-editor-modal">
       <form method="dialog" id="scheduleForm">
-        <div class="modal-head"><div><p class="eyebrow">SCHEDULE</p><h2 id="scheduleDialogTitle">新建日程</h2><p>安排时间范围，并决定截止时如何提醒你</p></div><button class="close-button" data-close-dialog="scheduleDialog" type="button">×</button></div>
+        <div class="modal-head"><div><p class="eyebrow">SCHEDULE</p><h2 id="scheduleDialogTitle">新建日程</h2><p>安排时间范围，并决定截止时如何提醒你</p></div><button class="close-button" data-close-dialog="scheduleDialog" type="button">关闭</button></div>
         <input id="scheduleId" type="hidden">
         <div class="form-grid schedule-form-grid">
           <div class="field full"><label for="scheduleTitle">日程内容</label><input id="scheduleTitle" maxlength="500" placeholder="例如：完成实验结果图"></div>
           <div class="field"><label for="scheduleDate">日期</label><input id="scheduleDate" type="date"></div>
           <div class="field"><label for="scheduleStartTime">开始时间</label><input id="scheduleStartTime" type="time"></div>
           <div class="field"><label for="scheduleEndTime">结束时间</label><input id="scheduleEndTime" type="time"></div>
-          <div class="field full"><label>优先级</label><div class="priority-picker" role="radiogroup"><label class="priority-option high"><input type="radio" name="schedulePriority" value="high"><span></span><b>最高</b><small>到时全屏红色提醒</small></label><label class="priority-option medium"><input type="radio" name="schedulePriority" value="medium"><span></span><b>重要</b><small>置顶黄色提醒</small></label><label class="priority-option low"><input type="radio" name="schedulePriority" value="low" checked><span></span><b>普通</b><small>Windows 通知</small></label></div></div>
+          <div class="field full"><label>优先级</label><div class="priority-picker" role="radiogroup"><label class="priority-option high"><input type="radio" name="schedulePriority" value="high"><span></span><b>最高</b><small>#1 · 全屏红色</small></label><label class="priority-option medium"><input type="radio" name="schedulePriority" value="medium"><span></span><b>重要</b><small>#2 · 置顶黄色</small></label><label class="priority-option low"><input type="radio" name="schedulePriority" value="low" checked><span></span><b>普通</b><small>#3 · Windows 通知</small></label></div></div>
           <div class="setting-row deadline-toggle full"><div><strong>这是一个 Deadline</strong><small>在开始时间触发所选等级的截止提醒</small></div><label class="switch"><input id="scheduleDeadline" type="checkbox"><span></span></label></div>
         </div>
         <p id="scheduleError" class="form-error"></p>
@@ -356,11 +388,11 @@
 
     <dialog id="noteDialog" class="modal workbench-editor-modal note-editor-modal">
       <form method="dialog" id="noteForm">
-        <div class="modal-head"><div><p class="eyebrow">NOTE</p><h2 id="noteDialogTitle">新建笔记</h2><p>元数据默认收起，不打断正常书写</p></div><button class="close-button" data-close-dialog="noteDialog" type="button">×</button></div>
+        <div class="modal-head"><div><p class="eyebrow">NOTE</p><h2 id="noteDialogTitle">新建笔记</h2><p>元数据默认收起，不打断正常书写</p></div><button class="close-button" data-close-dialog="noteDialog" type="button">关闭</button></div>
         <input id="noteId" type="hidden">
         <input id="noteTitle" class="note-title-input" maxlength="300" placeholder="笔记标题">
         <textarea id="noteContent" class="note-content-input" maxlength="100000" placeholder="记录实验想法、阅读摘录或下一步计划…"></textarea>
-        <button class="metadata-reveal" id="toggleNoteMetadataButton" type="button"><span>⌘</span><div><strong>笔记元数据</strong><small id="metadataSummary">点击展开并编辑属性</small></div><i>⌄</i></button>
+        <button class="metadata-reveal" id="toggleNoteMetadataButton" type="button"><div><strong>笔记元数据</strong><small id="metadataSummary">点击展开并编辑属性</small></div></button>
         <section id="noteMetadataPanel" class="note-metadata-panel" hidden><div id="noteMetadataFields" class="note-metadata-fields"></div><button class="text-button" id="openMetadataManagerButton" type="button">＋ 添加或管理字段</button></section>
         <p id="noteError" class="form-error"></p>
         <div class="modal-actions"><button class="button tertiary danger-quiet" id="deleteNoteButton" type="button" hidden>删除</button><button class="button tertiary" id="openStickyFromEditorButton" type="button" hidden>悬浮便笺</button><span class="modal-spacer"></span><button class="button secondary" data-close-dialog="noteDialog" type="button">取消</button><button class="button primary" id="saveNoteButton" type="button">保存笔记</button></div>
@@ -369,7 +401,7 @@
 
     <dialog id="metadataDialog" class="modal workbench-editor-modal metadata-modal">
       <div>
-        <div class="modal-head"><div><p class="eyebrow">METADATA SCHEMA</p><h2>管理笔记元数据</h2><p>字段可选文本、选择框或复选框，像 Obsidian 属性一样复用</p></div><button class="close-button" data-close-dialog="metadataDialog" type="button">×</button></div>
+        <div class="modal-head"><div><p class="eyebrow">METADATA SCHEMA</p><h2>管理笔记元数据</h2><p>字段可选文本、选择框或复选框，像 Obsidian 属性一样复用</p></div><button class="close-button" data-close-dialog="metadataDialog" type="button">关闭</button></div>
         <div id="metadataFieldList" class="metadata-field-list"></div>
         <button class="button secondary" id="addMetadataFieldButton" type="button">＋ 添加字段</button>
         <p id="metadataError" class="form-error"></p>
@@ -377,7 +409,31 @@
       </div>
     </dialog>
 
+    <dialog id="attendanceDialog" class="modal workbench-editor-modal attendance-editor-modal">
+      <form method="dialog" id="attendanceForm">
+        <div class="modal-head"><div><h2 id="attendanceDialogTitle">补录打卡</h2><p>补录或修正某一天的上下班时间</p></div><button class="close-button" data-close-dialog="attendanceDialog" type="button">关闭</button></div>
+        <input id="attendanceId" type="hidden">
+        <div class="form-grid">
+          <div class="field full"><label for="attendanceDate">日期</label><input id="attendanceDate" type="date"></div>
+          <div class="field"><label for="attendanceStartTime">上班时间</label><input id="attendanceStartTime" type="time"></div>
+          <div class="field"><label for="attendanceEndTime">下班时间</label><input id="attendanceEndTime" type="time"></div>
+        </div>
+        <p id="attendanceError" class="form-error"></p>
+        <div class="modal-actions"><button class="button tertiary danger-quiet" id="deleteAttendanceButton" type="button" hidden>删除</button><span class="modal-spacer"></span><button class="button secondary" data-close-dialog="attendanceDialog" type="button">取消</button><button class="button primary" id="saveAttendanceButton" type="button">保存记录</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="yanjiConfirmDialog" class="modal confirm-modal" aria-labelledby="yanjiConfirmTitle">
+      <div class="confirm-shell">
+        <span class="confirm-label">请确认</span>
+        <h2 id="yanjiConfirmTitle">确认操作</h2>
+        <p id="yanjiConfirmMessage"></p>
+        <div class="modal-actions"><button class="button secondary" id="yanjiConfirmCancel" type="button">取消</button><button class="button primary" id="yanjiConfirmAccept" type="button">确认</button></div>
+      </div>
+    </dialog>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script src="shared-ui.js"></script>
     <script src="app.js"></script>
     <script src="workbench.js"></script>
   </body>

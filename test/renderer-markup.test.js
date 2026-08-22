@@ -53,7 +53,7 @@ test('uses a sidebar layout with settings at the bottom and two add modes', () =
   assert.match(html, /最近成功同步/);
   assert.match(html, /class="settings-about\b/);
   assert.match(html, /class="window-titlebar"/);
-  assert.match(html, /\.\.\/\.\.\/build\/icon\.png/);
+  assert.doesNotMatch(html, /\.\.\/\.\.\/build\/icon\.png/);
   assert.doesNotMatch(html, /例如 Zhao|例如 Bo/);
 });
 
@@ -141,7 +141,7 @@ test('supports locally linking cross-journal submission journeys', () => {
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
   assert.match(html, /id="journeyDialog"/);
-  assert.match(html, /仅关联 PaperTrail 本地记录/);
+  assert.match(html, /仅关联研迹中的本地记录/);
   assert.match(mainJs, /papers:link-journey/);
   assert.match(mainJs, /papers:unlink-journey/);
   assert.match(preloadJs, /linkPaperJourney/);
@@ -196,16 +196,54 @@ test('research workbench exposes home, 24-hour schedule, metadata notes and quic
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   assert.match(indexHtml, /data-workbench-page="home"/);
   assert.match(indexHtml, /data-workbench-page="schedule"/);
+  assert.match(indexHtml, /data-workbench-page="attendance"/);
   assert.match(indexHtml, /data-workbench-page="notes"/);
   assert.match(indexHtml, /data-workbench-page="submissions"/);
   assert.match(indexHtml, /id="bingWallpaper"/);
   assert.match(indexHtml, /id="homeDayOverview"/);
   assert.match(indexHtml, /id="timelineHours"/);
+  assert.match(indexHtml, /id="attendanceGanttRows"/);
+  assert.match(indexHtml, /id="startFocusButton"/);
+  assert.match(indexHtml, /id="focusUsageList"/);
+  assert.match(indexHtml, /id="homeFeatureClock"/);
+  assert.match(indexHtml, /id="dailyQuote"/);
+  assert.match(indexHtml, /class="home-content-grid"/);
   assert.match(indexHtml, /id="notesGrid"/);
   assert.match(indexHtml, /id="noteMetadataPanel"/);
-  assert.match(indexHtml, /到时全屏红色提醒/);
+  assert.match(indexHtml, /#1 · 全屏红色/);
   assert.match(mainJs, /globalShortcut\.register/);
   assert.match(mainJs, /showDeadlineWindow/);
   assert.match(mainJs, /new Notification/);
   assert.match(preloadJs, /showCapture/);
+  assert.match(preloadJs, /startFocus/);
+  assert.match(preloadJs, /onFocusChanged/);
+});
+
+test('quick capture preserves Chinese IME composition and closes empty on blur', () => {
+  const captureHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.html'), 'utf8');
+  const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(captureHtml, /<textarea id="captureEditor"/);
+  assert.match(captureHtml, /id="captureHighlights"/);
+  assert.doesNotMatch(captureHtml, /contenteditable/);
+  assert.match(captureJs, /compositionstart/);
+  assert.match(captureJs, /event\.isComposing \|\| composing \|\| event\.keyCode === 229/);
+  assert.doesNotMatch(captureJs, /editor\.innerHTML\s*=/);
+  assert.match(mainJs, /quickCaptureWindow\.on\('blur'/);
+  assert.match(captureHtml, /#1 红、#2 黄、#3 绿/);
+});
+
+test('local-first messaging appears only inside settings', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  assert.equal((indexHtml.match(/本地优先/g) || []).length, 1);
+  assert.doesNotMatch(indexHtml, /class="privacy-note"/);
+});
+
+test('destructive workbench actions use the Yanji confirmation dialog', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const sharedUiJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'shared-ui.js'), 'utf8');
+  assert.match(indexHtml, /id="yanjiConfirmDialog"/);
+  assert.match(sharedUiJs, /window\.yanjiConfirm/);
+  assert.doesNotMatch(workbenchJs, /\bconfirm\s*\(/);
 });
