@@ -174,7 +174,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.0.3</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.0.4</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -220,9 +220,10 @@
           <div class="settings-sidebar-title"><div><small>研迹</small><strong>设置</strong></div></div>
           <nav class="settings-nav" role="tablist" aria-orientation="horizontal">
             <button class="settings-nav-item active" type="button" role="tab" aria-selected="true" data-settings-section="general"><span>通用</span></button>
-            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="notifications"><span>消息通知</span></button>
-            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="storage"><span>存储管理</span></button>
-            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="about"><span>关于</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="notifications"><span>提醒</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="tracking"><span>投稿追踪</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="storage"><span>数据与备份</span></button>
+            <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="updates"><span>更新</span></button>
           </nav>
         </aside>
 
@@ -235,47 +236,53 @@
           <div class="settings-scroll">
             <section class="settings-panel" data-settings-panel="general" role="tabpanel">
               <h2>通用</h2>
-              <h3>刷新与后台</h3>
-              <div class="settings-group">
-                <div class="setting-row"><div><strong>自动检查</strong><small>在后台按设定间隔刷新稿件</small></div><label class="switch"><input id="autoRefresh" type="checkbox"><span></span></label></div>
-                <div class="setting-row"><div><strong>启动时刷新</strong><small>冷启动研迹后自动检查全部稿件一次</small></div><label class="switch"><input id="refreshOnStartup" type="checkbox"><span></span></label></div>
-                <div class="setting-row stacked"><label for="refreshMinutes"><strong>检查间隔</strong><small>建议至少 6 小时，避免频繁请求</small></label><select id="refreshMinutes"><option value="60">每 1 小时</option><option value="180">每 3 小时</option><option value="360">每 6 小时</option><option value="720">每 12 小时</option><option value="1440">每天</option></select></div>
-              </div>
               <h3>Windows 行为</h3>
               <div class="settings-group">
-                <div class="setting-row"><div><strong>关闭时驻留托盘</strong><small>关闭窗口后继续执行后台检查</small></div><label class="switch"><input id="closeToTray" type="checkbox"><span></span></label></div>
-                <div class="setting-row"><div><strong>登录 Windows 后启动</strong><small>静默启动到系统托盘</small></div><label class="switch"><input id="startAtLogin" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>关闭时驻留托盘</strong><small>关闭主窗口后继续运行日程提醒、便笺和投稿检查</small></div><label class="switch"><input id="closeToTray" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>登录 Windows 后启动</strong><small>自动启动研迹工作台并驻留系统托盘</small></div><label class="switch"><input id="startAtLogin" type="checkbox"><span></span></label></div>
+              </div>
+              <h3>快捷操作</h3>
+              <div class="settings-group">
                 <div class="setting-row stacked"><label for="quickCaptureShortcut"><strong>即写即走快捷键</strong><small>全局唤醒屏幕中央快捷输入窗</small></label><input id="quickCaptureShortcut" type="text" value="CommandOrControl+Shift+Space" spellcheck="false"></div>
                 <div class="setting-row stacked"><label for="stickyNoteShortcut"><strong>新建悬浮便笺快捷键</strong><small>全局新建一张自动保存、保持置顶的便笺</small></label><input id="stickyNoteShortcut" type="text" value="CommandOrControl+Alt+N" spellcheck="false"></div>
               </div>
             </section>
 
-            <section class="settings-panel" data-settings-panel="notifications" role="tabpanel">
-              <h2>消息通知</h2>
-              <h3>重要进展</h3>
+            <section class="settings-panel" data-settings-panel="notifications" role="tabpanel" hidden>
+              <h2>提醒</h2>
+              <h3>Windows 通知</h3>
               <div class="settings-group">
-                <div class="setting-row"><div><strong>Windows 重要通知</strong><small>状态变化、审稿回复、截止任务、接收和出版节点出现时弹出</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>允许工作台提醒</strong><small>用于日程到时、日程 Deadline、稿件截止任务和投稿状态变化</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
               </div>
-              <div class="settings-note"><strong>只提醒值得关注的变化</strong><p>普通定时检查不会打扰你。稿件进展通知可打开对应官方页面；截止任务通知只会带你返回研迹。</p></div>
             </section>
 
-            <section class="settings-panel" data-settings-panel="storage" role="tabpanel">
-              <h2>存储管理</h2>
-              <h3>数据位置</h3>
+            <section class="settings-panel" data-settings-panel="tracking" role="tabpanel" hidden>
+              <h2>投稿追踪</h2>
+              <h3>自动检查</h3>
               <div class="settings-group">
-                <div class="setting-row storage-row"><div class="storage-copy"><strong>当前存储文件夹</strong><small id="dataDirectory" title="">正在读取…</small><small class="storage-help">更换到空文件夹时会复制当前数据，原位置保留备份。</small></div><button class="button tertiary" id="changeDataDirectoryButton" type="button">更改位置</button></div>
+                <div class="setting-row"><div><strong>后台检查投稿进展</strong><small>按设定间隔刷新已添加的稿件，不影响日程、笔记等其他工作台功能</small></div><label class="switch"><input id="autoRefresh" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>启动时检查</strong><small>每次冷启动研迹后检查全部稿件一次</small></div><label class="switch"><input id="refreshOnStartup" type="checkbox"><span></span></label></div>
+                <div class="setting-row stacked"><label for="refreshMinutes"><strong>检查间隔</strong><small>建议至少 6 小时，避免频繁请求出版商页面</small></label><select id="refreshMinutes"><option value="60">每 1 小时</option><option value="180">每 3 小时</option><option value="360">每 6 小时</option><option value="720">每 12 小时</option><option value="1440">每天</option></select></div>
               </div>
-              <h3>一个月迁移缓存</h3>
+            </section>
+
+            <section class="settings-panel" data-settings-panel="storage" role="tabpanel" hidden>
+              <h2>数据与备份</h2>
+              <h3>工作台数据位置</h3>
+              <div class="settings-group">
+                <div class="setting-row storage-row"><div class="storage-copy"><strong>当前存储文件夹</strong><small id="dataDirectory" title="">正在读取…</small><small class="storage-help">包含日程、打卡、专注记录、笔记、便笺、稿件和设置；更换位置会复制现有数据。</small></div><button class="button tertiary" id="changeDataDirectoryButton" type="button">更改位置</button></div>
+              </div>
+              <h3>迁移备份</h3>
               <div class="settings-group">
                 <div class="setting-row backup-row"><div><strong>迁移后保留的数据</strong><small id="backupSummary" title="">正在读取…</small><small>原位置保留 30 天，期满后自动安全清理；也可提前手动删除。</small></div><button class="button tertiary danger-quiet" id="deleteBackupsButton" type="button">立即删除</button></div>
               </div>
             </section>
 
-            <section class="settings-panel" data-settings-panel="about" role="tabpanel">
-              <h2>关于</h2>
-              <div class="settings-about settings-about-large" aria-label="软件版本信息"><div><strong>研迹 · 科研工作台</strong><small>日程、打卡、笔记与投稿管理 · 当前版本 <span id="currentVersion">1.0.3</span></small></div><span class="local-first-badge">本地优先</span></div>
-              <h3>版本与更新</h3>
+            <section class="settings-panel" data-settings-panel="updates" role="tabpanel" hidden>
+              <h2>更新</h2>
+              <h3>版本</h3>
               <div class="settings-group update-group">
+                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.0.4</span></small></div></div>
                 <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>
                 <div class="setting-row update-row">
                   <div class="update-copy"><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
@@ -283,8 +290,6 @@
                 </div>
                 <div class="update-progress" id="updateProgress" role="progressbar" aria-label="更新下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="updateProgressBar"></span></div>
               </div>
-              <div class="settings-note"><strong>数据只属于你</strong><p>追踪凭证由 Windows 安全存储加密，日程、打卡、笔记与稿件历史保存在你选择的本地文件夹中。研迹目前不包含账号系统或云同步。</p></div>
-              <div class="settings-note"><strong>产品说明</strong><p>研迹是独立开源工具，并非 Elsevier 官方产品。投稿追踪结果取决于出版商页面当前提供的数据。</p></div>
             </section>
           </div>
 

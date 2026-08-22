@@ -35,7 +35,7 @@ test('uses a sidebar layout with settings at the bottom and two add modes', () =
   assert.match(html, /id="addModeAuthor"/);
   assert.match(html, /id="productionReference"/);
   assert.match(html, /id="authorLastName"/);
-  assert.match(html, /Windows 重要通知/);
+  assert.match(html, /允许工作台提醒/);
   assert.match(html, /id="changeDataDirectoryButton"/);
   assert.match(html, /id="dataDirectory"/);
   assert.match(html, /id="currentVersion"/);
@@ -45,13 +45,14 @@ test('uses a sidebar layout with settings at the bottom and two add modes', () =
   assert.match(html, /class="settings-sidebar"/);
   assert.match(html, /data-settings-section="general"/);
   assert.match(html, /data-settings-section="notifications"/);
+  assert.match(html, /data-settings-section="tracking"/);
   assert.match(html, /data-settings-section="storage"/);
-  assert.match(html, /data-settings-section="about"/);
+  assert.match(html, /data-settings-section="updates"/);
   assert.match(html, /id="archivedNavButton"/);
   assert.match(html, /id="paperSearch"/);
   assert.match(html, /id="markAllReadButton"/);
   assert.match(html, /最近成功同步/);
-  assert.match(html, /class="settings-about\b/);
+  assert.doesNotMatch(html, /class="settings-note\b/);
   assert.match(html, /class="window-titlebar"/);
   assert.doesNotMatch(html, /\.\.\/\.\.\/build\/icon\.png/);
   assert.doesNotMatch(html, /例如 Zhao|例如 Bo/);
@@ -273,19 +274,21 @@ test('quick capture preserves Chinese IME composition and closes empty on blur',
   assert.match(captureHtml, /#1 红、#2 黄、#3 绿/);
 });
 
-test('local-first messaging appears only inside settings', () => {
+test('settings omit promotional and explanatory introduction cards', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  assert.equal((indexHtml.match(/本地优先/g) || []).length, 1);
+  assert.doesNotMatch(indexHtml, /数据只属于你|产品说明|只提醒值得关注的变化/);
+  assert.doesNotMatch(indexHtml, /class="settings-note\b/);
   assert.doesNotMatch(indexHtml, /class="privacy-note"/);
 });
 
-test('settings render as a workspace page with horizontal scroll-linked sections', () => {
+test('settings render as a workspace page with exact horizontal tabs', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
   assert.match(indexHtml, /<section id="settingsDialog"[^>]*data-page="settings"/);
   assert.doesNotMatch(indexHtml, /<dialog id="settingsDialog"/);
   assert.match(indexHtml, /aria-orientation="horizontal"/);
-  assert.match(appJs, /syncSettingsScrollSection/);
+  assert.match(appJs, /panel\.hidden = panel\.dataset\.settingsPanel !== section/);
+  assert.doesNotMatch(appJs, /syncSettingsScrollSection|scrollIntoView/);
   assert.doesNotMatch(appJs, /openDialog\(elements\.settingsDialog\)/);
 });
 

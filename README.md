@@ -8,6 +8,12 @@ publisher-neutral.
 
 ## Version 1.0 workbench features
 
+Version 1.0.4 replaces the scroll-linked Settings sections with exact tabs,
+separates manuscript polling from general workbench behavior, and organizes
+preferences around the whole workspace: General, Reminders, Manuscript
+Tracking, Data and Backups, and Updates. Promotional and explanatory cards
+were removed so every visible Settings block is actionable.
+
 Version 1.0.3 adds right-click deletion for note cards, hides visible scrollbars
 throughout modal dialogs while preserving scrolling, and brings Quick Capture
 time recognition into the normal schedule editor. Explicitly timed clauses such

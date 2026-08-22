@@ -744,7 +744,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '1.0.3';
+  const version = settings.appVersion || '1.0.4';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   const expirations = Array.isArray(settings.backupExpiresAt) ? settings.backupExpiresAt : [];
@@ -832,13 +832,14 @@ function populateSettings() {
 }
 
 const SETTINGS_SECTION_COPY = Object.freeze({
-  general: ['通用', '刷新频率、后台行为与 Windows 启动方式'],
-  notifications: ['消息通知', '控制值得关注的稿件进展提醒'],
-  storage: ['存储管理', '管理本地数据位置和迁移后留下的备份'],
-  about: ['关于研迹', '查看版本、隐私方式和产品信息']
+  general: ['通用', 'Windows 行为与全局快捷操作'],
+  notifications: ['提醒', '管理日程、任务和投稿进展的 Windows 通知'],
+  tracking: ['投稿追踪', '设置稿件状态的后台检查频率'],
+  storage: ['数据与备份', '管理整个科研工作台的数据位置和迁移备份'],
+  updates: ['更新', '查看当前版本并检查 GitHub Release']
 });
 
-function setSettingsSection(section, shouldScroll = true) {
+function setSettingsSection(section) {
   if (!SETTINGS_SECTION_COPY[section]) return;
   state.settingsSection = section;
   elements.settingsNavButtons.forEach((button) => {
@@ -850,28 +851,11 @@ function setSettingsSection(section, shouldScroll = true) {
   const [title, description] = SETTINGS_SECTION_COPY[section];
   elements.settingsSectionTitle.textContent = title;
   elements.settingsSectionDescription.textContent = description;
-  if (shouldScroll) {
-    const panel = elements.settingsPanels.find((item) => item.dataset.settingsPanel === section);
-    panel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-}
-
-function syncSettingsScrollSection() {
   const scroller = elements.settingsDialog.querySelector('.settings-scroll');
-  if (!scroller) return;
-  const top = scroller.getBoundingClientRect().top + 36;
-  let closest;
-  if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2) {
-    closest = elements.settingsPanels.at(-1);
-  } else {
-    closest = elements.settingsPanels[0];
-    for (const panel of elements.settingsPanels) {
-      if (panel.getBoundingClientRect().top <= top) closest = panel;
-    }
-  }
-  if (closest && closest.dataset.settingsPanel !== state.settingsSection) {
-    setSettingsSection(closest.dataset.settingsPanel, false);
-  }
+  elements.settingsPanels.forEach((panel) => {
+    panel.hidden = panel.dataset.settingsPanel !== section;
+  });
+  if (scroller) scroller.scrollTop = 0;
 }
 
 async function deleteDataBackups() {
@@ -1158,24 +1142,11 @@ function bindEvents() {
   elements.settingsButton.addEventListener('click', () => {
     elements.settingsError.textContent = '';
     populateSettings();
-    setSettingsSection('general', false);
-    const scroll = elements.settingsDialog.querySelector('.settings-scroll');
-    if (scroll) {
-      scroll.scrollTop = 0;
-      requestAnimationFrame(() => {
-        scroll.scrollTop = 0;
-        setSettingsSection('general', false);
-      });
-      setTimeout(() => {
-        scroll.scrollTop = 0;
-        setSettingsSection('general', false);
-      }, 0);
-    }
+    setSettingsSection('general');
   });
   elements.settingsNavButtons.forEach((button) => {
     button.addEventListener('click', () => setSettingsSection(button.dataset.settingsSection));
   });
-  elements.settingsDialog.querySelector('.settings-scroll')?.addEventListener('scroll', syncSettingsScrollSection, { passive: true });
   elements.closeSettingsDialogButton.addEventListener('click', () => document.querySelector('[data-workbench-page="home"]').click());
   elements.cancelSettingsButton.addEventListener('click', () => {
     populateSettings();

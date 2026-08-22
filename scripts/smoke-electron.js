@@ -156,10 +156,14 @@ app.whenReady().then(async () => {
       document.getElementById('settingsButton').click();
       document.querySelector('[data-settings-section="notifications"]').click();
       const notificationsVisible = !document.querySelector('[data-settings-panel="notifications"]').hidden;
+      document.querySelector('[data-settings-section="tracking"]').click();
+      const trackingVisible = !document.querySelector('[data-settings-panel="tracking"]').hidden;
       document.querySelector('[data-settings-section="storage"]').click();
       const storageVisible = !document.querySelector('[data-settings-panel="storage"]').hidden;
-      document.querySelector('[data-settings-section="about"]').click();
-      const aboutVisible = !document.querySelector('[data-settings-panel="about"]').hidden;
+      const storageSelectedExactly = document.querySelector('.settings-nav-item.active')?.dataset.settingsSection === 'storage'
+        && [...document.querySelectorAll('[data-settings-panel]')].filter((panel) => !panel.hidden).length === 1;
+      document.querySelector('[data-settings-section="updates"]').click();
+      const updatesVisible = !document.querySelector('[data-settings-panel="updates"]').hidden;
       const updateButton = document.getElementById('updateActionButton');
       const updateIdle = updateButton.textContent === '检查更新' && !updateButton.disabled;
       updateButton.click();
@@ -174,21 +178,15 @@ app.whenReady().then(async () => {
       const generalVisible = !document.querySelector('[data-settings-panel="general"]').hidden;
       const startAtLogin = document.getElementById('startAtLogin');
       startAtLogin.checked = true;
+      document.querySelector('[data-settings-section="storage"]').click();
       document.getElementById('changeDataDirectoryButton').click();
       await new Promise((resolve) => setTimeout(resolve, 180));
       const draftPreserved = startAtLogin.checked;
-      const settingsScroll = document.querySelector('#settingsDialog .settings-scroll');
-      settingsScroll.style.scrollBehavior = 'auto';
-      settingsScroll.scrollTop = settingsScroll.scrollHeight;
-      settingsScroll.dispatchEvent(new Event('scroll'));
-      await new Promise((resolve) => setTimeout(resolve, 80));
-      const scrollHighlightsAbout = document.querySelector('.settings-nav-item.active')?.dataset.settingsSection === 'about';
-      const scrollMetrics = { top: settingsScroll.scrollTop, height: settingsScroll.clientHeight, full: settingsScroll.scrollHeight, active: document.querySelector('.settings-nav-item.active')?.dataset.settingsSection };
       document.querySelector('[data-workbench-page="home"]').click();
-      return { notificationsVisible, storageVisible, aboutVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, draftPreserved, scrollHighlightsAbout, scrollMetrics };
+      return { notificationsVisible, trackingVisible, storageVisible, storageSelectedExactly, updatesVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, draftPreserved };
     })()
   `);
-  if (!Object.entries(settingsDraftResult).every(([key, value]) => key === 'scrollMetrics' || Boolean(value))) {
+  if (!Object.values(settingsDraftResult).every(Boolean)) {
     throw new Error(`Settings draft smoke test failed: ${JSON.stringify(settingsDraftResult)}`);
   }
   console.log(`SETTINGS_DRAFT_SMOKE_OK ${JSON.stringify(settingsDraftResult)}`);
@@ -284,18 +282,18 @@ app.whenReady().then(async () => {
   if (process.env.PAPERTRAIL_UPDATE_OUTPUT) {
     await window.webContents.executeJavaScript(`
       document.getElementById('settingsButton').click();
-      document.querySelector('[data-settings-section="about"]').click();
+      document.querySelector('[data-settings-section="updates"]').click();
     `);
     await new Promise((resolve) => setTimeout(resolve, 240));
     const updateDialogVisual = await window.webContents.executeJavaScript(`
       (() => ({
         visible: !document.getElementById('settingsDialog').hidden,
-        aboutVisible: !document.querySelector('[data-settings-panel="about"]').hidden,
+        updatesVisible: !document.querySelector('[data-settings-panel="updates"]').hidden,
         updateButton: document.getElementById('updateActionButton').textContent,
         horizontalOverflow: document.documentElement.scrollWidth > innerWidth
       }))()
     `);
-    if (!updateDialogVisual.visible || !updateDialogVisual.aboutVisible || updateDialogVisual.horizontalOverflow) {
+    if (!updateDialogVisual.visible || !updateDialogVisual.updatesVisible || updateDialogVisual.horizontalOverflow) {
       throw new Error(`Update settings visual state failed: ${JSON.stringify(updateDialogVisual)}`);
     }
     console.log(`UPDATE_SETTINGS_VISUAL_OK ${JSON.stringify(updateDialogVisual)}`);

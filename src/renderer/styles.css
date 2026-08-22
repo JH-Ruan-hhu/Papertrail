@@ -1037,6 +1037,8 @@ body { padding-top: var(--titlebar-height); color: var(--ink); }
 .settings-page .settings-sidebar-title small { display: none; }
 .settings-page .settings-sidebar-title strong { margin: 0; color: #1d1d1d; font-size: 30px; font-weight: 650; letter-spacing: -.6px; }
 .settings-page .settings-nav { display: flex; align-items: center; gap: 30px; overflow-x: auto; }
+.settings-page .settings-nav, .settings-page .settings-scroll { scrollbar-width: none; }
+.settings-page .settings-nav::-webkit-scrollbar, .settings-page .settings-scroll::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .settings-page .settings-nav-item {
   width: auto;
   min-height: 44px;
@@ -1056,7 +1058,7 @@ body { padding-top: var(--titlebar-height); color: var(--ink); }
 .settings-page .settings-content-head { display: none; }
 .settings-page .settings-scroll { min-height: 0; padding: 26px 8px 24px 0; overflow-y: auto; scroll-padding-top: 24px; }
 .settings-page .settings-panel { max-width: 1060px; padding-bottom: 44px; scroll-margin-top: 24px; }
-.settings-page .settings-panel + .settings-panel { padding-top: 38px; border-top: 1px solid #e3e3e3; }
+.settings-page .settings-panel + .settings-panel { padding-top: 0; border-top: 0; }
 .settings-page .settings-panel > h2 { margin: 0 0 22px; color: #222; font-size: 23px; font-weight: 600; }
 .settings-page .settings-panel > h3 { color: #4a4a4a; font-size: 14px; }
 .settings-page .settings-about-large { grid-template-columns: minmax(0,1fr) auto; }
