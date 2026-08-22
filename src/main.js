@@ -8,6 +8,7 @@ const {
   BrowserWindow,
   clipboard,
   dialog,
+  globalShortcut,
   ipcMain,
   Menu,
   nativeImage,
@@ -34,6 +35,12 @@ const {
   extractProductionSnapshot
 } = require('./production-core');
 const { importantChanges } = require('./notification-core');
+const {
+  normalizeMetadataField,
+  parseNaturalLanguageSchedule,
+  saveNote,
+  saveSchedule
+} = require('./workbench-core');
 const {
   applyRefreshFailure,
   applyRefreshSuccess,
@@ -62,11 +69,12 @@ const {
   nextUpdateState
 } = require('./update-core');
 
-const APP_NAME = 'PaperTrail';
+const APP_NAME = '研迹 · 科研工作台';
 const MAX_HISTORY = 100;
 const FETCH_TIMEOUT_MS = 20_000;
 const DATA_FILE_NAME = 'papertrail-data.json';
 const STORAGE_POINTER_NAME = 'papertrail-storage.json';
+const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
 const TITLE_BAR_NORMAL = Object.freeze({ color: '#f2f5f9', symbolColor: '#526071', height: 42 });
 const TITLE_BAR_MODAL = Object.freeze({ color: '#747e8b', symbolColor: '#e8edf4', height: 42 });
@@ -79,6 +87,11 @@ let isQuitting = false;
 let coldStartRefreshStarted = false;
 let updateState;
 let updaterInitialized = false;
+let quickCaptureWindow;
+let bingWallpaperCache;
+let lastBackupCleanupAt = 0;
+const stickyWindows = new Map();
+const deadlineWindows = new Map();
 const refreshingIds = new Set();
 
 function encryptSecret(value) {
@@ -190,10 +203,13 @@ function readStoragePointer() {
     const pointer = JSON.parse(fs.readFileSync(storagePointerPath(), 'utf8'));
     return {
       dataDirectory: String(pointer?.dataDirectory || ''),
-      backupFiles: Array.isArray(pointer?.backupFiles) ? pointer.backupFiles.map(String) : []
+      backupFiles: Array.isArray(pointer?.backupFiles) ? pointer.backupFiles.map(String) : [],
+      backupCreatedAt: pointer?.backupCreatedAt && typeof pointer.backupCreatedAt === 'object'
+        ? pointer.backupCreatedAt
+        : {}
     };
   } catch {
-    return { dataDirectory: '', backupFiles: [] };
+    return { dataDirectory: '', backupFiles: [], backupCreatedAt: {} };
   }
 }
 
@@ -230,27 +246,71 @@ function knownBackupFiles() {
 function writeStoragePointer(
   directory,
   backupFiles = knownBackupFiles(),
-  currentFile = path.join(directory, DATA_FILE_NAME)
+  currentFile = path.join(directory, DATA_FILE_NAME),
+  backupCreatedAt = readStoragePointer().backupCreatedAt
 ) {
   const pointerPath = storagePointerPath();
   const temporaryPath = `${pointerPath}.tmp`;
   fs.mkdirSync(path.dirname(pointerPath), { recursive: true });
+  const normalizedBackups = normalizeBackupFiles(backupFiles, currentFile);
+  const timestamps = {};
+  for (const backupFile of normalizedBackups) {
+    timestamps[backupFile] = isoBackupDate(backupCreatedAt?.[backupFile]) || new Date().toISOString();
+  }
   fs.writeFileSync(temporaryPath, JSON.stringify({
     dataDirectory: directory,
-    backupFiles: normalizeBackupFiles(backupFiles, currentFile)
+    backupFiles: normalizedBackups,
+    backupCreatedAt: timestamps
   }, null, 2), 'utf8');
   fs.renameSync(temporaryPath, pointerPath);
+}
+
+function isoBackupDate(value) {
+  return Number.isFinite(Date.parse(value)) ? new Date(value).toISOString() : null;
+}
+
+function cleanupExpiredBackups(now = new Date()) {
+  lastBackupCleanupAt = now.getTime();
+  const pointer = readStoragePointer();
+  const backups = knownBackupFiles();
+  const retained = [];
+  const dates = {};
+  let deletedCount = 0;
+  for (const backupFile of backups) {
+    const createdAt = isoBackupDate(pointer.backupCreatedAt?.[backupFile]) || now.toISOString();
+    if (now.getTime() - Date.parse(createdAt) < BACKUP_RETENTION_MS) {
+      retained.push(backupFile);
+      dates[backupFile] = createdAt;
+      continue;
+    }
+    try {
+      if (path.resolve(backupFile) === path.resolve(store.filePath)) continue;
+      if (path.basename(backupFile).toLowerCase() !== DATA_FILE_NAME) continue;
+      fs.unlinkSync(backupFile);
+      deletedCount += 1;
+    } catch {
+      retained.push(backupFile);
+      dates[backupFile] = createdAt;
+    }
+  }
+  writeStoragePointer(path.dirname(store.filePath), retained, store.filePath, dates);
+  return deletedCount;
 }
 
 function settingsForRenderer() {
   const dataDirectory = path.dirname(store.filePath);
   const backupFiles = knownBackupFiles();
+  const pointer = readStoragePointer();
   return {
     ...store.getSettings(),
     appVersion: app.getVersion(),
     dataDirectory,
     backupCount: backupFiles.length,
     backupFiles,
+    backupExpiresAt: backupFiles.map((file) => ({
+      file,
+      expiresAt: new Date(Date.parse(isoBackupDate(pointer.backupCreatedAt?.[file]) || new Date().toISOString()) + BACKUP_RETENTION_MS).toISOString()
+    })),
     isDefaultDataDirectory: path.resolve(dataDirectory) === path.resolve(path.dirname(defaultDataFilePath()))
   };
 }
@@ -447,6 +507,263 @@ function broadcastPapers() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('papers:changed', listSerializedPapers());
   }
+}
+
+function workspaceForRenderer() {
+  return {
+    schedules: [...store.listSchedules()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)),
+    notes: [...store.listNotes()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+    metadataFields: store.listMetadataFields()
+  };
+}
+
+function broadcastWorkspace() {
+  const workspace = workspaceForRenderer();
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('workspace:changed', workspace);
+  }
+  if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
+    quickCaptureWindow.webContents.send('workspace:changed', workspace);
+  }
+  for (const window of stickyWindows.values()) {
+    if (!window.isDestroyed()) window.webContents.send('workspace:changed', workspace);
+  }
+  return workspace;
+}
+
+function saveWorkspaceSchedule(input) {
+  const schedules = saveSchedule(
+    store.listSchedules(),
+    input,
+    new Date().toISOString(),
+    () => crypto.randomUUID()
+  );
+  store.setSchedules(schedules);
+  broadcastWorkspace();
+  return schedules.find((item) => item.id === String(input?.id || '')) || schedules[0];
+}
+
+function deleteWorkspaceSchedule(id) {
+  const schedules = store.listSchedules();
+  if (!schedules.some((item) => item.id === id)) throw new Error('找不到这条日程。');
+  store.setSchedules(schedules.filter((item) => item.id !== id));
+  broadcastWorkspace();
+  return true;
+}
+
+function setWorkspaceScheduleCompleted(id, completed) {
+  const schedule = store.listSchedules().find((item) => item.id === id);
+  if (!schedule) throw new Error('找不到这条日程。');
+  return saveWorkspaceSchedule({
+    ...schedule,
+    completedAt: completed ? new Date().toISOString() : null
+  });
+}
+
+function saveWorkspaceNote(input) {
+  const notes = saveNote(
+    store.listNotes(),
+    input,
+    new Date().toISOString(),
+    () => crypto.randomUUID()
+  );
+  store.setNotes(notes);
+  broadcastWorkspace();
+  return notes.find((item) => item.id === String(input?.id || '')) || notes[0];
+}
+
+function deleteWorkspaceNote(id) {
+  const notes = store.listNotes();
+  if (!notes.some((item) => item.id === id)) throw new Error('找不到这条笔记。');
+  store.setNotes(notes.filter((item) => item.id !== id));
+  const sticky = stickyWindows.get(id);
+  if (sticky && !sticky.isDestroyed()) sticky.close();
+  stickyWindows.delete(id);
+  broadcastWorkspace();
+  return true;
+}
+
+function saveMetadataFields(input) {
+  if (!Array.isArray(input)) throw new Error('元数据字段格式不正确。');
+  const fields = input.slice(0, 50).map((field, index) => normalizeMetadataField({
+    ...field,
+    id: field?.id || crypto.randomUUID()
+  }, index));
+  store.setMetadataFields(fields);
+  broadcastWorkspace();
+  return fields;
+}
+
+async function getBingWallpaper() {
+  if (!store.getSettings().bingWallpaper) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  if (bingWallpaperCache?.date === today) return bingWallpaperCache;
+  try {
+    const response = await net.fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN');
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const payload = await response.json();
+    const image = payload?.images?.[0];
+    if (!image?.url) throw new Error('壁纸响应缺少图片地址。');
+    bingWallpaperCache = {
+      date: today,
+      url: new URL(image.url, 'https://www.bing.com').href,
+      copyright: String(image.copyright || 'Bing 每日壁纸')
+    };
+    return bingWallpaperCache;
+  } catch {
+    return null;
+  }
+}
+
+function createQuickCaptureWindow() {
+  if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) return quickCaptureWindow;
+  quickCaptureWindow = new BrowserWindow({
+    width: 720,
+    height: 250,
+    show: false,
+    frame: false,
+    transparent: true,
+    resizable: false,
+    maximizable: false,
+    minimizable: false,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    backgroundColor: '#00000000',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      devTools: !app.isPackaged
+    }
+  });
+  quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'));
+  quickCaptureWindow.on('closed', () => { quickCaptureWindow = null; });
+  return quickCaptureWindow;
+}
+
+function toggleQuickCapture() {
+  const window = createQuickCaptureWindow();
+  if (window.isVisible()) {
+    window.hide();
+    return;
+  }
+  window.center();
+  window.show();
+  window.focus();
+  window.webContents.send('capture:focus');
+}
+
+function registerQuickCaptureShortcut(accelerator = store?.getSettings().quickCaptureShortcut) {
+  globalShortcut.unregisterAll();
+  const shortcut = String(accelerator || 'CommandOrControl+Shift+Space');
+  if (!globalShortcut.register(shortcut, toggleQuickCapture)) {
+    const fallback = 'CommandOrControl+Shift+Space';
+    if (shortcut !== fallback && globalShortcut.register(fallback, toggleQuickCapture)) return fallback;
+    return null;
+  }
+  return shortcut;
+}
+
+function openStickyNote(noteId) {
+  const id = String(noteId || '');
+  const note = store.listNotes().find((item) => item.id === id);
+  if (!note) throw new Error('找不到这条笔记。');
+  const existing = stickyWindows.get(id);
+  if (existing && !existing.isDestroyed()) {
+    existing.show();
+    existing.focus();
+    return true;
+  }
+  const window = new BrowserWindow({
+    width: 380,
+    height: 440,
+    minWidth: 300,
+    minHeight: 260,
+    frame: false,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    backgroundColor: '#fff7c7',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      devTools: !app.isPackaged
+    }
+  });
+  stickyWindows.set(id, window);
+  window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id } });
+  window.on('closed', () => stickyWindows.delete(id));
+  return true;
+}
+
+function showScheduleNotification(schedule) {
+  if (!store.getSettings().notifications || !Notification.isSupported()) return;
+  const notification = new Notification({
+    title: schedule.priority === 'medium' ? '重要日程已到时间' : '日程提醒',
+    body: schedule.title,
+    urgency: schedule.priority === 'medium' ? 'critical' : 'normal',
+    icon: path.join(__dirname, '..', 'build', 'icon.png')
+  });
+  notification.on('click', () => {
+    showMainWindow();
+    mainWindow?.webContents.send('workspace:navigate', 'schedule');
+  });
+  notification.show();
+}
+
+function showDeadlineWindow(schedule) {
+  const existing = deadlineWindows.get(schedule.id);
+  if (existing && !existing.isDestroyed()) return;
+  const urgent = schedule.priority === 'high';
+  const window = new BrowserWindow({
+    width: urgent ? 1000 : 620,
+    height: urgent ? 700 : 360,
+    show: false,
+    frame: false,
+    fullscreen: urgent,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    resizable: !urgent,
+    backgroundColor: urgent ? '#a40012' : '#f2b700',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true
+    }
+  });
+  deadlineWindows.set(schedule.id, window);
+  window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'));
+  window.webContents.once('did-finish-load', () => {
+    window.webContents.send('deadline:show', schedule);
+    window.show();
+    window.focus();
+    if (urgent) window.setAlwaysOnTop(true, 'screen-saver');
+  });
+  window.on('closed', () => deadlineWindows.delete(schedule.id));
+}
+
+function runWorkspaceReminders(now = new Date()) {
+  const due = store.listSchedules().filter((schedule) => (
+    schedule.deadline &&
+    !schedule.completedAt &&
+    !schedule.remindedAt &&
+    Date.parse(schedule.startAt) <= now.getTime()
+  ));
+  if (!due.length) return [];
+  let schedules = store.listSchedules();
+  for (const schedule of due) {
+    if (schedule.priority === 'high' || schedule.priority === 'medium') showDeadlineWindow(schedule);
+    if (schedule.priority !== 'high') showScheduleNotification(schedule);
+    schedules = schedules.map((item) => item.id === schedule.id
+      ? { ...item, remindedAt: now.toISOString(), updatedAt: now.toISOString() }
+      : item);
+  }
+  store.setSchedules(schedules);
+  broadcastWorkspace();
+  return due;
 }
 
 function broadcastRefreshState() {
@@ -713,8 +1030,13 @@ function validateSettings(patch) {
     throw new Error('设置格式不正确。');
   }
   const allowed = {};
-  for (const key of ['autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin']) {
+  for (const key of ['autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin', 'autoCheckUpdates', 'bingWallpaper']) {
     if (key in patch) allowed[key] = Boolean(patch[key]);
+  }
+  if ('quickCaptureShortcut' in patch) {
+    const shortcut = String(patch.quickCaptureShortcut || '').trim();
+    if (!shortcut || shortcut.length > 100) throw new Error('快捷键格式不正确。');
+    allowed.quickCaptureShortcut = shortcut;
   }
   if ('refreshMinutes' in patch) {
     const minutes = Number(patch.refreshMinutes);
@@ -857,6 +1179,8 @@ function runDeadlineReminders() {
 
 async function runScheduledWork() {
   runDeadlineReminders();
+  runWorkspaceReminders();
+  if (Date.now() - lastBackupCleanupAt >= 24 * 60 * 60_000) cleanupExpiredBackups();
   await runScheduledRefresh();
 }
 
@@ -957,6 +1281,44 @@ async function exportPaper(id, format) {
 }
 
 function registerIpc() {
+  ipcMain.handle('workspace:get', () => workspaceForRenderer());
+  ipcMain.handle('schedules:parse', (_event, input) => parseNaturalLanguageSchedule(input, new Date()));
+  ipcMain.handle('schedules:save', (_event, input) => saveWorkspaceSchedule(input));
+  ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
+  ipcMain.handle('schedules:complete', (_event, id, completed) => setWorkspaceScheduleCompleted(String(id), Boolean(completed)));
+  ipcMain.handle('notes:save', (_event, input) => saveWorkspaceNote(input));
+  ipcMain.handle('notes:delete', (_event, id) => deleteWorkspaceNote(String(id)));
+  ipcMain.handle('notes:open-sticky', (_event, id) => openStickyNote(String(id)));
+  ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
+  ipcMain.handle('wallpaper:get', () => getBingWallpaper());
+  ipcMain.handle('capture:show', () => {
+    toggleQuickCapture();
+    return true;
+  });
+  ipcMain.handle('capture:hide', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.hide();
+    return true;
+  });
+  ipcMain.handle('capture:submit', (_event, input) => {
+    if (input?.mode === 'note') {
+      return { mode: 'note', item: saveWorkspaceNote({ content: String(input.content || '') }) };
+    }
+    const parsed = parseNaturalLanguageSchedule(input?.content, new Date());
+    if (!parsed.valid) throw new Error('没有识别到可创建的日程。');
+    return { mode: 'schedule', item: saveWorkspaceSchedule(parsed) };
+  });
+  ipcMain.handle('sticky:close', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+    return true;
+  });
+  ipcMain.handle('sticky:set-always-on-top', (event, enabled) => {
+    BrowserWindow.fromWebContents(event.sender)?.setAlwaysOnTop(Boolean(enabled), 'floating');
+    return true;
+  });
+  ipcMain.handle('deadline:dismiss', (event) => {
+    BrowserWindow.fromWebContents(event.sender)?.close();
+    return true;
+  });
   ipcMain.handle('papers:list', () => listSerializedPapers());
   ipcMain.handle('papers:add', (_event, input) => addPaper(input));
   ipcMain.handle('papers:refresh', (_event, id) => refreshPaper(String(id)));
@@ -1001,7 +1363,17 @@ function registerIpc() {
   });
   ipcMain.handle('settings:get', () => settingsForRenderer());
   ipcMain.handle('settings:update', (_event, patch) => {
-    const updated = store.updateSettings(validateSettings(patch));
+    const validated = validateSettings(patch);
+    if ('quickCaptureShortcut' in validated) {
+      const previousShortcut = store.getSettings().quickCaptureShortcut;
+      const registered = registerQuickCaptureShortcut(validated.quickCaptureShortcut);
+      if (!registered) {
+        registerQuickCaptureShortcut(previousShortcut);
+        throw new Error('这个快捷键已被其他软件占用，请更换后重试。');
+      }
+      validated.quickCaptureShortcut = registered;
+    }
+    const updated = store.updateSettings(validated);
     updateLoginItemSetting(updated.startAtLogin);
     return settingsForRenderer();
   });
@@ -1034,13 +1406,22 @@ if (!gotLock) {
       app.setAppUserModelId('io.papertrail.desktop');
       store = new JsonStore(configuredDataFilePath());
       store.load();
+      cleanupExpiredBackups();
       setupAutoUpdater();
       registerIpc();
       createWindow();
       createTray();
       updateLoginItemSetting(store.getSettings().startAtLogin);
+      const registeredShortcut = registerQuickCaptureShortcut();
+      if (registeredShortcut && registeredShortcut !== store.getSettings().quickCaptureShortcut) {
+        store.updateSettings({ quickCaptureShortcut: registeredShortcut });
+      }
       scheduler = setInterval(() => runScheduledWork().catch(() => {}), 60_000);
       setTimeout(runDeadlineReminders, 1500);
+      setTimeout(runWorkspaceReminders, 1800);
+      if (store.getSettings().autoCheckUpdates) {
+        setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
+      }
     } catch (error) {
       dialog.showErrorBox('PaperTrail 无法安全打开数据', error?.message || '数据文件损坏或格式不受支持。');
       isQuitting = true;
@@ -1053,6 +1434,7 @@ app.on('activate', showMainWindow);
 app.on('before-quit', () => {
   isQuitting = true;
   if (scheduler) clearInterval(scheduler);
+  globalShortcut.unregisterAll();
 });
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin' && (isQuitting || !store?.getSettings().closeToTray || !tray)) {

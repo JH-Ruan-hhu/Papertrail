@@ -1,5 +1,13 @@
 'use strict';
 
+// Electron can outlive the parent shell briefly on Windows. Ignore a closed
+// diagnostic pipe so a successful visual smoke test never opens an error box.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on('error', (error) => {
+    if (error?.code !== 'EPIPE') throw error;
+  });
+}
+
 const fs = require('node:fs');
 const path = require('node:path');
 const { app, BrowserWindow } = require('electron');
@@ -324,6 +332,46 @@ app.whenReady().then(async () => {
       window.scrollTo(0, 0);
     `);
     await captureStablePage(process.env.PAPERTRAIL_NARROW_OUTPUT);
+  }
+  if (process.env.WORKBENCH_SCHEDULE_OUTPUT) {
+    const scheduleResult = await window.webContents.executeJavaScript(`
+      (() => {
+        document.querySelector('[data-workbench-page="schedule"]').click();
+        window.scrollTo(0, 0);
+        return {
+          pageVisible: !document.querySelector('[data-page="schedule"]').hidden,
+          hourLabels: document.querySelectorAll('#timelineHours span').length,
+          timelineEvents: document.querySelectorAll('#timelineTrack .timeline-event').length,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!scheduleResult.pageVisible || scheduleResult.hourLabels !== 24 || scheduleResult.timelineEvents < 2 || scheduleResult.horizontalOverflow) {
+      throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
+    }
+    console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
+    await new Promise((resolve) => setTimeout(resolve, 240));
+    await captureStablePage(process.env.WORKBENCH_SCHEDULE_OUTPUT);
+  }
+  if (process.env.WORKBENCH_NOTES_OUTPUT) {
+    const notesResult = await window.webContents.executeJavaScript(`
+      (() => {
+        document.querySelector('[data-workbench-page="notes"]').click();
+        window.scrollTo(0, 0);
+        return {
+          pageVisible: !document.querySelector('[data-page="notes"]').hidden,
+          noteCards: document.querySelectorAll('#notesGrid .note-card').length,
+          metadataButton: Boolean(document.getElementById('manageMetadataButton')),
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || notesResult.horizontalOverflow) {
+      throw new Error(`Workbench notes smoke failed: ${JSON.stringify(notesResult)}`);
+    }
+    console.log(`WORKBENCH_NOTES_OK ${JSON.stringify(notesResult)}`);
+    await new Promise((resolve) => setTimeout(resolve, 240));
+    await captureStablePage(process.env.WORKBENCH_NOTES_OUTPUT);
   }
   if (!process.env.PAPERTRAIL_SMOKE_OUTPUT) {
     window.webContents.invalidate();

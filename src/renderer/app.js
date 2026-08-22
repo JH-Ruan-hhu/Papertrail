@@ -744,12 +744,16 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '0.6.0';
+  const version = settings.appVersion || '0.7.0';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
+  const expirations = Array.isArray(settings.backupExpiresAt) ? settings.backupExpiresAt : [];
+  const nextExpiry = expirations.map((item) => Date.parse(item.expiresAt)).filter(Number.isFinite).sort((a, b) => a - b)[0];
   elements.dataDirectory.textContent = settings.dataDirectory || '系统默认位置';
   elements.dataDirectory.title = settings.dataDirectory || '';
-  elements.backupSummary.textContent = backupCount ? `共 ${backupCount} 份旧备份，可安全删除` : '暂无旧数据备份';
+  elements.backupSummary.textContent = backupCount
+    ? `共 ${backupCount} 份旧备份${nextExpiry ? `，最早于 ${formatDate(new Date(nextExpiry).toISOString(), false)} 自动清理` : ''}`
+    : '暂无旧数据备份';
   elements.backupSummary.title = backupFiles.join('\n');
   elements.deleteBackupsButton.disabled = backupCount === 0;
   elements.currentVersion.textContent = version;
@@ -821,6 +825,9 @@ function populateSettings() {
   document.getElementById('notifications').checked = settings.notifications;
   document.getElementById('closeToTray').checked = settings.closeToTray;
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
+  document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
+  document.getElementById('bingWallpaperSetting').checked = settings.bingWallpaper !== false;
+  document.getElementById('quickCaptureShortcut').value = settings.quickCaptureShortcut || 'CommandOrControl+Shift+Space';
   populateSettingsMetadata();
 }
 
@@ -828,10 +835,10 @@ const SETTINGS_SECTION_COPY = Object.freeze({
   general: ['通用', '刷新频率、后台行为与 Windows 启动方式'],
   notifications: ['消息通知', '控制值得关注的稿件进展提醒'],
   storage: ['存储管理', '管理本地数据位置和迁移后留下的备份'],
-  about: ['关于 PaperTrail', '查看版本、隐私方式和产品信息']
+  about: ['关于研迹', '查看版本、隐私方式和产品信息']
 });
 
-function setSettingsSection(section) {
+function setSettingsSection(section, shouldScroll = true) {
   if (!SETTINGS_SECTION_COPY[section]) return;
   state.settingsSection = section;
   elements.settingsNavButtons.forEach((button) => {
@@ -840,12 +847,26 @@ function setSettingsSection(section) {
     button.setAttribute('aria-selected', String(active));
     button.tabIndex = active ? 0 : -1;
   });
-  elements.settingsPanels.forEach((panel) => {
-    panel.hidden = panel.dataset.settingsPanel !== section;
-  });
   const [title, description] = SETTINGS_SECTION_COPY[section];
   elements.settingsSectionTitle.textContent = title;
   elements.settingsSectionDescription.textContent = description;
+  if (shouldScroll) {
+    const panel = elements.settingsPanels.find((item) => item.dataset.settingsPanel === section);
+    panel?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+}
+
+function syncSettingsScrollSection() {
+  const scroller = elements.settingsDialog.querySelector('.settings-scroll');
+  if (!scroller) return;
+  const top = scroller.getBoundingClientRect().top + 36;
+  let closest = elements.settingsPanels[0];
+  for (const panel of elements.settingsPanels) {
+    if (panel.getBoundingClientRect().top <= top) closest = panel;
+  }
+  if (closest && closest.dataset.settingsPanel !== state.settingsSection) {
+    setSettingsSection(closest.dataset.settingsPanel, false);
+  }
 }
 
 async function deleteDataBackups() {
@@ -923,7 +944,10 @@ async function saveSettings() {
       refreshMinutes: Number(document.getElementById('refreshMinutes').value),
       notifications: document.getElementById('notifications').checked,
       closeToTray: document.getElementById('closeToTray').checked,
-      startAtLogin: document.getElementById('startAtLogin').checked
+      startAtLogin: document.getElementById('startAtLogin').checked,
+      autoCheckUpdates: document.getElementById('autoCheckUpdates').checked,
+      bingWallpaper: document.getElementById('bingWallpaperSetting').checked,
+      quickCaptureShortcut: document.getElementById('quickCaptureShortcut').value
     });
     render();
     elements.settingsDialog.close();
@@ -1107,12 +1131,15 @@ function bindEvents() {
   elements.settingsButton.addEventListener('click', () => {
     elements.settingsError.textContent = '';
     populateSettings();
-    setSettingsSection(state.settingsSection);
+    setSettingsSection('general', false);
     openDialog(elements.settingsDialog);
+    const scroll = elements.settingsDialog.querySelector('.settings-scroll');
+    if (scroll) scroll.scrollTop = 0;
   });
   elements.settingsNavButtons.forEach((button) => {
     button.addEventListener('click', () => setSettingsSection(button.dataset.settingsSection));
   });
+  elements.settingsDialog.querySelector('.settings-scroll')?.addEventListener('scroll', syncSettingsScrollSection, { passive: true });
   elements.closeSettingsDialogButton.addEventListener('click', () => elements.settingsDialog.close());
   elements.cancelSettingsButton.addEventListener('click', () => elements.settingsDialog.close());
   elements.changeDataDirectoryButton.addEventListener('click', changeDataDirectory);

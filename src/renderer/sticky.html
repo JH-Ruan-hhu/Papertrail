@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>悬浮便笺</title>
+    <link rel="stylesheet" href="sticky.css">
+  </head>
+  <body>
+    <header><span>便笺</span><div><button id="pinButton" class="active" type="button" title="保持置顶">置顶</button><button id="closeButton" type="button" aria-label="关闭">×</button></div></header>
+    <main><input id="noteTitle" maxlength="300" placeholder="笔记标题"><textarea id="noteContent" maxlength="100000" placeholder="开始记录…"></textarea></main>
+    <footer><span id="saveState">已保存</span><span>本地保存</span></footer>
+    <script src="sticky.js"></script>
+  </body>
+</html>

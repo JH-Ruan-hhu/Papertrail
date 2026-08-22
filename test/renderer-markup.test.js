@@ -189,3 +189,23 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
   assert.match(appJs, /classList\.add\('dialog-entering'\)/);
   assert.match(appJs, /setTimeout\(finishEntering, 60\)/);
 });
+
+test('research workbench exposes home, 24-hour schedule, metadata notes and quick capture', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  assert.match(indexHtml, /data-workbench-page="home"/);
+  assert.match(indexHtml, /data-workbench-page="schedule"/);
+  assert.match(indexHtml, /data-workbench-page="notes"/);
+  assert.match(indexHtml, /data-workbench-page="submissions"/);
+  assert.match(indexHtml, /id="bingWallpaper"/);
+  assert.match(indexHtml, /id="homeDayOverview"/);
+  assert.match(indexHtml, /id="timelineHours"/);
+  assert.match(indexHtml, /id="notesGrid"/);
+  assert.match(indexHtml, /id="noteMetadataPanel"/);
+  assert.match(indexHtml, /到时全屏红色提醒/);
+  assert.match(mainJs, /globalShortcut\.register/);
+  assert.match(mainJs, /showDeadlineWindow/);
+  assert.match(mainJs, /new Notification/);
+  assert.match(preloadJs, /showCapture/);
+});

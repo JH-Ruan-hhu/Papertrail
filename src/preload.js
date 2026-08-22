@@ -3,6 +3,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('paperTrail', {
+  getWorkspace: () => ipcRenderer.invoke('workspace:get'),
+  parseSchedule: (input) => ipcRenderer.invoke('schedules:parse', input),
+  saveSchedule: (input) => ipcRenderer.invoke('schedules:save', input),
+  deleteSchedule: (id) => ipcRenderer.invoke('schedules:delete', id),
+  completeSchedule: (id, completed) => ipcRenderer.invoke('schedules:complete', id, completed),
+  saveNote: (input) => ipcRenderer.invoke('notes:save', input),
+  deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
+  openStickyNote: (id) => ipcRenderer.invoke('notes:open-sticky', id),
+  saveMetadataFields: (fields) => ipcRenderer.invoke('metadata:save-fields', fields),
+  getBingWallpaper: () => ipcRenderer.invoke('wallpaper:get'),
+  showCapture: () => ipcRenderer.invoke('capture:show'),
+  hideCapture: () => ipcRenderer.invoke('capture:hide'),
+  submitCapture: (input) => ipcRenderer.invoke('capture:submit', input),
+  closeSticky: () => ipcRenderer.invoke('sticky:close'),
+  setStickyAlwaysOnTop: (enabled) => ipcRenderer.invoke('sticky:set-always-on-top', enabled),
+  dismissDeadline: () => ipcRenderer.invoke('deadline:dismiss'),
   listPapers: () => ipcRenderer.invoke('papers:list'),
   addPaper: (payload) => ipcRenderer.invoke('papers:add', payload),
   refreshPaper: (id) => ipcRenderer.invoke('papers:refresh', id),
@@ -47,5 +63,25 @@ contextBridge.exposeInMainWorld('paperTrail', {
     const listener = (_event, state) => callback(state);
     ipcRenderer.on('updates:state', listener);
     return () => ipcRenderer.removeListener('updates:state', listener);
+  },
+  onWorkspaceChanged: (callback) => {
+    const listener = (_event, workspace) => callback(workspace);
+    ipcRenderer.on('workspace:changed', listener);
+    return () => ipcRenderer.removeListener('workspace:changed', listener);
+  },
+  onWorkspaceNavigate: (callback) => {
+    const listener = (_event, page) => callback(page);
+    ipcRenderer.on('workspace:navigate', listener);
+    return () => ipcRenderer.removeListener('workspace:navigate', listener);
+  },
+  onCaptureFocus: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('capture:focus', listener);
+    return () => ipcRenderer.removeListener('capture:focus', listener);
+  },
+  onDeadlineShow: (callback) => {
+    const listener = (_event, schedule) => callback(schedule);
+    ipcRenderer.on('deadline:show', listener);
+    return () => ipcRenderer.removeListener('deadline:show', listener);
   }
 });

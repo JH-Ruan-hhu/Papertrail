@@ -1,6 +1,12 @@
 'use strict';
 
-const DATA_VERSION = 3;
+const {
+  normalizeMetadataField,
+  normalizeNote,
+  normalizeSchedule
+} = require('./workbench-core');
+
+const DATA_VERSION = 4;
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
 const TASK_REMINDER_LEAD_MS = 48 * 60 * 60_000;
 const TASK_TYPES = Object.freeze(['revision', 'proof', 'copyright', 'followup']);
@@ -203,6 +209,9 @@ function migrateData(parsed, defaultSettings) {
   }
   if (parsed.settings != null && !asObject(parsed.settings)) throw new Error('设置数据格式无效。');
   if (parsed.papers != null && !Array.isArray(parsed.papers)) throw new Error('稿件列表格式无效。');
+  if (parsed.schedules != null && !Array.isArray(parsed.schedules)) throw new Error('日程列表格式无效。');
+  if (parsed.notes != null && !Array.isArray(parsed.notes)) throw new Error('笔记列表格式无效。');
+  if (parsed.metadataFields != null && !Array.isArray(parsed.metadataFields)) throw new Error('笔记元数据字段格式无效。');
 
   const settings = { ...defaultSettings, ...(parsed.settings || {}) };
   const papers = (parsed.papers || []).map(migratePaper).map((paper) => (
@@ -210,10 +219,16 @@ function migrateData(parsed, defaultSettings) {
       ? { ...paper, nextRetryAt: nextRetryAt(paper.lastAttemptAt, paper.failureStreak || 1, settings.refreshMinutes) }
       : paper
   ));
+  const schedules = (parsed.schedules || []).map((schedule, index) => normalizeSchedule(schedule, index));
+  const notes = (parsed.notes || []).map((note, index) => normalizeNote(note, index));
+  const metadataFields = (parsed.metadataFields || []).map(normalizeMetadataField);
   const data = {
     version: DATA_VERSION,
     settings,
-    papers
+    papers,
+    schedules,
+    notes,
+    metadataFields
   };
   return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) };
 }

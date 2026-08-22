@@ -135,6 +135,38 @@ const smokePapers = process.env.PAPERTRAIL_EMPTY_SMOKE === '1'
   : (process.env.PAPERTRAIL_JOURNEY_SMOKE === '1'
       ? [journeyMockPaper, previousSubmissionPaper, productionPaper, archivedPaper]
       : [mockPaper, productionPaper, archivedPaper]);
+let smokeWorkspace = {
+  schedules: [
+    {
+      id: 'schedule-today',
+      title: '整理实验结果图',
+      startAt: new Date(new Date().setHours(9, 30, 0, 0)).toISOString(),
+      endAt: new Date(new Date().setHours(11, 0, 0, 0)).toISOString(),
+      priority: 'high',
+      deadline: true,
+      completedAt: null,
+      remindedAt: null,
+      createdAt: new Date(now - 86_400_000).toISOString(),
+      updatedAt: new Date(now - 86_400_000).toISOString()
+    },
+    {
+      id: 'schedule-afternoon',
+      title: '文献组会',
+      startAt: new Date(new Date().setHours(15, 0, 0, 0)).toISOString(),
+      endAt: new Date(new Date().setHours(16, 30, 0, 0)).toISOString(),
+      priority: 'medium',
+      deadline: false,
+      completedAt: null,
+      remindedAt: null,
+      createdAt: new Date(now - 86_400_000).toISOString(),
+      updatedAt: new Date(now - 86_400_000).toISOString()
+    }
+  ],
+  notes: [
+    { id: 'note-1', title: 'PFAS 方法学想法', content: '下一轮实验需要同步核对回收率与基质效应。', metadata: { topic: '实验' }, pinned: false, createdAt: new Date(now - 7200_000).toISOString(), updatedAt: new Date(now - 3600_000).toISOString() }
+  ],
+  metadataFields: [{ id: 'topic', name: '类型', type: 'select', options: ['实验', '文献', '写作'] }]
+};
 let smokeUpdateState = {
   status: 'idle',
   currentVersion: '0.5.2',
@@ -146,6 +178,17 @@ let smokeUpdateState = {
 };
 
 contextBridge.exposeInMainWorld('paperTrail', {
+  getWorkspace: async () => smokeWorkspace,
+  parseSchedule: async () => ({ valid: true, title: '组会', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: 'low', deadline: false, matches: [] }),
+  saveSchedule: async (input) => input,
+  deleteSchedule: async () => true,
+  completeSchedule: async () => true,
+  saveNote: async (input) => input,
+  deleteNote: async () => true,
+  openStickyNote: async () => true,
+  saveMetadataFields: async (fields) => fields,
+  getBingWallpaper: async () => null,
+  showCapture: async () => true,
   listPapers: async () => smokePapers,
   addPaper: async (payload) => payload?.mode === 'author' ? productionPaper : mockPaper,
   refreshPaper: async () => mockPaper,
@@ -166,6 +209,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
     notifications: true,
     closeToTray: true,
     startAtLogin: false,
+    autoCheckUpdates: true,
+    bingWallpaper: true,
+    quickCaptureShortcut: 'CommandOrControl+Shift+Space',
     appVersion: '0.5.2',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\PaperTrail Data',
     backupCount: 1,
@@ -233,4 +279,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   onPapersChanged: () => () => {},
   onRefreshState: () => () => {},
   onUpdateState: () => () => {}
+  ,onWorkspaceChanged: () => () => {}
+  ,onWorkspaceNavigate: () => () => {}
 });

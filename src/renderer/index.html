@@ -3,48 +3,121 @@
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
-    <title>PaperTrail</title>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://www.bing.com; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>研迹 · 科研工作台</title>
     <link rel="stylesheet" href="styles.css">
   </head>
   <body>
     <div class="window-titlebar">
-      <div class="window-brand"><img src="../../build/icon.png" alt=""><span>PaperTrail</span></div>
+      <div class="window-brand"><img src="../../build/icon.png" alt=""><span>研迹 · 科研工作台</span></div>
     </div>
     <div class="app-layout">
       <aside class="sidebar">
-        <div class="brand" aria-label="PaperTrail">
+        <div class="brand" aria-label="研迹科研工作台">
           <span class="brand-mark" aria-hidden="true"><img src="../../build/icon.png" alt=""></span>
-          <span><strong>PaperTrail</strong><small>论文进展与待办</small></span>
+          <span><strong>研迹</strong><small>Research Workbench</small></span>
         </div>
 
         <nav class="side-nav" aria-label="主导航">
           <p class="nav-label">工作区</p>
-          <button class="nav-item active" id="allNavButton" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"></rect><path d="M8 9h8M8 13h5"></path></svg>
-            <span>全部稿件</span><b id="navPaperCount">0</b>
+          <button class="nav-item active" data-workbench-page="home" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 11 9-8 9 8v9H6v-9"></path><path d="M10 20v-6h4v6"></path></svg>
+            <span>主页</span>
           </button>
-          <button class="nav-item" id="importantNavButton" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3 9.5 8l-5.5.8 4 3.9-.9 5.5L12 15.6l4.9 2.6-.9-5.5 4-3.9-5.5-.8L12 3Z"></path></svg>
-            <span>重要更新</span><b id="notificationCount">0</b>
+          <button class="nav-item" data-workbench-page="schedule" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"></rect><path d="M7 3v4M17 3v4M3 10h18"></path></svg>
+            <span>日程</span><b id="navScheduleCount">0</b>
           </button>
-          <button class="nav-item" id="archivedNavButton" type="button">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7h16v13H4zM3 4h18v3H3zM9 11h6"></path></svg>
-            <span>已归档</span><b id="archivedCount">0</b>
+          <button class="nav-item" data-workbench-page="notes" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h14v18H5zM8 8h8M8 12h8M8 16h5"></path></svg>
+            <span>笔记</span><b id="navNoteCount">0</b>
+          </button>
+          <button class="nav-item" data-workbench-page="submissions" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h14v16H5zM8 8h8M8 12h5"></path><path d="m15 17 2 2 4-4"></path></svg>
+            <span>投稿管理</span><b id="navPaperCount">0</b>
           </button>
         </nav>
 
         <div class="sidebar-bottom">
-          <div class="privacy-note"><span></span><p><strong>本地加密</strong><small>追踪凭证仅保存在本机</small></p></div>
+          <button class="quick-capture-tip" id="openQuickCaptureButton" type="button"><span>⌨</span><p><strong>即写即走</strong><small id="shortcutTip">Ctrl + Shift + Space</small></p></button>
+          <div class="privacy-note"><span></span><p><strong>本地优先</strong><small>数据与凭证仅保存在本机</small></p></div>
           <button class="settings-entry" id="settingsButton" type="button">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"></path><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1a1.7 1.7 0 0 0 1.9.3A1.7 1.7 0 0 0 10 3v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1Z"></path></svg>
-            <span><strong>设置</strong><small>通知、刷新与启动</small></span>
+            <span><strong>设置</strong><small>通用、通知、存储与更新</small></span>
             <i>›</i>
           </button>
         </div>
       </aside>
 
       <main class="workspace">
+        <header class="workbench-topbar">
+          <div><strong id="workbenchPageTitle">主页</strong><span id="topbarDate"></span></div>
+          <div><span class="topbar-local"><i></i> 本地数据</span><time id="topbarClock"></time></div>
+        </header>
+
+        <section class="workbench-page home-page" data-page="home">
+          <section class="home-hero">
+            <img id="bingWallpaper" alt="Bing 每日壁纸">
+            <div class="home-hero-shade"></div>
+            <div class="home-hero-content">
+              <div><p id="homeGreeting">早上好</p><h1 id="heroDate"></h1><span id="wallpaperCredit">Bing 每日壁纸</span></div>
+              <div class="hero-clock"><strong id="heroClock"></strong><span>把注意力留给今天最重要的事</span></div>
+            </div>
+          </section>
+
+          <section class="home-toolbar">
+            <div><p class="eyebrow">OVERVIEW</p><h2>接下来四天</h2><span>昨天复盘，今天执行，未来提前安排</span></div>
+            <button class="button primary" id="quickScheduleButton" type="button"><span class="plus">＋</span> 快速写日程</button>
+          </section>
+
+          <div class="day-overview" id="homeDayOverview"></div>
+
+          <div class="home-lower-grid">
+            <section class="focus-panel">
+              <div class="panel-heading"><div><p class="eyebrow">TODAY FOCUS</p><h2>今日重点</h2></div><button class="text-button" data-go-page="schedule" type="button">打开时间轴 →</button></div>
+              <div id="todayFocusList" class="focus-list"></div>
+            </section>
+            <section class="latest-notes-panel">
+              <div class="panel-heading"><div><p class="eyebrow">LATEST NOTES</p><h2>最新笔记</h2></div><button class="text-button" data-go-page="notes" type="button">查看全部 →</button></div>
+              <div id="latestNotes" class="latest-notes"></div>
+            </section>
+          </div>
+        </section>
+
+        <section class="workbench-page schedule-page" data-page="schedule" hidden>
+          <header class="page-head-row">
+            <div><p class="eyebrow">24-HOUR TIMELINE</p><h1>日程</h1><p>在完整的一天里安排实验、写作和生活</p></div>
+            <div class="page-actions"><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
+          </header>
+          <div class="timeline-datebar">
+            <button id="previousDayButton" type="button" aria-label="前一天">‹</button>
+            <div><strong id="timelineDate"></strong><span id="timelineDateSubtitle"></span></div>
+            <button id="nextDayButton" type="button" aria-label="后一天">›</button>
+          </div>
+          <section class="timeline-shell">
+            <div class="timeline-scroll" id="timelineScroll">
+              <div class="timeline-hours" id="timelineHours"></div>
+              <div class="timeline-track" id="timelineTrack"></div>
+            </div>
+          </section>
+          <section class="schedule-agenda"><div class="panel-heading"><div><p class="eyebrow">AGENDA</p><h2>当天清单</h2></div><span id="agendaSummary"></span></div><div id="agendaList" class="agenda-list"></div></section>
+        </section>
+
+        <section class="workbench-page notes-page" data-page="notes" hidden>
+          <header class="page-head-row">
+            <div><p class="eyebrow">LOCAL KNOWLEDGE</p><h1>笔记</h1><p>随手记录，也能用元数据建立自己的研究秩序</p></div>
+            <div class="page-actions"><button class="button secondary" id="manageMetadataButton" type="button">管理元数据</button><button class="button primary" id="addNoteButton" type="button"><span class="plus">＋</span> 新建笔记</button></div>
+          </header>
+          <div class="notes-toolbar"><label class="search-box" for="noteSearch"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m16 16 4 4"></path></svg><input id="noteSearch" type="search" placeholder="搜索标题、正文或元数据"></label><span>点击图钉，将笔记悬浮在所有页面之上</span></div>
+          <div id="notesGrid" class="notes-grid"></div>
+        </section>
+
+        <section class="workbench-page submissions-page" data-page="submissions" hidden>
+          <div class="submission-filters">
+            <button class="filter-chip active" id="allNavButton" type="button">全部稿件 <b>0</b></button>
+            <button class="filter-chip" id="importantNavButton" type="button">重要更新 <b id="notificationCount">0</b></button>
+            <button class="filter-chip" id="archivedNavButton" type="button">已归档 <b id="archivedCount">0</b></button>
+          </div>
         <header class="workspace-header">
           <div><p class="eyebrow">MANUSCRIPT DESK</p><h1 id="pageTitle">全部稿件</h1><p id="pageSubtitle">集中查看审稿与出版进展</p></div>
           <div class="header-actions">
@@ -77,7 +150,8 @@
           </div>
         </section>
 
-        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail <b id="footerVersion">0.6.0</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span><i></i> 数据仅保存在本机</span><span>PaperTrail 模块 <b id="footerVersion">0.7.0</b> · 非 Elsevier 官方产品</span></footer>
+        </section>
       </main>
     </div>
 
@@ -146,10 +220,12 @@
               <div class="settings-group">
                 <div class="setting-row"><div><strong>关闭时驻留托盘</strong><small>关闭窗口后继续执行后台检查</small></div><label class="switch"><input id="closeToTray" type="checkbox"><span></span></label></div>
                 <div class="setting-row"><div><strong>登录 Windows 后启动</strong><small>静默启动到系统托盘</small></div><label class="switch"><input id="startAtLogin" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>主页使用 Bing 每日壁纸</strong><small>联网读取当天壁纸；失败时自动使用本地渐变背景</small></div><label class="switch"><input id="bingWallpaperSetting" type="checkbox"><span></span></label></div>
+                <div class="setting-row stacked"><label for="quickCaptureShortcut"><strong>即写即走快捷键</strong><small>全局唤醒屏幕中央快捷输入窗</small></label><input id="quickCaptureShortcut" type="text" value="CommandOrControl+Shift+Space" spellcheck="false"></div>
               </div>
             </section>
 
-            <section class="settings-panel" data-settings-panel="notifications" role="tabpanel" hidden>
+            <section class="settings-panel" data-settings-panel="notifications" role="tabpanel">
               <h3>重要进展</h3>
               <div class="settings-group">
                 <div class="setting-row"><div><strong>Windows 重要通知</strong><small>状态变化、审稿回复、截止任务、接收和出版节点出现时弹出</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
@@ -157,21 +233,22 @@
               <div class="settings-note"><strong>只提醒值得关注的变化</strong><p>普通定时检查不会打扰你。稿件进展通知可打开对应官方页面；截止任务通知只会带你返回 PaperTrail。</p></div>
             </section>
 
-            <section class="settings-panel" data-settings-panel="storage" role="tabpanel" hidden>
+            <section class="settings-panel" data-settings-panel="storage" role="tabpanel">
               <h3>数据位置</h3>
               <div class="settings-group">
                 <div class="setting-row storage-row"><div class="storage-copy"><strong>当前存储文件夹</strong><small id="dataDirectory" title="">正在读取…</small><small class="storage-help">更换到空文件夹时会复制当前数据，原位置保留备份。</small></div><button class="button tertiary" id="changeDataDirectoryButton" type="button">更改位置</button></div>
               </div>
-              <h3>旧备份</h3>
+              <h3>一个月迁移缓存</h3>
               <div class="settings-group">
-                <div class="setting-row backup-row"><div><strong>迁移后保留的数据</strong><small id="backupSummary" title="">正在读取…</small></div><button class="button tertiary danger-quiet" id="deleteBackupsButton" type="button">删除备份</button></div>
+                <div class="setting-row backup-row"><div><strong>迁移后保留的数据</strong><small id="backupSummary" title="">正在读取…</small><small>原位置保留 30 天，期满后自动安全清理；也可提前手动删除。</small></div><button class="button tertiary danger-quiet" id="deleteBackupsButton" type="button">立即删除</button></div>
               </div>
             </section>
 
-            <section class="settings-panel" data-settings-panel="about" role="tabpanel" hidden>
-              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>PaperTrail</strong><small>论文进展与待办中心 · 当前版本 <span id="currentVersion">0.6.0</span></small></div><span class="local-first-badge">本地优先</span></div>
+            <section class="settings-panel" data-settings-panel="about" role="tabpanel">
+              <div class="settings-about settings-about-large" aria-label="软件版本信息"><img src="../../build/icon.png" alt=""><div><strong>研迹 · 科研工作台</strong><small>日程、笔记与投稿管理 · 当前版本 <span id="currentVersion">0.7.0</span></small></div><span class="local-first-badge">本地优先</span></div>
               <h3>版本与更新</h3>
               <div class="settings-group update-group">
+                <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>
                 <div class="setting-row update-row">
                   <div class="update-copy"><strong id="updateStatusTitle">检查 PaperTrail 更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
                   <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button tertiary" id="updateActionButton" type="button">检查更新</button></div>
@@ -260,7 +337,48 @@
       <form method="dialog"><div class="danger-symbol">!</div><h2>永久删除本地记录？</h2><p id="removePaperTitle"></p><p class="field-help">加密凭证、未读更新和完整状态历史将一并删除。建议优先使用“归档”，此操作无法撤销。</p><div class="modal-actions centered"><button class="button secondary" value="cancel" type="submit">取消</button><button class="button danger" id="confirmRemoveButton" type="button">永久删除</button></div></form>
     </dialog>
 
+    <dialog id="scheduleDialog" class="modal workbench-editor-modal">
+      <form method="dialog" id="scheduleForm">
+        <div class="modal-head"><div><p class="eyebrow">SCHEDULE</p><h2 id="scheduleDialogTitle">新建日程</h2><p>安排时间范围，并决定截止时如何提醒你</p></div><button class="close-button" data-close-dialog="scheduleDialog" type="button">×</button></div>
+        <input id="scheduleId" type="hidden">
+        <div class="form-grid schedule-form-grid">
+          <div class="field full"><label for="scheduleTitle">日程内容</label><input id="scheduleTitle" maxlength="500" placeholder="例如：完成实验结果图"></div>
+          <div class="field"><label for="scheduleDate">日期</label><input id="scheduleDate" type="date"></div>
+          <div class="field"><label for="scheduleStartTime">开始时间</label><input id="scheduleStartTime" type="time"></div>
+          <div class="field"><label for="scheduleEndTime">结束时间</label><input id="scheduleEndTime" type="time"></div>
+          <div class="field full"><label>优先级</label><div class="priority-picker" role="radiogroup"><label class="priority-option high"><input type="radio" name="schedulePriority" value="high"><span></span><b>最高</b><small>到时全屏红色提醒</small></label><label class="priority-option medium"><input type="radio" name="schedulePriority" value="medium"><span></span><b>重要</b><small>置顶黄色提醒</small></label><label class="priority-option low"><input type="radio" name="schedulePriority" value="low" checked><span></span><b>普通</b><small>Windows 通知</small></label></div></div>
+          <div class="setting-row deadline-toggle full"><div><strong>这是一个 Deadline</strong><small>在开始时间触发所选等级的截止提醒</small></div><label class="switch"><input id="scheduleDeadline" type="checkbox"><span></span></label></div>
+        </div>
+        <p id="scheduleError" class="form-error"></p>
+        <div class="modal-actions"><button class="button tertiary danger-quiet" id="deleteScheduleButton" type="button" hidden>删除</button><span class="modal-spacer"></span><button class="button secondary" data-close-dialog="scheduleDialog" type="button">取消</button><button class="button primary" id="saveScheduleButton" type="button">保存日程</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="noteDialog" class="modal workbench-editor-modal note-editor-modal">
+      <form method="dialog" id="noteForm">
+        <div class="modal-head"><div><p class="eyebrow">NOTE</p><h2 id="noteDialogTitle">新建笔记</h2><p>元数据默认收起，不打断正常书写</p></div><button class="close-button" data-close-dialog="noteDialog" type="button">×</button></div>
+        <input id="noteId" type="hidden">
+        <input id="noteTitle" class="note-title-input" maxlength="300" placeholder="笔记标题">
+        <textarea id="noteContent" class="note-content-input" maxlength="100000" placeholder="记录实验想法、阅读摘录或下一步计划…"></textarea>
+        <button class="metadata-reveal" id="toggleNoteMetadataButton" type="button"><span>⌘</span><div><strong>笔记元数据</strong><small id="metadataSummary">点击展开并编辑属性</small></div><i>⌄</i></button>
+        <section id="noteMetadataPanel" class="note-metadata-panel" hidden><div id="noteMetadataFields" class="note-metadata-fields"></div><button class="text-button" id="openMetadataManagerButton" type="button">＋ 添加或管理字段</button></section>
+        <p id="noteError" class="form-error"></p>
+        <div class="modal-actions"><button class="button tertiary danger-quiet" id="deleteNoteButton" type="button" hidden>删除</button><button class="button tertiary" id="openStickyFromEditorButton" type="button" hidden>悬浮便笺</button><span class="modal-spacer"></span><button class="button secondary" data-close-dialog="noteDialog" type="button">取消</button><button class="button primary" id="saveNoteButton" type="button">保存笔记</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="metadataDialog" class="modal workbench-editor-modal metadata-modal">
+      <div>
+        <div class="modal-head"><div><p class="eyebrow">METADATA SCHEMA</p><h2>管理笔记元数据</h2><p>字段可选文本、选择框或复选框，像 Obsidian 属性一样复用</p></div><button class="close-button" data-close-dialog="metadataDialog" type="button">×</button></div>
+        <div id="metadataFieldList" class="metadata-field-list"></div>
+        <button class="button secondary" id="addMetadataFieldButton" type="button">＋ 添加字段</button>
+        <p id="metadataError" class="form-error"></p>
+        <div class="modal-actions"><span class="modal-spacer"></span><button class="button secondary" data-close-dialog="metadataDialog" type="button">取消</button><button class="button primary" id="saveMetadataButton" type="button">保存字段</button></div>
+      </div>
+    </dialog>
+
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="app.js"></script>
+    <script src="workbench.js"></script>
   </body>
 </html>

@@ -1,10 +1,36 @@
-# PaperTrail
+# 研迹 · Research Workbench
 
-PaperTrail is a local-first Windows desktop tool for tracking manuscript
-submission, peer-review, revision, deadline, and publication progress across a
-researcher's journal-submission journey. The current automatic data connectors
-cover Elsevier Author Hub and Elsevier accepted-article production pages; local
-workflow records are publisher-neutral.
+研迹 is a local-first Windows research workbench that brings daily planning,
+quick capture, structured notes, and the complete PaperTrail manuscript tracker
+into one desktop app. The manuscript connectors cover Elsevier Author Hub and
+Elsevier accepted-article production pages; local workflow records remain
+publisher-neutral.
+
+## Version 0.7 workbench features
+
+- Use a unified home, schedule, notes, submission-management, and settings
+  workspace with a focused left navigation and a Bing daily-wallpaper home.
+- Review yesterday, today, tomorrow, and the day after tomorrow from the home
+  page, create a schedule quickly, and see the latest notes without changing
+  pages.
+- Plan a day on a horizontally scrollable 24-hour timeline with multi-hour
+  events, completion state, and three Zotero-like priority choices.
+- Mark an event as a deadline. High-priority deadlines use a full-screen red
+  acknowledgement, medium priority uses a centered always-on-top amber alert
+  plus a Windows notification, and low priority uses a Windows notification.
+- Open the keyboard-first capture bar globally with `Ctrl+Shift+Space`, switch
+  between schedule and note with Tab, and recognize Chinese expressions such as
+  明天、后天、早上、下午 and 3点到5点.
+- Create local notes with reusable text, select, and checkbox metadata fields.
+  Metadata stays collapsed during normal writing. Any saved note can open as an
+  always-on-top sticky note.
+- Scroll through every settings section continuously while the matching
+  category in the settings navigation highlights automatically.
+- Keep the previous data file for 30 days after changing storage location, then
+  delete only the expired migration copy. Manual early deletion remains
+  available.
+- Optionally check GitHub Releases at startup without automatically downloading
+  or installing an update.
 
 ## Version 0.6 features
 
@@ -57,20 +83,20 @@ workflow records are publisher-neutral.
 - Move the local data file to a user-selected folder while retaining the old
   file as a removable backup.
 
-## Version 0.6 data model
+## Version 0.7 data model
 
 PaperTrail stores `lastAttemptAt`, `lastSuccessfulAt`, `failureStreak`, and
 `nextRetryAt` separately. Important updates contain their own occurrence time,
 content, and read state. Archived papers keep their encrypted credential,
 history, DOI, and production events but are excluded from automatic refresh.
 
-Schema version 3 adds `details`, `tasks`, `revisionRounds`, and observed review
-events. Data files from schema versions 1 and 2 are migrated locally on first
-successful load. Existing encrypted credentials, history, unread updates,
-archives, and submission journeys are retained. A failed legacy check is not
-treated as a successful sync. Invalid JSON, unsupported future schema versions,
-and structurally damaged paper or workflow records are rejected without
-overwriting the original file.
+Schema version 4 adds `schedules`, `notes`, and reusable `metadataFields` while
+retaining version 3 manuscript details, tasks, revision rounds, and observed
+review events. Older data files are migrated locally on first successful load.
+Existing encrypted credentials, history, unread updates, archives, and
+submission journeys are retained. Invalid JSON, unsupported future schema
+versions, and structurally damaged records are rejected without overwriting the
+original file.
 
 ## Privacy and security
 
@@ -82,9 +108,10 @@ refresh is requested. No analytics or cloud sync is included.
 The renderer remains sandboxed with `contextIsolation` enabled and a restrictive
 Content Security Policy. Exports are generated in the main process from an
 explicit allow-list of paper metadata and are redacted again before writing.
-Deadlines, revision-round details, contacts, and notes are never included in
-publisher requests. There is no account system, cloud sync, collaboration
-service, analytics, or telemetry.
+Deadlines, revision-round details, contacts, schedules, and notes are never
+included in publisher requests. The only optional home-page request is Bing's
+daily-wallpaper metadata and image. There is no account system, cloud sync,
+collaboration service, analytics, or telemetry.
 
 ## Development
 
@@ -100,10 +127,10 @@ Build Windows artifacts:
 npm run dist
 ```
 
-The build produces an NSIS installer and a portable executable.
+The build produces the x64 NSIS installer only. Portable builds are no longer
+generated.
 For application updates, publish the NSIS installer, its blockmap, and the
-generated `latest.yml` together in the same public GitHub Release. Portable
-builds open the release page instead of attempting an in-place installation.
+generated `latest.yml` together in the same public GitHub Release.
 
 ## Limitations
 

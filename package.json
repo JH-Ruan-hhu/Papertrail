@@ -1,7 +1,7 @@
 {
   "name": "papertrail-desktop",
-  "version": "0.6.0",
-  "description": "Local-first manuscript progress and deadline tracker for Windows",
+  "version": "0.7.0",
+  "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "PaperTrail contributors",
   "license": "MIT",
@@ -11,7 +11,7 @@
     "start": "electron .",
     "test": "node --test",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --win nsis portable --x64"
+    "dist": "electron-builder --win nsis --x64"
   },
   "dependencies": {
     "electron-updater": "6.8.9"
@@ -42,10 +42,6 @@
         {
           "target": "nsis",
           "arch": ["x64"]
-        },
-        {
-          "target": "portable",
-          "arch": ["x64"]
         }
       ]
     },
@@ -55,9 +51,6 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
-    },
-    "portable": {
-      "artifactName": "PaperTrail-Portable-${version}-${arch}.${ext}"
     },
     "publish": [
       {

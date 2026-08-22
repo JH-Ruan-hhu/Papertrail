@@ -10,7 +10,10 @@ const DEFAULT_SETTINGS = Object.freeze({
   refreshMinutes: 360,
   notifications: true,
   closeToTray: true,
-  startAtLogin: false
+  startAtLogin: false,
+  autoCheckUpdates: true,
+  bingWallpaper: true,
+  quickCaptureShortcut: 'CommandOrControl+Shift+Space'
 });
 
 class JsonStore {
@@ -19,7 +22,10 @@ class JsonStore {
     this.data = {
       version: DATA_VERSION,
       settings: { ...DEFAULT_SETTINGS },
-      papers: []
+      papers: [],
+      schedules: [],
+      notes: [],
+      metadataFields: []
     };
   }
 
@@ -108,6 +114,36 @@ class JsonStore {
     this.data.papers = this.data.papers.filter((paper) => paper.id !== id);
     if (this.data.papers.length === before) throw new Error('找不到这篇稿件。');
     this.save();
+  }
+
+  listSchedules() {
+    return this.data.schedules;
+  }
+
+  setSchedules(schedules) {
+    this.data.schedules = schedules;
+    this.save();
+    return this.data.schedules;
+  }
+
+  listNotes() {
+    return this.data.notes;
+  }
+
+  setNotes(notes) {
+    this.data.notes = notes;
+    this.save();
+    return this.data.notes;
+  }
+
+  listMetadataFields() {
+    return this.data.metadataFields;
+  }
+
+  setMetadataFields(fields) {
+    this.data.metadataFields = fields;
+    this.save();
+    return this.data.metadataFields;
   }
 }
 
