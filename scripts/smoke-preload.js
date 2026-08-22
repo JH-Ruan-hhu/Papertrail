@@ -178,7 +178,7 @@ let smokeWorkspace = {
 };
 let smokeUpdateState = {
   status: 'idle',
-  currentVersion: '0.9.0',
+  currentVersion: '1.0.0',
   latestVersion: null,
   releaseDate: null,
   percent: null,
@@ -243,7 +243,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
     autoCheckUpdates: true,
     quickCaptureShortcut: 'CommandOrControl+Shift+Space',
     stickyNoteShortcut: 'CommandOrControl+Alt+N',
-    appVersion: '0.9.0',
+    appVersion: '1.0.0',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\Yanji Data',
     backupCount: 1,
     backupFiles: ['C:\\Users\\Demo\\Documents\\Yanji Old\\papertrail-data.json'],
@@ -259,7 +259,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.9.0',
+      appVersion: '1.0.0',
       dataDirectory: 'D:\\Research\\Yanji',
       backupCount: 1,
       backupFiles: ['C:\\Users\\Demo\\Documents\\Yanji Data\\papertrail-data.json'],
@@ -276,7 +276,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.9.0',
+      appVersion: '1.0.0',
       dataDirectory: 'D:\\Research\\Yanji',
       backupCount: 0,
       backupFiles: [],
@@ -288,9 +288,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
     smokeUpdateState = {
       ...smokeUpdateState,
       status: 'available',
-      latestVersion: '0.9.1',
+      latestVersion: '1.0.1',
       releaseDate: '2026-08-17T00:00:00.000Z',
-      message: '发现新版本 0.9.1，可立即下载。'
+      message: '发现新版本 1.0.1，可立即下载。'
     };
     return smokeUpdateState;
   },

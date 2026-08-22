@@ -6,7 +6,7 @@ into one desktop app. The manuscript connectors cover Elsevier Author Hub and
 Elsevier accepted-article production pages; local workflow records remain
 publisher-neutral.
 
-## Version 0.9 workbench features
+## Version 1.0 workbench features
 
 - Use a cohesive pale-blue desktop shell with consistent line icons,
   compact spacing, a small top-right clock, and responsive narrow-window
@@ -119,7 +119,7 @@ publisher-neutral.
 - Move the local data file to a user-selected folder while retaining the old
   file as a removable backup.
 
-## Version 0.9 data model
+## Version 1.0 data model
 
 Yanji stores `lastAttemptAt`, `lastSuccessfulAt`, `failureStreak`, and
 `nextRetryAt` separately. Important updates contain their own occurrence time,

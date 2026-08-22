@@ -13,7 +13,7 @@ const path = require('node:path');
 const { app, BrowserWindow } = require('electron');
 
 app.disableHardwareAcceleration();
-app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.9.0'));
+app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-1.0.0'));
 
 app.whenReady().then(async () => {
   const window = new BrowserWindow({
@@ -165,7 +165,7 @@ app.whenReady().then(async () => {
       updateButton.click();
       await new Promise((resolve) => setTimeout(resolve, 40));
       const updateAvailable = updateButton.textContent === '下载更新'
-        && document.getElementById('updateVersionBadge').textContent === 'v0.9.1';
+        && document.getElementById('updateVersionBadge').textContent === 'v1.0.1';
       updateButton.click();
       await new Promise((resolve) => setTimeout(resolve, 40));
       const updateDownloaded = updateButton.textContent === '安装并重启'

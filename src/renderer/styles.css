@@ -1106,7 +1106,7 @@ body { padding-top: var(--titlebar-height); color: var(--ink); }
   .workbench-page, .note-card, .nav-item, .button { animation: none; transition-duration: 0ms; }
 }
 
-/* v0.9 warm research desk */
+/* Legacy warm research desk */
 :root {
   --ink: #493b35;
   --muted: #8b766a;
@@ -1264,7 +1264,7 @@ body, .workspace { background: var(--canvas); }
 }
 @media (prefers-reduced-motion: reduce) { .focus-duration-options button, .usage-range-tabs button { transition-duration: 0ms; } }
 
-/* v0.10 pale-blue research desk */
+/* v1.0 pale-blue research desk */
 :root {
   --ink: #294457;
   --muted: #6c8291;
