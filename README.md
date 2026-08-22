@@ -8,6 +8,11 @@ publisher-neutral.
 
 ## Version 1.0 workbench features
 
+Version 1.0.2 replaces the desktop widget's CSS-only outer corners with a
+transparent Electron surface plus a native Windows rounded window region, so
+the wallpaper shows cleanly outside the card instead of exposing a square
+background behind the curve.
+
 Version 1.0.1 polishes the pale-blue shell by hiding visible root scrollbars,
 removing the selected-navigation edge shadow, and eliminating native black
 frames from the 3:4 desktop schedule widget. Quick Capture also understands

@@ -1105,6 +1105,15 @@ public static class YanjiDesktopHost {
   [DllImport("user32.dll", SetLastError = true)]
   private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
 
+  [DllImport("gdi32.dll", SetLastError = true)]
+  private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
+
+  [DllImport("user32.dll", SetLastError = true)]
+  private static extern int SetWindowRgn(IntPtr hWnd, IntPtr region, bool redraw);
+
+  [DllImport("gdi32.dll")]
+  private static extern bool DeleteObject(IntPtr value);
+
   private static IntPtr GetStyle(IntPtr hWnd) {
     return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, -16) : GetWindowLong32(hWnd, -16);
   }
@@ -1158,7 +1167,14 @@ public static class YanjiDesktopHost {
     if (GetParent(child) != host) return 3;
 
     const uint flags = 0x0010 | 0x0020 | 0x0040;
-    return SetWindowPos(child, IntPtr.Zero, origin.X, origin.Y, targetWidth, targetHeight, flags) ? 0 : 4;
+    if (!SetWindowPos(child, IntPtr.Zero, origin.X, origin.Y, targetWidth, targetHeight, flags)) return 4;
+    IntPtr region = CreateRoundRectRgn(0, 0, targetWidth + 1, targetHeight + 1, 40, 40);
+    if (region == IntPtr.Zero) return 5;
+    if (SetWindowRgn(child, region, true) == 0) {
+      DeleteObject(region);
+      return 6;
+    }
+    return 0;
   }
 }
 '@
@@ -1227,7 +1243,7 @@ async function showScheduleWidget() {
     show: false,
     frame: false,
     thickFrame: false,
-    transparent: false,
+    transparent: true,
     resizable: false,
     maximizable: false,
     minimizable: false,
@@ -1235,7 +1251,7 @@ async function showScheduleWidget() {
     alwaysOnTop: false,
     skipTaskbar: true,
     hasShadow: false,
-    backgroundColor: '#eaf5fb',
+    backgroundColor: '#00000000',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

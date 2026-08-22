@@ -1,7 +1,7 @@
 :root {
   font-family: "Segoe UI Variable", "Microsoft YaHei UI", sans-serif;
   color: #294b61;
-  background: #edf7fb;
+  background: transparent;
 }
 
 * { box-sizing: border-box; }
@@ -12,7 +12,7 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
-  background: #edf7fb;
+  background: transparent;
 }
 
 body {

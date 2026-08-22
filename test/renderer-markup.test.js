@@ -197,6 +197,7 @@ test('research workbench exposes home, weekly schedule board, metadata notes and
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
   const scheduleWidgetHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.html'), 'utf8');
   const scheduleWidgetJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.js'), 'utf8');
+  const scheduleWidgetCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.css'), 'utf8');
   assert.match(indexHtml, /data-workbench-page="home"/);
   assert.match(indexHtml, /data-workbench-page="schedule"/);
   assert.match(indexHtml, /data-workbench-page="attendance"/);
@@ -227,7 +228,11 @@ test('research workbench exposes home, weekly schedule board, metadata notes and
   assert.match(mainJs, /alwaysOnTop: false/);
   assert.match(mainJs, /skipTaskbar: true/);
   assert.match(mainJs, /thickFrame: false/);
+  assert.match(mainJs, /transparent: true/);
+  assert.match(mainJs, /backgroundColor: '#00000000'/);
   assert.match(mainJs, /nativeFrame = 0x00C00000L \| 0x00040000L/);
+  assert.match(mainJs, /CreateRoundRectRgn\(0, 0, targetWidth \+ 1, targetHeight \+ 1, 40, 40\)/);
+  assert.match(mainJs, /SetWindowRgn\(child, region, true\)/);
   assert.doesNotMatch(mainJs, /scheduleWidgetWindow[\s\S]*setResizable\(true\)/);
   assert.match(mainJs, /showDeadlineWindow/);
   assert.match(mainJs, /new Notification/);
@@ -238,6 +243,7 @@ test('research workbench exposes home, weekly schedule board, metadata notes and
   assert.match(scheduleWidgetHtml, /id="closeWidgetButton"/);
   assert.match(scheduleWidgetJs, /schedulesForToday/);
   assert.match(scheduleWidgetJs, /completeSchedule/);
+  assert.match(scheduleWidgetCss, /:root[\s\S]*background: transparent/);
   assert.match(preloadJs, /startFocus/);
   assert.match(preloadJs, /onFocusChanged/);
   assert.match(workbenchJs, /schedule-board-column/);
