@@ -34,7 +34,7 @@
 
         <div class="sidebar-bottom">
           <button class="quick-capture-tip" id="openQuickCaptureButton" type="button"><p><strong>即写即走</strong><small id="shortcutTip">Ctrl + Shift + Space</small></p></button>
-          <button class="settings-entry" id="settingsButton" type="button">
+          <button class="settings-entry" id="settingsButton" data-workbench-page="settings" type="button">
             <span><strong>设置</strong><small>通用、通知、存储与更新</small></span>
           </button>
         </div>
@@ -222,11 +222,11 @@
       </form>
     </dialog>
 
-    <dialog id="settingsDialog" class="modal settings-modal">
-      <form method="dialog" id="settingsForm" class="settings-shell">
+    <section id="settingsDialog" class="workbench-page settings-page" data-page="settings" hidden>
+      <form id="settingsForm" class="settings-shell">
         <aside class="settings-sidebar" aria-label="设置分类">
           <div class="settings-sidebar-title"><div><small>研迹</small><strong>设置</strong></div></div>
-          <nav class="settings-nav" role="tablist" aria-orientation="vertical">
+          <nav class="settings-nav" role="tablist" aria-orientation="horizontal">
             <button class="settings-nav-item active" type="button" role="tab" aria-selected="true" data-settings-section="general"><span>通用</span></button>
             <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="notifications"><span>消息通知</span></button>
             <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="storage"><span>存储管理</span></button>
@@ -237,11 +237,12 @@
         <section class="settings-pane">
           <div class="settings-content-head">
             <div><p class="eyebrow">PREFERENCES</p><h2 id="settingsSectionTitle">通用</h2><p id="settingsSectionDescription">刷新频率、后台行为与 Windows 启动方式</p></div>
-            <button class="close-button" id="closeSettingsDialogButton" type="button">关闭</button>
+            <button class="close-button" id="closeSettingsDialogButton" type="button" hidden>返回主页</button>
           </div>
 
           <div class="settings-scroll">
             <section class="settings-panel" data-settings-panel="general" role="tabpanel">
+              <h2>通用</h2>
               <h3>刷新与后台</h3>
               <div class="settings-group">
                 <div class="setting-row"><div><strong>自动检查</strong><small>在后台按设定间隔刷新稿件</small></div><label class="switch"><input id="autoRefresh" type="checkbox"><span></span></label></div>
@@ -258,6 +259,7 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="notifications" role="tabpanel">
+              <h2>消息通知</h2>
               <h3>重要进展</h3>
               <div class="settings-group">
                 <div class="setting-row"><div><strong>Windows 重要通知</strong><small>状态变化、审稿回复、截止任务、接收和出版节点出现时弹出</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
@@ -266,6 +268,7 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="storage" role="tabpanel">
+              <h2>存储管理</h2>
               <h3>数据位置</h3>
               <div class="settings-group">
                 <div class="setting-row storage-row"><div class="storage-copy"><strong>当前存储文件夹</strong><small id="dataDirectory" title="">正在读取…</small><small class="storage-help">更换到空文件夹时会复制当前数据，原位置保留备份。</small></div><button class="button tertiary" id="changeDataDirectoryButton" type="button">更改位置</button></div>
@@ -277,6 +280,7 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="about" role="tabpanel">
+              <h2>关于</h2>
               <div class="settings-about settings-about-large" aria-label="软件版本信息"><div><strong>研迹 · 科研工作台</strong><small>日程、打卡、笔记与投稿管理 · 当前版本 <span id="currentVersion">0.8.0</span></small></div><span class="local-first-badge">本地优先</span></div>
               <h3>版本与更新</h3>
               <div class="settings-group update-group">
@@ -296,7 +300,7 @@
           <div class="modal-actions settings-actions"><button class="button secondary" id="cancelSettingsButton" type="button">取消</button><button class="button primary" id="saveSettingsButton" type="button">保存设置</button></div>
         </section>
       </form>
-    </dialog>
+    </section>
 
     <dialog id="journeyDialog" class="modal journey-modal">
       <form method="dialog">

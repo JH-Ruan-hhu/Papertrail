@@ -125,12 +125,12 @@ app.whenReady().then(async () => {
       const closedByClose = !dialog.open;
 
       document.getElementById('settingsButton').click();
-      const settingsDialog = document.getElementById('settingsDialog');
-      const settingsOpened = settingsDialog.open;
-      settingsDialog.dispatchEvent(new MouseEvent('click', { bubbles: true, clientX: 0, clientY: 0 }));
-      const settingsClosedByBackdrop = !settingsDialog.open;
+      const settingsPage = document.getElementById('settingsDialog');
+      const settingsPageVisible = !settingsPage.hidden;
+      const settingsIsNotDialog = settingsPage.tagName === 'SECTION' && !settingsPage.matches('dialog');
+      document.querySelector('[data-workbench-page="home"]').click();
 
-      return { minimizeRemoved, openedForCancel, closedByCancel, openedForClose, closedByClose, settingsOpened, settingsClosedByBackdrop };
+      return { minimizeRemoved, openedForCancel, closedByCancel, openedForClose, closedByClose, settingsPageVisible, settingsIsNotDialog };
     })()
   `);
   if (!Object.values(dialogResult).every(Boolean)) {
@@ -163,8 +163,14 @@ app.whenReady().then(async () => {
       document.getElementById('changeDataDirectoryButton').click();
       await new Promise((resolve) => setTimeout(resolve, 50));
       const draftPreserved = startAtLogin.checked;
-      document.getElementById('settingsDialog').close();
-      return { notificationsVisible, storageVisible, aboutVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, draftPreserved };
+      const settingsScroll = document.querySelector('#settingsDialog .settings-scroll');
+      settingsScroll.style.scrollBehavior = 'auto';
+      settingsScroll.scrollTop = settingsScroll.scrollHeight;
+      settingsScroll.dispatchEvent(new Event('scroll'));
+      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      const scrollHighlightsAbout = document.querySelector('.settings-nav-item.active')?.dataset.settingsSection === 'about';
+      document.querySelector('[data-workbench-page="home"]').click();
+      return { notificationsVisible, storageVisible, aboutVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, draftPreserved, scrollHighlightsAbout };
     })()
   `);
   if (!Object.values(settingsDraftResult).every(Boolean)) {
@@ -241,20 +247,23 @@ app.whenReady().then(async () => {
   if (process.env.PAPERTRAIL_SETTINGS_OUTPUT) {
     await window.webContents.executeJavaScript(`document.getElementById('settingsButton').click()`);
     await new Promise((resolve) => setTimeout(resolve, 240));
-      const settingsDialogVisual = await window.webContents.executeJavaScript(`
+    const settingsPageVisual = await window.webContents.executeJavaScript(`
       (() => {
-        const dialog = document.getElementById('settingsDialog');
-        const style = getComputedStyle(dialog);
-        const rect = dialog.getBoundingClientRect();
-        return { open: dialog.open, className: dialog.className, opacity: style.opacity, transform: style.transform, top: rect.top, right: innerWidth - rect.right };
+        const page = document.getElementById('settingsDialog');
+        const rect = page.getBoundingClientRect();
+        const nav = page.querySelector('.settings-nav').getBoundingClientRect();
+        const active = page.querySelector('.settings-nav-item.active');
+        const firstPanel = page.querySelector('[data-settings-panel="general"]').getBoundingClientRect();
+        const scroller = page.querySelector('.settings-scroll').getBoundingClientRect();
+        return { visible: !page.hidden, tagName: page.tagName, left: rect.left, top: rect.top, navWide: nav.width > nav.height * 4, activeSection: active?.dataset.settingsSection, startsAtGeneral: firstPanel.top >= scroller.top && firstPanel.top - scroller.top < 40, horizontalOverflow: document.documentElement.scrollWidth > innerWidth };
       })()
     `);
-    if (!settingsDialogVisual.open || Number(settingsDialogVisual.opacity) < 0.99 || settingsDialogVisual.top < 50 || settingsDialogVisual.right < 20) {
-      throw new Error(`Settings dialog visual state failed: ${JSON.stringify(settingsDialogVisual)}`);
+    if (!settingsPageVisual.visible || settingsPageVisual.tagName !== 'SECTION' || settingsPageVisual.left < 170 || settingsPageVisual.top < 36 || !settingsPageVisual.navWide || settingsPageVisual.activeSection !== 'general' || !settingsPageVisual.startsAtGeneral || settingsPageVisual.horizontalOverflow) {
+      throw new Error(`Settings page visual state failed: ${JSON.stringify(settingsPageVisual)}`);
     }
-    console.log(`SETTINGS_DIALOG_VISUAL_OK ${JSON.stringify(settingsDialogVisual)}`);
+    console.log(`SETTINGS_PAGE_VISUAL_OK ${JSON.stringify(settingsPageVisual)}`);
     await captureStablePage(process.env.PAPERTRAIL_SETTINGS_OUTPUT);
-    await window.webContents.executeJavaScript(`document.getElementById('settingsDialog').close()`);
+    await window.webContents.executeJavaScript(`document.querySelector('[data-workbench-page="home"]').click()`);
     await new Promise((resolve) => setTimeout(resolve, 80));
   }
   if (process.env.PAPERTRAIL_UPDATE_OUTPUT) {
@@ -265,18 +274,18 @@ app.whenReady().then(async () => {
     await new Promise((resolve) => setTimeout(resolve, 240));
     const updateDialogVisual = await window.webContents.executeJavaScript(`
       (() => ({
-        open: document.getElementById('settingsDialog').open,
+        visible: !document.getElementById('settingsDialog').hidden,
         aboutVisible: !document.querySelector('[data-settings-panel="about"]').hidden,
         updateButton: document.getElementById('updateActionButton').textContent,
         horizontalOverflow: document.documentElement.scrollWidth > innerWidth
       }))()
     `);
-    if (!updateDialogVisual.open || !updateDialogVisual.aboutVisible || updateDialogVisual.horizontalOverflow) {
+    if (!updateDialogVisual.visible || !updateDialogVisual.aboutVisible || updateDialogVisual.horizontalOverflow) {
       throw new Error(`Update settings visual state failed: ${JSON.stringify(updateDialogVisual)}`);
     }
     console.log(`UPDATE_SETTINGS_VISUAL_OK ${JSON.stringify(updateDialogVisual)}`);
     await captureStablePage(process.env.PAPERTRAIL_UPDATE_OUTPUT);
-    await window.webContents.executeJavaScript(`document.getElementById('settingsDialog').close()`);
+    await window.webContents.executeJavaScript(`document.querySelector('[data-workbench-page="home"]').click()`);
     await new Promise((resolve) => setTimeout(resolve, 80));
   }
   if (process.env.PAPERTRAIL_SMOKE_OUTPUT) {

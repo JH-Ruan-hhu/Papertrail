@@ -10,6 +10,8 @@ publisher-neutral.
 
 - Use a quiet, text-first desktop shell inspired by WeChat: a compact Windows
   title area, a small top-right clock, and no decorative navigation icons.
+- Open Settings as a normal workspace page with horizontal categories; scrolling
+  through the page automatically highlights the section currently in view.
 - Clock in and out from Home, correct records manually, and review each week on
   a 24-hour Gantt chart with total time and average start/end times.
 - Run a 25, 50, or 90 minute focus session from the attendance page. Yanji can

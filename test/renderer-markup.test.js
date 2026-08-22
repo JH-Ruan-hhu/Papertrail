@@ -239,6 +239,16 @@ test('local-first messaging appears only inside settings', () => {
   assert.doesNotMatch(indexHtml, /class="privacy-note"/);
 });
 
+test('settings render as a workspace page with horizontal scroll-linked sections', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  assert.match(indexHtml, /<section id="settingsDialog"[^>]*data-page="settings"/);
+  assert.doesNotMatch(indexHtml, /<dialog id="settingsDialog"/);
+  assert.match(indexHtml, /aria-orientation="horizontal"/);
+  assert.match(appJs, /syncSettingsScrollSection/);
+  assert.doesNotMatch(appJs, /openDialog\(elements\.settingsDialog\)/);
+});
+
 test('destructive workbench actions use the Yanji confirmation dialog', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');

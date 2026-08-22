@@ -9,7 +9,7 @@ const wb = {
   editingNote: null
 };
 
-const pageTitles = Object.freeze({ home: '主页', schedule: '日程', attendance: '打卡', notes: '笔记', submissions: '投稿管理' });
+const pageTitles = Object.freeze({ home: '主页', schedule: '日程', attendance: '打卡', notes: '笔记', submissions: '投稿管理', settings: '设置' });
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
 const dailyQuotes = Object.freeze([
   '千里之行，始于足下。——《道德经》',

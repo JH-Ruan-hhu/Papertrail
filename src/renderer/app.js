@@ -860,9 +860,14 @@ function syncSettingsScrollSection() {
   const scroller = elements.settingsDialog.querySelector('.settings-scroll');
   if (!scroller) return;
   const top = scroller.getBoundingClientRect().top + 36;
-  let closest = elements.settingsPanels[0];
-  for (const panel of elements.settingsPanels) {
-    if (panel.getBoundingClientRect().top <= top) closest = panel;
+  let closest;
+  if (scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2) {
+    closest = elements.settingsPanels.at(-1);
+  } else {
+    closest = elements.settingsPanels[0];
+    for (const panel of elements.settingsPanels) {
+      if (panel.getBoundingClientRect().top <= top) closest = panel;
+    }
   }
   if (closest && closest.dataset.settingsPanel !== state.settingsSection) {
     setSettingsSection(closest.dataset.settingsPanel, false);
@@ -926,7 +931,7 @@ async function changeDataDirectory() {
 }
 
 function syncModalTitleBar() {
-  const active = [elements.addDialog, elements.settingsDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog]
+  const active = [elements.addDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog]
     .some((dialog) => dialog.open);
   api.setModalWindowState(active).catch(() => {});
 }
@@ -971,7 +976,6 @@ async function saveSettings() {
       quickCaptureShortcut: document.getElementById('quickCaptureShortcut').value
     });
     render();
-    elements.settingsDialog.close();
     showToast('设置已保存。');
   } catch (error) {
     elements.settingsError.textContent = getErrorMessage(error);
@@ -1153,27 +1157,34 @@ function bindEvents() {
     elements.settingsError.textContent = '';
     populateSettings();
     setSettingsSection('general', false);
-    openDialog(elements.settingsDialog);
     const scroll = elements.settingsDialog.querySelector('.settings-scroll');
-    if (scroll) scroll.scrollTop = 0;
+    if (scroll) {
+      scroll.scrollTop = 0;
+      requestAnimationFrame(() => {
+        scroll.scrollTop = 0;
+        setSettingsSection('general', false);
+      });
+    }
   });
   elements.settingsNavButtons.forEach((button) => {
     button.addEventListener('click', () => setSettingsSection(button.dataset.settingsSection));
   });
   elements.settingsDialog.querySelector('.settings-scroll')?.addEventListener('scroll', syncSettingsScrollSection, { passive: true });
-  elements.closeSettingsDialogButton.addEventListener('click', () => elements.settingsDialog.close());
-  elements.cancelSettingsButton.addEventListener('click', () => elements.settingsDialog.close());
+  elements.closeSettingsDialogButton.addEventListener('click', () => document.querySelector('[data-workbench-page="home"]').click());
+  elements.cancelSettingsButton.addEventListener('click', () => {
+    populateSettings();
+    document.querySelector('[data-workbench-page="home"]').click();
+  });
   elements.changeDataDirectoryButton.addEventListener('click', changeDataDirectory);
   elements.deleteBackupsButton.addEventListener('click', deleteDataBackups);
   elements.updateActionButton.addEventListener('click', handleUpdateAction);
-  elements.settingsDialog.addEventListener('click', closeOnBackdrop);
   elements.addDialog.addEventListener('click', closeOnBackdrop);
   elements.journeyDialog.addEventListener('click', closeOnBackdrop);
   elements.workflowDialog.addEventListener('click', closeOnBackdrop);
   elements.saveSettingsButton.addEventListener('click', saveSettings);
   elements.confirmRemoveButton.addEventListener('click', removeSelectedPaper);
   elements.removeDialog.addEventListener('close', () => { state.removeId = null; });
-  [elements.addDialog, elements.settingsDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog].forEach((dialog) => {
+  [elements.addDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog].forEach((dialog) => {
     dialog.addEventListener('close', () => {
       dialog.classList.remove('dialog-entering');
       syncModalTitleBar();
