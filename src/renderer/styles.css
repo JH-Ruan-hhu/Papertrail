@@ -271,6 +271,8 @@ footer { display: flex; justify-content: space-between; margin-top: 30px; paddin
 footer i { width: 6px; height: 6px; display: inline-block; margin-right: 5px; border-radius: 50%; background: #36b98f; }
 
 .modal { width: min(690px, calc(100vw - 44px)); max-height: calc(100vh - 44px); padding: 0; overflow: auto; color: var(--ink); background: #fbfcff; border: 1px solid rgba(217,224,236,.9); border-radius: 19px; box-shadow: 0 28px 90px rgba(14,25,45,.28); opacity: 1; transform: translateY(0) scale(1); transition: opacity 170ms var(--ease-out), transform 190ms var(--ease-out); }
+.modal, .modal * { scrollbar-width: none; }
+.modal::-webkit-scrollbar, .modal *::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .modal.dialog-entering { opacity: 0; transform: translateY(7px) scale(.985); }
 .modal::backdrop { background: rgba(31,43,60,.54); }
 .modal form { padding: 25px 26px 23px; }
@@ -672,6 +674,8 @@ footer i { width: 6px; height: 6px; display: inline-block; margin-right: 5px; bo
 .workbench-editor-modal { width: min(690px, calc(100vw - 44px)); max-height: calc(100vh - 54px); overflow-y: auto; }
 .workbench-editor-modal > form, .workbench-editor-modal > div { padding: 27px; }
 .schedule-form-grid { grid-template-columns: 1.4fr 1fr 1fr; }
+.schedule-recognition { display: block; margin-top: 7px; color: #4d819d; font-size: 11px; line-height: 1.5; }
+.schedule-recognition[hidden] { display: none; }
 .priority-picker { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; }
 .priority-option { min-height: 74px; display: grid; grid-template-columns: 13px 1fr; grid-template-rows: auto auto; column-gap: 8px; padding: 11px; border: 1px solid #dde2dd; border-radius: 11px; cursor: pointer; }
 .priority-option input { position: absolute; opacity: 0; pointer-events: none; }

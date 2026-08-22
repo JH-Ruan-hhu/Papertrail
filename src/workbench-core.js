@@ -183,6 +183,54 @@ function parseNaturalLanguageSchedule(input, base = new Date()) {
   };
 }
 
+function hasExplicitScheduleTime(parsed) {
+  return Boolean(parsed?.matches?.some((match) => /今天|明天|后天|大后天|凌晨|早上|上午|中午|下午|傍晚|晚上|月|日|号|点|时|[:：/]|^20\d{2}-/.test(match.text)));
+}
+
+function splitScheduleClauses(input) {
+  const text = cleanText(input, 2000);
+  const separator = /[，,；;。\n]+|\s*(?:然后|接着|之后)\s*/g;
+  const clauses = [];
+  let cursor = 0;
+  for (const match of text.matchAll(separator)) {
+    const raw = text.slice(cursor, match.index);
+    const leading = raw.length - raw.trimStart().length;
+    const value = raw.trim();
+    if (value) clauses.push({ value, start: cursor + leading });
+    cursor = match.index + match[0].length;
+  }
+  const raw = text.slice(cursor);
+  const leading = raw.length - raw.trimStart().length;
+  const value = raw.trim();
+  if (value) clauses.push({ value, start: cursor + leading });
+  return { text, clauses };
+}
+
+function parseNaturalLanguageSchedules(input, base = new Date()) {
+  const { text, clauses } = splitScheduleClauses(input);
+  const fallback = () => {
+    const parsed = parseNaturalLanguageSchedule(text, base);
+    return { ...parsed, schedules: parsed.valid ? [parsed] : [] };
+  };
+  if (clauses.length < 2) return fallback();
+  const schedules = [];
+  const matches = [];
+  let inheritedDate = base instanceof Date ? base : new Date(base);
+  for (const clause of clauses) {
+    const parsed = parseNaturalLanguageSchedule(clause.value, inheritedDate);
+    if (!parsed.valid || !hasExplicitScheduleTime(parsed)) return fallback();
+    schedules.push(parsed);
+    inheritedDate = new Date(parsed.startAt);
+    matches.push(...parsed.matches.map((match) => ({ ...match, start: match.start + clause.start, end: match.end + clause.start })));
+  }
+  return {
+    ...schedules[0],
+    title: schedules.map((schedule) => schedule.title).join('；'),
+    schedules,
+    matches: matches.sort((a, b) => a.start - b.start)
+  };
+}
+
 function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOString()) {
   if (!asObject(value)) throw new Error(`第 ${index + 1} 条日程格式无效。`);
   const startAt = isoDate(value.startAt);
@@ -378,6 +426,7 @@ module.exports = {
   normalizeNote,
   normalizeSchedule,
   parseNaturalLanguageSchedule,
+  parseNaturalLanguageSchedules,
   saveAttendance,
   saveFocusSession,
   saveNote,

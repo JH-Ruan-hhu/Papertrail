@@ -7,6 +7,7 @@ const {
   normalizeFocusSession,
   normalizeMetadataField,
   parseNaturalLanguageSchedule,
+  parseNaturalLanguageSchedules,
   saveAttendance,
   saveFocusSession,
   saveNote,
@@ -35,6 +36,15 @@ test('removes the connector between a relative date and its clock phrase', () =>
   assert.equal(start.getDate(), 23);
   assert.equal(start.getHours(), 16);
   assert.equal(start.getMinutes(), 0);
+});
+
+test('splits multiple explicitly timed clauses and inherits their date', () => {
+  const parsed = parseNaturalLanguageSchedules('明天上午八点去采样，下午五点去洗澡', new Date(2026, 7, 22, 10, 0));
+  assert.equal(parsed.schedules.length, 2);
+  assert.deepEqual(parsed.schedules.map((item) => item.title), ['去采样', '去洗澡']);
+  assert.deepEqual(parsed.schedules.map((item) => new Date(item.startAt).getHours()), [8, 17]);
+  assert.deepEqual(parsed.schedules.map((item) => new Date(item.startAt).getDate()), [23, 23]);
+  assert.ok(parsed.matches.some((match) => match.text.includes('下午')));
 });
 
 test('marks urgent deadline text and gives a one-hour default duration', () => {

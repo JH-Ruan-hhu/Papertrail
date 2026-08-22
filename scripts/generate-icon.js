@@ -33,36 +33,57 @@ function fillCircle(cx, cy, radius, color) {
   }
 }
 
-for (let y = 0; y < height; y += 1) {
-  for (let x = 0; x < width; x += 1) {
-    if (inRoundedRect(x, y, 8, 8, 247, 247, 62)) {
-      setPixel(x, y, [130, 174, 239, 255]);
+function fillRoundedRect(left, top, right, bottom, radius, color) {
+  for (let y = top; y <= bottom; y += 1) {
+    for (let x = left; x <= right; x += 1) {
+      if (inRoundedRect(x, y, left, top, right, bottom, radius)) setPixel(x, y, color);
     }
   }
 }
 
-// Paper silhouette with a folded top-right corner.
-for (let y = 47; y <= 210; y += 1) {
-  for (let x = 74; x <= 191; x += 1) {
-    if (y < 86 && x > 152 + (y - 47)) continue;
-    setPixel(x, y, [255, 253, 247, 255]);
-  }
-}
-for (let y = 47; y <= 90; y += 1) {
-  for (let x = 152; x <= 191; x += 1) {
-    if (y >= x - 105) setPixel(x, y, [220, 235, 255, 255]);
+function drawLine(x1, y1, x2, y2, thickness, color) {
+  const steps = Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1));
+  for (let step = 0; step <= steps; step += 1) {
+    const ratio = steps === 0 ? 0 : step / steps;
+    fillCircle(
+      Math.round(x1 + (x2 - x1) * ratio),
+      Math.round(y1 + (y2 - y1) * ratio),
+      thickness,
+      color
+    );
   }
 }
 
-fillCircle(107, 151, 13, [49, 95, 159, 255]);
-fillCircle(158, 151, 13, [94, 147, 216, 255]);
-
-// Friendly curved mouth made from overlapping circles.
-for (let x = 108; x <= 158; x += 1) {
-  const normalized = (x - 133) / 25;
-  const y = Math.round(181 + 8 * (1 - normalized * normalized));
-  fillCircle(x, y, 4, [49, 95, 159, 255]);
+// A low-contrast ice-blue tile that stays light in the taskbar and installer.
+for (let y = 0; y < height; y += 1) {
+  for (let x = 0; x < width; x += 1) {
+    if (inRoundedRect(x, y, 8, 8, 247, 247, 62)) {
+      const shade = Math.round(248 - ((x + y) / (width + height)) * 10);
+      setPixel(x, y, [shade - 8, shade, 252, 255]);
+    }
+  }
 }
+
+// Research notebook: white page, soft blue binding, and a rising trail.
+fillRoundedRect(55, 43, 201, 215, 29, [190, 220, 234, 255]);
+fillRoundedRect(59, 39, 197, 211, 27, [255, 255, 255, 255]);
+fillRoundedRect(59, 39, 82, 211, 20, [166, 211, 231, 255]);
+fillRoundedRect(75, 39, 82, 211, 3, [166, 211, 231, 255]);
+
+const ink = [61, 137, 173, 255];
+const inkSoft = [114, 181, 211, 255];
+drawLine(101, 82, 169, 82, 4, inkSoft);
+drawLine(101, 105, 151, 105, 4, inkSoft);
+drawLine(101, 128, 135, 128, 4, inkSoft);
+
+// Three waypoints form a gentle upward research trajectory.
+drawLine(101, 172, 126, 154, 4, ink);
+drawLine(126, 154, 151, 164, 4, ink);
+drawLine(151, 164, 177, 137, 4, ink);
+fillCircle(101, 172, 8, ink);
+fillCircle(126, 154, 8, inkSoft);
+fillCircle(151, 164, 8, inkSoft);
+fillCircle(177, 137, 9, ink);
 
 function crc32(buffer) {
   let crc = 0xffffffff;

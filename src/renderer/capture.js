@@ -22,6 +22,10 @@ function plainText() {
 
 function formatWhen(schedule) {
   if (!schedule?.valid) return '自动识别时间；#1 红、#2 黄、#3 绿，默认绿色';
+  if (schedule.schedules?.length > 1) {
+    const times = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return `已识别 ${schedule.schedules.length} 条日程 · ${schedule.schedules.map((item) => `${times.format(new Date(item.startAt))} ${item.title}`).join(' · ')}`;
+  }
   const start = new Date(schedule.startAt);
   const end = new Date(schedule.endAt);
   const date = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(start);

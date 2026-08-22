@@ -363,7 +363,7 @@ app.whenReady().then(async () => {
   }
   if (process.env.WORKBENCH_SCHEDULE_OUTPUT) {
     const scheduleResult = await window.webContents.executeJavaScript(`
-      (() => {
+      (async () => {
         document.querySelector('[data-workbench-page="schedule"]').click();
         window.scrollTo(0, 0);
         const shellRect = document.querySelector('.schedule-board-shell').getBoundingClientRect();
@@ -374,16 +374,28 @@ app.whenReady().then(async () => {
           return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0
             && rect.width > 0 && rect.height > 0 && rect.right > shellRect.left && rect.left < shellRect.right;
         });
+        document.getElementById('addScheduleButton').click();
+        const scheduleTitle = document.getElementById('scheduleTitle');
+        scheduleTitle.value = '明天上午八点去采样，下午五点去洗澡';
+        scheduleTitle.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 360));
+        const multiPreview = document.getElementById('scheduleRecognition').textContent.includes('将创建 2 条日程');
+        const modalScrollbarHidden = getComputedStyle(document.getElementById('scheduleDialog')).getPropertyValue('scrollbar-width') === 'none';
+        document.getElementById('saveScheduleButton').click();
+        await new Promise((resolve) => setTimeout(resolve, 80));
         return {
           pageVisible: !document.querySelector('[data-page="schedule"]').hidden,
           dayColumns: document.querySelectorAll('#scheduleBoard .schedule-board-column').length,
           scheduleCards: cards.length,
           intersectsBoard,
+          multiPreview,
+          multiSaved: document.body.dataset.savedScheduleCount === '2',
+          modalScrollbarHidden,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 7 || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 7 || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.modalScrollbarHidden || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
@@ -439,7 +451,7 @@ app.whenReady().then(async () => {
   }
   if (process.env.WORKBENCH_NOTES_OUTPUT) {
     const notesResult = await window.webContents.executeJavaScript(`
-      (() => {
+      (async () => {
         document.querySelector('[data-workbench-page="notes"]').click();
         window.scrollTo(0, 0);
         document.getElementById('manageMetadataButton').click();
@@ -455,6 +467,11 @@ app.whenReady().then(async () => {
         const noteOpened = document.getElementById('noteDialog').open;
         document.getElementById('noteDialog').dispatchEvent(new MouseEvent('click', { bubbles: true }));
         const noteBackdropClosed = !document.getElementById('noteDialog').open;
+        document.querySelector('#notesGrid .note-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        const rightClickConfirmation = document.getElementById('yanjiConfirmDialog').open;
+        document.getElementById('yanjiConfirmAccept').click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
         return {
           pageVisible: !document.querySelector('[data-page="notes"]').hidden,
           noteCards: document.querySelectorAll('#notesGrid .note-card').length,
@@ -462,11 +479,13 @@ app.whenReady().then(async () => {
           multiOptions,
           noteOpened,
           noteBackdropClosed,
+          rightClickConfirmation,
+          rightClickDeleted: document.body.dataset.deletedNoteCount === '1',
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || !notesResult.multiOptions || !notesResult.noteOpened || !notesResult.noteBackdropClosed || notesResult.horizontalOverflow) {
+    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || !notesResult.multiOptions || !notesResult.noteOpened || !notesResult.noteBackdropClosed || !notesResult.rightClickConfirmation || !notesResult.rightClickDeleted || notesResult.horizontalOverflow) {
       throw new Error(`Workbench notes smoke failed: ${JSON.stringify(notesResult)}`);
     }
     console.log(`WORKBENCH_NOTES_OK ${JSON.stringify(notesResult)}`);
@@ -517,11 +536,11 @@ app.whenReady().then(async () => {
         dateLoaded: Boolean(document.getElementById('dateDay').textContent),
         progressLoaded: document.getElementById('widgetProgress').textContent.includes(' / '),
         closeButtonNamed: document.getElementById('closeWidgetButton').getAttribute('aria-label') === '从桌面移除当日日程',
-        paleBlue: getComputedStyle(document.documentElement).backgroundColor === 'rgb(234, 245, 251)',
+        transparentRoot: getComputedStyle(document.documentElement).backgroundColor === 'rgba(0, 0, 0, 0)',
         horizontalOverflow: document.documentElement.scrollWidth > innerWidth
       }))()
     `);
-    if (!widgetResult.threeByFour || widgetResult.scheduleCards < 2 || !widgetResult.dateLoaded || !widgetResult.progressLoaded || !widgetResult.closeButtonNamed || !widgetResult.paleBlue || widgetResult.horizontalOverflow) {
+    if (!widgetResult.threeByFour || widgetResult.scheduleCards < 2 || !widgetResult.dateLoaded || !widgetResult.progressLoaded || !widgetResult.closeButtonNamed || !widgetResult.transparentRoot || widgetResult.horizontalOverflow) {
       throw new Error(`Workbench schedule widget smoke failed: ${JSON.stringify(widgetResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_WIDGET_OK ${JSON.stringify(widgetResult)}`);

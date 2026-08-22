@@ -39,7 +39,7 @@ const {
 const { importantChanges } = require('./notification-core');
 const {
   normalizeMetadataField,
-  parseNaturalLanguageSchedule,
+  parseNaturalLanguageSchedules,
   saveAttendance,
   saveFocusSession,
   saveNote,
@@ -1880,7 +1880,7 @@ async function exportPaper(id, format) {
 
 function registerIpc() {
   ipcMain.handle('workspace:get', () => workspaceForRenderer());
-  ipcMain.handle('schedules:parse', (_event, input) => parseNaturalLanguageSchedule(input, new Date()));
+  ipcMain.handle('schedules:parse', (_event, input) => parseNaturalLanguageSchedules(input, new Date()));
   ipcMain.handle('schedules:save', (_event, input) => saveWorkspaceSchedule(input));
   ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
   ipcMain.handle('schedules:complete', (_event, id, completed) => setWorkspaceScheduleCompleted(String(id), Boolean(completed)));
@@ -1921,9 +1921,10 @@ function registerIpc() {
     if (input?.mode === 'note') {
       return { mode: 'note', item: saveWorkspaceNote({ content: String(input.content || '') }) };
     }
-    const parsed = parseNaturalLanguageSchedule(input?.content, new Date());
+    const parsed = parseNaturalLanguageSchedules(input?.content, new Date());
     if (!parsed.valid) throw new Error('没有识别到可创建的日程。');
-    return { mode: 'schedule', item: saveWorkspaceSchedule(parsed) };
+    const items = parsed.schedules.map((schedule) => saveWorkspaceSchedule(schedule));
+    return { mode: 'schedule', item: items[0], items };
   });
   ipcMain.handle('sticky:close', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.close();

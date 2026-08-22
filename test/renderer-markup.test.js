@@ -206,6 +206,7 @@ test('research workbench exposes home, weekly schedule board, metadata notes and
   assert.doesNotMatch(indexHtml, /id="bingWallpaper"/);
   assert.match(indexHtml, /id="homeDayOverview"/);
   assert.match(indexHtml, /id="scheduleBoard"/);
+  assert.match(indexHtml, /id="scheduleRecognition"/);
   assert.match(indexHtml, /id="attendanceGanttRows"/);
   assert.match(indexHtml, /id="startFocusButton"/);
   assert.match(indexHtml, /id="focusUsageList"/);
@@ -247,6 +248,11 @@ test('research workbench exposes home, weekly schedule board, metadata notes and
   assert.match(preloadJs, /startFocus/);
   assert.match(preloadJs, /onFocusChanged/);
   assert.match(workbenchJs, /schedule-board-column/);
+  assert.match(workbenchJs, /recognizeScheduleEditorInput/);
+  assert.match(workbenchJs, /workbenchApi\.parseSchedule/);
+  assert.match(workbenchJs, /recognizedSchedules\.length > 1/);
+  assert.match(workbenchJs, /notesGrid'\)\.addEventListener\('contextmenu'/);
+  assert.match(workbenchJs, /event\.isComposing \|\| scheduleTitleComposing/);
   assert.doesNotMatch(indexHtml, /文献推荐|data-workbench-page="literature"/);
   assert.doesNotMatch(mainJs, /OpenAlex|literature:recommend|recommendLatestLiterature/);
   assert.doesNotMatch(preloadJs, /recommendLiterature|literature:recommend/);

@@ -8,6 +8,14 @@ publisher-neutral.
 
 ## Version 1.0 workbench features
 
+Version 1.0.3 adds right-click deletion for note cards, hides visible scrollbars
+throughout modal dialogs while preserving scrolling, and brings Quick Capture
+time recognition into the normal schedule editor. Explicitly timed clauses such
+as `明天上午八点去采样，下午五点去洗澡` are previewed and saved as two
+separate schedules, with the later clause inheriting the date.
+The application icon now uses a light ice-blue research-notebook design across
+the executable, installer, shortcuts, windows, and tray.
+
 Version 1.0.2 replaces the desktop widget's CSS-only outer corners with a
 transparent Electron surface plus a native Windows rounded window region, so
 the wallpaper shows cleanly outside the card instead of exposing a square

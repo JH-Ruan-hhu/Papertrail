@@ -178,7 +178,7 @@ let smokeWorkspace = {
 };
 let smokeUpdateState = {
   status: 'idle',
-  currentVersion: '1.0.0',
+  currentVersion: '1.0.3',
   latestVersion: null,
   releaseDate: null,
   percent: null,
@@ -190,17 +190,26 @@ contextBridge.exposeInMainWorld('paperTrail', {
   getWorkspace: async () => smokeWorkspace,
   parseSchedule: async (input) => {
     const text = String(input || '');
+    if (text.includes('，')) {
+      const schedules = [
+        { valid: true, title: '去采样', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: 'low', deadline: false, matches: [] },
+        { valid: true, title: '去洗澡', startAt: new Date(now + 118_800_000).toISOString(), endAt: new Date(now + 122_400_000).toISOString(), priority: 'low', deadline: false, matches: [] }
+      ];
+      const matches = ['明天', '上午八点', '下午五点'].map((token) => ({ start: text.indexOf(token), end: text.indexOf(token) + token.length, text: token })).filter((match) => match.start >= 0);
+      return { ...schedules[0], title: '去采样；去洗澡', schedules, matches };
+    }
     const matches = ['明天', '下午 3 点到 5 点', '#1'].map((token) => ({ start: text.indexOf(token), end: text.indexOf(token) + token.length, text: token })).filter((match) => match.start >= 0);
-    return { valid: true, title: '组会', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: /#1/.test(text) ? 'high' : 'low', deadline: false, matches };
+    const parsed = { valid: true, title: '组会', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: /#1/.test(text) ? 'high' : 'low', deadline: false, matches };
+    return { ...parsed, schedules: [parsed] };
   },
-  saveSchedule: async (input) => input,
+  saveSchedule: async (input) => { document.body.dataset.savedScheduleCount = String(Number(document.body.dataset.savedScheduleCount || 0) + 1); return input; },
   deleteSchedule: async () => true,
   completeSchedule: async () => true,
   showScheduleWidget: async () => ({ attached: true }),
   closeScheduleWidget: async () => { document.body.dataset.closeRequested = 'true'; return true; },
   openScheduleWidgetMain: async () => { document.body.dataset.openMainRequested = 'true'; return true; },
   saveNote: async (input) => input,
-  deleteNote: async () => true,
+  deleteNote: async () => { document.body.dataset.deletedNoteCount = String(Number(document.body.dataset.deletedNoteCount || 0) + 1); return true; },
   openStickyNote: async () => true,
   createStickyNote: async () => ({ id: 'new-sticky-note', title: '便笺', content: '' }),
   saveMetadataFields: async (fields) => fields,
