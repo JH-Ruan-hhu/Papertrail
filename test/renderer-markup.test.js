@@ -191,11 +191,12 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
   assert.match(appJs, /setTimeout\(finishEntering, 60\)/);
 });
 
-test('research workbench exposes home, weekly schedule board, metadata notes and quick capture', () => {
+test('research workbench exposes home, rolling schedule board, metadata notes and quick capture', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const storeJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'store.js'), 'utf8');
   const scheduleWidgetHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.html'), 'utf8');
   const scheduleWidgetJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.js'), 'utf8');
   const scheduleWidgetCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.css'), 'utf8');
@@ -235,6 +236,13 @@ test('research workbench exposes home, weekly schedule board, metadata notes and
   assert.match(mainJs, /nativeFrame = 0x00C00000L \| 0x00040000L/);
   assert.match(mainJs, /CreateRoundRectRgn\(0, 0, targetWidth \+ 1, targetHeight \+ 1, 40, 40\)/);
   assert.match(mainJs, /SetWindowRgn\(child, region, true\)/);
+  assert.match(mainJs, /Math\.round\(width \* scaleFactor\)/);
+  assert.match(mainJs, /Math\.round\(height \* scaleFactor\)/);
+  assert.match(mainJs, /webContents\.setZoomFactor\(scaleFactor\)/);
+  assert.match(mainJs, /scheduleWidgetEnabled: true/);
+  assert.match(mainJs, /scheduleWidgetEnabled: false/);
+  assert.match(mainJs, /getSettings\(\)\.scheduleWidgetEnabled/);
+  assert.match(storeJs, /scheduleWidgetEnabled: false/);
   assert.doesNotMatch(mainJs, /scheduleWidgetWindow[\s\S]*setResizable\(true\)/);
   assert.match(mainJs, /showDeadlineWindow/);
   assert.match(mainJs, /new Notification/);
@@ -246,14 +254,30 @@ test('research workbench exposes home, weekly schedule board, metadata notes and
   assert.match(scheduleWidgetJs, /schedulesForToday/);
   assert.match(scheduleWidgetJs, /completeSchedule/);
   assert.match(scheduleWidgetCss, /:root[\s\S]*background: transparent/);
+  assert.match(scheduleWidgetCss, /-webkit-line-clamp: 2/);
   assert.match(preloadJs, /startFocus/);
   assert.match(preloadJs, /onFocusChanged/);
   assert.match(workbenchJs, /schedule-board-column/);
+  assert.match(workbenchJs, /const rangeStart = addDays\(selected, -2\)/);
+  assert.match(workbenchJs, /const rangeEnd = addDays\(selected, 4\)/);
+  assert.match(workbenchJs, /addDays\(wb\.selectedDate, -1\)/);
+  assert.match(workbenchJs, /addDays\(wb\.selectedDate, 1\)/);
+  assert.doesNotMatch(workbenchJs, /addDays\(wb\.selectedDate, [-]?7\)/);
   assert.match(workbenchJs, /recognizeScheduleEditorInput/);
   assert.match(workbenchJs, /workbenchApi\.parseSchedule/);
   assert.match(workbenchJs, /recognizedSchedules\.length > 1/);
   assert.match(workbenchJs, /notesGrid'\)\.addEventListener\('contextmenu'/);
   assert.match(workbenchJs, /event\.isComposing \|\| scheduleTitleComposing/);
+  assert.match(indexHtml, /class="focus-timer-panel home-focus-timer"[\s\S]*id="homeClockButton"/);
+  assert.doesNotMatch(indexHtml, /class="home-attendance-panel"|id="homeAttendanceStatus"|id="homeAttendanceTrack"|id="homeAttendanceDuration"/);
+  assert.match(workbenchJs, /button\.textContent = openRecord \? '下班打卡' : '上班打卡'/);
+  assert.match(indexHtml, /id="closeScheduleButton"/);
+  assert.match(indexHtml, /id="cancelScheduleButton"/);
+  assert.match(workbenchJs, /SCHEDULE_DRAFT_KEY = 'yanji\.scheduleDraft\.v1'/);
+  assert.match(workbenchJs, /closeScheduleEditorPreservingDraft/);
+  assert.match(workbenchJs, /localStorage\.setItem\(SCHEDULE_DRAFT_KEY/);
+  assert.match(workbenchJs, /localStorage\.removeItem\(SCHEDULE_DRAFT_KEY/);
+  assert.match(workbenchJs, /scheduleDialog'\)\.addEventListener\('cancel'/);
   assert.doesNotMatch(indexHtml, /文献推荐|data-workbench-page="literature"/);
   assert.doesNotMatch(mainJs, /OpenAlex|literature:recommend|recommendLatestLiterature/);
   assert.doesNotMatch(preloadJs, /recommendLiterature|literature:recommend/);

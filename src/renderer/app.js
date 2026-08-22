@@ -744,7 +744,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '1.0.4';
+  const version = settings.appVersion || '1.0.5';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   const expirations = Array.isArray(settings.backupExpiresAt) ? settings.backupExpiresAt : [];

@@ -8,6 +8,15 @@ publisher-neutral.
 
 ## Version 1.0 workbench features
 
+Version 1.0.5 moves the sole Home attendance action into the Focus Timer card
+and removes the separate attendance summary card. The Schedule board now shows
+a rolling seven-day window from two days before the selected date through four
+days after it; navigation shifts by one day instead of one calendar week. New
+schedule dialogs preserve drafts on Close, backdrop click, or Escape while
+Cancel discards them. The desktop schedule widget remembers whether it is
+enabled across cold starts, disables that behavior from its close button, and
+uses DPI-aware native sizing so all 360 x 480 content remains visible.
+
 Version 1.0.4 replaces the scroll-linked Settings sections with exact tabs,
 separates manuscript polling from general workbench behavior, and organizes
 preferences around the whole workspace: General, Reminders, Manuscript

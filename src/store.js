@@ -12,6 +12,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   closeToTray: true,
   startAtLogin: false,
   autoCheckUpdates: true,
+  scheduleWidgetEnabled: false,
   quickCaptureShortcut: 'CommandOrControl+Shift+Space',
   stickyNoteShortcut: 'CommandOrControl+Alt+N'
 });

@@ -364,6 +364,11 @@ app.whenReady().then(async () => {
       (async () => {
         document.querySelector('[data-workbench-page="schedule"]').click();
         window.scrollTo(0, 0);
+        const localKey = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
+        const today = new Date();
+        const twoDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2);
+        const fourDaysLater = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 4);
+        const boardDates = [...document.querySelectorAll('#scheduleBoard .schedule-board-column')].map((column) => column.dataset.boardDate);
         const shellRect = document.querySelector('.schedule-board-shell').getBoundingClientRect();
         const cards = [...document.querySelectorAll('#scheduleBoard .schedule-board-card')];
         const intersectsBoard = cards.some((card) => {
@@ -372,6 +377,24 @@ app.whenReady().then(async () => {
           return style.display !== 'none' && style.visibility !== 'hidden' && Number(style.opacity) > 0
             && rect.width > 0 && rect.height > 0 && rect.right > shellRect.left && rect.left < shellRect.right;
         });
+        document.getElementById('addScheduleButton').click();
+        const scheduleDialog = document.getElementById('scheduleDialog');
+        const draftTitle = document.getElementById('scheduleTitle');
+        draftTitle.value = '后天上午十点整理草稿';
+        document.getElementById('closeScheduleButton').click();
+        const closePreserved = !scheduleDialog.open
+          && JSON.parse(localStorage.getItem('yanji.scheduleDraft.v1')).title === '后天上午十点整理草稿'
+          && !document.body.dataset.savedScheduleCount;
+        document.getElementById('addScheduleButton').click();
+        const closeRestored = document.getElementById('scheduleTitle').value === '后天上午十点整理草稿';
+        document.getElementById('scheduleTitle').value = '遮罩关闭的草稿';
+        scheduleDialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        const backdropPreserved = !scheduleDialog.open
+          && JSON.parse(localStorage.getItem('yanji.scheduleDraft.v1')).title === '遮罩关闭的草稿';
+        document.getElementById('addScheduleButton').click();
+        const backdropRestored = document.getElementById('scheduleTitle').value === '遮罩关闭的草稿';
+        document.getElementById('cancelScheduleButton').click();
+        const cancelDiscarded = !scheduleDialog.open && !localStorage.getItem('yanji.scheduleDraft.v1');
         document.getElementById('addScheduleButton').click();
         const scheduleTitle = document.getElementById('scheduleTitle');
         scheduleTitle.value = '明天上午八点去采样，下午五点去洗澡';
@@ -384,16 +407,23 @@ app.whenReady().then(async () => {
         return {
           pageVisible: !document.querySelector('[data-page="schedule"]').hidden,
           dayColumns: document.querySelectorAll('#scheduleBoard .schedule-board-column').length,
+          centeredSevenDays: boardDates[0] === localKey(twoDaysAgo) && boardDates[2] === localKey(today) && boardDates[6] === localKey(fourDaysLater),
           scheduleCards: cards.length,
           intersectsBoard,
+          closePreserved,
+          closeRestored,
+          backdropPreserved,
+          backdropRestored,
+          cancelDiscarded,
           multiPreview,
           multiSaved: document.body.dataset.savedScheduleCount === '2',
+          draftClearedAfterSave: !localStorage.getItem('yanji.scheduleDraft.v1'),
           modalScrollbarHidden,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 7 || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.modalScrollbarHidden || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 7 || !scheduleResult.centeredSevenDays || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
@@ -411,6 +441,10 @@ app.whenReady().then(async () => {
           pageVisible: !document.querySelector('[data-page="home"]').hidden,
           focusFirst: Boolean(document.querySelector('.home-top-grid #todayFocusList')),
           focusTimerHome: Boolean(document.querySelector('.home-focus-timer #focusTimeRemaining')),
+          clockInsideFocus: Boolean(document.querySelector('.home-focus-timer #homeClockButton')),
+          clockOnly: !document.querySelector('.home-attendance-panel')
+            && !document.getElementById('homeAttendanceStatus')
+            && document.getElementById('homeClockButton')?.textContent === '上班打卡',
           quickNote: Boolean(document.getElementById('quickNoteButton')),
           fourDayCards: document.querySelectorAll('#homeDayOverview .day-card').length,
           notesRight: notes.left > schedule.left,
@@ -528,17 +562,23 @@ app.whenReady().then(async () => {
     await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.html'));
     await new Promise((resolve) => setTimeout(resolve, 180));
     const widgetResult = await window.webContents.executeJavaScript(`
-      (() => ({
-        threeByFour: Math.abs((innerWidth / innerHeight) - 0.75) < 0.03,
-        scheduleCards: document.querySelectorAll('#widgetScheduleList .widget-item').length,
-        dateLoaded: Boolean(document.getElementById('dateDay').textContent),
-        progressLoaded: document.getElementById('widgetProgress').textContent.includes(' / '),
-        closeButtonNamed: document.getElementById('closeWidgetButton').getAttribute('aria-label') === '从桌面移除当日日程',
-        transparentRoot: getComputedStyle(document.documentElement).backgroundColor === 'rgba(0, 0, 0, 0)',
-        horizontalOverflow: document.documentElement.scrollWidth > innerWidth
-      }))()
+      (() => {
+        const close = document.getElementById('closeWidgetButton').getBoundingClientRect();
+        const footer = document.querySelector('footer').getBoundingClientRect();
+        const list = document.getElementById('widgetScheduleList').getBoundingClientRect();
+        return {
+          threeByFour: Math.abs((innerWidth / innerHeight) - 0.75) < 0.03,
+          scheduleCards: document.querySelectorAll('#widgetScheduleList .widget-item').length,
+          dateLoaded: Boolean(document.getElementById('dateDay').textContent),
+          progressLoaded: document.getElementById('widgetProgress').textContent.includes(' / '),
+          closeButtonNamed: document.getElementById('closeWidgetButton').getAttribute('aria-label') === '从桌面移除当日日程',
+          contentFits: close.right <= innerWidth && footer.bottom <= innerHeight && list.right <= innerWidth && list.bottom <= footer.top,
+          transparentRoot: getComputedStyle(document.documentElement).backgroundColor === 'rgba(0, 0, 0, 0)',
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
     `);
-    if (!widgetResult.threeByFour || widgetResult.scheduleCards < 2 || !widgetResult.dateLoaded || !widgetResult.progressLoaded || !widgetResult.closeButtonNamed || !widgetResult.transparentRoot || widgetResult.horizontalOverflow) {
+    if (!widgetResult.threeByFour || widgetResult.scheduleCards < 2 || !widgetResult.dateLoaded || !widgetResult.progressLoaded || !widgetResult.closeButtonNamed || !widgetResult.contentFits || !widgetResult.transparentRoot || widgetResult.horizontalOverflow) {
       throw new Error(`Workbench schedule widget smoke failed: ${JSON.stringify(widgetResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_WIDGET_OK ${JSON.stringify(widgetResult)}`);

@@ -107,7 +107,7 @@ main {
 .widget-item {
   position: relative;
   display: grid;
-  grid-template-columns: 48px 1fr 26px;
+  grid-template-columns: 76px minmax(0, 1fr) 24px;
   align-items: center;
   gap: 9px;
   min-height: 64px;
@@ -140,7 +140,16 @@ main {
 }
 
 .widget-item-copy { min-width: 0; }
-.widget-item-copy strong { display: block; overflow: hidden; color: #2f5064; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
+.widget-item-copy strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: #2f5064;
+  font-size: 13px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
 .widget-item-copy span { display: block; margin-top: 5px; color: #7b929f; font-size: 10px; }
 
 .widget-check {

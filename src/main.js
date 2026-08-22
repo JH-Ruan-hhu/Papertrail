@@ -1232,7 +1232,8 @@ async function showScheduleWidget() {
     scheduleWidgetWindow.showInactive();
     return { attached: Boolean(scheduleWidgetWindow.yanjiDesktopAttached) };
   }
-  const { workArea } = screen.getPrimaryDisplay();
+  const display = screen.getPrimaryDisplay();
+  const { workArea, scaleFactor } = display;
   const width = 360;
   const height = 480;
   const window = new BrowserWindow({
@@ -1265,8 +1266,12 @@ async function showScheduleWidget() {
     if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
   });
   await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'));
-  window.yanjiDesktopAttached = await attachWindowToDesktop(window, { width, height });
+  window.yanjiDesktopAttached = await attachWindowToDesktop(window, {
+    width: Math.round(width * scaleFactor),
+    height: Math.round(height * scaleFactor)
+  });
   if (window.yanjiDesktopAttached) {
+    window.webContents.setZoomFactor(scaleFactor);
     await new Promise((resolve) => setTimeout(resolve, 80));
   } else {
     window.setSize(width, height);
@@ -1884,8 +1889,13 @@ function registerIpc() {
   ipcMain.handle('schedules:save', (_event, input) => saveWorkspaceSchedule(input));
   ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
   ipcMain.handle('schedules:complete', (_event, id, completed) => setWorkspaceScheduleCompleted(String(id), Boolean(completed)));
-  ipcMain.handle('schedule-widget:show', () => showScheduleWidget());
+  ipcMain.handle('schedule-widget:show', async () => {
+    const result = await showScheduleWidget();
+    store.updateSettings({ scheduleWidgetEnabled: true });
+    return result;
+  });
   ipcMain.handle('schedule-widget:close', (event) => {
+    store.updateSettings({ scheduleWidgetEnabled: false });
     BrowserWindow.fromWebContents(event.sender)?.close();
     return true;
   });
@@ -2057,12 +2067,19 @@ if (!gotLock) {
       if (store.getSettings().autoCheckUpdates) {
         setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
       }
+      if (store.getSettings().scheduleWidgetEnabled && !process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
+        setTimeout(() => showScheduleWidget().catch(() => {}), 900);
+      }
       if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
         const result = await showScheduleWidget();
         const bounds = scheduleWidgetWindow.getBounds();
         const [contentWidth, contentHeight] = scheduleWidgetWindow.getContentSize();
-        console.log(`DESKTOP_WIDGET_ATTACH_OK ${JSON.stringify({ attached: result.attached, contentWidth, contentHeight, outerWidth: bounds.width, outerHeight: bounds.height, alwaysOnTop: scheduleWidgetWindow.isAlwaysOnTop(), skipTaskbar: true })}`);
-        if (!result.attached || contentWidth !== 360 || contentHeight !== 480 || scheduleWidgetWindow.isAlwaysOnTop()) {
+        const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
+        const layout = await scheduleWidgetWindow.webContents.executeJavaScript(`(() => { const close = document.getElementById('closeWidgetButton').getBoundingClientRect(); const footer = document.querySelector('footer').getBoundingClientRect(); return { innerWidth, innerHeight, closeRight: close.right, footerBottom: footer.bottom }; })()`);
+        const expectedWidth = Math.round(360 * scaleFactor);
+        const expectedHeight = Math.round(480 * scaleFactor);
+        console.log(`DESKTOP_WIDGET_ATTACH_OK ${JSON.stringify({ attached: result.attached, scaleFactor, contentWidth, contentHeight, outerWidth: bounds.width, outerHeight: bounds.height, layout, alwaysOnTop: scheduleWidgetWindow.isAlwaysOnTop(), skipTaskbar: true })}`);
+        if (!result.attached || contentWidth !== expectedWidth || contentHeight !== expectedHeight || Math.abs(layout.innerWidth - 360) > 1 || Math.abs(layout.innerHeight - 480) > 1 || layout.closeRight > layout.innerWidth || layout.footerBottom > layout.innerHeight || scheduleWidgetWindow.isAlwaysOnTop()) {
           throw new Error('桌面日程组件没有按 3:4 非置顶桌面层模式打开。');
         }
         try {

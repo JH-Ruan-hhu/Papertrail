@@ -13,6 +13,7 @@ const wb = {
 };
 
 const pageTitles = Object.freeze({ home: '主页', schedule: '日程', attendance: '打卡', notes: '笔记', submissions: '投稿管理', settings: '设置' });
+const SCHEDULE_DRAFT_KEY = 'yanji.scheduleDraft.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
 const UI_ICON_PATHS = Object.freeze({
   check: '<path d="m6 12 4 4 8-9"/>',
@@ -163,55 +164,22 @@ function renderHome() {
 }
 
 function renderHomeAttendance() {
-  const status = document.getElementById('homeAttendanceStatus');
-  if (!status || !wb.workspace) return;
-  const detail = document.getElementById('homeAttendanceDetail');
-  const duration = document.getElementById('homeAttendanceDuration');
   const button = document.getElementById('homeClockButton');
-  const track = document.getElementById('homeAttendanceTrack');
-  const todayKey = localDateKey(new Date());
-  const records = wb.workspace.attendance.filter((item) => item.date === todayKey).sort((a, b) => Date.parse(a.clockInAt) - Date.parse(b.clockInAt));
+  if (!button || !wb.workspace) return;
   const openRecord = wb.workspace.attendance.find((item) => !item.clockOutAt);
-  button.dataset.clockAction = '';
-  track.innerHTML = '';
-  if (!records.length && !openRecord) {
-    status.textContent = '尚未打卡';
-    detail.textContent = '开始今天的工作时记录上班时间';
-    duration.textContent = '--';
-    button.textContent = '上班打卡';
-    button.dataset.clockAction = 'in';
-    return;
-  }
-  track.innerHTML = records.map((record) => {
-    const start = new Date(record.clockInAt);
-    const end = record.clockOutAt ? new Date(record.clockOutAt) : new Date();
-    const startMinutes = start.getHours() * 60 + start.getMinutes();
-    const endMinutes = Math.max(startMinutes, Math.min(1440, end.getHours() * 60 + end.getMinutes()));
-    return `<span class="${record.clockOutAt ? '' : 'open'}" style="left:${startMinutes / 1440 * 100}%;width:${Math.max(.5, (endMinutes - startMinutes) / 1440 * 100)}%"></span>`;
-  }).join('');
-  const totalMs = records.reduce((sum, record) => sum + Math.max(0, (record.clockOutAt ? Date.parse(record.clockOutAt) : Date.now()) - Date.parse(record.clockInAt)), 0);
-  duration.textContent = formatDuration(totalMs);
-  if (openRecord) {
-    status.textContent = `工作中 · 第 ${records.length || 1} 段`;
-    detail.textContent = `${formatTime(openRecord.clockInAt)} 上班，应用使用时间正在统计`;
-    button.textContent = '下班打卡';
-    button.dataset.clockAction = 'out';
-  } else {
-    status.textContent = `今日已记录 ${records.length} 段`;
-    detail.textContent = records.map((record) => `${formatTime(record.clockInAt)}–${formatTime(record.clockOutAt)}`).join(' · ');
-    button.textContent = '再次上班';
-    button.dataset.clockAction = 'in';
-  }
+  button.textContent = openRecord ? '下班打卡' : '上班打卡';
+  button.dataset.clockAction = openRecord ? 'out' : 'in';
+  button.setAttribute('aria-label', openRecord ? '结束当前工作并下班打卡' : '开始工作并上班打卡');
 }
 
 function renderTimeline() {
   const selected = wb.selectedDate;
-  const weekStart = startOfWeek(selected);
-  const weekEnd = addDays(weekStart, 6);
-  document.getElementById('timelineDate').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(weekStart)} — ${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(weekEnd)}`;
-  document.getElementById('timelineDateSubtitle').textContent = localDateKey(weekStart) === localDateKey(startOfWeek(new Date())) ? '本周 · 点击日期查看当天完整清单' : '点击日期查看当天完整清单';
+  const rangeStart = addDays(selected, -2);
+  const rangeEnd = addDays(selected, 4);
+  document.getElementById('timelineDate').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(rangeStart)} — ${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(rangeEnd)}`;
+  document.getElementById('timelineDateSubtitle').textContent = `${sameDay(selected, new Date()) ? '今天前两天至后四天' : '所选日期前两天至后四天'} · 点击日期查看当天完整清单`;
   document.getElementById('scheduleBoard').innerHTML = Array.from({ length: 7 }, (_, index) => {
-    const date = addDays(weekStart, index);
+    const date = addDays(rangeStart, index);
     const dateKey = localDateKey(date);
     const events = schedulesForDay(date);
     const cards = events.map((item) => {
@@ -394,24 +362,66 @@ function openScheduleEditor(schedule = null) {
   const defaultStart = new Date(wb.selectedDate);
   const now = new Date();
   defaultStart.setHours(sameDay(wb.selectedDate, now) ? Math.min(23, now.getHours() + 1) : 9, 0, 0, 0);
-  const start = schedule ? new Date(schedule.startAt) : defaultStart;
-  const end = schedule ? new Date(schedule.endAt) : new Date(start.getTime() + 60 * 60_000);
+  let draft = null;
+  if (!schedule) {
+    try { draft = JSON.parse(localStorage.getItem(SCHEDULE_DRAFT_KEY) || 'null'); } catch { draft = null; }
+  }
+  const start = schedule ? new Date(schedule.startAt) : draft?.date && draft?.startTime ? new Date(`${draft.date}T${draft.startTime}:00`) : defaultStart;
+  const end = schedule ? new Date(schedule.endAt) : draft?.date && draft?.endTime ? new Date(`${draft.date}T${draft.endTime}:00`) : new Date(start.getTime() + 60 * 60_000);
   document.getElementById('scheduleId').value = schedule?.id || '';
-  document.getElementById('scheduleTitle').value = schedule?.title || '';
+  document.getElementById('scheduleTitle').value = schedule?.title || draft?.title || '';
   document.getElementById('scheduleDate').value = localDateKey(start);
   document.getElementById('scheduleStartTime').value = `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
   document.getElementById('scheduleEndTime').value = `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
-  document.querySelector(`input[name="schedulePriority"][value="${schedule?.priority || 'low'}"]`).checked = true;
-  document.getElementById('scheduleDeadline').checked = Boolean(schedule?.deadline);
-  wb.scheduleRecognition = null;
+  document.querySelector(`input[name="schedulePriority"][value="${schedule?.priority || draft?.priority || 'low'}"]`).checked = true;
+  document.getElementById('scheduleDeadline').checked = Boolean(schedule?.deadline || draft?.deadline);
+  wb.scheduleRecognition = !schedule && draft?.recognition?.input === draft?.title ? draft.recognition : null;
   wb.scheduleRecognitionRequest += 1;
   document.getElementById('scheduleRecognition').hidden = true;
   document.getElementById('scheduleRecognition').textContent = '';
+  if (wb.scheduleRecognition?.parsed) {
+    const parsed = wb.scheduleRecognition.parsed;
+    document.getElementById('scheduleRecognition').textContent = parsed.schedules?.length > 1
+      ? `将创建 ${parsed.schedules.length} 条日程：${parsed.schedules.map((item) => `${formatTime(item.startAt)} ${item.title}`).join('；')}`
+      : `已恢复草稿：${draft.date} ${draft.startTime}–${draft.endTime}`;
+    document.getElementById('scheduleRecognition').hidden = false;
+  }
   document.getElementById('scheduleDialogTitle').textContent = schedule ? '编辑日程' : '新建日程';
   document.getElementById('deleteScheduleButton').hidden = !schedule;
   document.getElementById('scheduleError').textContent = '';
   openWorkbenchDialog(dialog);
   setTimeout(() => document.getElementById('scheduleTitle').focus(), 20);
+}
+
+function captureScheduleDraft() {
+  const title = document.getElementById('scheduleTitle').value;
+  return {
+    title,
+    date: document.getElementById('scheduleDate').value,
+    startTime: document.getElementById('scheduleStartTime').value,
+    endTime: document.getElementById('scheduleEndTime').value,
+    priority: document.querySelector('input[name="schedulePriority"]:checked')?.value || 'low',
+    deadline: document.getElementById('scheduleDeadline').checked,
+    recognition: wb.scheduleRecognition?.input === title.trim() ? wb.scheduleRecognition : null
+  };
+}
+
+function closeScheduleEditorPreservingDraft() {
+  const dialog = document.getElementById('scheduleDialog');
+  if (!document.getElementById('scheduleId').value) {
+    localStorage.setItem(SCHEDULE_DRAFT_KEY, JSON.stringify(captureScheduleDraft()));
+    showWorkbenchToast('日程草稿已保留。');
+  }
+  closeWorkbenchDialog(dialog);
+}
+
+function cancelScheduleEditor() {
+  if (!document.getElementById('scheduleId').value) localStorage.removeItem(SCHEDULE_DRAFT_KEY);
+  closeWorkbenchDialog(document.getElementById('scheduleDialog'));
+}
+
+function clearScheduleDraft() {
+  localStorage.removeItem(SCHEDULE_DRAFT_KEY);
 }
 
 function parsedScheduleHasTemporalMatch(parsed) {
@@ -479,6 +489,7 @@ async function saveScheduleFromEditor() {
     if (!scheduleId && recognizedSchedules.length > 1) {
       for (const schedule of recognizedSchedules) await workbenchApi.saveSchedule(schedule);
       wb.selectedDate = new Date(recognizedSchedules[0].startAt);
+      clearScheduleDraft();
       closeWorkbenchDialog(document.getElementById('scheduleDialog'));
       showWorkbenchToast(`已创建 ${recognizedSchedules.length} 条日程。`);
       return;
@@ -492,6 +503,7 @@ async function saveScheduleFromEditor() {
       deadline: document.getElementById('scheduleDeadline').checked
     });
     wb.selectedDate = dateFromKey(date);
+    if (!scheduleId) clearScheduleDraft();
     closeWorkbenchDialog(document.getElementById('scheduleDialog'));
     showWorkbenchToast('日程已保存。');
   } catch (exception) {
@@ -630,9 +642,18 @@ function bindWorkbenchEvents() {
   document.getElementById('quickNoteButton').addEventListener('click', () => openNoteEditor());
   document.getElementById('addScheduleButton').addEventListener('click', () => openScheduleEditor());
   document.getElementById('scheduleTodayButton').addEventListener('click', () => { wb.selectedDate = new Date(); renderTimeline(); });
-  document.getElementById('previousDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, -7); renderTimeline(); });
-  document.getElementById('nextDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, 7); renderTimeline(); });
+  document.getElementById('previousDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, -1); renderTimeline(); });
+  document.getElementById('nextDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, 1); renderTimeline(); });
   document.getElementById('saveScheduleButton').addEventListener('click', saveScheduleFromEditor);
+  document.getElementById('closeScheduleButton').addEventListener('click', closeScheduleEditorPreservingDraft);
+  document.getElementById('cancelScheduleButton').addEventListener('click', cancelScheduleEditor);
+  document.getElementById('scheduleDialog').addEventListener('click', (event) => {
+    if (event.target === event.currentTarget) closeScheduleEditorPreservingDraft();
+  });
+  document.getElementById('scheduleDialog').addEventListener('cancel', (event) => {
+    event.preventDefault();
+    closeScheduleEditorPreservingDraft();
+  });
   document.getElementById('deleteScheduleButton').addEventListener('click', async () => {
     const id = document.getElementById('scheduleId').value;
     const accepted = id && await window.yanjiConfirm({ title: '删除日程', message: '这条日程将从时间轴中移除，此操作无法撤销。', confirmText: '删除日程', tone: 'danger' });

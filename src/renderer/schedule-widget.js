@@ -57,7 +57,7 @@ function render() {
   document.getElementById('widgetScheduleList').innerHTML = schedules.length ? schedules.map((item) => {
     const timing = timeForToday(item);
     const priority = item.priority === 'high' ? '最高优先级' : item.priority === 'medium' ? '重要' : '普通';
-    return `<article class="widget-item tone-${escapeHtml(item.priority)} ${item.completedAt ? 'completed' : ''}"><time>${timing.start}<br>${timing.end}</time><div class="widget-item-copy"><strong>${escapeHtml(item.title)}</strong><span>${priority}${item.deadline ? ' · Deadline' : ''}${timing.spansDay ? ' · 跨日' : ''}</span></div><button class="widget-check" data-complete-schedule="${escapeHtml(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button" aria-label="${item.completedAt ? '恢复' : '完成'}${escapeHtml(item.title)}">${item.completedAt ? '✓' : ''}</button></article>`;
+    return `<article class="widget-item tone-${escapeHtml(item.priority)} ${item.completedAt ? 'completed' : ''}"><time>${timing.start}–${timing.end}</time><div class="widget-item-copy"><strong>${escapeHtml(item.title)}</strong><span>${priority}${item.deadline ? ' · Deadline' : ''}${timing.spansDay ? ' · 跨日' : ''}</span></div><button class="widget-check" data-complete-schedule="${escapeHtml(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button" aria-label="${item.completedAt ? '恢复' : '完成'}${escapeHtml(item.title)}">${item.completedAt ? '✓' : ''}</button></article>`;
   }).join('') : '<div class="widget-empty">今天还没有安排。<br>打开研迹新建一项日程吧。</div>';
 }
 
