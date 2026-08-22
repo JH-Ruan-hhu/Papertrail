@@ -6,21 +6,23 @@ const wb = {
   workspace: { schedules: [], notes: [], metadataFields: [], attendance: [], focusSessions: [] },
   selectedDate: new Date(),
   attendanceWeekStart: null,
-  editingNote: null
+  editingNote: null,
+  usageRange: 'day',
+  literatureResults: []
 };
 
-const pageTitles = Object.freeze({ home: '主页', schedule: '日程', attendance: '打卡', notes: '笔记', submissions: '投稿管理', settings: '设置' });
+const pageTitles = Object.freeze({ home: '主页', schedule: '日程', attendance: '打卡', notes: '笔记', literature: '文献推荐', submissions: '投稿管理', settings: '设置' });
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
-const dailyQuotes = Object.freeze([
-  '千里之行，始于足下。——《道德经》',
-  '不积跬步，无以至千里。——《荀子》',
-  '锲而不舍，金石可镂。——《荀子》',
-  '学而不思则罔，思而不学则殆。——《论语》',
-  '博学之，审问之，慎思之，明辨之，笃行之。——《礼记》',
-  '知之者不如好之者，好之者不如乐之者。——《论语》',
-  '纸上得来终觉浅，绝知此事要躬行。——陆游',
-  '业精于勤，荒于嬉；行成于思，毁于随。——韩愈'
-]);
+const UI_ICON_PATHS = Object.freeze({
+  check: '<path d="m6 12 4 4 8-9"/>',
+  chevron: '<path d="m9 6 6 6-6 6"/>',
+  note: '<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h4M9 12h6M9 16h4"/>',
+  external: '<path d="M13 5h6v6M19 5l-8 8"/><path d="M17 13v6H5V7h6"/>'
+});
+
+function uiIcon(name, className = 'ui-icon') {
+  return `<svg class="${className}" viewBox="0 0 24 24" aria-hidden="true">${UI_ICON_PATHS[name] || ''}</svg>`;
+}
 
 function wbEscape(value) {
   return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -107,13 +109,7 @@ function switchWorkbenchPage(page) {
 function renderClock() {
   const now = new Date();
   const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
-  const date = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(now);
   document.getElementById('topbarClock').textContent = clock;
-  document.getElementById('homeFeatureClock').textContent = clock;
-  document.getElementById('heroDate').textContent = date;
-  document.getElementById('homeGreeting').textContent = now.getHours() < 11 ? '早上好' : now.getHours() < 14 ? '中午好' : now.getHours() < 18 ? '下午好' : '晚上好';
-  const localDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() / 86_400_000;
-  document.getElementById('dailyQuote').textContent = dailyQuotes[Math.abs(Math.floor(localDay)) % dailyQuotes.length];
   renderHomeAttendance();
   renderFocus();
 }
@@ -138,13 +134,13 @@ function renderHome() {
     .filter((item) => !item.completedAt)
     .sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority] || Date.parse(a.startAt) - Date.parse(b.startAt))
     .slice(0, 5);
-  document.getElementById('todayFocusList').innerHTML = focus.length ? focus.map((item) => `<button class="focus-row" data-edit-schedule="${wbEscape(item.id)}" type="button"><span class="priority-dot ${item.priority}"></span><time>${formatTime(item.startAt)}</time><div><strong>${wbEscape(item.title)}</strong><small>${item.deadline ? 'Deadline · ' : ''}${priorityLabels[item.priority]}优先级</small></div><i>›</i></button>`).join('') : '<div class="workbench-empty"><span>✓</span><p>今天还没有安排，给自己留一点从容。</p></div>';
+  document.getElementById('todayFocusList').innerHTML = focus.length ? focus.map((item) => `<button class="focus-row" data-edit-schedule="${wbEscape(item.id)}" type="button"><span class="priority-dot ${item.priority}"></span><time>${formatTime(item.startAt)}</time><div><strong>${wbEscape(item.title)}</strong><small>${item.deadline ? 'Deadline · ' : ''}${priorityLabels[item.priority]}优先级</small></div><i>${uiIcon('chevron')}</i></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('check')}</span><p>今天还没有安排，给自己留一点从容。</p></div>`;
 
   const notes = wb.workspace.notes.slice(0, 3);
-  document.getElementById('latestNotes').innerHTML = notes.length ? notes.map((note) => `<button class="latest-note" data-edit-note="${wbEscape(note.id)}" type="button"><strong>${wbEscape(note.title)}</strong><p>${wbEscape(note.content.slice(0, 90) || '空白笔记')}</p><span>${formatUpdated(note.updatedAt)}</span></button>`).join('') : '<div class="workbench-empty"><span>✦</span><p>还没有笔记，先记下一条想法吧。</p></div>';
+  document.getElementById('latestNotes').innerHTML = notes.length ? notes.map((note) => `<button class="latest-note" data-edit-note="${wbEscape(note.id)}" type="button"><strong>${wbEscape(note.title)}</strong><p>${wbEscape(note.content.slice(0, 90) || '空白笔记')}</p><span>${formatUpdated(note.updatedAt)}</span></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('note')}</span><p>还没有笔记，先记下一条想法吧。</p></div>`;
   document.getElementById('navScheduleCount').textContent = String(wb.workspace.schedules.filter((item) => !item.completedAt && Date.parse(item.startAt) >= Date.now() - 86_400_000).length);
   document.getElementById('navNoteCount').textContent = String(wb.workspace.notes.length);
-  document.getElementById('navAttendanceCount').textContent = String(wb.workspace.attendance.filter((item) => item.date >= localDateKey(startOfWeek(new Date()))).length);
+  document.getElementById('navAttendanceCount').textContent = String(new Set(wb.workspace.attendance.filter((item) => item.date >= localDateKey(startOfWeek(new Date()))).map((item) => item.date)).size);
   renderHomeAttendance();
 }
 
@@ -154,13 +150,13 @@ function renderHomeAttendance() {
   const detail = document.getElementById('homeAttendanceDetail');
   const duration = document.getElementById('homeAttendanceDuration');
   const button = document.getElementById('homeClockButton');
-  const bar = document.getElementById('homeAttendanceBar');
-  const record = wb.workspace.attendance.find((item) => item.date === localDateKey(new Date()));
+  const track = document.getElementById('homeAttendanceTrack');
+  const todayKey = localDateKey(new Date());
+  const records = wb.workspace.attendance.filter((item) => item.date === todayKey).sort((a, b) => Date.parse(a.clockInAt) - Date.parse(b.clockInAt));
+  const openRecord = wb.workspace.attendance.find((item) => !item.clockOutAt);
   button.dataset.clockAction = '';
-  button.dataset.editAttendance = '';
-  bar.style.left = '0%';
-  bar.style.width = '0%';
-  if (!record) {
+  track.innerHTML = '';
+  if (!records.length && !openRecord) {
     status.textContent = '尚未打卡';
     detail.textContent = '开始今天的工作时记录上班时间';
     duration.textContent = '--';
@@ -168,23 +164,25 @@ function renderHomeAttendance() {
     button.dataset.clockAction = 'in';
     return;
   }
-  const start = new Date(record.clockInAt);
-  const end = record.clockOutAt ? new Date(record.clockOutAt) : new Date();
-  const startMinutes = start.getHours() * 60 + start.getMinutes();
-  const endMinutes = Math.max(startMinutes, Math.min(1440, end.getHours() * 60 + end.getMinutes()));
-  bar.style.left = `${startMinutes / 1440 * 100}%`;
-  bar.style.width = `${Math.max(0.5, (endMinutes - startMinutes) / 1440 * 100)}%`;
-  duration.textContent = formatDuration(end - start);
-  if (!record.clockOutAt) {
-    status.textContent = '工作中';
-    detail.textContent = `${formatTime(record.clockInAt)} 上班，正在累计工作时间`;
+  track.innerHTML = records.map((record) => {
+    const start = new Date(record.clockInAt);
+    const end = record.clockOutAt ? new Date(record.clockOutAt) : new Date();
+    const startMinutes = start.getHours() * 60 + start.getMinutes();
+    const endMinutes = Math.max(startMinutes, Math.min(1440, end.getHours() * 60 + end.getMinutes()));
+    return `<span class="${record.clockOutAt ? '' : 'open'}" style="left:${startMinutes / 1440 * 100}%;width:${Math.max(.5, (endMinutes - startMinutes) / 1440 * 100)}%"></span>`;
+  }).join('');
+  const totalMs = records.reduce((sum, record) => sum + Math.max(0, (record.clockOutAt ? Date.parse(record.clockOutAt) : Date.now()) - Date.parse(record.clockInAt)), 0);
+  duration.textContent = formatDuration(totalMs);
+  if (openRecord) {
+    status.textContent = `工作中 · 第 ${records.length || 1} 段`;
+    detail.textContent = `${formatTime(openRecord.clockInAt)} 上班，应用使用时间正在统计`;
     button.textContent = '下班打卡';
     button.dataset.clockAction = 'out';
   } else {
-    status.textContent = '今日已完成';
-    detail.textContent = `${formatTime(record.clockInAt)}–${formatTime(record.clockOutAt)}`;
-    button.textContent = '修改记录';
-    button.dataset.editAttendance = record.id;
+    status.textContent = `今日已记录 ${records.length} 段`;
+    detail.textContent = records.map((record) => `${formatTime(record.clockInAt)}–${formatTime(record.clockOutAt)}`).join(' · ');
+    button.textContent = '再次上班';
+    button.dataset.clockAction = 'in';
   }
 }
 
@@ -215,7 +213,7 @@ function renderTimeline() {
     track.append(line);
   }
   document.getElementById('agendaSummary').textContent = `${events.length} 项安排`;
-  document.getElementById('agendaList').innerHTML = events.length ? events.map((item) => `<article class="agenda-row ${item.completedAt ? 'completed' : ''}"><button class="agenda-check" data-complete-schedule="${wbEscape(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button">${item.completedAt ? '✓' : ''}</button><time>${formatTime(item.startAt)}<small>${formatTime(item.endAt)}</small></time><span class="priority-bar ${item.priority}"></span><div><strong>${wbEscape(item.title)}</strong><small>${item.deadline ? 'Deadline · ' : ''}${priorityLabels[item.priority]}优先级</small></div><button class="agenda-edit" data-edit-schedule="${wbEscape(item.id)}" type="button">编辑</button></article>`).join('') : '<div class="workbench-empty large"><span>24</span><p>这一天还没有安排。时间轴是空的，也是可以自由决定的。</p></div>';
+  document.getElementById('agendaList').innerHTML = events.length ? events.map((item) => `<article class="agenda-row ${item.completedAt ? 'completed' : ''}"><button class="agenda-check" data-complete-schedule="${wbEscape(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button">${item.completedAt ? uiIcon('check') : ''}</button><time>${formatTime(item.startAt)}<small>${formatTime(item.endAt)}</small></time><span class="priority-bar ${item.priority}"></span><div><strong>${wbEscape(item.title)}</strong><small>${item.deadline ? 'Deadline · ' : ''}${priorityLabels[item.priority]}优先级</small></div><button class="agenda-edit" data-edit-schedule="${wbEscape(item.id)}" type="button">编辑</button></article>`).join('') : '<div class="workbench-empty large"><span>24</span><p>这一天还没有安排。时间轴是空的，也是可以自由决定的。</p></div>';
   requestAnimationFrame(() => {
     const earliestHour = events.length
       ? Math.min(...events.map((item) => new Date(item.startAt).getHours()))
@@ -245,7 +243,7 @@ function renderAttendance() {
   document.getElementById('attendanceGanttHours').innerHTML = '<span></span>' + Array.from({ length: 9 }, (_, index) => `<time>${String(index * 3).padStart(2, '0')}:00</time>`).join('');
   const weekRecords = wb.workspace.attendance.filter((record) => record.date >= localDateKey(weekStart) && record.date <= localDateKey(weekEnd));
   const totalMs = weekRecords.reduce((sum, record) => sum + (record.clockOutAt ? Date.parse(record.clockOutAt) - Date.parse(record.clockInAt) : (record.date === localDateKey(new Date()) ? Date.now() - Date.parse(record.clockInAt) : 0)), 0);
-  document.getElementById('attendanceDays').textContent = `${weekRecords.length} 天`;
+  document.getElementById('attendanceDays').textContent = `${new Set(weekRecords.map((record) => record.date)).size} 天`;
   document.getElementById('attendanceTotal').textContent = formatDuration(totalMs);
   document.getElementById('attendanceAverageStart').textContent = averageClock(weekRecords, 'clockInAt');
   document.getElementById('attendanceAverageEnd').textContent = averageClock(weekRecords, 'clockOutAt');
@@ -253,10 +251,9 @@ function renderAttendance() {
   document.getElementById('attendanceGanttRows').innerHTML = Array.from({ length: 7 }, (_, index) => {
     const date = addDays(weekStart, index);
     const dateKey = localDateKey(date);
-    const record = weekRecords.find((item) => item.date === dateKey);
+    const records = weekRecords.filter((item) => item.date === dateKey).sort((a, b) => Date.parse(a.clockInAt) - Date.parse(b.clockInAt));
     const isToday = dateKey === localDateKey(new Date());
-    let bar = '';
-    if (record) {
+    const bars = records.map((record, recordIndex) => {
       const start = new Date(record.clockInAt);
       const end = record.clockOutAt ? new Date(record.clockOutAt) : (isToday ? new Date() : new Date(start));
       const startMinutes = start.getHours() * 60 + start.getMinutes();
@@ -264,11 +261,32 @@ function renderAttendance() {
       const left = startMinutes / 1440 * 100;
       const width = Math.max(.6, (endMinutes - startMinutes) / 1440 * 100);
       const label = record.clockOutAt ? `${formatTime(record.clockInAt)}–${formatTime(record.clockOutAt)}` : `${formatTime(record.clockInAt)}–进行中`;
-      bar = `<button class="attendance-bar ${record.clockOutAt ? '' : 'open'}" style="left:${left}%;width:${width}%" data-edit-attendance="${wbEscape(record.id)}" type="button"><span>${label}</span></button>`;
-    }
-    return `<div class="attendance-gantt-row ${isToday ? 'today' : ''}"><div class="attendance-day"><strong>${weekday[index]}</strong><small>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}</small></div><div class="attendance-row-track">${Array.from({ length: 8 }, () => '<i></i>').join('')}${bar}</div></div>`;
+      return `<button class="attendance-bar ${record.clockOutAt ? '' : 'open'}" style="left:${left}%;width:${width}%;top:${8 + recordIndex * 25}px" data-edit-attendance="${wbEscape(record.id)}" type="button"><span>${label}</span></button>`;
+    }).join('');
+    return `<div class="attendance-gantt-row ${isToday ? 'today' : ''}" style="min-height:${Math.max(56, 16 + records.length * 25)}px"><div class="attendance-day"><strong>${weekday[index]}</strong><small>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}${records.length > 1 ? ` · ${records.length} 段` : ''}</small></div><div class="attendance-row-track">${Array.from({ length: 8 }, () => '<i></i>').join('')}${bars}</div></div>`;
   }).join('');
+  renderAttendanceUsage();
   renderFocus();
+}
+
+function renderAttendanceUsage() {
+  const list = document.getElementById('focusUsageList');
+  if (!list) return;
+  const today = new Date();
+  const rangeStart = wb.usageRange === 'week' ? localDateKey(startOfWeek(today)) : localDateKey(today);
+  const rangeEnd = wb.usageRange === 'week' ? localDateKey(addDays(startOfWeek(today), 6)) : localDateKey(today);
+  const usage = {};
+  for (const record of wb.workspace.attendance.filter((item) => item.date >= rangeStart && item.date <= rangeEnd)) {
+    for (const [name, seconds] of Object.entries(record.appUsage || {})) usage[name] = (usage[name] || 0) + seconds;
+  }
+  const entries = Object.entries(usage).sort((a, b) => b[1] - a[1]).slice(0, 8);
+  const total = entries.reduce((sum, [, seconds]) => sum + seconds, 0);
+  const max = Math.max(1, ...entries.map(([, seconds]) => seconds));
+  document.getElementById('focusUsageTotal').textContent = `${wb.usageRange === 'week' ? '本周' : '今天'} ${formatDuration(total * 1000)}`;
+  document.querySelectorAll('[data-usage-range]').forEach((button) => button.classList.toggle('active', button.dataset.usageRange === wb.usageRange));
+  list.innerHTML = entries.length
+    ? entries.map(([name, seconds]) => `<div class="focus-usage-row"><div><strong>${wbEscape(name)}</strong><time>${formatDuration(seconds * 1000)}</time></div><span><i style="width:${Math.max(3, seconds / max * 100)}%"></i></span></div>`).join('')
+    : `<p class="focus-usage-empty">${wb.usageRange === 'week' ? '本周' : '今天'}还没有打卡期间的应用记录</p>`;
 }
 
 function focusSessionElapsedMs(session, now = Date.now()) {
@@ -299,6 +317,10 @@ function renderFocus() {
   caption.textContent = active ? '正在专注' : '准备专注';
   document.getElementById('focusRing').style.setProperty('--focus-progress', `${active ? Math.min(1, elapsedMs / (plannedMinutes * 60_000)) * 360 : 0}deg`);
   duration.disabled = Boolean(active);
+  document.querySelectorAll('[data-focus-minutes]').forEach((button) => {
+    button.disabled = Boolean(active);
+    button.classList.toggle('active', Number(button.dataset.focusMinutes) === Number(duration.value));
+  });
   suppress.disabled = Boolean(active);
   startButton.hidden = Boolean(active);
   stopButton.hidden = !active;
@@ -307,17 +329,6 @@ function renderFocus() {
   else if (active && !active.suppressNotifications) notificationStatus.textContent = '本次专注未暂停 Windows 通知';
   else notificationStatus.textContent = '仅在计时期间生效，结束后自动恢复';
 
-  const usage = {};
-  for (const session of todaySessions) {
-    for (const [name, seconds] of Object.entries(session.appUsage || {})) usage[name] = (usage[name] || 0) + seconds;
-  }
-  const usageEntries = Object.entries(usage).sort((a, b) => b[1] - a[1]).slice(0, 6);
-  const usageTotal = usageEntries.reduce((sum, [, seconds]) => sum + seconds, 0);
-  const usageMax = Math.max(1, ...usageEntries.map(([, seconds]) => seconds));
-  document.getElementById('focusUsageTotal').textContent = formatDuration(usageTotal * 1000);
-  document.getElementById('focusUsageList').innerHTML = usageEntries.length
-    ? usageEntries.map(([name, seconds]) => `<div class="focus-usage-row"><div><strong>${wbEscape(name)}</strong><time>${formatDuration(seconds * 1000)}</time></div><span><i style="width:${Math.max(3, seconds / usageMax * 100)}%"></i></span></div>`).join('')
-    : '<p class="focus-usage-empty">开始专注后自动统计</p>';
 }
 
 function openAttendanceEditor(record = null) {
@@ -479,7 +490,28 @@ async function saveNoteFromEditor() {
 
 function renderMetadataManager() {
   const list = document.getElementById('metadataFieldList');
-  list.innerHTML = wb.workspace.metadataFields.map((field) => `<div class="metadata-field-row" data-field-id="${wbEscape(field.id)}"><input data-field-name value="${wbEscape(field.name)}" placeholder="字段名称"><select data-field-type><option value="text" ${field.type === 'text' ? 'selected' : ''}>文本</option><option value="select" ${field.type === 'select' ? 'selected' : ''}>选择框</option><option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>复选框</option></select><input data-field-options value="${wbEscape(field.options.join('，'))}" placeholder="选项，用逗号分隔" ${field.type !== 'select' ? 'hidden' : ''}><button data-remove-field type="button">删除</button></div>`).join('');
+  list.innerHTML = wb.workspace.metadataFields.map((field) => metadataFieldRowHtml(field)).join('');
+}
+
+function metadataFieldRowHtml(field = {}) {
+  const options = Array.isArray(field.options) ? field.options : [];
+  return `<div class="metadata-field-row" data-field-id="${wbEscape(field.id || '')}"><input data-field-name value="${wbEscape(field.name || '')}" placeholder="字段名称"><select data-field-type><option value="text" ${field.type === 'text' ? 'selected' : ''}>文本</option><option value="select" ${field.type === 'select' ? 'selected' : ''}>选择框</option><option value="checkbox" ${field.type === 'checkbox' ? 'selected' : ''}>复选框</option></select><div class="metadata-options-editor" ${field.type !== 'select' ? 'hidden' : ''}><div data-option-chips>${options.map((option, index) => `<span>${wbEscape(option)}<button data-remove-option="${index}" type="button" aria-label="删除选项">×</button></span>`).join('')}</div><div class="metadata-option-entry"><input data-option-draft placeholder="输入选项后按 Enter"><button data-add-option type="button">添加</button></div><input data-field-options type="hidden" value="${wbEscape(options.join('\n'))}"></div><button data-remove-field type="button">删除</button></div>`;
+}
+
+function updateMetadataOptions(row, values) {
+  const options = [...new Set(values.map((value) => String(value).trim()).filter(Boolean))].slice(0, 50);
+  row.querySelector('[data-field-options]').value = options.join('\n');
+  row.querySelector('[data-option-chips]').innerHTML = options.map((option, index) => `<span>${wbEscape(option)}<button data-remove-option="${index}" type="button" aria-label="删除选项">×</button></span>`).join('');
+}
+
+function addMetadataOption(row) {
+  const draft = row.querySelector('[data-option-draft]');
+  const additions = draft.value.split(/[，,\n]/).map((value) => value.trim()).filter(Boolean);
+  if (!additions.length) return;
+  const existing = row.querySelector('[data-field-options]').value.split('\n').filter(Boolean);
+  updateMetadataOptions(row, [...existing, ...additions]);
+  draft.value = '';
+  draft.focus();
 }
 
 function openMetadataManager() {
@@ -493,7 +525,7 @@ async function saveMetadataManager() {
     id: row.dataset.fieldId || undefined,
     name: row.querySelector('[data-field-name]').value,
     type: row.querySelector('[data-field-type]').value,
-    options: row.querySelector('[data-field-options]').value.split(/[，,]/).map((item) => item.trim()).filter(Boolean)
+    options: row.querySelector('[data-field-options]').value.split('\n').map((item) => item.trim()).filter(Boolean)
   }));
   try {
     wb.workspace.metadataFields = await workbenchApi.saveMetadataFields(fields);
@@ -505,16 +537,39 @@ async function saveMetadataManager() {
   }
 }
 
-async function loadWallpaper() {
-  const wallpaper = await workbenchApi.getBingWallpaper().catch(() => null);
-  const image = document.getElementById('bingWallpaper');
-  if (!wallpaper?.url) {
-    image.removeAttribute('src');
-    document.getElementById('wallpaperCredit').textContent = '离线专注模式';
-    return;
+function renderLiteratureResults(response) {
+  const items = Array.isArray(response?.items) ? response.items.slice(0, 3) : [];
+  wb.literatureResults = items;
+  document.getElementById('literatureResultTitle').textContent = items.length ? `找到 ${items.length} 篇最新相关文章` : '没有找到符合全部条件的文章';
+  document.getElementById('literatureResultMeta').textContent = response?.fromDate ? `${response.fromDate} 起 · 按发布日期倒序` : '按发布日期倒序';
+  const cards = items.map((item, index) => `<article class="literature-card"><header><span>0${index + 1}</span><time>${wbEscape(item.publicationDate || '日期未知')}</time></header><h2>${wbEscape(item.title)}</h2><p class="literature-journal">${wbEscape(item.journal || '来源未知')}${item.impactProxy == null ? '' : ` · 2 年影响指标 ${Number(item.impactProxy).toFixed(1)}`}</p><p class="literature-authors">${wbEscape(item.authors?.join('、') || '作者信息暂缺')}</p><div class="literature-summary"><strong>摘要要点</strong><p>${wbEscape(item.summary || '当前记录未提供摘要。')}</p></div><footer><span>${item.citedByCount || 0} 次被引${item.isOpenAccess ? ' · 开放获取' : ''}</span><button class="text-button icon-button" data-literature-url="${wbEscape(item.url || '')}" type="button" ${item.url ? '' : 'disabled'}>打开文章 ${uiIcon('external')}</button></footer></article>`);
+  while (cards.length < 3) cards.push(`<article class="literature-card empty"><span>0${cards.length + 1}</span><p>当前筛选条件下暂无更多文章。可以扩大年份范围或降低影响指标。</p></article>`);
+  document.getElementById('literatureResults').innerHTML = cards.join('');
+}
+
+async function recommendLiterature() {
+  const query = document.getElementById('literatureQuery').value.trim();
+  if (query.length < 2) return showWorkbenchToast('请至少输入 2 个字符的推荐关键词。', 'error');
+  const button = document.getElementById('recommendLiteratureButton');
+  button.disabled = true;
+  button.textContent = '正在检索…';
+  document.getElementById('literatureResultTitle').textContent = '正在查找最新文献';
+  try {
+    const response = await workbenchApi.recommendLiterature({
+      query,
+      journal: document.getElementById('literatureJournal').value.trim(),
+      minimumImpact: Number(document.getElementById('literatureImpact').value) || 0,
+      years: Number(document.getElementById('literatureYears').value) || 2
+    });
+    renderLiteratureResults(response);
+  } catch (exception) {
+    document.getElementById('literatureResultTitle').textContent = '文献检索暂时不可用';
+    document.getElementById('literatureResultMeta').textContent = '请检查网络后重试';
+    showWorkbenchToast(exception.message || '无法获取最新文献。', 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = '查找最新文献';
   }
-  image.src = wallpaper.url;
-  document.getElementById('wallpaperCredit').textContent = wallpaper.copyright;
 }
 
 async function refreshWorkspace(workspace = null) {
@@ -531,6 +586,7 @@ function bindWorkbenchEvents() {
   document.querySelectorAll('[data-workbench-page]').forEach((button) => button.addEventListener('click', () => switchWorkbenchPage(button.dataset.workbenchPage)));
   document.querySelectorAll('[data-go-page]').forEach((button) => button.addEventListener('click', () => switchWorkbenchPage(button.dataset.goPage)));
   document.getElementById('quickScheduleButton').addEventListener('click', () => openScheduleEditor());
+  document.getElementById('quickNoteButton').addEventListener('click', () => openNoteEditor());
   document.getElementById('addScheduleButton').addEventListener('click', () => openScheduleEditor());
   document.getElementById('scheduleTodayButton').addEventListener('click', () => { wb.selectedDate = new Date(); renderTimeline(); });
   document.getElementById('previousDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, -1); renderTimeline(); });
@@ -573,7 +629,14 @@ function bindWorkbenchEvents() {
     closeWorkbenchDialog(document.getElementById('attendanceDialog'));
     showWorkbenchToast('打卡记录已删除。');
   });
-  document.getElementById('focusDuration').addEventListener('change', renderFocus);
+  document.querySelectorAll('[data-focus-minutes]').forEach((button) => button.addEventListener('click', () => {
+    document.getElementById('focusDuration').value = button.dataset.focusMinutes;
+    renderFocus();
+  }));
+  document.querySelectorAll('[data-usage-range]').forEach((button) => button.addEventListener('click', () => {
+    wb.usageRange = button.dataset.usageRange;
+    renderAttendanceUsage();
+  }));
   document.getElementById('startFocusButton').addEventListener('click', async () => {
     const suppressNotifications = document.getElementById('focusSuppressNotifications').checked;
     if (suppressNotifications) {
@@ -627,19 +690,46 @@ function bindWorkbenchEvents() {
   document.getElementById('manageMetadataButton').addEventListener('click', openMetadataManager);
   document.getElementById('openMetadataManagerButton').addEventListener('click', openMetadataManager);
   document.getElementById('addMetadataFieldButton').addEventListener('click', () => {
-    const row = document.createElement('div');
-    row.className = 'metadata-field-row';
-    row.innerHTML = '<input data-field-name placeholder="字段名称"><select data-field-type><option value="text">文本</option><option value="select">选择框</option><option value="checkbox">复选框</option></select><input data-field-options placeholder="选项，用逗号分隔" hidden><button data-remove-field type="button">删除</button>';
+    const template = document.createElement('template');
+    template.innerHTML = metadataFieldRowHtml({ type: 'text', options: [] });
+    const row = template.content.firstElementChild;
     document.getElementById('metadataFieldList').append(row);
-    row.querySelector('input').focus();
+    row.querySelector('[data-field-name]').focus();
   });
   document.getElementById('metadataFieldList').addEventListener('change', (event) => {
-    if (event.target.matches('[data-field-type]')) event.target.closest('.metadata-field-row').querySelector('[data-field-options]').hidden = event.target.value !== 'select';
+    if (event.target.matches('[data-field-type]')) event.target.closest('.metadata-field-row').querySelector('.metadata-options-editor').hidden = event.target.value !== 'select';
   });
-  document.getElementById('metadataFieldList').addEventListener('click', (event) => { if (event.target.matches('[data-remove-field]')) event.target.closest('.metadata-field-row').remove(); });
+  document.getElementById('metadataFieldList').addEventListener('click', (event) => {
+    const row = event.target.closest('.metadata-field-row');
+    if (!row) return;
+    if (event.target.matches('[data-remove-field]')) row.remove();
+    if (event.target.matches('[data-add-option]')) addMetadataOption(row);
+    if (event.target.matches('[data-remove-option]')) {
+      const options = row.querySelector('[data-field-options]').value.split('\n').filter(Boolean);
+      options.splice(Number(event.target.dataset.removeOption), 1);
+      updateMetadataOptions(row, options);
+    }
+  });
+  document.getElementById('metadataFieldList').addEventListener('keydown', (event) => {
+    if (event.target.matches('[data-option-draft]') && event.key === 'Enter') {
+      event.preventDefault();
+      addMetadataOption(event.target.closest('.metadata-field-row'));
+    }
+  });
   document.getElementById('saveMetadataButton').addEventListener('click', saveMetadataManager);
+  document.getElementById('noteDialog').addEventListener('click', (event) => {
+    if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget);
+  });
+  document.getElementById('recommendLiteratureButton').addEventListener('click', recommendLiterature);
+  document.getElementById('literatureQuery').addEventListener('keydown', (event) => { if (event.key === 'Enter') recommendLiterature(); });
+  document.querySelectorAll('[data-literature-years]').forEach((button) => button.addEventListener('click', () => {
+    document.getElementById('literatureYears').value = button.dataset.literatureYears;
+    document.querySelectorAll('[data-literature-years]').forEach((item) => item.classList.toggle('active', item === button));
+  }));
   document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => closeWorkbenchDialog(document.getElementById(button.dataset.closeDialog))));
   document.body.addEventListener('click', async (event) => {
+    const literatureTarget = event.target.closest('[data-literature-url]');
+    if (literatureTarget?.dataset.literatureUrl) return workbenchApi.openExternal(literatureTarget.dataset.literatureUrl);
     const attendanceTarget = event.target.closest('[data-edit-attendance]');
     if (attendanceTarget?.dataset.editAttendance) return openAttendanceEditor(wb.workspace.attendance.find((item) => item.id === attendanceTarget.dataset.editAttendance));
     const scheduleTarget = event.target.closest('[data-edit-schedule]');
@@ -660,7 +750,7 @@ async function initializeWorkbench() {
   setInterval(renderClock, 15_000);
   const settings = await workbenchApi.getSettings().catch(() => null);
   if (settings?.quickCaptureShortcut) document.getElementById('shortcutTip').textContent = settings.quickCaptureShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
-  await Promise.all([refreshWorkspace(), loadWallpaper()]);
+  await refreshWorkspace();
   workbenchApi.onWorkspaceChanged(refreshWorkspace);
   workbenchApi.onWorkspaceNavigate(switchWorkbenchPage);
   workbenchApi.onFocusChanged((sessions) => {

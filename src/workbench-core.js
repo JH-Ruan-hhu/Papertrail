@@ -253,11 +253,20 @@ function normalizeAttendance(value, index = 0, fallbackAt = new Date(0).toISOStr
     throw new Error(`第 ${index + 1} 条打卡记录的下班时间必须晚于上班时间。`);
   }
   const createdAt = isoDate(value.createdAt, fallbackAt);
+  const appUsage = {};
+  if (asObject(value.appUsage)) {
+    for (const [name, seconds] of Object.entries(value.appUsage).slice(0, 100)) {
+      const safeName = cleanText(name, 100);
+      const safeSeconds = Math.max(0, Math.min(31_536_000, Math.round(Number(seconds) || 0)));
+      if (safeName && safeSeconds) appUsage[safeName] = safeSeconds;
+    }
+  }
   return {
     id: cleanText(value.id, 200) || `attendance-${index + 1}`,
     date,
     clockInAt,
     clockOutAt,
+    appUsage,
     createdAt,
     updatedAt: isoDate(value.updatedAt, createdAt)
   };
@@ -332,8 +341,7 @@ function saveNote(list, input, now = new Date().toISOString(), makeId = () => `n
 }
 
 function saveAttendance(list, input, now = new Date().toISOString(), makeId = () => `attendance-${Date.now()}`) {
-  const existing = (input?.id ? list.find((item) => item.id === String(input.id)) : null)
-    || list.find((item) => item.date === String(input?.date || ''));
+  const existing = input?.id ? list.find((item) => item.id === String(input.id)) : null;
   const candidate = normalizeAttendance({
     ...existing,
     ...input,

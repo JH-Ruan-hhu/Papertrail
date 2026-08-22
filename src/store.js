@@ -12,7 +12,6 @@ const DEFAULT_SETTINGS = Object.freeze({
   closeToTray: true,
   startAtLogin: false,
   autoCheckUpdates: true,
-  bingWallpaper: true,
   quickCaptureShortcut: 'CommandOrControl+Shift+Space'
 });
 

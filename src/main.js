@@ -16,6 +16,7 @@ const {
   net,
   Notification,
   safeStorage,
+  screen,
   shell,
   Tray
 } = require('electron');
@@ -98,7 +99,8 @@ let focusSamplerBuffer = '';
 let focusUsageLive = {};
 let focusLastSampleAt = 0;
 let focusLastPersistAt = 0;
-let bingWallpaperCache;
+let attendanceUsageLive = {};
+let attendanceLastPersistAt = 0;
 let lastBackupCleanupAt = 0;
 const stickyWindows = new Map();
 const deadlineWindows = new Map();
@@ -514,11 +516,14 @@ function broadcastPapers() {
 }
 
 function workspaceForRenderer() {
+  const activeAttendance = activeAttendanceRecord();
   return {
     schedules: [...store.listSchedules()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)),
     notes: [...store.listNotes()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     metadataFields: store.listMetadataFields(),
-    attendance: [...store.listAttendance()].sort((a, b) => b.date.localeCompare(a.date)),
+    attendance: [...store.listAttendance()]
+      .map((record) => record.id === activeAttendance?.id ? { ...record, appUsage: { ...attendanceUsageLive } } : record)
+      .sort((a, b) => b.date.localeCompare(a.date) || Date.parse(b.clockInAt) - Date.parse(a.clockInAt)),
     focusSessions: focusSessionsForRenderer()
   };
 }
@@ -604,47 +609,193 @@ function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function cleanLiteratureText(value, limit = 2_000) {
+  return String(value || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, limit);
+}
+
+function reconstructOpenAlexAbstract(index) {
+  if (!index || typeof index !== 'object' || Array.isArray(index)) return '';
+  const words = [];
+  for (const [word, positions] of Object.entries(index)) {
+    if (!Array.isArray(positions)) continue;
+    for (const position of positions) if (Number.isInteger(position) && position >= 0 && position < 20_000) words[position] = word;
+  }
+  return cleanLiteratureText(words.filter(Boolean).join(' '), 8_000);
+}
+
+function summarizeLiteratureAbstract(abstract, work) {
+  const cleaned = cleanLiteratureText(abstract, 8_000);
+  if (cleaned) {
+    const sentences = cleaned.match(/[^.!?。！？]+[.!?。！？]?/g) || [cleaned];
+    return cleanLiteratureText(sentences.slice(0, 2).join(' '), 520);
+  }
+  const topics = (work.topics || []).slice(0, 3).map((topic) => cleanLiteratureText(topic.display_name, 80)).filter(Boolean);
+  const topicText = topics.length ? `，主题涉及 ${topics.join('、')}` : '';
+  return `这是一篇发表于 ${cleanLiteratureText(work.publication_date, 20) || '近期'} 的研究${topicText}。OpenAlex 当前未提供可复述摘要，请打开原文核对研究问题、方法与结论。`;
+}
+
+async function fetchOpenAlexJson(url) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 18_000);
+  try {
+    const response = await net.fetch(url, {
+      headers: { Accept: 'application/json', 'User-Agent': 'Yanji-Research-Workbench/0.9 (https://github.com/JH-Ruan-hhu/Papertrail)' },
+      signal: controller.signal
+    });
+    if (!response.ok) {
+      if (response.status === 429) throw new Error('OpenAlex 请求较多，请稍后再试。');
+      if (response.status === 401 || response.status === 403) throw new Error('OpenAlex 当前要求访问凭据，暂时无法获取推荐。');
+      throw new Error(`OpenAlex 返回错误（${response.status}）。`);
+    }
+    return response.json();
+  } catch (error) {
+    if (error?.name === 'AbortError') throw new Error('文献检索超时，请检查网络后重试。');
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function safeArticleUrl(work) {
+  const candidate = work.doi || work.primary_location?.landing_page_url || work.open_access?.oa_url || '';
+  try {
+    const url = new URL(candidate);
+    return ['https:', 'http:'].includes(url.protocol) ? url.toString() : '';
+  } catch {
+    return '';
+  }
+}
+
+async function recommendLatestLiterature(input) {
+  const query = cleanLiteratureText(input?.query, 200);
+  const journal = cleanLiteratureText(input?.journal, 200);
+  const minimumImpact = Math.max(0, Math.min(100, Number(input?.minimumImpact) || 0));
+  const years = [1, 2, 5].includes(Number(input?.years)) ? Number(input.years) : 2;
+  if (query.length < 2) throw new Error('请至少输入 2 个字符的推荐关键词。');
+  const from = new Date();
+  from.setFullYear(from.getFullYear() - years);
+  const fromDate = localDateKey(from);
+  let resolvedSource = null;
+  if (journal) {
+    const sourceUrl = new URL('https://api.openalex.org/sources');
+    sourceUrl.searchParams.set('search', journal);
+    sourceUrl.searchParams.set('per-page', '5');
+    const sources = (await fetchOpenAlexJson(sourceUrl.toString())).results || [];
+    const normalized = journal.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+    resolvedSource = sources.find((source) => [source.display_name, ...(source.alternate_titles || [])].some((name) => cleanLiteratureText(name, 200).toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, '') === normalized)) || sources[0] || null;
+    if (!resolvedSource) throw new Error(`没有找到期刊“${journal}”，请检查名称后重试。`);
+  }
+  const filters = [`from_publication_date:${fromDate}`, `to_publication_date:${localDateKey(new Date())}`, 'type:article', 'is_retracted:false'];
+  if (resolvedSource?.id) filters.push(`primary_location.source.id:${resolvedSource.id.split('/').pop()}`);
+  const worksUrl = new URL('https://api.openalex.org/works');
+  worksUrl.searchParams.set('search', query);
+  worksUrl.searchParams.set('filter', filters.join(','));
+  worksUrl.searchParams.set('sort', 'publication_date:desc');
+  worksUrl.searchParams.set('per-page', '40');
+  const works = (await fetchOpenAlexJson(worksUrl.toString())).results || [];
+  const sourceIds = [...new Set(works.map((work) => work.primary_location?.source?.id).filter(Boolean).map((id) => id.split('/').pop()))];
+  const sourceMap = new Map();
+  if (sourceIds.length) {
+    const sourcesUrl = new URL('https://api.openalex.org/sources');
+    sourcesUrl.searchParams.set('filter', `openalex:${sourceIds.join('|')}`);
+    sourcesUrl.searchParams.set('per-page', '100');
+    const sourceDetails = (await fetchOpenAlexJson(sourcesUrl.toString())).results || [];
+    sourceDetails.forEach((source) => sourceMap.set(source.id?.split('/').pop(), source));
+  }
+  const items = [];
+  for (const work of works) {
+    const sourceId = work.primary_location?.source?.id?.split('/').pop();
+    const source = sourceMap.get(sourceId) || work.primary_location?.source || {};
+    const impactProxy = Number(source.summary_stats?.['2yr_mean_citedness']);
+    if (minimumImpact && (!Number.isFinite(impactProxy) || impactProxy < minimumImpact)) continue;
+    const abstract = reconstructOpenAlexAbstract(work.abstract_inverted_index);
+    items.push({
+      id: cleanLiteratureText(work.id, 120),
+      title: cleanLiteratureText(work.display_name || work.title, 500) || '未命名文章',
+      publicationDate: cleanLiteratureText(work.publication_date, 20),
+      journal: cleanLiteratureText(source.display_name || work.primary_location?.source?.display_name, 300) || '来源未知',
+      impactProxy: Number.isFinite(impactProxy) ? impactProxy : null,
+      authors: (work.authorships || []).slice(0, 6).map((entry) => cleanLiteratureText(entry.author?.display_name, 120)).filter(Boolean),
+      summary: summarizeLiteratureAbstract(abstract, work),
+      citedByCount: Math.max(0, Number(work.cited_by_count) || 0),
+      isOpenAccess: Boolean(work.open_access?.is_oa),
+      url: safeArticleUrl(work)
+    });
+    if (items.length === 3) break;
+  }
+  return { items, fromDate, journal: resolvedSource?.display_name || journal || null, metric: 'OpenAlex 2yr_mean_citedness' };
+}
+
 function saveWorkspaceAttendance(input) {
+  const before = store.listAttendance();
+  const existing = input?.id ? before.find((item) => item.id === String(input.id)) : null;
+  const activeOther = before.find((item) => !item.clockOutAt && item.id !== String(input?.id || ''));
+  if (!input?.clockOutAt && activeOther) throw new Error('已有一段工作正在计时，请先下班打卡。');
+  const closingActive = Boolean(existing && !existing.clockOutAt && input?.clockOutAt);
+  if (closingActive) persistAttendanceUsage();
+  const prepared = closingActive ? { ...input, appUsage: { ...attendanceUsageLive } } : input;
+  let createdId = null;
   const attendance = saveAttendance(
-    store.listAttendance(),
-    input,
+    before,
+    prepared,
     new Date().toISOString(),
-    () => crypto.randomUUID()
+    () => { createdId = crypto.randomUUID(); return createdId; }
   );
   store.setAttendance(attendance);
-  broadcastWorkspace();
-  return attendance.find((item) => item.id === String(input?.id || ''))
-    || attendance.find((item) => item.date === String(input?.date || ''))
+  const saved = attendance.find((item) => item.id === String(input?.id || ''))
+    || attendance.find((item) => item.id === createdId)
     || attendance[0];
+  if (!saved.clockOutAt) {
+    attendanceUsageLive = { ...(saved.appUsage || {}) };
+    attendanceLastPersistAt = Date.now();
+    startFocusSampler();
+  } else if (closingActive) {
+    attendanceUsageLive = {};
+    stopUsageSamplerIfIdle();
+  }
+  broadcastWorkspace();
+  return saved;
 }
 
 function clockWorkspaceAttendance(action) {
   const now = new Date();
   const records = store.listAttendance();
   const openRecord = records.find((item) => !item.clockOutAt);
-  const todayRecord = records.find((item) => item.date === localDateKey(now));
   if (action === 'in') {
-    if (openRecord) return openRecord;
-    if (todayRecord) throw new Error('今天已经完成打卡，可在打卡页面修改记录。');
-    return saveWorkspaceAttendance({ date: localDateKey(now), clockInAt: now.toISOString(), clockOutAt: null });
+    if (openRecord) throw new Error('当前已有一段工作正在计时，请先下班打卡。');
+    const record = saveWorkspaceAttendance({ date: localDateKey(now), clockInAt: now.toISOString(), clockOutAt: null, appUsage: {} });
+    attendanceUsageLive = {};
+    attendanceLastPersistAt = Date.now();
+    startFocusSampler();
+    return record;
   }
   if (action === 'out') {
     if (!openRecord) throw new Error('当前没有进行中的上班记录。');
-    return saveWorkspaceAttendance({ ...openRecord, clockOutAt: now.toISOString() });
+    const record = saveWorkspaceAttendance({ ...openRecord, appUsage: attendanceUsageLive, clockOutAt: now.toISOString() });
+    return record;
   }
   throw new Error('不支持的打卡操作。');
 }
 
 function deleteWorkspaceAttendance(id) {
   const attendance = store.listAttendance();
-  if (!attendance.some((item) => item.id === id)) throw new Error('找不到这条打卡记录。');
+  const target = attendance.find((item) => item.id === id);
+  if (!target) throw new Error('找不到这条打卡记录。');
   store.setAttendance(attendance.filter((item) => item.id !== id));
+  if (!target.clockOutAt) {
+    attendanceUsageLive = {};
+    stopUsageSamplerIfIdle();
+  }
   broadcastWorkspace();
   return true;
 }
 
 const TOAST_POLICY_KEY = 'HKCU\\Software\\Policies\\Microsoft\\Windows\\CurrentVersion\\PushNotifications';
 const TOAST_POLICY_VALUE = 'NoToastApplicationNotification';
+
+function activeAttendanceRecord() {
+  return store.listAttendance().find((record) => !record.clockOutAt) || null;
+}
 
 function activeFocusSession() {
   return store.listFocusSessions().find((session) => session.status === 'active' && !session.endedAt) || null;
@@ -744,6 +895,14 @@ function persistFocusUsage() {
   focusLastPersistAt = Date.now();
 }
 
+function persistAttendanceUsage() {
+  const active = activeAttendanceRecord();
+  if (!active) return;
+  const attendance = saveAttendance(store.listAttendance(), { ...active, appUsage: attendanceUsageLive }, new Date().toISOString());
+  store.setAttendance(attendance);
+  attendanceLastPersistAt = Date.now();
+}
+
 function handleFocusSample(line) {
   const [pidText, ...nameParts] = String(line || '').trim().split('|');
   const pid = Number(pidText);
@@ -752,9 +911,15 @@ function handleFocusSample(line) {
   const elapsedSeconds = focusLastSampleAt ? Math.max(1, Math.min(10, Math.round((now - focusLastSampleAt) / 1000))) : 5;
   focusLastSampleAt = now;
   if (!pid || !processName || app.getAppMetrics().some((metric) => metric.pid === pid)) return;
-  focusUsageLive[processName] = (focusUsageLive[processName] || 0) + elapsedSeconds;
-  if (now - focusLastPersistAt >= 30_000) persistFocusUsage();
-  broadcastFocus();
+  if (activeFocusSession()) {
+    focusUsageLive[processName] = (focusUsageLive[processName] || 0) + elapsedSeconds;
+    if (now - focusLastPersistAt >= 30_000) persistFocusUsage();
+  }
+  if (activeAttendanceRecord()) {
+    attendanceUsageLive[processName] = (attendanceUsageLive[processName] || 0) + elapsedSeconds;
+    if (now - attendanceLastPersistAt >= 30_000) persistAttendanceUsage();
+  }
+  broadcastWorkspace();
 }
 
 function startFocusSampler() {
@@ -778,10 +943,14 @@ function startFocusSampler() {
 function stopFocusRuntime() {
   if (focusTimer) clearInterval(focusTimer);
   focusTimer = null;
-  if (focusSampler) focusSampler.kill();
-  focusSampler = null;
   if (focusRecoveryProcess) focusRecoveryProcess.kill();
   focusRecoveryProcess = null;
+}
+
+function stopUsageSamplerIfIdle(force = false) {
+  if (!force && (activeFocusSession() || activeAttendanceRecord())) return;
+  if (focusSampler) focusSampler.kill();
+  focusSampler = null;
   focusSamplerBuffer = '';
   focusLastSampleAt = 0;
 }
@@ -853,6 +1022,7 @@ async function finishFocusSession(status = 'stopped') {
   }, new Date().toISOString());
   store.setFocusSessions(sessions);
   focusUsageLive = {};
+  stopUsageSamplerIfIdle();
   broadcastWorkspace();
   return focusSessionsForRenderer();
 }
@@ -865,25 +1035,12 @@ function resumeFocusRuntime() {
   else startFocusRuntime(active);
 }
 
-async function getBingWallpaper() {
-  if (!store.getSettings().bingWallpaper) return null;
-  const today = new Date().toISOString().slice(0, 10);
-  if (bingWallpaperCache?.date === today) return bingWallpaperCache;
-  try {
-    const response = await net.fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN');
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const payload = await response.json();
-    const image = payload?.images?.[0];
-    if (!image?.url) throw new Error('壁纸响应缺少图片地址。');
-    bingWallpaperCache = {
-      date: today,
-      url: new URL(image.url, 'https://www.bing.com').href,
-      copyright: String(image.copyright || 'Bing 每日壁纸')
-    };
-    return bingWallpaperCache;
-  } catch {
-    return null;
-  }
+function resumeAttendanceRuntime() {
+  const active = activeAttendanceRecord();
+  if (!active) return;
+  attendanceUsageLive = { ...(active.appUsage || {}) };
+  attendanceLastPersistAt = Date.now();
+  startFocusSampler();
 }
 
 function createQuickCaptureWindow() {
@@ -993,34 +1150,54 @@ function showScheduleNotification(schedule) {
 
 function showDeadlineWindow(schedule) {
   const existing = deadlineWindows.get(schedule.id);
-  if (existing && !existing.isDestroyed()) return;
+  if (existing && [...existing].some((window) => !window.isDestroyed())) return;
   const urgent = schedule.priority === 'high';
-  const window = new BrowserWindow({
-    width: urgent ? 1000 : 620,
-    height: urgent ? 700 : 360,
-    show: false,
-    frame: false,
-    fullscreen: urgent,
-    alwaysOnTop: true,
-    skipTaskbar: false,
-    resizable: !urgent,
-    backgroundColor: urgent ? '#a40012' : '#f2b700',
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true
-    }
+  const displays = urgent ? screen.getAllDisplays() : [screen.getDisplayNearestPoint(screen.getCursorScreenPoint())];
+  const windows = new Set();
+  deadlineWindows.set(schedule.id, windows);
+  displays.forEach((display, index) => {
+    const bounds = display.bounds;
+    const window = new BrowserWindow({
+      ...(urgent ? bounds : { width: 620, height: 380 }),
+      show: false,
+      frame: false,
+      fullscreen: false,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      movable: !urgent,
+      minimizable: false,
+      maximizable: false,
+      backgroundColor: urgent ? '#332735' : '#f3cf8f',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true
+      }
+    });
+    window.yanjiDeadlineId = schedule.id;
+    windows.add(window);
+    window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'));
+    window.webContents.once('did-finish-load', () => {
+      window.webContents.send('deadline:show', schedule);
+      window.setAlwaysOnTop(true, 'screen-saver');
+      window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+      window.show();
+      if (index === 0) window.focus();
+    });
+    window.on('closed', () => {
+      windows.delete(window);
+      if (!windows.size) deadlineWindows.delete(schedule.id);
+    });
   });
-  deadlineWindows.set(schedule.id, window);
-  window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'));
-  window.webContents.once('did-finish-load', () => {
-    window.webContents.send('deadline:show', schedule);
-    window.show();
-    window.focus();
-    if (urgent) window.setAlwaysOnTop(true, 'screen-saver');
-  });
-  window.on('closed', () => deadlineWindows.delete(schedule.id));
+}
+
+function dismissDeadlineWindows(id) {
+  const windows = deadlineWindows.get(id);
+  if (!windows) return;
+  for (const window of [...windows]) if (!window.isDestroyed()) window.close();
+  deadlineWindows.delete(id);
 }
 
 function runWorkspaceReminders(now = new Date()) {
@@ -1308,7 +1485,7 @@ function validateSettings(patch) {
     throw new Error('设置格式不正确。');
   }
   const allowed = {};
-  for (const key of ['autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin', 'autoCheckUpdates', 'bingWallpaper']) {
+  for (const key of ['autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin', 'autoCheckUpdates']) {
     if (key in patch) allowed[key] = Boolean(patch[key]);
   }
   if ('quickCaptureShortcut' in patch) {
@@ -1574,7 +1751,7 @@ function registerIpc() {
   ipcMain.handle('focus:get-state', () => focusSessionsForRenderer());
   ipcMain.handle('focus:start', (_event, input) => startFocusSession(input));
   ipcMain.handle('focus:stop', () => finishFocusSession('stopped'));
-  ipcMain.handle('wallpaper:get', () => getBingWallpaper());
+  ipcMain.handle('literature:recommend', (_event, input) => recommendLatestLiterature(input));
   ipcMain.handle('capture:show', () => {
     toggleQuickCapture();
     return true;
@@ -1604,7 +1781,9 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle('deadline:dismiss', (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.close();
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window?.yanjiDeadlineId) dismissDeadlineWindows(window.yanjiDeadlineId);
+    else window?.close();
     return true;
   });
   ipcMain.handle('papers:list', () => listSerializedPapers());
@@ -1678,6 +1857,13 @@ function registerIpc() {
     clipboard.writeText(value);
     return true;
   });
+  ipcMain.handle('system:open-external', async (_event, value) => {
+    let url;
+    try { url = new URL(String(value || '')); } catch { throw new Error('文章链接无效。'); }
+    if (!['https:', 'http:'].includes(url.protocol)) throw new Error('不支持打开这个链接。');
+    await shell.openExternal(url.toString());
+    return true;
+  });
   ipcMain.handle('window:set-modal-state', (_event, active) => {
     setModalTitleBar(Boolean(active));
     return true;
@@ -1708,6 +1894,7 @@ if (!gotLock) {
       setTimeout(runDeadlineReminders, 1500);
       setTimeout(runWorkspaceReminders, 1800);
       resumeFocusRuntime();
+      resumeAttendanceRuntime();
       if (store.getSettings().autoCheckUpdates) {
         setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
       }
@@ -1737,6 +1924,8 @@ app.on('before-quit', () => {
       notificationError: restored ? active.notificationError : '退出时未能恢复 Windows 通知设置。'
     }, new Date().toISOString()));
   }
+  if (store && activeAttendanceRecord()) persistAttendanceUsage();
+  stopUsageSamplerIfIdle(true);
   globalShortcut.unregisterAll();
 });
 app.on('window-all-closed', () => {

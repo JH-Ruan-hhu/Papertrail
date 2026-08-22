@@ -8,7 +8,7 @@ const {
   normalizeSchedule
 } = require('./workbench-core');
 
-const DATA_VERSION = 6;
+const DATA_VERSION = 7;
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
 const TASK_REMINDER_LEAD_MS = 48 * 60 * 60_000;
 const TASK_TYPES = Object.freeze(['revision', 'proof', 'copyright', 'followup']);

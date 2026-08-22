@@ -72,20 +72,29 @@ test('notes preserve typed metadata and metadata fields support custom selects',
   assert.equal(notes[0].metadata.reviewed, true);
 });
 
-test('attendance creates one record per day and validates clock order', () => {
+test('attendance supports multiple work segments per day and validates clock order', () => {
   const created = saveAttendance([], {
     date: '2026-08-22',
     clockInAt: '2026-08-22T01:00:00.000Z',
     clockOutAt: '2026-08-22T09:30:00.000Z'
   }, '2026-08-22T10:00:00.000Z', () => 'attendance-1');
-  const updated = saveAttendance(created, {
+  const second = saveAttendance(created, {
     date: '2026-08-22',
     clockInAt: '2026-08-22T01:15:00.000Z',
-    clockOutAt: '2026-08-22T10:00:00.000Z'
-  }, '2026-08-22T11:00:00.000Z');
-  assert.equal(updated.length, 1);
-  assert.equal(updated[0].id, 'attendance-1');
-  assert.equal(updated[0].clockInAt, '2026-08-22T01:15:00.000Z');
+    clockOutAt: '2026-08-22T03:00:00.000Z',
+    appUsage: { WINWORD: 480 }
+  }, '2026-08-22T11:00:00.000Z', () => 'attendance-2');
+  assert.equal(second.length, 2);
+  assert.equal(second[0].id, 'attendance-2');
+  assert.equal(second[0].appUsage.WINWORD, 480);
+  const updated = saveAttendance(second, {
+    id: 'attendance-1',
+    date: '2026-08-22',
+    clockInAt: '2026-08-22T01:10:00.000Z',
+    clockOutAt: '2026-08-22T09:30:00.000Z'
+  }, '2026-08-22T12:00:00.000Z');
+  assert.equal(updated.length, 2);
+  assert.equal(updated.find((item) => item.id === 'attendance-1').clockInAt, '2026-08-22T01:10:00.000Z');
   assert.throws(() => normalizeAttendance({
     date: '2026-08-22',
     clockInAt: '2026-08-22T09:00:00.000Z',

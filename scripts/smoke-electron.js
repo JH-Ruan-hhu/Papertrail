@@ -13,7 +13,7 @@ const path = require('node:path');
 const { app, BrowserWindow } = require('electron');
 
 app.disableHardwareAcceleration();
-app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.8.0'));
+app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-0.9.0'));
 
 app.whenReady().then(async () => {
   const window = new BrowserWindow({
@@ -137,6 +137,20 @@ app.whenReady().then(async () => {
     throw new Error(`Dialog close smoke test failed: ${JSON.stringify(dialogResult)}`);
   }
   console.log(`DIALOG_SMOKE_OK ${JSON.stringify(dialogResult)}`);
+  const confirmLayoutResult = await window.webContents.executeJavaScript(`
+    (async () => {
+      const pending = window.yanjiConfirm({ title: '结束本次专注', message: '测试居中布局', confirmText: '结束专注' });
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      const dialog = document.getElementById('yanjiConfirmDialog').getBoundingClientRect();
+      const actions = document.querySelector('#yanjiConfirmDialog .modal-actions').getBoundingClientRect();
+      const centered = Math.abs((actions.left + actions.width / 2) - (dialog.left + dialog.width / 2)) <= 2 && getComputedStyle(document.querySelector('#yanjiConfirmDialog .modal-actions')).justifyContent === 'center';
+      document.getElementById('yanjiConfirmCancel').click();
+      await pending;
+      return { centered };
+    })()
+  `);
+  if (!confirmLayoutResult.centered) throw new Error(`Confirm button alignment smoke failed: ${JSON.stringify(confirmLayoutResult)}`);
+  console.log(`CONFIRM_LAYOUT_OK ${JSON.stringify(confirmLayoutResult)}`);
   const settingsDraftResult = await window.webContents.executeJavaScript(`
     (async () => {
       document.getElementById('settingsButton').click();
@@ -151,7 +165,7 @@ app.whenReady().then(async () => {
       updateButton.click();
       await new Promise((resolve) => setTimeout(resolve, 40));
       const updateAvailable = updateButton.textContent === '下载更新'
-        && document.getElementById('updateVersionBadge').textContent === 'v0.8.1';
+        && document.getElementById('updateVersionBadge').textContent === 'v0.9.1';
       updateButton.click();
       await new Promise((resolve) => setTimeout(resolve, 40));
       const updateDownloaded = updateButton.textContent === '安装并重启'
@@ -161,19 +175,20 @@ app.whenReady().then(async () => {
       const startAtLogin = document.getElementById('startAtLogin');
       startAtLogin.checked = true;
       document.getElementById('changeDataDirectoryButton').click();
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 180));
       const draftPreserved = startAtLogin.checked;
       const settingsScroll = document.querySelector('#settingsDialog .settings-scroll');
       settingsScroll.style.scrollBehavior = 'auto';
       settingsScroll.scrollTop = settingsScroll.scrollHeight;
       settingsScroll.dispatchEvent(new Event('scroll'));
-      await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+      await new Promise((resolve) => setTimeout(resolve, 80));
       const scrollHighlightsAbout = document.querySelector('.settings-nav-item.active')?.dataset.settingsSection === 'about';
+      const scrollMetrics = { top: settingsScroll.scrollTop, height: settingsScroll.clientHeight, full: settingsScroll.scrollHeight, active: document.querySelector('.settings-nav-item.active')?.dataset.settingsSection };
       document.querySelector('[data-workbench-page="home"]').click();
-      return { notificationsVisible, storageVisible, aboutVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, draftPreserved, scrollHighlightsAbout };
+      return { notificationsVisible, storageVisible, aboutVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, draftPreserved, scrollHighlightsAbout, scrollMetrics };
     })()
   `);
-  if (!Object.values(settingsDraftResult).every(Boolean)) {
+  if (!Object.entries(settingsDraftResult).every(([key, value]) => key === 'scrollMetrics' || Boolean(value))) {
     throw new Error(`Settings draft smoke test failed: ${JSON.stringify(settingsDraftResult)}`);
   }
   console.log(`SETTINGS_DRAFT_SMOKE_OK ${JSON.stringify(settingsDraftResult)}`);
@@ -255,7 +270,7 @@ app.whenReady().then(async () => {
         const active = page.querySelector('.settings-nav-item.active');
         const firstPanel = page.querySelector('[data-settings-panel="general"]').getBoundingClientRect();
         const scroller = page.querySelector('.settings-scroll').getBoundingClientRect();
-        return { visible: !page.hidden, tagName: page.tagName, left: rect.left, top: rect.top, navWide: nav.width > nav.height * 4, activeSection: active?.dataset.settingsSection, startsAtGeneral: firstPanel.top >= scroller.top && firstPanel.top - scroller.top < 40, horizontalOverflow: document.documentElement.scrollWidth > innerWidth };
+        return { visible: !page.hidden, tagName: page.tagName, left: rect.left, top: rect.top, navWide: nav.width > nav.height * 4, activeSection: active?.dataset.settingsSection, startsAtGeneral: firstPanel.top >= scroller.top && firstPanel.top - scroller.top < 40, panelOffset: Math.round(firstPanel.top - scroller.top), scrollTop: Math.round(page.querySelector('.settings-scroll').scrollTop), horizontalOverflow: document.documentElement.scrollWidth > innerWidth };
       })()
     `);
     if (!settingsPageVisual.visible || settingsPageVisual.tagName !== 'SECTION' || settingsPageVisual.left < 170 || settingsPageVisual.top < 36 || !settingsPageVisual.navWide || settingsPageVisual.activeSection !== 'general' || !settingsPageVisual.startsAtGeneral || settingsPageVisual.horizontalOverflow) {
@@ -289,11 +304,11 @@ app.whenReady().then(async () => {
     await new Promise((resolve) => setTimeout(resolve, 80));
   }
   if (process.env.PAPERTRAIL_SMOKE_OUTPUT) {
-    await window.webContents.executeJavaScript(`document.getElementById('allNavButton').click(); window.scrollTo(0, 0)`);
+    await window.webContents.executeJavaScript(`document.querySelector('[data-workbench-page="submissions"]').click(); document.getElementById('allNavButton').click(); window.scrollTo(0, 0)`);
     await captureStablePage(process.env.PAPERTRAIL_SMOKE_OUTPUT);
   }
   if (process.env.PAPERTRAIL_IMPORTANT_OUTPUT) {
-    await window.webContents.executeJavaScript(`document.getElementById('importantNavButton').click(); window.scrollTo(0, 0)`);
+    await window.webContents.executeJavaScript(`document.querySelector('[data-workbench-page="submissions"]').click(); document.getElementById('importantNavButton').click(); window.scrollTo(0, 0)`);
     const importantLayout = await window.webContents.executeJavaScript(`
       (() => {
         const rect = (element) => {
@@ -316,12 +331,13 @@ app.whenReady().then(async () => {
     await captureStablePage(process.env.PAPERTRAIL_IMPORTANT_OUTPUT);
   }
   if (process.env.PAPERTRAIL_ARCHIVED_OUTPUT) {
-    await window.webContents.executeJavaScript(`document.getElementById('archivedNavButton').click(); window.scrollTo(0, 0)`);
+    await window.webContents.executeJavaScript(`document.querySelector('[data-workbench-page="submissions"]').click(); document.getElementById('archivedNavButton').click(); window.scrollTo(0, 0)`);
     await captureStablePage(process.env.PAPERTRAIL_ARCHIVED_OUTPUT);
   }
   if (process.env.PAPERTRAIL_TIMELINE_OUTPUT) {
     await window.webContents.executeJavaScript(`
       (() => {
+        document.querySelector('[data-workbench-page="submissions"]').click();
         document.getElementById('allNavButton').click();
         const card = document.querySelector('[data-paper-id="demo-production-paper"]');
         card.querySelector('[data-action="history"]').click();
@@ -342,6 +358,8 @@ app.whenReady().then(async () => {
       window.scrollTo(0, 0);
     `);
     await captureStablePage(process.env.PAPERTRAIL_NARROW_OUTPUT);
+    window.setSize(Number(process.env.PAPERTRAIL_SMOKE_WIDTH) || 1180, Number(process.env.PAPERTRAIL_SMOKE_HEIGHT) || 780);
+    await new Promise((resolve) => setTimeout(resolve, 120));
   }
   if (process.env.WORKBENCH_SCHEDULE_OUTPUT) {
     const scheduleResult = await window.webContents.executeJavaScript(`
@@ -373,8 +391,8 @@ app.whenReady().then(async () => {
         return {
           pageVisible: !document.querySelector('[data-page="home"]').hidden,
           focusFirst: Boolean(document.querySelector('.home-top-grid #todayFocusList')),
-          dailyTime: Boolean(document.getElementById('homeFeatureClock').textContent.trim()),
-          dailyQuote: Boolean(document.getElementById('dailyQuote').textContent.trim()),
+          focusTimerHome: Boolean(document.querySelector('.home-focus-timer #focusTimeRemaining')),
+          quickNote: Boolean(document.getElementById('quickNoteButton')),
           fourDayCards: document.querySelectorAll('#homeDayOverview .day-card').length,
           notesRight: notes.left > schedule.left,
           aligned: Math.abs(notes.top - schedule.top) <= 1,
@@ -398,13 +416,12 @@ app.whenReady().then(async () => {
           pageVisible: !document.querySelector('[data-page="attendance"]').hidden,
           ganttRows: document.querySelectorAll('#attendanceGanttRows .attendance-gantt-row').length,
           ganttBars: document.querySelectorAll('#attendanceGanttRows .attendance-bar').length,
-          focusTimer: document.getElementById('focusTimeRemaining').textContent === '50:00',
           appRows: document.querySelectorAll('#focusUsageList .focus-usage-row').length,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!attendanceResult.pageVisible || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 1 || !attendanceResult.focusTimer || attendanceResult.appRows < 1 || attendanceResult.horizontalOverflow) {
+    if (!attendanceResult.pageVisible || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 2 || attendanceResult.appRows < 1 || attendanceResult.horizontalOverflow) {
       throw new Error(`Workbench attendance smoke failed: ${JSON.stringify(attendanceResult)}`);
     }
     console.log(`WORKBENCH_ATTENDANCE_OK ${JSON.stringify(attendanceResult)}`);
@@ -416,20 +433,59 @@ app.whenReady().then(async () => {
       (() => {
         document.querySelector('[data-workbench-page="notes"]').click();
         window.scrollTo(0, 0);
+        document.getElementById('manageMetadataButton').click();
+        const metadataRow = document.querySelector('.metadata-field-row');
+        const initialOptions = metadataRow.querySelectorAll('[data-option-chips] span').length;
+        metadataRow.querySelector('[data-option-draft]').value = '方法 A';
+        metadataRow.querySelector('[data-add-option]').click();
+        metadataRow.querySelector('[data-option-draft]').value = '方法 B';
+        metadataRow.querySelector('[data-option-draft]').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+        const multiOptions = metadataRow.querySelectorAll('[data-option-chips] span').length === initialOptions + 2;
+        document.querySelector('[data-close-dialog="metadataDialog"]').click();
+        document.getElementById('quickNoteButton').click();
+        const noteOpened = document.getElementById('noteDialog').open;
+        document.getElementById('noteDialog').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        const noteBackdropClosed = !document.getElementById('noteDialog').open;
         return {
           pageVisible: !document.querySelector('[data-page="notes"]').hidden,
           noteCards: document.querySelectorAll('#notesGrid .note-card').length,
           metadataButton: Boolean(document.getElementById('manageMetadataButton')),
+          multiOptions,
+          noteOpened,
+          noteBackdropClosed,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || notesResult.horizontalOverflow) {
+    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || !notesResult.multiOptions || !notesResult.noteOpened || !notesResult.noteBackdropClosed || notesResult.horizontalOverflow) {
       throw new Error(`Workbench notes smoke failed: ${JSON.stringify(notesResult)}`);
     }
     console.log(`WORKBENCH_NOTES_OK ${JSON.stringify(notesResult)}`);
     await new Promise((resolve) => setTimeout(resolve, 240));
     await captureStablePage(process.env.WORKBENCH_NOTES_OUTPUT);
+  }
+  if (process.env.WORKBENCH_LITERATURE_OUTPUT) {
+    const literatureResult = await window.webContents.executeJavaScript(`
+      (async () => {
+        document.querySelector('[data-workbench-page="literature"]').click();
+        document.getElementById('literatureQuery').value = 'PFAS groundwater';
+        document.getElementById('recommendLiteratureButton').click();
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const cards = document.querySelectorAll('#literatureResults .literature-card');
+        return {
+          pageVisible: !document.querySelector('[data-page="literature"]').hidden,
+          cards: cards.length,
+          summaries: document.querySelectorAll('#literatureResults .literature-summary').length,
+          metricNote: document.querySelector('.literature-metric-note').textContent.includes('并非 Clarivate JCR'),
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!literatureResult.pageVisible || literatureResult.cards !== 3 || literatureResult.summaries !== 3 || !literatureResult.metricNote || literatureResult.horizontalOverflow) {
+      throw new Error(`Workbench literature smoke failed: ${JSON.stringify(literatureResult)}`);
+    }
+    console.log(`WORKBENCH_LITERATURE_OK ${JSON.stringify(literatureResult)}`);
+    await captureStablePage(process.env.WORKBENCH_LITERATURE_OUTPUT);
   }
   if (process.env.WORKBENCH_CAPTURE_OUTPUT) {
     window.setSize(720, 290);

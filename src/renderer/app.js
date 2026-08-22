@@ -744,7 +744,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '0.8.0';
+  const version = settings.appVersion || '0.9.0';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   const expirations = Array.isArray(settings.backupExpiresAt) ? settings.backupExpiresAt : [];
@@ -826,7 +826,6 @@ function populateSettings() {
   document.getElementById('closeToTray').checked = settings.closeToTray;
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
-  document.getElementById('bingWallpaperSetting').checked = settings.bingWallpaper !== false;
   document.getElementById('quickCaptureShortcut').value = settings.quickCaptureShortcut || 'CommandOrControl+Shift+Space';
   populateSettingsMetadata();
 }
@@ -972,7 +971,6 @@ async function saveSettings() {
       closeToTray: document.getElementById('closeToTray').checked,
       startAtLogin: document.getElementById('startAtLogin').checked,
       autoCheckUpdates: document.getElementById('autoCheckUpdates').checked,
-      bingWallpaper: document.getElementById('bingWallpaperSetting').checked,
       quickCaptureShortcut: document.getElementById('quickCaptureShortcut').value
     });
     render();
@@ -1164,6 +1162,10 @@ function bindEvents() {
         scroll.scrollTop = 0;
         setSettingsSection('general', false);
       });
+      setTimeout(() => {
+        scroll.scrollTop = 0;
+        setSettingsSection('general', false);
+      }, 0);
     }
   });
   elements.settingsNavButtons.forEach((button) => {

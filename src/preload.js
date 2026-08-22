@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   getFocusState: () => ipcRenderer.invoke('focus:get-state'),
   startFocus: (input) => ipcRenderer.invoke('focus:start', input),
   stopFocus: () => ipcRenderer.invoke('focus:stop'),
-  getBingWallpaper: () => ipcRenderer.invoke('wallpaper:get'),
+  recommendLiterature: (input) => ipcRenderer.invoke('literature:recommend', input),
   showCapture: () => ipcRenderer.invoke('capture:show'),
   hideCapture: () => ipcRenderer.invoke('capture:hide'),
   setCaptureContentState: (hasContent) => ipcRenderer.send('capture:content-state', Boolean(hasContent)),
@@ -55,6 +55,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   installUpdate: () => ipcRenderer.invoke('updates:install'),
   openUpdateReleasePage: () => ipcRenderer.invoke('updates:open-release-page'),
   copyText: (text) => ipcRenderer.invoke('system:copy-text', text),
+  openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
   setModalWindowState: (active) => ipcRenderer.invoke('window:set-modal-state', Boolean(active)),
   onPapersChanged: (callback) => {
     const listener = (_event, papers) => callback(papers);

@@ -6,20 +6,31 @@ into one desktop app. The manuscript connectors cover Elsevier Author Hub and
 Elsevier accepted-article production pages; local workflow records remain
 publisher-neutral.
 
-## Version 0.8 workbench features
+## Version 0.9 workbench features
 
-- Use a quiet, text-first desktop shell inspired by WeChat: a compact Windows
-  title area, a small top-right clock, and no decorative navigation icons.
+- Use a cohesive warm-neutral desktop shell with consistent line icons,
+  compact spacing, a small top-right clock, and responsive narrow-window
+  layouts.
 - Open Settings as a normal workspace page with horizontal categories; scrolling
   through the page automatically highlights the section currently in view.
-- Clock in and out from Home, correct records manually, and review each week on
-  a 24-hour Gantt chart with total time and average start/end times.
-- Run a 25, 50, or 90 minute focus session from the attendance page. Yanji can
+- Clock in and out repeatedly during one day, including lunch breaks, correct
+  each work segment manually, and review the week on a 24-hour Gantt chart.
+  Foreground-app time is recorded only during active work segments and can be
+  summarized for today or the current week.
+- Run a 25, 50, or 90 minute focus session from Home. Yanji can
   temporarily pause application toast notifications, restore the previous
-  Windows policy afterward, and summarize foreground-app time without reading
-  window content.
-- Keep today's priorities at the top of Home beside a compact clock and a daily
-  quotation. The four-day schedule and latest notes share the next row.
+  Windows policy afterward, and retain the focus session locally.
+- Keep today's priorities at the top of Home beside focus controls. The
+  four-day schedule and latest notes share the next row, with quick-create
+  actions for both schedules and notes.
+- Search OpenAlex for the latest articles by topic, optionally narrow to a
+  journal or a minimum public two-year mean-citedness metric, and review three
+  article cards with abstract-grounded summaries.
+- Show high-priority deadlines on every connected display with a low-stimulus
+  star-field treatment; reduced-motion preferences disable decorative motion.
+- Add multiple reusable options to note select metadata through a tag editor.
+  Note dialogs close on backdrop click and floating sticky notes use a standard
+  close icon.
 - Keep Chinese IME composition stable in Quick Capture by separating the real
   textarea from the recognized-time highlight layer. Empty capture windows
   close automatically when they lose focus.
@@ -28,10 +39,10 @@ publisher-neutral.
 - Use the app's own confirmation dialog for destructive actions instead of the
   browser or Windows legacy confirmation box.
 
-## Version 0.7 workbench features
+## Research workbench features
 
 - Use a unified home, schedule, notes, submission-management, and settings
-  workspace with a focused left navigation and a Bing daily-wallpaper home.
+  workspace with a focused left navigation and a home focus timer.
 - Review yesterday, today, tomorrow, and the day after tomorrow from the home
   page, create a schedule quickly, and see the latest notes without changing
   pages.
@@ -105,17 +116,18 @@ publisher-neutral.
 - Move the local data file to a user-selected folder while retaining the old
   file as a removable backup.
 
-## Version 0.8 data model
+## Version 0.9 data model
 
 Yanji stores `lastAttemptAt`, `lastSuccessfulAt`, `failureStreak`, and
 `nextRetryAt` separately. Important updates contain their own occurrence time,
 content, and read state. Archived papers keep their encrypted credential,
 history, DOI, and production events but are excluded from automatic refresh.
 
-Schema version 6 includes `schedules`, `notes`, reusable `metadataFields`,
-`attendance`, and `focusSessions` while retaining manuscript details, tasks,
-revision rounds, and observed review events. Older data files are migrated
-locally on first successful load.
+Schema version 7 includes `schedules`, `notes`, reusable `metadataFields`,
+multi-segment `attendance` records with per-application usage totals, and
+`focusSessions` while retaining manuscript details, tasks, revision rounds,
+and observed review events. Older data files are migrated locally on first
+successful load.
 Existing encrypted credentials, history, unread updates, archives, and
 submission journeys are retained. Invalid JSON, unsupported future schema
 versions, and structurally damaged records are rejected without overwriting the
@@ -131,10 +143,11 @@ refresh is requested. No analytics or cloud sync is included.
 The renderer remains sandboxed with `contextIsolation` enabled and a restrictive
 Content Security Policy. Exports are generated in the main process from an
 explicit allow-list of paper metadata and are redacted again before writing.
-Deadlines, revision-round details, contacts, schedules, and notes are never
-included in publisher requests. The only optional home-page request is Bing's
-daily-wallpaper metadata and image. There is no account system, cloud sync,
-collaboration service, analytics, or telemetry.
+Deadlines, revision-round details, contacts, schedules, notes, attendance, and
+application-use totals are never included in publisher requests. Literature
+queries are sent to OpenAlex only when the user requests recommendations; they
+do not include local notes or manuscript credentials. There is no account
+system, cloud sync, collaboration service, analytics, or telemetry.
 
 ## Development
 
@@ -170,6 +183,9 @@ generated `latest.yml` together in the same public GitHub Release.
   but do not yet have automatic status connectors.
 - Deadline reminders require Yanji to be running (the window may remain in
   the system tray) and Windows notifications to be enabled.
+- Literature recommendations depend on current OpenAlex metadata. The displayed
+  two-year mean citedness is a public impact-factor-style proxy, not the licensed
+  Clarivate Journal Impact Factor; some records do not include an abstract.
 - The app does not bypass login, CAPTCHA, access controls, or publisher policy.
 - A tracking UUID is required; Yanji cannot discover submissions from an
   Editorial Manager account automatically.

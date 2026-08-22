@@ -169,7 +169,8 @@ let smokeWorkspace = {
   ],
   metadataFields: [{ id: 'topic', name: '类型', type: 'select', options: ['实验', '文献', '写作'] }],
   attendance: [
-    { id: 'attendance-today', date: todayKey, clockInAt: todayAt(8, 45), clockOutAt: todayAt(17, 35), createdAt: todayAt(8, 45), updatedAt: todayAt(17, 35) }
+    { id: 'attendance-morning', date: todayKey, clockInAt: todayAt(8, 45), clockOutAt: todayAt(12, 5), appUsage: { WINWORD: 1620, chrome: 840 }, createdAt: todayAt(8, 45), updatedAt: todayAt(12, 5) },
+    { id: 'attendance-afternoon', date: todayKey, clockInAt: todayAt(13, 20), clockOutAt: todayAt(17, 35), appUsage: { Zotero: 1320, WINWORD: 780 }, createdAt: todayAt(13, 20), updatedAt: todayAt(17, 35) }
   ],
   focusSessions: [
     { id: 'focus-today', startedAt: todayAt(10, 0), endedAt: todayAt(10, 50), plannedMinutes: 50, status: 'completed', appUsage: { WINWORD: 1260, chrome: 980, Zotero: 510 }, suppressNotifications: true, notificationsSuppressed: true, notificationRestore: null, notificationRestoredAt: todayAt(10, 50), notificationError: null, createdAt: todayAt(10, 0), updatedAt: todayAt(10, 50) }
@@ -177,7 +178,7 @@ let smokeWorkspace = {
 };
 let smokeUpdateState = {
   status: 'idle',
-  currentVersion: '0.8.0',
+  currentVersion: '0.9.0',
   latestVersion: null,
   releaseDate: null,
   percent: null,
@@ -211,7 +212,11 @@ contextBridge.exposeInMainWorld('paperTrail', {
     smokeWorkspace.focusSessions = smokeWorkspace.focusSessions.map((session) => session.status === 'active' ? { ...session, status: 'stopped', endedAt: new Date().toISOString() } : session);
     return smokeWorkspace.focusSessions;
   },
-  getBingWallpaper: async () => null,
+  recommendLiterature: async () => ({
+    fromDate: '2024-08-22',
+    items: [0, 1, 2].map((index) => ({ id: `work-${index}`, title: `PFAS 最新研究 ${index + 1}`, publicationDate: `2026-08-${20 - index}`, journal: 'Water Research', impactProxy: 11.4, authors: ['Researcher A', 'Researcher B'], summary: '该研究评估了 PFAS 在水环境中的迁移与去除路径，并报告了可复核的实验结果。', citedByCount: 8 - index, isOpenAccess: true, url: `https://doi.org/10.1000/mock${index}` }))
+  }),
+  openExternal: async () => true,
   showCapture: async () => true,
   hideCapture: async () => { document.body.dataset.hideRequested = 'true'; return true; },
   setCaptureContentState: () => {},
@@ -236,9 +241,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
     closeToTray: true,
     startAtLogin: false,
     autoCheckUpdates: true,
-    bingWallpaper: true,
     quickCaptureShortcut: 'CommandOrControl+Shift+Space',
-    appVersion: '0.8.0',
+    appVersion: '0.9.0',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\Yanji Data',
     backupCount: 1,
     backupFiles: ['C:\\Users\\Demo\\Documents\\Yanji Old\\papertrail-data.json'],
@@ -254,7 +258,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.8.0',
+      appVersion: '0.9.0',
       dataDirectory: 'D:\\Research\\Yanji',
       backupCount: 1,
       backupFiles: ['C:\\Users\\Demo\\Documents\\Yanji Data\\papertrail-data.json'],
@@ -271,7 +275,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
       notifications: true,
       closeToTray: true,
       startAtLogin: false,
-      appVersion: '0.8.0',
+      appVersion: '0.9.0',
       dataDirectory: 'D:\\Research\\Yanji',
       backupCount: 0,
       backupFiles: [],
@@ -283,9 +287,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
     smokeUpdateState = {
       ...smokeUpdateState,
       status: 'available',
-      latestVersion: '0.8.1',
+      latestVersion: '0.9.1',
       releaseDate: '2026-08-17T00:00:00.000Z',
-      message: '发现新版本 0.8.1，可立即下载。'
+      message: '发现新版本 0.9.1，可立即下载。'
     };
     return smokeUpdateState;
   },
