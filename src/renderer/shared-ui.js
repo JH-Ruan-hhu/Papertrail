@@ -7,6 +7,10 @@ const confirmAccept = document.getElementById('yanjiConfirmAccept');
 const confirmCancel = document.getElementById('yanjiConfirmCancel');
 let settleConfirm = null;
 
+function popupText(value) {
+  return String(value ?? '').replace(/[。]+$/g, '');
+}
+
 function syncConfirmModalState() {
   const active = [...document.querySelectorAll('dialog')].some((dialog) => dialog.open);
   window.paperTrail?.setModalWindowState(active).catch(() => {});
@@ -29,9 +33,9 @@ window.yanjiConfirm = ({
 } = {}) => new Promise((resolve) => {
   if (settleConfirm) settleConfirm(false);
   settleConfirm = resolve;
-  confirmTitle.textContent = String(title);
-  confirmMessage.textContent = String(message);
-  confirmAccept.textContent = String(confirmText);
+  confirmTitle.textContent = popupText(title);
+  confirmMessage.textContent = popupText(message);
+  confirmAccept.textContent = popupText(confirmText);
   confirmAccept.classList.toggle('danger', tone === 'danger');
   confirmDialog.showModal();
   syncConfirmModalState();

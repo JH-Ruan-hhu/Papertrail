@@ -4,16 +4,19 @@
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>当日日程</title>
+    <title>今日概览</title>
+    <script src="theme-bootstrap.js"></script>
     <link rel="stylesheet" href="schedule-widget.css">
+    <link rel="stylesheet" href="v11-layout.css">
+    <link rel="stylesheet" href="themes/liquid-glass.css">
   </head>
   <body>
     <header class="widget-header">
       <div>
         <span class="widget-kicker">TODAY</span>
-        <strong>当日日程</strong>
+        <strong>今日概览</strong>
       </div>
-      <button id="closeWidgetButton" type="button" aria-label="从桌面移除当日日程" title="从桌面移除">×</button>
+      <button id="closeWidgetButton" type="button" aria-label="从桌面移除今日概览" title="从桌面移除">×</button>
     </header>
     <main>
       <section class="date-card" aria-label="今天日期">
@@ -21,11 +24,13 @@
         <p id="dateFull"></p>
       </section>
       <section class="schedule-list" id="widgetScheduleList" aria-live="polite"></section>
+      <section class="todo-list" id="widgetTodoList" aria-label="今日待办"></section>
     </main>
     <footer>
       <div><strong id="widgetProgress">0 / 0</strong><span>今日完成</span></div>
-      <button id="openMainButton" type="button">打开日程</button>
+      <button id="openMainButton" type="button">打开工作台</button>
     </footer>
+    <script src="theme-runtime.js"></script>
     <script src="schedule-widget.js"></script>
   </body>
 </html>

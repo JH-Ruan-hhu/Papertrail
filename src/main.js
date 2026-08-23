@@ -22,6 +22,9 @@ const {
 } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const { JsonStore } = require('./store');
+const { createPlanningService } = require('./planning-service');
+const { collectReminderCandidates } = require('./reminder-core');
+const { parseNaturalLanguageTodo } = require('./todo-core');
 const {
   parseTrackingInput,
   normalizeTrackerPayload,
@@ -92,6 +95,7 @@ const TITLE_BAR_MODAL = Object.freeze({ color: '#9dabb6', symbolColor: '#f5fbfe'
 let mainWindow;
 let tray;
 let store;
+let planningService;
 let scheduler;
 let isQuitting = false;
 let coldStartRefreshStarted = false;
@@ -523,10 +527,46 @@ function broadcastPapers() {
   }
 }
 
+function todayWidgetForRenderer() {
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayEnd = new Date(dayStart);
+  dayEnd.setDate(dayEnd.getDate() + 1);
+  const settings = store.getSettings();
+  const schedules = store.listSchedules()
+    .filter((item) => {
+      const start = Date.parse(item.startAt);
+      const end = Date.parse(item.endAt || item.startAt);
+      return Number.isFinite(start) && Number.isFinite(end) && start < dayEnd.getTime() && end > dayStart.getTime();
+    })
+    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
+    .map((item) => ({
+      id: item.id,
+      title: item.title,
+      startAt: item.startAt,
+      endAt: item.endAt,
+      allDay: Boolean(item.allDay),
+      priority: item.priority,
+      sourceRef: item.sourceRef || null
+    }));
+  const todos = store.listTodos()
+    .filter((item) => item.status === 'open' && (!item.dueAt || localDateKey(new Date(item.dueAt)) === localDateKey(now)))
+    .sort((a, b) => (a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY) - (b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY))
+    .slice(0, 12)
+    .map((item) => ({ id: item.id, title: item.title, dueAt: item.dueAt, priority: item.priority, status: item.status }));
+  return {
+    date: localDateKey(now),
+    schedules: settings.widgetShowSchedules !== false ? schedules : [],
+    todos: settings.widgetShowTodos !== false ? todos : [],
+    showCompletedTodos: settings.widgetShowCompletedTodos === true
+  };
+}
+
 function workspaceForRenderer() {
   const activeAttendance = activeAttendanceRecord();
   return {
     schedules: [...store.listSchedules()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)),
+    todos: [...store.listTodos()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     notes: [...store.listNotes()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     metadataFields: store.listMetadataFields(),
     attendance: [...store.listAttendance()]
@@ -541,19 +581,27 @@ function broadcastWorkspace() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('workspace:changed', workspace);
   }
-  if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) {
-    quickCaptureWindow.webContents.send('workspace:changed', workspace);
-  }
-  for (const window of stickyWindows.values()) {
-    if (!window.isDestroyed()) window.webContents.send('workspace:changed', workspace);
-  }
   if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
-    scheduleWidgetWindow.webContents.send('workspace:changed', workspace);
+    scheduleWidgetWindow.webContents.send('today-widget:changed', todayWidgetForRenderer());
   }
   return workspace;
 }
 
+function broadcastSettings() {
+  const settings = settingsForRenderer();
+  for (const window of [mainWindow, quickCaptureWindow, scheduleWidgetWindow, ...stickyWindows.values()]) {
+    if (window && !window.isDestroyed()) window.webContents.send('settings:changed', settings);
+  }
+  return settings;
+}
+
+function getPlanningService() {
+  if (!planningService) throw new Error('规划服务尚未准备好，请稍后重试。');
+  return planningService;
+}
+
 function saveWorkspaceSchedule(input) {
+  if (planningService) return getPlanningService().saveSchedule(input);
   const schedules = saveSchedule(
     store.listSchedules(),
     input,
@@ -566,6 +614,7 @@ function saveWorkspaceSchedule(input) {
 }
 
 function deleteWorkspaceSchedule(id) {
+  if (planningService) return getPlanningService().deleteSchedule(id);
   const schedules = store.listSchedules();
   if (!schedules.some((item) => item.id === id)) throw new Error('找不到这条日程。');
   store.setSchedules(schedules.filter((item) => item.id !== id));
@@ -618,6 +667,10 @@ function saveMetadataFields(input) {
 
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function saveWorkspaceTodo(input) {
+  return getPlanningService().saveTodo(input);
 }
 
 function reconcileStaleAttendance(now = new Date()) {
@@ -976,7 +1029,7 @@ function createQuickCaptureWindow() {
       devTools: !app.isPackaged
     }
   });
-  quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'));
+  quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'), { query: { appearance: store.getSettings().appearanceTheme } });
   quickCaptureWindow.on('blur', () => {
     setTimeout(() => {
       if (quickCaptureWindow && !quickCaptureWindow.isDestroyed() && quickCaptureWindow.isVisible() && !quickCaptureHasContent) {
@@ -1050,7 +1103,7 @@ function openStickyNote(noteId) {
     }
   });
   stickyWindows.set(id, window);
-  window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id } });
+  window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id, appearance: store.getSettings().appearanceTheme } });
   window.on('closed', () => stickyWindows.delete(id));
   return true;
 }
@@ -1286,7 +1339,7 @@ async function showScheduleWidget() {
   window.on('closed', () => {
     if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
   });
-  await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'));
+  await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'), { query: { appearance: store.getSettings().appearanceTheme } });
   window.yanjiDesktopAttached = await attachWindowToDesktop(window, {
     width: Math.round(width * scaleFactor),
     height: Math.round(height * scaleFactor)
@@ -1316,13 +1369,13 @@ function showScheduleNotification(schedule) {
   notification.show();
 }
 
-function showDeadlineWindow(schedule) {
-  const existing = deadlineWindows.get(schedule.id);
+function showDeadlineWindow(item, kind = 'todo') {
+  const existing = deadlineWindows.get(item.id);
   if (existing && [...existing].some((window) => !window.isDestroyed())) return;
-  const urgent = schedule.priority === 'high';
+  const urgent = item.priority === 'high';
   const displays = urgent ? screen.getAllDisplays() : [screen.getDisplayNearestPoint(screen.getCursorScreenPoint())];
   const windows = new Set();
-  deadlineWindows.set(schedule.id, windows);
+  deadlineWindows.set(item.id, windows);
   displays.forEach((display, index) => {
     const bounds = display.bounds;
     const window = new BrowserWindow({
@@ -1344,11 +1397,12 @@ function showDeadlineWindow(schedule) {
         sandbox: true
       }
     });
-    window.yanjiDeadlineId = schedule.id;
+    window.yanjiDeadlineId = item.id;
+    window.yanjiDeadlineKind = kind;
     windows.add(window);
-    window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'));
+    window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'), { query: { appearance: store.getSettings().appearanceTheme } });
     window.webContents.once('did-finish-load', () => {
-      window.webContents.send('deadline:show', schedule);
+      window.webContents.send('deadline:show', { ...item, reminderKind: kind });
       window.setAlwaysOnTop(true, 'screen-saver');
       window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       window.show();
@@ -1356,7 +1410,7 @@ function showDeadlineWindow(schedule) {
     });
     window.on('closed', () => {
       windows.delete(window);
-      if (!windows.size) deadlineWindows.delete(schedule.id);
+      if (!windows.size) deadlineWindows.delete(item.id);
     });
   });
 }
@@ -1368,25 +1422,63 @@ function dismissDeadlineWindows(id) {
   deadlineWindows.delete(id);
 }
 
+function showTodoNotification(todo, level = 'reminder') {
+  if (!store.getSettings().notifications || !store.getSettings().todoNotifications || !Notification.isSupported()) return;
+  const overdue = level === 'overdue';
+  const notification = new Notification({
+    title: overdue ? '待办已逾期' : '待办提醒',
+    body: overdue ? `${todo.title} 已逾期` : todo.title,
+    urgency: todo.priority === 'high' ? 'critical' : 'normal',
+    icon: APP_ICON_PNG_PATH
+  });
+  notification.on('click', () => {
+    showMainWindow();
+    mainWindow?.webContents.send('workspace:navigate', 'todos');
+  });
+  notification.show();
+}
+
+function stickyNoteForRenderer(noteId) {
+  const id = String(noteId || '');
+  const note = store.listNotes().find((item) => item.id === id);
+  return note ? { id: note.id, title: note.title, content: note.content } : null;
+}
+
 function runWorkspaceReminders(now = new Date()) {
-  const due = store.listSchedules().filter((schedule) => (
-    schedule.deadline &&
-    !schedule.completedAt &&
-    !schedule.remindedAt &&
-    Date.parse(schedule.startAt) <= now.getTime()
-  ));
-  if (!due.length) return [];
-  let schedules = store.listSchedules();
-  for (const schedule of due) {
-    if (schedule.priority === 'high' || schedule.priority === 'medium') showDeadlineWindow(schedule);
-    if (schedule.priority !== 'high') showScheduleNotification(schedule);
-    schedules = schedules.map((item) => item.id === schedule.id
-      ? { ...item, remindedAt: now.toISOString(), updatedAt: now.toISOString() }
-      : item);
+  const candidates = collectReminderCandidates({
+    schedules: store.listSchedules(),
+    todos: store.listTodos(),
+    now,
+    settings: store.getSettings()
+  });
+  if (!candidates.length) return [];
+  for (const candidate of candidates) {
+    if (candidate.type === 'event') {
+      showScheduleNotification(candidate.item);
+      store.updateWorkspace((workspace) => {
+        workspace.schedules = workspace.schedules.map((item) => item.id === candidate.item.id
+          ? { ...item, reminderSentAt: now.toISOString(), updatedAt: now.toISOString() }
+          : item);
+        return workspace;
+      });
+      continue;
+    }
+    const todo = candidate.item;
+    if (todo.priority === 'high') showDeadlineWindow(todo, 'todo');
+    else showTodoNotification(todo, candidate.level);
+    store.updateWorkspace((workspace) => {
+      workspace.todos = workspace.todos.map((item) => item.id === todo.id
+        ? {
+            ...item,
+            ...(candidate.level === 'overdue' ? { overdueNotifiedAt: now.toISOString() } : { reminderSentAt: now.toISOString(), snoozedUntil: null }),
+            updatedAt: now.toISOString()
+          }
+        : item);
+      return workspace;
+    });
   }
-  store.setSchedules(schedules);
   broadcastWorkspace();
-  return due;
+  return candidates;
 }
 
 function broadcastRefreshState() {
@@ -1653,7 +1745,11 @@ function validateSettings(patch) {
     throw new Error('设置格式不正确。');
   }
   const allowed = {};
-  for (const key of ['autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin', 'autoCheckUpdates']) {
+  for (const key of [
+    'autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin', 'autoCheckUpdates',
+    'todayWidgetEnabled', 'scheduleWidgetEnabled', 'widgetShowSchedules', 'widgetShowTodos',
+    'widgetShowCompletedTodos', 'eventNotifications', 'todoNotifications'
+  ]) {
     if (key in patch) allowed[key] = Boolean(patch[key]);
   }
   for (const key of ['quickCaptureShortcut', 'stickyNoteShortcut']) {
@@ -1668,6 +1764,21 @@ function validateSettings(patch) {
       throw new Error('自动刷新间隔必须在 60–1440 分钟之间。');
     }
     allowed.refreshMinutes = minutes;
+  }
+  if ('appearanceTheme' in patch) {
+    const theme = String(patch.appearanceTheme || '').trim();
+    if (!['liquid-glass', 'classic'].includes(theme)) throw new Error('外观主题不受支持。');
+    allowed.appearanceTheme = theme;
+  }
+  if ('defaultEventReminderMinutes' in patch) {
+    const minutes = patch.defaultEventReminderMinutes == null ? null : Number(patch.defaultEventReminderMinutes);
+    if (![null, 0, 5, 10, 15, 30, 60, 1440].includes(minutes)) throw new Error('日程提醒时间不受支持。');
+    allowed.defaultEventReminderMinutes = minutes;
+  }
+  if ('defaultTodoReminderMode' in patch) {
+    const mode = String(patch.defaultTodoReminderMode || 'none');
+    if (!['none', 'at-due', '15m-before', '1h-before', '1d-before', 'custom'].includes(mode)) throw new Error('待办提醒方式不受支持。');
+    allowed.defaultTodoReminderMode = mode;
   }
   return allowed;
 }
@@ -1687,7 +1798,7 @@ function createWindow() {
     height: 780,
     minWidth: 800,
     minHeight: 600,
-    show: false,
+    show: !process.argv.includes('--hidden'),
     backgroundColor: '#edf7fc',
     title: APP_NAME,
     icon: APP_ICON_PATH,
@@ -1703,8 +1814,12 @@ function createWindow() {
     }
   });
 
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
+  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { appearance: store.getSettings().appearanceTheme } });
   mainWindow.webContents.once('did-finish-load', () => {
+    if (!process.argv.includes('--hidden')) {
+      if (!mainWindow.isMaximized()) mainWindow.maximize();
+      mainWindow.show();
+    }
     if (coldStartRefreshStarted || !store.getSettings().refreshOnStartup) return;
     coldStartRefreshStarted = true;
     setTimeout(() => refreshAll({ notify: true }).catch(() => {}), 900);
@@ -1915,17 +2030,32 @@ function registerIpc() {
     reconcileStaleAttendance();
     return workspaceForRenderer();
   });
+  ipcMain.handle('today-widget:get-data', () => todayWidgetForRenderer());
   ipcMain.handle('schedules:parse', (_event, input) => parseNaturalLanguageSchedules(input, new Date()));
-  ipcMain.handle('schedules:save', (_event, input) => saveWorkspaceSchedule(input));
+  ipcMain.handle('schedules:save', (_event, input) => getPlanningService().saveSchedule(input));
   ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
   ipcMain.handle('schedules:complete', (_event, id, completed) => setWorkspaceScheduleCompleted(String(id), Boolean(completed)));
+  ipcMain.handle('schedules:convert-to-todo', (_event, id, input) => getPlanningService().convertScheduleToTodo(String(id), input || {}));
+  ipcMain.handle('schedules:detach', (_event, id) => getPlanningService().detachSchedule(String(id)));
+  ipcMain.handle('todos:parse', (_event, input) => parseNaturalLanguageTodo(input, new Date()));
+  ipcMain.handle('todos:save', (_event, input) => getPlanningService().saveTodo(input));
+  ipcMain.handle('todos:delete', (_event, id) => getPlanningService().deleteTodo(String(id)));
+  ipcMain.handle('todos:complete', (_event, id) => getPlanningService().completeTodo(String(id)));
+  ipcMain.handle('todos:reopen', (_event, id) => getPlanningService().reopenTodo(String(id)));
+  ipcMain.handle('todos:cancel', (_event, id) => getPlanningService().cancelTodo(String(id)));
+  ipcMain.handle('todos:snooze', (_event, id, until) => getPlanningService().snoozeTodo(String(id), until));
+  ipcMain.handle('todos:get-linked-schedules', (_event, id) => getPlanningService().getLinkedSchedules(String(id)));
+  ipcMain.handle('todos:schedule', (_event, id, input) => getPlanningService().scheduleTodo(String(id), input || {}));
+  ipcMain.handle('todos:convert-to-schedule', (_event, id, input) => getPlanningService().convertTodoToSchedule(String(id), input || {}));
   ipcMain.handle('schedule-widget:show', async () => {
     const result = await showScheduleWidget();
-    store.updateSettings({ scheduleWidgetEnabled: true });
+    store.updateSettings({ todayWidgetEnabled: true, scheduleWidgetEnabled: true });
+    broadcastSettings();
     return result;
   });
   ipcMain.handle('schedule-widget:close', (event) => {
-    store.updateSettings({ scheduleWidgetEnabled: false });
+    store.updateSettings({ todayWidgetEnabled: false, scheduleWidgetEnabled: false });
+    broadcastSettings();
     BrowserWindow.fromWebContents(event.sender)?.close();
     return true;
   });
@@ -1937,6 +2067,7 @@ function registerIpc() {
   ipcMain.handle('notes:save', (_event, input) => saveWorkspaceNote(input));
   ipcMain.handle('notes:delete', (_event, id) => deleteWorkspaceNote(String(id)));
   ipcMain.handle('notes:open-sticky', (_event, id) => openStickyNote(String(id)));
+  ipcMain.handle('notes:get-sticky', (_event, id) => stickyNoteForRenderer(String(id)));
   ipcMain.handle('notes:create-sticky', () => createNewStickyNote());
   ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
   ipcMain.handle('attendance:clock', (_event, action) => clockWorkspaceAttendance(String(action || '')));
@@ -1961,6 +2092,12 @@ function registerIpc() {
     if (input?.mode === 'note') {
       return { mode: 'note', item: saveWorkspaceNote({ content: String(input.content || '') }) };
     }
+    if (input?.mode === 'todo') {
+      const parsed = parseNaturalLanguageTodo(input?.content, new Date());
+      if (!parsed.valid) throw new Error(parsed.warning || '没有识别到可创建的待办。');
+      const item = getPlanningService().saveTodo(parsed);
+      return { mode: 'todo', item };
+    }
     const parsed = parseNaturalLanguageSchedules(input?.content, new Date());
     if (!parsed.valid) throw new Error('没有识别到可创建的日程。');
     const items = parsed.schedules.map((schedule) => saveWorkspaceSchedule(schedule));
@@ -1976,6 +2113,17 @@ function registerIpc() {
   });
   ipcMain.handle('deadline:dismiss', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
+    if (window?.yanjiDeadlineId) dismissDeadlineWindows(window.yanjiDeadlineId);
+    else window?.close();
+    return true;
+  });
+  ipcMain.handle('deadline:snooze', (event, until) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window?.yanjiDeadlineKind === 'todo') {
+      const result = getPlanningService().snoozeTodo(window.yanjiDeadlineId, until);
+      dismissDeadlineWindows(window.yanjiDeadlineId);
+      return result;
+    }
     if (window?.yanjiDeadlineId) dismissDeadlineWindows(window.yanjiDeadlineId);
     else window?.close();
     return true;
@@ -2035,6 +2183,8 @@ function registerIpc() {
     }
     const updated = store.updateSettings(validated);
     updateLoginItemSetting(updated.startAtLogin);
+    broadcastSettings();
+    if (Object.keys(validated).some((key) => ['todayWidgetEnabled', 'scheduleWidgetEnabled', 'widgetShowSchedules', 'widgetShowTodos', 'widgetShowCompletedTodos'].includes(key))) broadcastWorkspace();
     return settingsForRenderer();
   });
   ipcMain.handle('settings:choose-data-directory', (_event, request) => chooseDataDirectory(request));
@@ -2077,6 +2227,11 @@ if (!gotLock) {
       app.setAppUserModelId('io.papertrail.desktop');
       store = new JsonStore(configuredDataFilePath());
       store.load();
+      planningService = createPlanningService({
+        store,
+        makeId: () => crypto.randomUUID(),
+        onWorkspaceChanged: () => broadcastWorkspace()
+      });
       reconcileStaleAttendance();
       cleanupExpiredBackups();
       setupAutoUpdater();
@@ -2098,7 +2253,7 @@ if (!gotLock) {
       if (store.getSettings().autoCheckUpdates) {
         setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
       }
-      if (store.getSettings().scheduleWidgetEnabled && !process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
+      if ((store.getSettings().todayWidgetEnabled || store.getSettings().scheduleWidgetEnabled) && !process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
         setTimeout(() => showScheduleWidget().catch(() => {}), 900);
       }
       if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {

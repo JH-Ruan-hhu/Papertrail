@@ -70,7 +70,7 @@ test('uses compact priority tags and defaults untagged capture to green', () => 
   assert.ok(high.matches.some((match) => match.text === '#1'));
 });
 
-test('creates and updates schedules without losing reminder state unnecessarily', () => {
+test('creates and updates schedules without importing the legacy deadline reminder marker', () => {
   const now = '2026-08-22T01:00:00.000Z';
   const initial = saveSchedule([], {
     title: '跑样',
@@ -82,7 +82,41 @@ test('creates and updates schedules without losing reminder state unnecessarily'
   const reminded = [{ ...initial[0], remindedAt: '2026-08-23T01:00:00.000Z' }];
   const updated = saveSchedule(reminded, { ...reminded[0], title: '继续跑样' }, '2026-08-22T02:00:00.000Z');
   assert.equal(updated[0].title, '继续跑样');
-  assert.equal(updated[0].remindedAt, reminded[0].remindedAt);
+  assert.equal(updated[0].reminderSentAt, null);
+  assert.equal(updated[0].legacy.remindedAt, '2026-08-23T01:00:00.000Z');
+});
+
+test('resets an event reminder when its time or reminder lead changes', () => {
+  const saved = saveSchedule([], {
+    id: 'event-1',
+    title: '组会',
+    startAt: '2026-08-23T01:00:00.000Z',
+    endAt: '2026-08-23T02:00:00.000Z',
+    reminderMinutesBefore: 10,
+    reminderSentAt: '2026-08-22T10:00:00.000Z'
+  }, '2026-08-22T11:00:00.000Z');
+  const updated = saveSchedule(saved, { id: 'event-1', title: '组会改期', startAt: '2026-08-23T01:00:00.000Z', endAt: '2026-08-23T02:00:00.000Z', reminderMinutesBefore: 30 }, '2026-08-22T12:00:00.000Z');
+  assert.equal(updated[0].reminderSentAt, null);
+});
+
+test('allows an edited schedule to turn its reminder off explicitly', () => {
+  const original = saveSchedule([], {
+    id: 'reminder-off',
+    title: '关闭提醒',
+    startAt: '2026-08-23T09:00:00.000Z',
+    endAt: '2026-08-23T10:00:00.000Z',
+    reminderMinutesBefore: 15,
+    reminderSentAt: '2026-08-23T08:45:00.000Z'
+  }, '2026-08-22T10:00:00.000Z');
+  const changed = saveSchedule(original, {
+    id: 'reminder-off',
+    title: '关闭提醒',
+    startAt: '2026-08-23T09:00:00.000Z',
+    endAt: '2026-08-23T10:00:00.000Z',
+    reminderMinutesBefore: null
+  }, '2026-08-22T11:00:00.000Z');
+  assert.equal(changed[0].reminderMinutesBefore, null);
+  assert.equal(changed[0].reminderSentAt, null);
 });
 
 test('notes preserve typed metadata and metadata fields support custom selects', () => {

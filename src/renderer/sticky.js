@@ -10,8 +10,7 @@ let timer;
 let pinned = true;
 
 async function load() {
-  const workspace = await api.getWorkspace();
-  note = workspace.notes.find((item) => item.id === id);
+  note = await api.getStickyNote(id);
   if (!note) return api.closeSticky();
   title.value = note.title;
   content.value = note.content;

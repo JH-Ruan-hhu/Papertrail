@@ -4,11 +4,10 @@ const {
   normalizeAttendance,
   normalizeFocusSession,
   normalizeMetadataField,
-  normalizeNote,
-  normalizeSchedule
+  normalizeNote
 } = require('./workbench-core');
+const { DATA_VERSION, migrateSchema7To8 } = require('./migration-core');
 
-const DATA_VERSION = 7;
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
 const TASK_REMINDER_LEAD_MS = 48 * 60 * 60_000;
 const TASK_TYPES = Object.freeze(['revision', 'proof', 'copyright', 'followup']);
@@ -202,43 +201,31 @@ function migratePaper(paper, index = 0) {
 }
 
 function migrateData(parsed, defaultSettings) {
-  if (!asObject(parsed)) throw new Error('数据文件根节点必须是对象。');
-  if (parsed.version != null && (!Number.isInteger(parsed.version) || parsed.version < 1)) {
-    throw new Error('数据文件版本号无效。');
-  }
-  if (Number(parsed.version || 1) > DATA_VERSION) {
-    throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
-  }
-  if (parsed.settings != null && !asObject(parsed.settings)) throw new Error('设置数据格式无效。');
-  if (parsed.papers != null && !Array.isArray(parsed.papers)) throw new Error('稿件列表格式无效。');
-  if (parsed.schedules != null && !Array.isArray(parsed.schedules)) throw new Error('日程列表格式无效。');
-  if (parsed.notes != null && !Array.isArray(parsed.notes)) throw new Error('笔记列表格式无效。');
-  if (parsed.metadataFields != null && !Array.isArray(parsed.metadataFields)) throw new Error('笔记元数据字段格式无效。');
-  if (parsed.attendance != null && !Array.isArray(parsed.attendance)) throw new Error('打卡记录格式无效。');
-  if (parsed.focusSessions != null && !Array.isArray(parsed.focusSessions)) throw new Error('专注记录格式无效。');
-
-  const settings = { ...defaultSettings, ...(parsed.settings || {}) };
-  const papers = (parsed.papers || []).map(migratePaper).map((paper) => (
+  const migrated = migrateSchema7To8(parsed, { defaultSettings });
+  const source = migrated.data;
+  const settings = source.settings;
+  const papers = (source.papers || []).map(migratePaper).map((paper) => (
     paper.lastError && !paper.nextRetryAt
       ? { ...paper, nextRetryAt: nextRetryAt(paper.lastAttemptAt, paper.failureStreak || 1, settings.refreshMinutes) }
       : paper
   ));
-  const schedules = (parsed.schedules || []).map((schedule, index) => normalizeSchedule(schedule, index));
-  const notes = (parsed.notes || []).map((note, index) => normalizeNote(note, index));
-  const metadataFields = (parsed.metadataFields || []).map(normalizeMetadataField);
-  const attendance = (parsed.attendance || []).map((record, index) => normalizeAttendance(record, index));
-  const focusSessions = (parsed.focusSessions || []).map((session, index) => normalizeFocusSession(session, index));
+  const notes = (source.notes || []).map((note, index) => normalizeNote(note, index));
+  const metadataFields = (source.metadataFields || []).map(normalizeMetadataField);
+  const attendance = (source.attendance || []).map((record, index) => normalizeAttendance(record, index));
+  const focusSessions = (source.focusSessions || []).map((session, index) => normalizeFocusSession(session, index));
   const data = {
+    ...source,
     version: DATA_VERSION,
     settings,
     papers,
-    schedules,
+    schedules: source.schedules || [],
+    todos: source.todos || [],
     notes,
     metadataFields,
     attendance,
     focusSessions
   };
-  return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) };
+  return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) || migrated.changed };
 }
 
 function retryDelayMs(failureStreak, refreshMinutes = 360) {

@@ -18,6 +18,8 @@ h1 { margin: 30px 0 14px; font-size: clamp(38px, 6vw, 78px); line-height: 1.12; 
 p { margin: 0 0 42px; font-size: clamp(16px,1.7vw,20px); opacity: .78; }
 button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 14px 22px; color: #674250; background: #fff8ed; border: 1px solid rgba(255,255,255,.5); border-radius: 14px; box-shadow: 0 10px 30px rgba(17,13,24,.16); font: inherit; font-weight: 700; cursor: pointer; transition: transform 160ms var(--ease-out), box-shadow 180ms var(--ease-out); }
 button:active { transform: scale(.97); }
+.deadline-actions { display: flex; justify-content: center; gap: 10px; }
+.deadline-actions button + button { margin-left: 0; }
 button:focus-visible { outline: 3px solid #ffd18f; outline-offset: 4px; }
 body.medium button { color: #5c402d; background: #fffaf1; }
 kbd { padding: 2px 6px; border: 1px solid currentColor; border-radius: 5px; font-family: inherit; font-size: 11px; opacity: .58; }

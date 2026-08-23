@@ -571,7 +571,7 @@ app.whenReady().then(async () => {
           scheduleCards: document.querySelectorAll('#widgetScheduleList .widget-item').length,
           dateLoaded: Boolean(document.getElementById('dateDay').textContent),
           progressLoaded: document.getElementById('widgetProgress').textContent.includes(' / '),
-          closeButtonNamed: document.getElementById('closeWidgetButton').getAttribute('aria-label') === '从桌面移除当日日程',
+          closeButtonNamed: document.getElementById('closeWidgetButton').getAttribute('aria-label') === '从桌面移除今日概览',
           contentFits: close.right <= innerWidth && footer.bottom <= innerHeight && list.right <= innerWidth && list.bottom <= footer.top,
           transparentRoot: getComputedStyle(document.documentElement).backgroundColor === 'rgba(0, 0, 0, 0)',
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
@@ -593,7 +593,8 @@ app.whenReady().then(async () => {
         titleLoaded: document.getElementById('noteTitle').value === 'PFAS 方法学想法',
         contentLoaded: document.getElementById('noteContent').value.includes('回收率与基质效应'),
         closeButtonNamed: document.getElementById('closeButton').getAttribute('aria-label') === '关闭便笺',
-        paleBlue: getComputedStyle(document.body).backgroundColor === 'rgb(245, 251, 255)'
+        liquidGlass: document.documentElement.dataset.appearance === 'liquid-glass'
+          && getComputedStyle(document.body).backgroundImage.includes('radial-gradient')
       }))()
     `);
     if (!Object.values(stickyResult).every(Boolean)) throw new Error(`Workbench sticky smoke failed: ${JSON.stringify(stickyResult)}`);

@@ -181,6 +181,9 @@ main {
   line-height: 1.7;
 }
 
+.widget-todo-item { display: flex; gap: 9px; align-items: center; padding: 8px 0; color: var(--widget-text, #183747); font-size: 13px; }
+.widget-todo-item input { accent-color: #3c9d7f; }
+
 footer {
   display: flex;
   align-items: center;

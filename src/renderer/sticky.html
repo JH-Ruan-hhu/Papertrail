@@ -5,12 +5,16 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>悬浮便笺</title>
+    <script src="theme-bootstrap.js"></script>
     <link rel="stylesheet" href="sticky.css">
+    <link rel="stylesheet" href="v11-layout.css">
+    <link rel="stylesheet" href="themes/liquid-glass.css">
   </head>
   <body>
     <header><span>便笺</span><div><button id="pinButton" class="active" type="button">取消置顶</button><button id="closeButton" type="button" aria-label="关闭便笺" title="关闭">×</button></div></header>
     <main><input id="noteTitle" maxlength="300" placeholder="笔记标题"><textarea id="noteContent" maxlength="100000" placeholder="开始记录…"></textarea></main>
     <footer><span id="saveState">已保存</span></footer>
+    <script src="theme-runtime.js"></script>
     <script src="sticky.js"></script>
   </body>
 </html>

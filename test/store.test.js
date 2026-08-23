@@ -178,3 +178,29 @@ test('does not overwrite the original file when workflow migration fails', (t) =
   assert.throws(() => store.load(), /截止任务缺少有效截止时间/);
   assert.equal(fs.readFileSync(filePath, 'utf8'), original);
 });
+
+test('backs up Schema 7 before the first Schema 8 write and keeps unknown root fields', (t) => {
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'papertrail-store-v8-'));
+  t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
+  const filePath = path.join(directory, 'papertrail-data.json');
+  const original = {
+    version: 7,
+    settings: { scheduleWidgetEnabled: true },
+    papers: [],
+    schedules: [{ id: 'event-1', title: '组会', startAt: '2026-08-25T01:00:00.000Z', endAt: '2026-08-25T02:00:00.000Z' }],
+    notes: [],
+    metadataFields: [],
+    attendance: [],
+    focusSessions: [],
+    unknownRoot: { retained: true }
+  };
+  fs.writeFileSync(filePath, JSON.stringify(original), 'utf8');
+  const store = new JsonStore(filePath);
+  store.load();
+  const migrated = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  const backups = fs.readdirSync(directory).filter((name) => name.startsWith('papertrail-data.pre-v8.') && name.endsWith('.json'));
+  assert.equal(migrated.version, 8);
+  assert.deepEqual(migrated.unknownRoot, original.unknownRoot);
+  assert.equal(backups.length, 1);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(directory, backups[0]), 'utf8')), original);
+});

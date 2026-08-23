@@ -197,6 +197,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8');
+  const liquidCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'themes', 'liquid-glass.css'), 'utf8');
   const storeJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'store.js'), 'utf8');
   const scheduleWidgetHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.html'), 'utf8');
   const scheduleWidgetJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.js'), 'utf8');
@@ -261,7 +262,8 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(scheduleWidgetHtml, /id="widgetScheduleList"/);
   assert.match(scheduleWidgetHtml, /id="closeWidgetButton"/);
   assert.match(scheduleWidgetJs, /schedulesForToday/);
-  assert.match(scheduleWidgetJs, /completeSchedule/);
+  assert.doesNotMatch(preloadJs, /completeSchedule/);
+  assert.doesNotMatch(scheduleWidgetJs, /completeSchedule/);
   assert.match(scheduleWidgetCss, /:root[\s\S]*background: transparent/);
   assert.match(scheduleWidgetCss, /-webkit-line-clamp: 2/);
   assert.match(preloadJs, /startFocus/);
@@ -287,7 +289,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.doesNotMatch(workbenchJs, /title: '删除日程'.*无法撤销。/);
   assert.doesNotMatch(workbenchJs, /title: '删除打卡记录'.*无法撤销。/);
   assert.doesNotMatch(workbenchJs, /title: '删除笔记'.*无法撤销。/);
-  assert.match(css, /backdrop-filter: var\(--glass-blur\)/);
+  assert.match(liquidCss, /backdrop-filter: blur\(var\(--glass-blur\)\)/);
   assert.match(indexHtml, /id="closeScheduleButton"/);
   assert.match(indexHtml, /id="cancelScheduleButton"/);
   assert.match(workbenchJs, /SCHEDULE_DRAFT_KEY = 'yanji\.scheduleDraft\.v1'/);

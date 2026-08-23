@@ -188,6 +188,12 @@ let smokeUpdateState = {
 
 contextBridge.exposeInMainWorld('paperTrail', {
   getWorkspace: async () => smokeWorkspace,
+  getTodayWidgetData: async () => smokeWorkspace,
+  onTodayWidgetChanged: () => {},
+  completeTodo: async (id) => {
+    smokeWorkspace.todos = (smokeWorkspace.todos || []).map((todo) => todo.id === id ? { ...todo, status: 'completed' } : todo);
+    return true;
+  },
   parseSchedule: async (input) => {
     const text = String(input || '');
     if (text.includes('，')) {
@@ -209,6 +215,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
   closeScheduleWidget: async () => { document.body.dataset.closeRequested = 'true'; return true; },
   openScheduleWidgetMain: async () => { document.body.dataset.openMainRequested = 'true'; return true; },
   saveNote: async (input) => input,
+  getStickyNote: async (id) => (smokeWorkspace.notes || []).find((note) => note.id === id) || null,
+  closeSticky: async () => { document.body.dataset.closeRequested = 'true'; return true; },
+  setStickyAlwaysOnTop: async () => true,
   deleteNote: async () => { document.body.dataset.deletedNoteCount = String(Number(document.body.dataset.deletedNoteCount || 0) + 1); return true; },
   openStickyNote: async () => true,
   createStickyNote: async () => ({ id: 'new-sticky-note', title: '便笺', content: '' }),

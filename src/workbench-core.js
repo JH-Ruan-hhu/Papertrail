@@ -1,6 +1,7 @@
 'use strict';
 
 const SCHEDULE_PRIORITIES = Object.freeze(['high', 'medium', 'low']);
+const SCHEDULE_REMINDER_MINUTES = Object.freeze([null, 0, 5, 10, 15, 30, 60, 1440]);
 const METADATA_TYPES = Object.freeze(['text', 'select', 'checkbox']);
 const ATTENDANCE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const FOCUS_STATUSES = Object.freeze(['active', 'completed', 'stopped']);
@@ -172,15 +173,25 @@ function parseNaturalLanguageSchedule(input, base = new Date()) {
   }
   matches.sort((a, b) => a.start - b.start);
 
-  return {
+  const parsed = {
     valid: true,
     title,
     startAt: start.toISOString(),
     endAt: end.toISOString(),
     priority,
-    deadline,
-    matches
+    matches,
+    meta: {
+      explicitDate: Boolean(resolvedDate.token),
+      explicitTime: Boolean(timeToken && /\d|点|时|:|：/.test(timeToken)),
+      timeRange: Boolean(endClock),
+      dateToken: resolvedDate.token || null,
+      timeToken: timeToken || null
+    }
   };
+  // Kept as a non-enumerable compatibility getter for v1.0 renderer/tests.
+  // Schema 8 never persists Deadline semantics on a schedule.
+  Object.defineProperty(parsed, 'deadline', { value: deadline, enumerable: false, configurable: true });
+  return parsed;
 }
 
 function hasExplicitScheduleTime(parsed) {
@@ -233,24 +244,63 @@ function parseNaturalLanguageSchedules(input, base = new Date()) {
 
 function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOString()) {
   if (!asObject(value)) throw new Error(`第 ${index + 1} 条日程格式无效。`);
-  const startAt = isoDate(value.startAt);
-  const endAt = isoDate(value.endAt);
+  const sourceStartAt = isoDate(value.startAt);
+  const sourceEndAt = isoDate(value.endAt);
+  const allDay = Boolean(value.allDay);
+  let startAt = sourceStartAt;
+  let endAt = sourceEndAt;
+  if (allDay && sourceStartAt) {
+    const startDate = new Date(sourceStartAt);
+    startAt = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate()).toISOString();
+    endAt = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + 1).toISOString();
+  }
   if (!startAt || !endAt || Date.parse(endAt) <= Date.parse(startAt)) {
     throw new Error(`第 ${index + 1} 条日程时间范围无效。`);
   }
   const createdAt = isoDate(value.createdAt, fallbackAt);
-  return {
+  const legacy = asObject(value.legacy) ? { ...value.legacy } : {};
+  const knownKeys = new Set([
+    'id', 'title', 'startAt', 'endAt', 'allDay', 'priority', 'reminderMinutesBefore',
+    'reminderSentAt', 'sourceRef', 'createdAt', 'updatedAt', 'legacy',
+    'deadline', 'completedAt', 'remindedAt'
+  ]);
+  for (const [key, item] of Object.entries(value)) {
+    if (!knownKeys.has(key)) legacy[key] = item;
+  }
+  if (value.deadline !== undefined) legacy.deadline = Boolean(value.deadline);
+  if (value.completedAt) legacy.completedAt = isoDate(value.completedAt);
+  if (value.remindedAt) legacy.remindedAt = isoDate(value.remindedAt);
+  // `remindedAt` was a Schema 7 deadline marker. Keep it in `legacy`, but do
+  // not treat it as a Schema 8 event reminder for an ordinary time block.
+  const reminderSentAt = isoDate(value.reminderSentAt);
+  const sourceRef = asObject(value.sourceRef) && value.sourceRef.type === 'todo' && String(value.sourceRef.id || '').trim()
+    ? { type: 'todo', id: String(value.sourceRef.id).trim() }
+    : null;
+  const reminderMinutesBefore = SCHEDULE_REMINDER_MINUTES.includes(value.reminderMinutesBefore)
+    ? value.reminderMinutesBefore
+    : SCHEDULE_REMINDER_MINUTES.includes(Number(value.reminderMinutesBefore))
+      ? Number(value.reminderMinutesBefore)
+      : null;
+  const schedule = {
     id: cleanText(value.id, 200) || `schedule-${index + 1}`,
     title: cleanText(value.title, 500) || '未命名日程',
     startAt,
     endAt,
+    allDay,
     priority: SCHEDULE_PRIORITIES.includes(value.priority) ? value.priority : 'low',
-    deadline: Boolean(value.deadline),
-    completedAt: isoDate(value.completedAt),
-    remindedAt: isoDate(value.remindedAt),
+    reminderMinutesBefore,
+    reminderSentAt,
+    sourceRef,
     createdAt,
-    updatedAt: isoDate(value.updatedAt, createdAt)
+    updatedAt: isoDate(value.updatedAt, createdAt),
+    legacy
   };
+  Object.defineProperties(schedule, {
+    deadline: { value: Boolean(value.deadline || legacy.deadline), enumerable: false, configurable: true, writable: true },
+    completedAt: { value: isoDate(value.completedAt || legacy.completedAt), enumerable: false, configurable: true, writable: true },
+    remindedAt: { value: reminderSentAt, enumerable: false, configurable: true, writable: true }
+  });
+  return schedule;
 }
 
 function normalizeMetadataField(value, index = 0) {
@@ -381,13 +431,24 @@ function normalizeFocusSession(value, index = 0, fallbackAt = new Date(0).toISOS
 
 function saveSchedule(list, input, now = new Date().toISOString(), makeId = () => `schedule-${Date.now()}`) {
   const existing = input?.id ? list.find((item) => item.id === String(input.id)) : null;
+  const hasInput = (key) => Object.prototype.hasOwnProperty.call(input || {}, key);
+  const nextStartAt = hasInput('startAt') ? input.startAt : existing?.startAt;
+  const nextEndAt = hasInput('endAt') ? input.endAt : existing?.endAt;
+  const nextAllDay = hasInput('allDay') ? input.allDay : existing?.allDay;
+  const nextReminderMinutes = hasInput('reminderMinutesBefore') ? input.reminderMinutesBefore : existing?.reminderMinutesBefore;
+  const sameReminderIdentity = Boolean(existing
+    && existing.startAt === nextStartAt
+    && existing.endAt === nextEndAt
+    && existing.allDay === Boolean(nextAllDay)
+    && existing.reminderMinutesBefore === nextReminderMinutes);
+  const requestedReminder = input?.reminderSentAt ?? null;
   const candidate = normalizeSchedule({
     ...existing,
     ...input,
     id: existing?.id || makeId(),
     createdAt: existing?.createdAt || now,
     updatedAt: now,
-    remindedAt: existing && existing.startAt === input.startAt ? existing.remindedAt : null
+    reminderSentAt: sameReminderIdentity ? (existing.reminderSentAt || requestedReminder) : requestedReminder
   }, 0, now);
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
@@ -439,6 +500,7 @@ function saveFocusSession(list, input, now = new Date().toISOString(), makeId = 
 module.exports = {
   METADATA_TYPES,
   SCHEDULE_PRIORITIES,
+  SCHEDULE_REMINDER_MINUTES,
   closeStaleAttendanceRecords,
   normalizeAttendance,
   normalizeFocusSession,

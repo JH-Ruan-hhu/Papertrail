@@ -165,7 +165,7 @@ function daysSince(value) {
 
 function showToast(message, type = 'success', duration = 3200) {
   clearTimeout(state.toastTimer);
-  elements.toast.textContent = message;
+  elements.toast.textContent = String(message ?? '').replace(/[。]+$/g, '');
   elements.toast.className = `toast show ${type === 'error' ? 'error' : ''}`;
   state.toastTimer = setTimeout(() => { elements.toast.className = 'toast'; }, duration);
 }
@@ -823,6 +823,14 @@ function populateSettings() {
   document.getElementById('refreshOnStartup').checked = settings.refreshOnStartup !== false;
   document.getElementById('refreshMinutes').value = String(settings.refreshMinutes);
   document.getElementById('notifications').checked = settings.notifications;
+  document.getElementById('eventNotifications').checked = settings.eventNotifications !== false;
+  document.getElementById('todoNotifications').checked = settings.todoNotifications !== false;
+  document.getElementById('defaultEventReminderMinutes').value = String(settings.defaultEventReminderMinutes == null ? 'null' : settings.defaultEventReminderMinutes);
+  document.getElementById('defaultTodoReminderMode').value = settings.defaultTodoReminderMode || 'at-due';
+  document.getElementById('todayWidgetEnabled').checked = settings.todayWidgetEnabled ?? settings.scheduleWidgetEnabled;
+  document.getElementById('widgetShowSchedules').checked = settings.widgetShowSchedules !== false;
+  document.getElementById('widgetShowTodos').checked = settings.widgetShowTodos !== false;
+  document.querySelectorAll('input[name="appearanceTheme"]').forEach((input) => { input.checked = input.value === (settings.appearanceTheme || 'liquid-glass'); });
   document.getElementById('closeToTray').checked = settings.closeToTray;
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
@@ -833,6 +841,7 @@ function populateSettings() {
 
 const SETTINGS_SECTION_COPY = Object.freeze({
   general: ['通用', 'Windows 行为与全局快捷操作'],
+  appearance: ['外观', '选择液态玻璃或经典工作台，并配置桌面概览'],
   notifications: ['提醒', '管理日程、任务和投稿进展的 Windows 通知'],
   tracking: ['投稿追踪', '设置稿件状态的后台检查频率'],
   storage: ['数据与备份', '管理整个科研工作台的数据位置和迁移备份'],
@@ -952,12 +961,21 @@ async function saveSettings() {
       refreshOnStartup: document.getElementById('refreshOnStartup').checked,
       refreshMinutes: Number(document.getElementById('refreshMinutes').value),
       notifications: document.getElementById('notifications').checked,
+      eventNotifications: document.getElementById('eventNotifications').checked,
+      todoNotifications: document.getElementById('todoNotifications').checked,
+      defaultEventReminderMinutes: document.getElementById('defaultEventReminderMinutes').value === 'null' ? null : Number(document.getElementById('defaultEventReminderMinutes').value),
+      defaultTodoReminderMode: document.getElementById('defaultTodoReminderMode').value,
+      appearanceTheme: document.querySelector('input[name="appearanceTheme"]:checked')?.value || 'liquid-glass',
+      todayWidgetEnabled: document.getElementById('todayWidgetEnabled').checked,
+      widgetShowSchedules: document.getElementById('widgetShowSchedules').checked,
+      widgetShowTodos: document.getElementById('widgetShowTodos').checked,
       closeToTray: document.getElementById('closeToTray').checked,
       startAtLogin: document.getElementById('startAtLogin').checked,
       autoCheckUpdates: document.getElementById('autoCheckUpdates').checked,
       quickCaptureShortcut: document.getElementById('quickCaptureShortcut').value,
       stickyNoteShortcut: document.getElementById('stickyNoteShortcut').value
     });
+    window.yanjiTheme?.apply(state.settings);
     const formatShortcut = (value) => String(value || '').replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
     document.getElementById('shortcutTip').textContent = formatShortcut(state.settings.quickCaptureShortcut);
     document.getElementById('stickyShortcutTip').textContent = formatShortcut(state.settings.stickyNoteShortcut);
@@ -1187,6 +1205,10 @@ async function initialize() {
     api.onUpdateState((updateStatus) => {
       state.updateStatus = updateStatus;
       renderUpdateStatus();
+    });
+    api.onSettingsChanged((settings) => {
+      state.settings = settings;
+      if (!elements.settingsDialog.hidden) populateSettings();
     });
     setInterval(render, 60_000);
   } catch (error) {

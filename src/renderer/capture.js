@@ -9,6 +9,7 @@ const card = document.querySelector('.capture-card');
 let mode = 'schedule';
 let parseSequence = 0;
 let parsedSchedule = null;
+let parsedTodo = null;
 let composing = false;
 let parseTimer = null;
 
@@ -34,6 +35,15 @@ function formatWhen(schedule) {
   return `${date} · ${times.format(start)}–${times.format(end)} · ${priority}`;
 }
 
+function formatTodo(todo) {
+  if (!todo?.valid) return todo?.warning || '输入内容后自动识别截止日期；没有日期会进入收件箱';
+  if (!todo.dueAt) return `收件箱 · ${todo.title}`;
+  const due = new Date(todo.dueAt);
+  const date = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(due);
+  const time = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(due);
+  return `${date} · ${time} 截止 · ${todo.priority === 'high' ? '最高优先级' : todo.priority === 'medium' ? '重要' : '普通'}${todo.warning ? ` · ${todo.warning}` : ''}`;
+}
+
 function placeCaretAtEnd() {
   editor.focus();
   editor.setSelectionRange(editor.value.length, editor.value.length);
@@ -57,6 +67,10 @@ function syncScroll() {
   highlights.scrollLeft = editor.scrollLeft;
 }
 
+function activeMatches() {
+  return mode === 'schedule' ? parsedSchedule?.matches : mode === 'todo' ? parsedTodo?.matches : [];
+}
+
 function queueParse(delay = 120) {
   clearTimeout(parseTimer);
   if (composing) return;
@@ -67,17 +81,26 @@ async function parseInput() {
   const sequence = ++parseSequence;
   const text = plainText();
   result.classList.remove('error');
-  if (mode !== 'schedule' || !text.trim()) {
+  if (!text.trim()) {
     parsedSchedule = null;
+    parsedTodo = null;
     renderHighlights(text);
-    result.textContent = mode === 'note' ? '笔记保留原文，不解析时间' : '自动识别时间；#1 红、#2 黄、#3 绿，默认绿色';
+    result.textContent = mode === 'note' ? '笔记保留原文，不解析时间' : mode === 'todo' ? '自动识别截止日期；没有日期会进入收件箱' : '自动识别时间；#1 红、#2 黄、#3 绿，默认绿色';
     return;
   }
   try {
-    const parsed = await api.parseSchedule(text);
+    if (mode === 'note') {
+      parsedSchedule = null;
+      parsedTodo = null;
+      result.textContent = '笔记保留原文，不解析时间';
+      renderHighlights(text);
+      return;
+    }
+    const parsed = mode === 'todo' ? await api.parseTodo(text) : await api.parseSchedule(text);
     if (sequence !== parseSequence) return;
-    parsedSchedule = parsed;
-    result.textContent = formatWhen(parsed);
+    parsedSchedule = mode === 'schedule' ? parsed : null;
+    parsedTodo = mode === 'todo' ? parsed : null;
+    result.textContent = mode === 'todo' ? formatTodo(parsed) : mode === 'schedule' ? formatWhen(parsed) : '笔记保留原文，不解析时间';
     renderHighlights(text, parsed.matches);
   } catch (error) {
     result.textContent = error.message || '暂时无法解析时间';
@@ -90,10 +113,12 @@ function setMode(nextMode) {
   tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.mode === mode));
   editor.placeholder = mode === 'schedule'
     ? '例如：明天下午 3 点到 5 点组会 #1'
-    : '随手记录想法…（Ctrl + Enter 保存）';
+    : mode === 'todo'
+      ? '例如：周五前提交论文修改稿 #1'
+      : '随手记录想法…（Ctrl + Enter 保存）';
   document.getElementById('submitHint').innerHTML = mode === 'schedule'
     ? '<kbd>Enter</kbd> 创建'
-    : '<kbd>Ctrl Enter</kbd> 保存';
+    : mode === 'todo' ? '<kbd>Enter</kbd> 创建' : '<kbd>Ctrl Enter</kbd> 保存';
   renderHighlights(plainText());
   placeCaretAtEnd();
   queueParse(0);
@@ -110,6 +135,7 @@ async function submit() {
     renderHighlights('');
     api.setCaptureContentState(false);
     parsedSchedule = null;
+    parsedTodo = null;
     await api.hideCapture();
   } catch (error) {
     result.textContent = error.message || '保存失败';
@@ -121,7 +147,7 @@ tabs.forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.mo
 editor.addEventListener('input', () => {
   const text = plainText();
   api.setCaptureContentState(Boolean(text.trim()));
-  renderHighlights(text, composing ? [] : parsedSchedule?.matches);
+  renderHighlights(text, composing ? [] : activeMatches());
   queueParse();
 });
 editor.addEventListener('compositionstart', () => {
@@ -140,7 +166,8 @@ document.addEventListener('keydown', (event) => {
   if (event.isComposing || composing || event.keyCode === 229) return;
   if (event.key === 'Tab') {
     event.preventDefault();
-    setMode(mode === 'schedule' ? 'note' : 'schedule');
+    const modes = ['schedule', 'todo', 'note'];
+    setMode(modes[(modes.indexOf(mode) + (event.shiftKey ? modes.length - 1 : 1)) % modes.length]);
   } else if (event.key === 'Escape') {
     if (!plainText().trim()) api.hideCapture();
     else {
@@ -149,7 +176,7 @@ document.addEventListener('keydown', (event) => {
       result.textContent = '内容尚未保存；清空后再按 Esc 关闭';
       result.classList.add('error');
     }
-  } else if (event.key === 'Enter' && mode === 'schedule' && !event.shiftKey) {
+  } else if (event.key === 'Enter' && (mode === 'schedule' || mode === 'todo') && !event.shiftKey) {
     event.preventDefault();
     submit();
   } else if (event.key === 'Enter' && mode === 'note' && (event.ctrlKey || event.metaKey)) {

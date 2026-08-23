@@ -12,7 +12,18 @@ const DEFAULT_SETTINGS = Object.freeze({
   closeToTray: true,
   startAtLogin: false,
   autoCheckUpdates: true,
+  // Kept in the defaults as a read-compatibility marker; Schema 8 stores
+  // todayWidgetEnabled and getSettings exposes the old name as an alias.
   scheduleWidgetEnabled: false,
+  todayWidgetEnabled: false,
+  widgetShowSchedules: true,
+  widgetShowTodos: true,
+  widgetShowCompletedTodos: false,
+  appearanceTheme: 'liquid-glass',
+  eventNotifications: true,
+  todoNotifications: true,
+  defaultEventReminderMinutes: 10,
+  defaultTodoReminderMode: 'at-due',
   quickCaptureShortcut: 'CommandOrControl+Shift+Space',
   stickyNoteShortcut: 'CommandOrControl+Alt+N'
 });
@@ -20,11 +31,14 @@ const DEFAULT_SETTINGS = Object.freeze({
 class JsonStore {
   constructor(filePath) {
     this.filePath = filePath;
+    const initialSettings = { ...DEFAULT_SETTINGS };
+    delete initialSettings.scheduleWidgetEnabled;
     this.data = {
       version: DATA_VERSION,
-      settings: { ...DEFAULT_SETTINGS },
+      settings: initialSettings,
       papers: [],
       schedules: [],
+      todos: [],
       notes: [],
       metadataFields: [],
       attendance: [],
@@ -52,15 +66,36 @@ class JsonStore {
       throw new Error(`研迹数据结构损坏或不受支持，未写入任何内容：${error.message}`);
     }
     this.data = migrated.data;
-    if (migrated.changed) this.save();
+    const sourceVersion = Number(parsed.version || 1);
+    if (migrated.changed) {
+      if (sourceVersion < DATA_VERSION) this.createMigrationBackup();
+      this.save();
+    }
     return this.data;
   }
 
-  save() {
+  createMigrationBackup() {
+    const parsedPath = path.parse(this.filePath);
+    const base = `${parsedPath.name}.pre-v8`;
+    let backupPath = path.join(parsedPath.dir, `${base}.${Date.now()}.json`);
+    let suffix = 2;
+    while (fs.existsSync(backupPath)) backupPath = path.join(parsedPath.dir, `${base}.${Date.now()}.${suffix++}.json`);
+    try {
+      // A failed backup must stop migration before the original is replaced.
+      fs.writeFileSync(backupPath, fs.readFileSync(this.filePath), { flag: 'wx' });
+      console.info('[研迹] Schema 8 迁移前备份已创建: ' + backupPath);
+    } catch (error) {
+      throw new Error(`Schema 8 迁移前备份失败，原数据未修改：${error.message}`);
+    }
+    return backupPath;
+  }
+
+  save(nextData = this.data) {
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.tmp`;
-    fs.writeFileSync(tempPath, JSON.stringify(this.data, null, 2), 'utf8');
+    fs.writeFileSync(tempPath, JSON.stringify(nextData, null, 2), 'utf8');
     fs.renameSync(tempPath, this.filePath);
+    this.data = nextData;
   }
 
   copyTo(filePath) {
@@ -76,13 +111,31 @@ class JsonStore {
   }
 
   getSettings() {
-    return { ...this.data.settings };
+    return {
+      ...this.data.settings,
+      scheduleWidgetEnabled: this.data.settings.todayWidgetEnabled ?? this.data.settings.scheduleWidgetEnabled ?? false
+    };
   }
 
   updateSettings(patch) {
-    this.data.settings = { ...this.data.settings, ...patch };
+    const next = { ...this.data.settings, ...patch };
+    if ('scheduleWidgetEnabled' in patch && !('todayWidgetEnabled' in patch)) next.todayWidgetEnabled = Boolean(patch.scheduleWidgetEnabled);
+    delete next.scheduleWidgetEnabled;
+    this.data.settings = next;
     this.save();
     return this.getSettings();
+  }
+
+  updateWorkspace(updater) {
+    const draft = JSON.parse(JSON.stringify(this.data));
+    const next = updater(draft) || draft;
+    if (!next || typeof next !== 'object' || Array.isArray(next)) throw new Error('工作区更新结果无效。');
+    this.save(next);
+    return this.data;
+  }
+
+  commitWorkspace(updater) {
+    return this.updateWorkspace(updater);
   }
 
   listPapers() {
@@ -127,6 +180,16 @@ class JsonStore {
     this.data.schedules = schedules;
     this.save();
     return this.data.schedules;
+  }
+
+  listTodos() {
+    return this.data.todos;
+  }
+
+  setTodos(todos) {
+    this.data.todos = todos;
+    this.save();
+    return this.data.todos;
   }
 
   listNotes() {

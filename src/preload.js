@@ -4,16 +4,29 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('paperTrail', {
   getWorkspace: () => ipcRenderer.invoke('workspace:get'),
+  getTodayWidgetData: () => ipcRenderer.invoke('today-widget:get-data'),
   parseSchedule: (input) => ipcRenderer.invoke('schedules:parse', input),
   saveSchedule: (input) => ipcRenderer.invoke('schedules:save', input),
   deleteSchedule: (id) => ipcRenderer.invoke('schedules:delete', id),
-  completeSchedule: (id, completed) => ipcRenderer.invoke('schedules:complete', id, completed),
+  convertScheduleToTodo: (id, input) => ipcRenderer.invoke('schedules:convert-to-todo', id, input),
+  detachSchedule: (id) => ipcRenderer.invoke('schedules:detach', id),
+  parseTodo: (input) => ipcRenderer.invoke('todos:parse', input),
+  saveTodo: (input) => ipcRenderer.invoke('todos:save', input),
+  deleteTodo: (id) => ipcRenderer.invoke('todos:delete', id),
+  completeTodo: (id) => ipcRenderer.invoke('todos:complete', id),
+  reopenTodo: (id) => ipcRenderer.invoke('todos:reopen', id),
+  cancelTodo: (id) => ipcRenderer.invoke('todos:cancel', id),
+  snoozeTodo: (id, until) => ipcRenderer.invoke('todos:snooze', id, until),
+  getLinkedSchedules: (id) => ipcRenderer.invoke('todos:get-linked-schedules', id),
+  scheduleTodo: (id, input) => ipcRenderer.invoke('todos:schedule', id, input),
+  convertTodoToSchedule: (id, input) => ipcRenderer.invoke('todos:convert-to-schedule', id, input),
   showScheduleWidget: () => ipcRenderer.invoke('schedule-widget:show'),
   closeScheduleWidget: () => ipcRenderer.invoke('schedule-widget:close'),
   openScheduleWidgetMain: () => ipcRenderer.invoke('schedule-widget:open-main'),
   saveNote: (input) => ipcRenderer.invoke('notes:save', input),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
   openStickyNote: (id) => ipcRenderer.invoke('notes:open-sticky', id),
+  getStickyNote: (id) => ipcRenderer.invoke('notes:get-sticky', id),
   createStickyNote: () => ipcRenderer.invoke('notes:create-sticky'),
   saveMetadataFields: (fields) => ipcRenderer.invoke('metadata:save-fields', fields),
   clockAttendance: (action) => ipcRenderer.invoke('attendance:clock', action),
@@ -29,6 +42,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   closeSticky: () => ipcRenderer.invoke('sticky:close'),
   setStickyAlwaysOnTop: (enabled) => ipcRenderer.invoke('sticky:set-always-on-top', enabled),
   dismissDeadline: () => ipcRenderer.invoke('deadline:dismiss'),
+  snoozeDeadline: (until) => ipcRenderer.invoke('deadline:snooze', until),
   listPapers: () => ipcRenderer.invoke('papers:list'),
   addPaper: (payload) => ipcRenderer.invoke('papers:add', payload),
   refreshPaper: (id) => ipcRenderer.invoke('papers:refresh', id),
@@ -80,6 +94,16 @@ contextBridge.exposeInMainWorld('paperTrail', {
     ipcRenderer.on('workspace:changed', listener);
     return () => ipcRenderer.removeListener('workspace:changed', listener);
   },
+  onTodayWidgetChanged: (callback) => {
+    const listener = (_event, data) => callback(data);
+    ipcRenderer.on('today-widget:changed', listener);
+    return () => ipcRenderer.removeListener('today-widget:changed', listener);
+  },
+  onSettingsChanged: (callback) => {
+    const listener = (_event, settings) => callback(settings);
+    ipcRenderer.on('settings:changed', listener);
+    return () => ipcRenderer.removeListener('settings:changed', listener);
+  },
   onWorkspaceNavigate: (callback) => {
     const listener = (_event, page) => callback(page);
     ipcRenderer.on('workspace:navigate', listener);
@@ -99,5 +123,20 @@ contextBridge.exposeInMainWorld('paperTrail', {
     const listener = (_event, schedule) => callback(schedule);
     ipcRenderer.on('deadline:show', listener);
     return () => ipcRenderer.removeListener('deadline:show', listener);
+  },
+  // Namespaced aliases mirror the v1.1 contract while the flat methods above
+  // preserve the existing PaperTrail renderer API.
+  todos: {
+    parse: (input) => ipcRenderer.invoke('todos:parse', input),
+    save: (input) => ipcRenderer.invoke('todos:save', input),
+    delete: (id) => ipcRenderer.invoke('todos:delete', id),
+    setCompleted: (id, completed = true) => ipcRenderer.invoke(completed ? 'todos:complete' : 'todos:reopen', id),
+    setCancelled: (id, cancelled = true) => ipcRenderer.invoke(cancelled ? 'todos:cancel' : 'todos:reopen', id),
+    schedule: (id, input) => ipcRenderer.invoke('todos:schedule', id, input),
+    convertToSchedule: (id, input) => ipcRenderer.invoke('todos:convert-to-schedule', id, input),
+    getLinkedSchedules: (id) => ipcRenderer.invoke('todos:get-linked-schedules', id)
+  },
+  schedules: {
+    convertToTodo: (id, input) => ipcRenderer.invoke('schedules:convert-to-todo', id, input)
   }
 });
