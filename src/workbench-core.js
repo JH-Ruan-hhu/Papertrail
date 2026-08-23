@@ -321,6 +321,25 @@ function normalizeAttendance(value, index = 0, fallbackAt = new Date(0).toISOStr
   };
 }
 
+function closeStaleAttendanceRecords(list, now = new Date(), updatedAt = now.toISOString()) {
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  let changed = false;
+  const records = list.map((record) => {
+    if (record.clockOutAt || String(record.date || '') >= todayKey) return record;
+    const [year, month, day] = String(record.date).split('-').map(Number);
+    const localMidnight = new Date(year, month - 1, day + 1, 0, 0, 0, 0);
+    const clockInMs = Date.parse(record.clockInAt);
+    const closeAtMs = Math.max(localMidnight.getTime(), clockInMs + 60_000);
+    changed = true;
+    return {
+      ...record,
+      clockOutAt: new Date(closeAtMs).toISOString(),
+      updatedAt
+    };
+  });
+  return { records, changed };
+}
+
 function normalizeFocusSession(value, index = 0, fallbackAt = new Date(0).toISOString()) {
   if (!asObject(value)) throw new Error(`第 ${index + 1} 条专注记录格式无效。`);
   const startedAt = isoDate(value.startedAt);
@@ -420,6 +439,7 @@ function saveFocusSession(list, input, now = new Date().toISOString(), makeId = 
 module.exports = {
   METADATA_TYPES,
   SCHEDULE_PRIORITIES,
+  closeStaleAttendanceRecords,
   normalizeAttendance,
   normalizeFocusSession,
   normalizeMetadataField,

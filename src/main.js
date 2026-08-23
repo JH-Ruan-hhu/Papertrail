@@ -38,6 +38,7 @@ const {
 } = require('./production-core');
 const { importantChanges } = require('./notification-core');
 const {
+  closeStaleAttendanceRecords,
   normalizeMetadataField,
   parseNaturalLanguageSchedules,
   saveAttendance,
@@ -74,6 +75,9 @@ const {
 } = require('./update-core');
 
 const APP_NAME = '研迹 · 科研工作台';
+const BUILD_DIR = path.join(__dirname, '..', 'build');
+const APP_ICON_PNG_PATH = path.join(BUILD_DIR, 'icon.png');
+const APP_ICON_PATH = process.platform === 'win32' ? path.join(BUILD_DIR, 'icon.ico') : APP_ICON_PNG_PATH;
 const MAX_HISTORY = 100;
 const FETCH_TIMEOUT_MS = 20_000;
 const DATA_FILE_NAME = 'papertrail-data.json';
@@ -616,7 +620,20 @@ function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
+function reconcileStaleAttendance(now = new Date()) {
+  const before = store.listAttendance();
+  const result = closeStaleAttendanceRecords(before, now, now.toISOString());
+  if (!result.changed) return false;
+  store.setAttendance(result.records);
+  if (!result.records.some((record) => !record.clockOutAt)) {
+    attendanceUsageLive = {};
+    stopUsageSamplerIfIdle();
+  }
+  return true;
+}
+
 function saveWorkspaceAttendance(input) {
+  if (!input?.clockOutAt) reconcileStaleAttendance();
   const before = store.listAttendance();
   const existing = input?.id ? before.find((item) => item.id === String(input.id)) : null;
   const activeOther = before.find((item) => !item.clockOutAt && item.id !== String(input?.id || ''));
@@ -649,6 +666,7 @@ function saveWorkspaceAttendance(input) {
 
 function clockWorkspaceAttendance(action) {
   const now = new Date();
+  const reconciled = reconcileStaleAttendance(now);
   const records = store.listAttendance();
   const openRecord = records.find((item) => !item.clockOutAt);
   if (action === 'in') {
@@ -660,7 +678,10 @@ function clockWorkspaceAttendance(action) {
     return record;
   }
   if (action === 'out') {
-    if (!openRecord) throw new Error('当前没有进行中的上班记录。');
+    if (!openRecord) {
+      if (reconciled) broadcastWorkspace();
+      throw new Error('当前没有进行中的上班记录。');
+    }
     const record = saveWorkspaceAttendance({ ...openRecord, appUsage: attendanceUsageLive, clockOutAt: now.toISOString() });
     return record;
   }
@@ -1286,7 +1307,7 @@ function showScheduleNotification(schedule) {
     title: schedule.priority === 'medium' ? '重要日程已到时间' : '日程提醒',
     body: schedule.title,
     urgency: schedule.priority === 'medium' ? 'critical' : 'normal',
-    icon: path.join(__dirname, '..', 'build', 'icon.png')
+    icon: APP_ICON_PNG_PATH
   });
   notification.on('click', () => {
     showMainWindow();
@@ -1440,7 +1461,7 @@ function notifyChange(paper, changes) {
     title: `${paper.snapshot.title} 有新进展`,
     body,
     silent: false,
-    icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    icon: APP_ICON_PNG_PATH,
     timeoutType: 'never'
   });
   notification.on('click', async () => {
@@ -1669,7 +1690,7 @@ function createWindow() {
     show: false,
     backgroundColor: '#edf7fc',
     title: APP_NAME,
-    icon: path.join(__dirname, '..', 'build', 'icon.png'),
+    icon: APP_ICON_PATH,
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     titleBarOverlay: TITLE_BAR_NORMAL,
@@ -1689,7 +1710,10 @@ function createWindow() {
     setTimeout(() => refreshAll({ notify: true }).catch(() => {}), 900);
   });
   mainWindow.once('ready-to-show', () => {
-    if (!process.argv.includes('--hidden')) mainWindow.show();
+    if (!process.argv.includes('--hidden')) {
+      if (!mainWindow.isMaximized()) mainWindow.maximize();
+      mainWindow.show();
+    }
   });
   mainWindow.on('close', (event) => {
     if (!isQuitting && store.getSettings().closeToTray && tray) {
@@ -1703,7 +1727,7 @@ function createWindow() {
 
 function createTrayIcon() {
   return nativeImage
-    .createFromPath(path.join(__dirname, '..', 'build', 'icon.png'))
+    .createFromPath(APP_ICON_PNG_PATH)
     .resize({ width: 20, height: 20, quality: 'best' });
 }
 
@@ -1729,6 +1753,8 @@ function createTray() {
 
 function showMainWindow() {
   if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  if (!mainWindow.isMaximized()) mainWindow.maximize();
   mainWindow.show();
   mainWindow.focus();
 }
@@ -1770,7 +1796,7 @@ function runDeadlineReminders() {
       title: `${urgency.state === 'overdue' ? '任务已逾期' : '任务即将到期'} · ${paper.snapshot.title}`,
       body: deadlineNotificationBody(task, urgency),
       silent: false,
-      icon: path.join(__dirname, '..', 'build', 'icon.png')
+      icon: APP_ICON_PNG_PATH
     });
     notification.on('click', showMainWindow);
     notification.show();
@@ -1781,6 +1807,7 @@ function runDeadlineReminders() {
 }
 
 async function runScheduledWork() {
+  if (reconcileStaleAttendance()) broadcastWorkspace();
   runDeadlineReminders();
   runWorkspaceReminders();
   if (Date.now() - lastBackupCleanupAt >= 24 * 60 * 60_000) cleanupExpiredBackups();
@@ -1884,7 +1911,10 @@ async function exportPaper(id, format) {
 }
 
 function registerIpc() {
-  ipcMain.handle('workspace:get', () => workspaceForRenderer());
+  ipcMain.handle('workspace:get', () => {
+    reconcileStaleAttendance();
+    return workspaceForRenderer();
+  });
   ipcMain.handle('schedules:parse', (_event, input) => parseNaturalLanguageSchedules(input, new Date()));
   ipcMain.handle('schedules:save', (_event, input) => saveWorkspaceSchedule(input));
   ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
@@ -2047,6 +2077,7 @@ if (!gotLock) {
       app.setAppUserModelId('io.papertrail.desktop');
       store = new JsonStore(configuredDataFilePath());
       store.load();
+      reconcileStaleAttendance();
       cleanupExpiredBackups();
       setupAutoUpdater();
       registerIpc();

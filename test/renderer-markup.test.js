@@ -196,6 +196,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8');
   const storeJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'store.js'), 'utf8');
   const scheduleWidgetHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.html'), 'utf8');
   const scheduleWidgetJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.js'), 'utf8');
@@ -206,8 +207,12 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /data-workbench-page="notes"/);
   assert.match(indexHtml, /data-workbench-page="submissions"/);
   assert.doesNotMatch(indexHtml, /id="bingWallpaper"/);
+  assert.match(indexHtml, /class="home-progress-strip"[\s\S]*id="homeProgressHeadline"/);
+  assert.match(indexHtml, /id="homeProgressRateBar"/);
   assert.match(indexHtml, /id="homeDayOverview"/);
   assert.match(indexHtml, /id="scheduleBoard"/);
+  assert.match(indexHtml, /class="schedule-today-panel"[\s\S]*id="todayScheduleList"/);
+  assert.doesNotMatch(indexHtml, /id="agendaList"/);
   assert.match(indexHtml, /id="scheduleRecognition"/);
   assert.match(indexHtml, /id="attendanceGanttRows"/);
   assert.match(indexHtml, /id="startFocusButton"/);
@@ -246,6 +251,10 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.doesNotMatch(mainJs, /scheduleWidgetWindow[\s\S]*setResizable\(true\)/);
   assert.match(mainJs, /showDeadlineWindow/);
   assert.match(mainJs, /new Notification/);
+  assert.match(mainJs, /APP_ICON_PATH = process\.platform === 'win32'/);
+  assert.match(mainJs, /if \(!mainWindow\.isMaximized\(\)\) mainWindow\.maximize\(\)/);
+  assert.match(mainJs, /closeStaleAttendanceRecords/);
+  assert.match(mainJs, /reconcileStaleAttendance/);
   assert.match(preloadJs, /showCapture/);
   assert.match(preloadJs, /createStickyNote/);
   assert.match(preloadJs, /showScheduleWidget/);
@@ -271,6 +280,14 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /class="focus-timer-panel home-focus-timer"[\s\S]*id="homeClockButton"/);
   assert.doesNotMatch(indexHtml, /class="home-attendance-panel"|id="homeAttendanceStatus"|id="homeAttendanceTrack"|id="homeAttendanceDuration"/);
   assert.match(workbenchJs, /button\.textContent = openRecord \? '下班打卡' : '上班打卡'/);
+  assert.match(workbenchJs, /button\.classList\.toggle\('is-clocked-in'/);
+  assert.match(workbenchJs, /item\.date === todayKey/);
+  assert.match(workbenchJs, /const record = await workbenchApi\.clockAttendance\(action\)/);
+  assert.match(workbenchJs, /renderTodaySchedule/);
+  assert.doesNotMatch(workbenchJs, /title: '删除日程'.*无法撤销。/);
+  assert.doesNotMatch(workbenchJs, /title: '删除打卡记录'.*无法撤销。/);
+  assert.doesNotMatch(workbenchJs, /title: '删除笔记'.*无法撤销。/);
+  assert.match(css, /backdrop-filter: var\(--glass-blur\)/);
   assert.match(indexHtml, /id="closeScheduleButton"/);
   assert.match(indexHtml, /id="cancelScheduleButton"/);
   assert.match(workbenchJs, /SCHEDULE_DRAFT_KEY = 'yanji\.scheduleDraft\.v1'/);

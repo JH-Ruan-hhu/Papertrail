@@ -54,24 +54,25 @@ function drawLine(x1, y1, x2, y2, thickness, color) {
   }
 }
 
-// A low-contrast ice-blue tile that stays light in the taskbar and installer.
+// A pale glass tile with a high-contrast notebook silhouette that remains
+// legible when Windows reduces it to a 16–20px taskbar icon.
 for (let y = 0; y < height; y += 1) {
   for (let x = 0; x < width; x += 1) {
     if (inRoundedRect(x, y, 8, 8, 247, 247, 62)) {
-      const shade = Math.round(248 - ((x + y) / (width + height)) * 10);
-      setPixel(x, y, [shade - 8, shade, 252, 255]);
+      const shade = Math.round(235 - ((x + y) / (width + height)) * 14);
+      setPixel(x, y, [shade - 7, shade + 6, 248, 255]);
     }
   }
 }
 
 // Research notebook: white page, soft blue binding, and a rising trail.
-fillRoundedRect(55, 43, 201, 215, 29, [190, 220, 234, 255]);
+fillRoundedRect(55, 43, 201, 215, 29, [83, 145, 171, 255]);
 fillRoundedRect(59, 39, 197, 211, 27, [255, 255, 255, 255]);
-fillRoundedRect(59, 39, 82, 211, 20, [166, 211, 231, 255]);
-fillRoundedRect(75, 39, 82, 211, 3, [166, 211, 231, 255]);
+fillRoundedRect(59, 39, 82, 211, 20, [62, 132, 160, 255]);
+fillRoundedRect(75, 39, 82, 211, 3, [62, 132, 160, 255]);
 
-const ink = [61, 137, 173, 255];
-const inkSoft = [114, 181, 211, 255];
+const ink = [27, 103, 134, 255];
+const inkSoft = [75, 163, 190, 255];
 drawLine(101, 82, 169, 82, 4, inkSoft);
 drawLine(101, 105, 151, 105, 4, inkSoft);
 drawLine(101, 128, 135, 128, 4, inkSoft);

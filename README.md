@@ -6,6 +6,21 @@ into one desktop app. The manuscript connectors cover Elsevier Author Hub and
 Elsevier accepted-article production pages; local workflow records remain
 publisher-neutral.
 
+## Version 1.1 workbench features
+
+Version 1.1.0 updates the published workbench to the current 研迹 experience.
+Home now leads with today's progress, completed items, project completion rate,
+and focus time. The Schedule page places today's agenda at the top and keeps a
+compact seven-day board below it. The workspace uses an Apple-inspired liquid
+glass material with a solid fallback for systems that do not support blur.
+
+Attendance now closes an unfinished previous-day segment at that day's local
+midnight, so a forgotten clock-out cannot block the next day's clock-in or a
+new record after deletion. The main window opens maximized, and Windows uses a
+regenerated high-contrast ICO for the taskbar, installer, shortcuts, and app
+window. Destructive workbench prompts use concise copy without trailing full
+stops.
+
 ## Version 1.0 workbench features
 
 Version 1.0.5 moves the sole Home attendance action into the Focus Timer card
@@ -28,8 +43,8 @@ throughout modal dialogs while preserving scrolling, and brings Quick Capture
 time recognition into the normal schedule editor. Explicitly timed clauses such
 as `明天上午八点去采样，下午五点去洗澡` are previewed and saved as two
 separate schedules, with the later clause inheriting the date.
-The application icon now uses a light ice-blue research-notebook design across
-the executable, installer, shortcuts, windows, and tray.
+The application icon uses a light ice-blue research-notebook design across the
+executable, installer, shortcuts, windows, taskbar, and tray.
 
 Version 1.0.2 replaces the desktop widget's CSS-only outer corners with a
 transparent Electron surface plus a native Windows rounded window region, so
@@ -42,7 +57,7 @@ frames from the 3:4 desktop schedule widget. Quick Capture also understands
 connectors such as `明天的下午四点去污水厂采样` without leaving `的` in the
 saved schedule title.
 
-- Use a cohesive pale-blue desktop shell with consistent line icons,
+- Use an Apple-inspired liquid-glass desktop shell with consistent line icons,
   compact spacing, a small top-right clock, and responsive narrow-window
   layouts.
 - Open Settings as a normal workspace page with horizontal categories; scrolling
@@ -77,9 +92,9 @@ saved schedule title.
 - Review yesterday, today, tomorrow, and the day after tomorrow from the home
   page, create a schedule quickly, and see the latest notes without changing
   pages.
-- Review a complete week on a horizontally scrollable date-column board. Each
-  event card shows its time range, priority, deadline, completion state, and
-  cross-midnight status; selecting a date opens its full agenda below.
+- See today's schedule at the top of the Schedule page with completion progress,
+  then review a compact seven-day date-column board. Each event card shows its
+  time range, priority, deadline, completion state, and cross-midnight status.
 - Put today's schedule on the Windows desktop as a fixed 360 × 480 (3:4)
   component. It is attached to the desktop-icon host instead of floating above
   applications, stays out of the taskbar, and updates when schedules change.

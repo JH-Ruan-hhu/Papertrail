@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  closeStaleAttendanceRecords,
   normalizeAttendance,
   normalizeFocusSession,
   normalizeMetadataField,
@@ -120,6 +121,25 @@ test('attendance supports multiple work segments per day and validates clock ord
     clockInAt: '2026-08-22T09:00:00.000Z',
     clockOutAt: '2026-08-22T08:00:00.000Z'
   }), /下班时间必须晚于上班时间/);
+});
+
+test('closes an unfinished previous-day attendance segment at local midnight', () => {
+  const records = [{
+    id: 'attendance-stale',
+    date: '2026-08-22',
+    clockInAt: new Date(2026, 7, 22, 9, 0).toISOString(),
+    clockOutAt: null,
+    appUsage: { chrome: 120 },
+    createdAt: new Date(2026, 7, 22, 9, 0).toISOString(),
+    updatedAt: new Date(2026, 7, 22, 9, 0).toISOString()
+  }];
+  const now = new Date(2026, 7, 23, 9, 0);
+  const result = closeStaleAttendanceRecords(records, now, now.toISOString());
+  assert.equal(result.changed, true);
+  assert.equal(result.records[0].clockOutAt, new Date(2026, 7, 23, 0, 0).toISOString());
+  assert.deepEqual(result.records[0].appUsage, { chrome: 120 });
+  assert.equal(result.records[0].updatedAt, now.toISOString());
+  assert.equal(closeStaleAttendanceRecords(result.records, now).changed, false);
 });
 
 test('focus sessions retain local app usage and validate their time range', () => {

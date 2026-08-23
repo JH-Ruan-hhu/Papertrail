@@ -43,6 +43,20 @@
 
       <main class="workspace">
         <section class="workbench-page home-page" data-page="home">
+          <section class="home-progress-strip" aria-label="今日进度">
+            <div class="home-progress-copy">
+              <p class="eyebrow">TODAY PROGRESS</p>
+              <h1 id="homeProgressHeadline">今天进度推进了 0 项</h1>
+              <p id="homeProgressSubline">完成率 0% · 先安排一件重要的事</p>
+            </div>
+            <div class="home-progress-metrics">
+              <article><span>今日安排</span><strong id="homeProgressScheduleCount">0</strong><small>项</small></article>
+              <article><span>已完成</span><strong id="homeProgressCompletedCount">0</strong><small>项</small></article>
+              <article class="rate"><span>项目完成率</span><strong id="homeProgressRate">0%</strong><small>今日</small><span class="home-progress-rate-track" aria-hidden="true"><i id="homeProgressRateBar"></i></span></article>
+              <article><span>专注时长</span><strong id="homeProgressFocus">0</strong><small>分钟</small></article>
+            </div>
+          </section>
+
           <div class="home-top-grid">
             <section class="focus-panel home-focus-panel">
               <div class="panel-heading"><div><h2>今日重点</h2><p>把注意力留给真正重要的事</p></div><button class="text-button" data-go-page="schedule" type="button">打开时间轴</button></div>
@@ -111,6 +125,13 @@
             <div><p class="eyebrow">WEEKLY SCHEDULE</p><h1>日程</h1><p>按日期浏览完整安排，也可把当日清单放到桌面</p></div>
             <div class="page-actions"><button class="button secondary" id="openScheduleWidgetButton" type="button" title="以 3×4 桌面组件显示当日日程">放到桌面</button><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
           </header>
+          <section class="schedule-today-panel" aria-label="今日安排">
+            <div class="schedule-today-heading">
+              <div><p class="eyebrow">TODAY</p><h2 id="todayScheduleTitle">今日安排</h2><p id="todayScheduleSubtitle">今天还没有安排</p></div>
+              <div class="schedule-today-progress"><strong id="todayScheduleProgress">0 / 0</strong><span>已完成</span></div>
+            </div>
+            <div id="todayScheduleList" class="today-schedule-list"></div>
+          </section>
           <div class="timeline-datebar schedule-weekbar">
             <button id="previousDayButton" type="button" aria-label="前一天">‹</button>
             <div><strong id="timelineDate"></strong><span id="timelineDateSubtitle"></span></div>
@@ -119,7 +140,6 @@
           <section class="schedule-board-shell" aria-label="一周日程看板">
             <div class="schedule-board" id="scheduleBoard"></div>
           </section>
-          <section class="schedule-agenda"><div class="panel-heading"><div><p class="eyebrow">AGENDA</p><h2 id="agendaTitle">当天清单</h2></div><span id="agendaSummary"></span></div><div id="agendaList" class="agenda-list"></div></section>
         </section>
 
         <section class="workbench-page notes-page" data-page="notes" hidden>
@@ -168,7 +188,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.0.5</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.1.0</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -276,7 +296,7 @@
               <h2>更新</h2>
               <h3>版本</h3>
               <div class="settings-group update-group">
-                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.0.5</span></small></div></div>
+                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.1.0</span></small></div></div>
                 <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>
                 <div class="setting-row update-row">
                   <div class="update-copy"><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
@@ -361,7 +381,7 @@
     </dialog>
 
     <dialog id="removeDialog" class="modal confirm-modal">
-      <form method="dialog"><div class="danger-symbol">!</div><h2>永久删除本地记录？</h2><p id="removePaperTitle"></p><p class="field-help">加密凭证、未读更新和完整状态历史将一并删除。建议优先使用“归档”，此操作无法撤销。</p><div class="modal-actions centered"><button class="button secondary" value="cancel" type="submit">取消</button><button class="button danger" id="confirmRemoveButton" type="button">永久删除</button></div></form>
+      <form method="dialog"><div class="danger-symbol">!</div><h2>永久删除本地记录？</h2><p id="removePaperTitle"></p><p class="field-help">加密凭证、未读更新和完整状态历史将一并删除，建议优先使用“归档”，此操作无法撤销</p><div class="modal-actions centered"><button class="button secondary" value="cancel" type="submit">取消</button><button class="button danger" id="confirmRemoveButton" type="button">永久删除</button></div></form>
     </dialog>
 
     <dialog id="scheduleDialog" class="modal workbench-editor-modal">

@@ -744,7 +744,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '1.0.5';
+  const version = settings.appVersion || '1.1.0';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   const expirations = Array.isArray(settings.backupExpiresAt) ? settings.backupExpiresAt : [];
@@ -866,7 +866,7 @@ async function deleteDataBackups() {
     if (result?.requiresConfirmation) {
       const accepted = await window.yanjiConfirm({
         title: '删除旧数据备份',
-        message: `将删除 ${result.backupCount} 份迁移备份，当前使用的数据不受影响。此操作无法撤销。`,
+        message: `将删除 ${result.backupCount} 份迁移备份，当前使用的数据不受影响，此操作无法撤销`,
         confirmText: '删除备份',
         tone: 'danger'
       });
@@ -878,7 +878,7 @@ async function deleteDataBackups() {
       populateSettingsMetadata();
     }
     if (!result?.canceled) {
-      showToast(result.deletedCount ? `已删除 ${result.deletedCount} 份旧数据备份。` : '没有需要删除的旧数据备份。');
+      showToast(result.deletedCount ? `已删除 ${result.deletedCount} 份旧数据备份` : '没有需要删除的旧数据备份');
     }
   } catch (error) {
     elements.settingsError.textContent = getErrorMessage(error);
@@ -1063,7 +1063,7 @@ async function removeSelectedPaper() {
     await api.removePaper(removeId);
     elements.removeDialog.close();
     state.expandedIds.delete(removeId);
-    showToast('本地记录已永久删除。');
+    showToast('本地记录已永久删除');
   } catch (error) {
     showToast(getErrorMessage(error), 'error');
   } finally {

@@ -79,6 +79,12 @@ function formatDuration(milliseconds) {
   return hours ? `${hours} 小时 ${minutes} 分` : `${minutes} 分钟`;
 }
 
+function attendanceElapsedMs(record, now = Date.now()) {
+  if (!record?.clockInAt) return 0;
+  const end = record.clockOutAt ? Date.parse(record.clockOutAt) : now;
+  return Math.max(0, end - Date.parse(record.clockInAt));
+}
+
 function showWorkbenchToast(message, tone = '') {
   const toast = document.getElementById('toast');
   toast.textContent = message;
@@ -147,6 +153,7 @@ function renderHome() {
     return `<article class="day-card ${index === 1 ? 'today' : ''}"><header><div><strong>${label}</strong><span>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date)}</span></div><b>${events.length}</b></header><div>${items || '<p class="empty-mini">暂时没有安排</p>'}${events.length > 3 ? `<small>还有 ${events.length - 3} 项</small>` : ''}</div></article>`;
   }).join('');
   document.getElementById('homeDayOverview').innerHTML = overview;
+  renderHomeProgress();
 
   const priorityRank = { high: 0, medium: 1, low: 2 };
   const focus = schedulesForDay(today)
@@ -166,18 +173,62 @@ function renderHome() {
 function renderHomeAttendance() {
   const button = document.getElementById('homeClockButton');
   if (!button || !wb.workspace) return;
-  const openRecord = wb.workspace.attendance.find((item) => !item.clockOutAt);
+  const todayKey = localDateKey(new Date());
+  const openRecord = wb.workspace.attendance.find((item) => !item.clockOutAt && item.date === todayKey);
   button.textContent = openRecord ? '下班打卡' : '上班打卡';
   button.dataset.clockAction = openRecord ? 'out' : 'in';
+  button.classList.toggle('is-clocked-in', Boolean(openRecord));
+  button.setAttribute('aria-pressed', String(Boolean(openRecord)));
+  button.title = openRecord ? '结束当前工作并下班打卡' : '开始工作并上班打卡';
   button.setAttribute('aria-label', openRecord ? '结束当前工作并下班打卡' : '开始工作并上班打卡');
+}
+
+function renderHomeProgress() {
+  const today = new Date();
+  const todaySchedules = schedulesForDay(today);
+  const completed = todaySchedules.filter((item) => item.completedAt).length;
+  const total = todaySchedules.length;
+  const rate = total ? Math.round(completed / total * 100) : 0;
+  const focusMs = (wb.workspace.focusSessions || [])
+    .filter((session) => sameDay(session.startedAt, today))
+    .reduce((sum, session) => sum + focusSessionElapsedMs(session), 0);
+  const todayAttendance = wb.workspace.attendance.filter((record) => record.date === localDateKey(today));
+  const attendanceMs = todayAttendance.reduce((sum, record) => sum + attendanceElapsedMs(record), 0);
+  const attendanceLabel = todayAttendance.some((record) => !record.clockOutAt)
+    ? `已工作 ${formatDuration(attendanceMs)}`
+    : attendanceMs ? `今日工作 ${formatDuration(attendanceMs)}` : '尚未打卡';
+  const headline = total ? `今天进度推进了 ${completed} / ${total} 项` : '今天进度推进了 0 项';
+  const subline = total ? `完成率 ${rate}% · ${total - completed ? `还有 ${total - completed} 项待完成` : '今天安排已全部完成'} · ${attendanceLabel}` : `完成率 0% · ${attendanceLabel}`;
+  document.getElementById('homeProgressHeadline').textContent = headline;
+  document.getElementById('homeProgressSubline').textContent = subline;
+  document.getElementById('homeProgressScheduleCount').textContent = String(total);
+  document.getElementById('homeProgressCompletedCount').textContent = String(completed);
+  document.getElementById('homeProgressRate').textContent = `${rate}%`;
+  document.getElementById('homeProgressRateBar').style.width = `${rate}%`;
+  document.getElementById('homeProgressFocus').textContent = String(Math.round(focusMs / 60_000));
+}
+
+function renderTodaySchedule() {
+  const today = new Date();
+  const events = schedulesForDay(today);
+  const completed = events.filter((item) => item.completedAt).length;
+  const rate = events.length ? Math.round(completed / events.length * 100) : 0;
+  document.getElementById('todayScheduleTitle').textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(today);
+  document.getElementById('todayScheduleSubtitle').textContent = events.length ? `${events.length} 项安排 · 完成率 ${rate}%` : '今天还没有安排，先写下一件重要的事';
+  document.getElementById('todayScheduleProgress').textContent = `${completed} / ${events.length}`;
+  document.getElementById('todayScheduleList').innerHTML = events.length ? events.map((item) => {
+    const timing = scheduleTimeForDay(item, today);
+    return `<article class="today-schedule-item tone-${item.priority} ${item.completedAt ? 'completed' : ''}"><button class="today-schedule-check" data-complete-schedule="${wbEscape(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button" aria-label="${item.completedAt ? '恢复' : '完成'}${wbEscape(item.title)}">${item.completedAt ? uiIcon('check') : ''}</button><time>${timing.label}</time><div><strong>${wbEscape(item.title)}</strong><small>${item.deadline ? 'Deadline · ' : ''}${priorityLabels[item.priority]}优先级${timing.spansDay ? ' · 跨日' : ''}</small></div><button class="today-schedule-edit" data-edit-schedule="${wbEscape(item.id)}" type="button">编辑</button></article>`;
+  }).join('') : '<div class="today-schedule-empty"><span>今日</span><p>还没有安排，给今天留下一件最重要的事</p></div>';
 }
 
 function renderTimeline() {
   const selected = wb.selectedDate;
+  renderTodaySchedule();
   const rangeStart = addDays(selected, -2);
   const rangeEnd = addDays(selected, 4);
   document.getElementById('timelineDate').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(rangeStart)} — ${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(rangeEnd)}`;
-  document.getElementById('timelineDateSubtitle').textContent = `${sameDay(selected, new Date()) ? '今天前两天至后四天' : '所选日期前两天至后四天'} · 点击日期查看当天完整清单`;
+  document.getElementById('timelineDateSubtitle').textContent = `${sameDay(selected, new Date()) ? '今天前两天至后四天' : '所选日期前两天至后四天'} · 点击日期查看并编辑安排`;
   document.getElementById('scheduleBoard').innerHTML = Array.from({ length: 7 }, (_, index) => {
     const date = addDays(rangeStart, index);
     const dateKey = localDateKey(date);
@@ -193,14 +244,6 @@ function renderTimeline() {
   if (boardShell && selectedColumn) {
     boardShell.scrollLeft = Math.max(0, selectedColumn.offsetLeft - (boardShell.clientWidth - selectedColumn.clientWidth) / 2);
   }
-  const events = schedulesForDay(selected);
-  document.getElementById('agendaTitle').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(selected)}清单`;
-  document.getElementById('agendaSummary').textContent = `${events.length} 项安排`;
-  document.getElementById('agendaList').innerHTML = events.length ? events.map((item) => {
-    const timing = scheduleTimeForDay(item, selected);
-    const [start, end] = timing.label.split('–');
-    return `<article class="agenda-row ${item.completedAt ? 'completed' : ''}"><button class="agenda-check" data-complete-schedule="${wbEscape(item.id)}" data-completed="${Boolean(item.completedAt)}" type="button">${item.completedAt ? uiIcon('check') : ''}</button><time>${start}<small>${end}</small></time><span class="priority-bar ${item.priority}"></span><div><strong>${wbEscape(item.title)}</strong><small>${item.deadline ? 'Deadline · ' : ''}${priorityLabels[item.priority]}优先级${timing.spansDay ? ' · 跨日' : ''}</small></div><button class="agenda-edit" data-edit-schedule="${wbEscape(item.id)}" type="button">编辑</button></article>`;
-  }).join('') : '<div class="workbench-empty large"><p>这一天还没有安排，可以直接在上方日期列中新建日程。</p></div>';
 }
 
 function averageClock(records, key) {
@@ -310,6 +353,7 @@ function renderFocus() {
   else if (active && !active.suppressNotifications) notificationStatus.textContent = '本次专注未暂停 Windows 通知';
   else notificationStatus.textContent = '仅在计时期间生效，结束后自动恢复';
 
+  renderHomeProgress();
 }
 
 function openAttendanceEditor(record = null) {
@@ -656,11 +700,11 @@ function bindWorkbenchEvents() {
   });
   document.getElementById('deleteScheduleButton').addEventListener('click', async () => {
     const id = document.getElementById('scheduleId').value;
-    const accepted = id && await window.yanjiConfirm({ title: '删除日程', message: '这条日程将从时间轴中移除，此操作无法撤销。', confirmText: '删除日程', tone: 'danger' });
+    const accepted = id && await window.yanjiConfirm({ title: '删除日程', message: '这条日程将从时间轴中移除，此操作无法撤销', confirmText: '删除日程', tone: 'danger' });
     if (accepted) {
       await workbenchApi.deleteSchedule(id);
       closeWorkbenchDialog(document.getElementById('scheduleDialog'));
-      showWorkbenchToast('日程已删除。');
+      showWorkbenchToast('日程已删除');
     }
   });
   document.getElementById('homeClockButton').addEventListener('click', async (event) => {
@@ -670,7 +714,14 @@ function bindWorkbenchEvents() {
     if (!action) return;
     event.currentTarget.disabled = true;
     try {
-      await workbenchApi.clockAttendance(action);
+      const record = await workbenchApi.clockAttendance(action);
+      if (!record?.id) throw new Error('打卡记录保存失败');
+      const records = wb.workspace.attendance || [];
+      wb.workspace.attendance = action === 'in'
+        ? [record, ...records.filter((item) => item.id !== record?.id)]
+        : records.map((item) => item.id === record?.id ? { ...item, ...record } : item);
+      renderHome();
+      if (wb.page === 'attendance') renderAttendance();
       showWorkbenchToast(action === 'in' ? '上班打卡成功。' : '下班打卡成功。');
     } catch (exception) {
       showWorkbenchToast(exception.message || '打卡失败。', 'error');
@@ -685,11 +736,14 @@ function bindWorkbenchEvents() {
   document.getElementById('saveAttendanceButton').addEventListener('click', saveAttendanceFromEditor);
   document.getElementById('deleteAttendanceButton').addEventListener('click', async () => {
     const id = document.getElementById('attendanceId').value;
-    const accepted = id && await window.yanjiConfirm({ title: '删除打卡记录', message: '这一天的上下班时间将被删除，此操作无法撤销。', confirmText: '删除记录', tone: 'danger' });
+    const accepted = id && await window.yanjiConfirm({ title: '删除打卡记录', message: '这一天的上下班时间将被删除，此操作无法撤销', confirmText: '删除记录', tone: 'danger' });
     if (!accepted) return;
     await workbenchApi.deleteAttendance(id);
+    wb.workspace.attendance = wb.workspace.attendance.filter((item) => item.id !== id);
     closeWorkbenchDialog(document.getElementById('attendanceDialog'));
-    showWorkbenchToast('打卡记录已删除。');
+    renderHome();
+    if (wb.page === 'attendance') renderAttendance();
+    showWorkbenchToast('打卡记录已删除');
   });
   document.querySelectorAll('[data-focus-minutes]').forEach((button) => button.addEventListener('click', () => {
     document.getElementById('focusDuration').value = button.dataset.focusMinutes;
@@ -740,19 +794,19 @@ function bindWorkbenchEvents() {
     event.preventDefault();
     const note = wb.workspace.notes.find((item) => item.id === noteCard.dataset.editNote);
     if (!note) return;
-    const accepted = await window.yanjiConfirm({ title: '删除笔记', message: `“${note.title}”及其元数据将被删除，此操作无法撤销。`, confirmText: '删除笔记', tone: 'danger' });
+    const accepted = await window.yanjiConfirm({ title: '删除笔记', message: `“${note.title}”及其元数据将被删除，此操作无法撤销`, confirmText: '删除笔记', tone: 'danger' });
     if (!accepted) return;
     await workbenchApi.deleteNote(note.id);
-    showWorkbenchToast('笔记已删除。');
+    showWorkbenchToast('笔记已删除');
   });
   document.getElementById('saveNoteButton').addEventListener('click', saveNoteFromEditor);
   document.getElementById('deleteNoteButton').addEventListener('click', async () => {
     const id = document.getElementById('noteId').value;
-    const accepted = id && await window.yanjiConfirm({ title: '删除笔记', message: '这条笔记及其元数据将被删除，此操作无法撤销。', confirmText: '删除笔记', tone: 'danger' });
+    const accepted = id && await window.yanjiConfirm({ title: '删除笔记', message: '这条笔记及其元数据将被删除，此操作无法撤销', confirmText: '删除笔记', tone: 'danger' });
     if (accepted) {
       await workbenchApi.deleteNote(id);
       closeWorkbenchDialog(document.getElementById('noteDialog'));
-      showWorkbenchToast('笔记已删除。');
+      showWorkbenchToast('笔记已删除');
     }
   });
   document.getElementById('toggleNoteMetadataButton').addEventListener('click', () => {
