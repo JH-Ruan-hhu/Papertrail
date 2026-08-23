@@ -435,9 +435,38 @@ app.whenReady().then(async () => {
       (() => {
         document.querySelector('[data-workbench-page="home"]').click();
         window.scrollTo(0, 0);
-        const schedule = document.querySelector('.home-schedule-panel').getBoundingClientRect();
-        const notes = document.querySelector('.latest-notes-panel').getBoundingClientRect();
+        const rect = (element) => {
+          const value = element.getBoundingClientRect();
+          return {
+            left: value.left,
+            right: value.right,
+            top: value.top,
+            bottom: value.bottom,
+            width: value.width
+          };
+        };
+        const homePage = document.querySelector('[data-page="home"]');
+        const schedule = rect(document.querySelector('.home-schedule-panel'));
+        const notes = rect(document.querySelector('.latest-notes-panel'));
+        const progress = rect(document.querySelector('.home-progress-strip'));
+        const command = rect(document.querySelector('.home-command-grid'));
+        const focus = rect(document.querySelector('.home-top-grid'));
+        const content = rect(document.querySelector('.home-content-grid'));
+        const commandCards = [...document.querySelectorAll('.home-command-grid > article')].map(rect);
+        const commandWidths = commandCards.map((card) => card.width);
         return {
+          viewportWidth: innerWidth,
+          viewportHeight: innerHeight,
+          homeScrollHeight: homePage.scrollHeight,
+          homeClientHeight: homePage.clientHeight,
+          documentScrollHeight: document.documentElement.scrollHeight,
+          progressBottom: Math.round(progress.bottom),
+          commandTop: Math.round(command.top),
+          commandBottom: Math.round(command.bottom),
+          focusTop: Math.round(focus.top),
+          focusBottom: Math.round(focus.bottom),
+          contentTop: Math.round(content.top),
+          contentBottom: Math.round(content.bottom),
           pageVisible: !document.querySelector('[data-page="home"]').hidden,
           focusFirst: Boolean(document.querySelector('.home-top-grid #todayFocusList')),
           focusTimerHome: Boolean(document.querySelector('.home-focus-timer #focusTimeRemaining')),
@@ -449,11 +478,30 @@ app.whenReady().then(async () => {
           fourDayCards: document.querySelectorAll('#homeDayOverview .day-card').length,
           notesRight: notes.left > schedule.left,
           aligned: Math.abs(notes.top - schedule.top) <= 1,
+          homeContentFits: homePage.scrollHeight <= innerHeight && content.bottom <= innerHeight - 8,
+          homeRowsAligned: command.top >= progress.bottom - 1
+            && focus.top >= command.bottom - 1
+            && content.top >= focus.bottom - 1,
+          homeColumnsAligned: Math.abs(focus.left - content.left) <= 1
+            && Math.abs(focus.right - content.right) <= 1,
+          commandCardsAligned: commandWidths.length >= 2
+            && Math.max(...commandWidths) - Math.min(...commandWidths) <= 1,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!Object.entries(homeResult).every(([key, value]) => key === 'fourDayCards' ? value === 4 : key === 'horizontalOverflow' ? value === false : value === true)) {
+    const homeLayoutNumbers = new Set([
+      'viewportWidth', 'viewportHeight', 'homeScrollHeight', 'homeClientHeight',
+      'documentScrollHeight', 'progressBottom', 'commandTop', 'commandBottom',
+      'focusTop', 'focusBottom', 'contentTop', 'contentBottom'
+    ]);
+    const homeSmokePassed = Object.entries(homeResult).every(([key, value]) => {
+      if (homeLayoutNumbers.has(key)) return Number.isFinite(value) && value > 0;
+      if (key === 'fourDayCards') return value === 4;
+      if (key === 'horizontalOverflow') return value === false;
+      return value === true;
+    });
+    if (!homeSmokePassed) {
       throw new Error(`Workbench home smoke failed: ${JSON.stringify(homeResult)}`);
     }
     console.log(`WORKBENCH_HOME_OK ${JSON.stringify(homeResult)}`);

@@ -8,6 +8,10 @@ publisher-neutral.
 
 ## Version 1.1 workbench features
 
+Version 1.1.1 is the responsive layout patch: the home dashboard detects the
+available viewport, keeps its high-value content in view on short desktop
+windows, and uses shared grid boundaries so adjacent panels align cleanly.
+
 Version 1.1.0 updates the published workbench to the current 研迹 experience.
 Home now leads with today's progress, completed items, project completion rate,
 and focus time. The Schedule page places today's agenda at the top and keeps a

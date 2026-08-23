@@ -16,6 +16,21 @@ const wb = {
   usageRange: 'day'
 };
 
+function syncViewportDensity() {
+  const viewport = window.visualViewport;
+  const width = Math.max(1, Math.round(viewport?.width || window.innerWidth));
+  const height = Math.max(1, Math.round(viewport?.height || window.innerHeight));
+  const density = height <= 760 ? 'ultra-compact' : height <= 900 ? 'compact' : 'roomy';
+  document.documentElement.dataset.viewportDensity = density;
+  document.documentElement.dataset.viewportWidth = width <= 1040 ? 'narrow' : 'wide';
+  document.documentElement.style.setProperty('--viewport-width', `${width}px`);
+  document.documentElement.style.setProperty('--viewport-height', `${height}px`);
+}
+
+syncViewportDensity();
+window.addEventListener('resize', syncViewportDensity, { passive: true });
+window.visualViewport?.addEventListener('resize', syncViewportDensity, { passive: true });
+
 const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', submissions: '投稿', settings: '设置' });
 const SCHEDULE_DRAFT_KEY = 'yanji.scheduleDraft.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });

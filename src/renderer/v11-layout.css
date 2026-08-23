@@ -99,6 +99,84 @@ body { color: var(--yanji-text); }
 .conversion-options span { display: grid; gap: 3px; }
 .conversion-options small { color: var(--yanji-muted); line-height: 1.4; }
 
+/* Home uses one shared twelve-column baseline so the card edges line up. */
+.home-command-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); align-items: stretch; }
+.home-command-grid > .home-next-event-card,
+.home-command-grid > .home-today-card { grid-column: span 4; min-width: 0; }
+.home-top-grid, .home-content-grid { grid-template-columns: minmax(0, 2fr) minmax(270px, 1fr); align-items: stretch; }
+.home-top-grid > section, .home-content-grid > section { min-width: 0; height: auto; }
+.home-content-grid .day-overview { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.home-progress-rate-track { display: block; height: 4px; margin-top: 4px; overflow: hidden; border-radius: 999px; background: rgba(87, 122, 137, .14); }
+.home-progress-rate-track i { display: block; width: 0; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #4bb68c, #197d9f); transition: width .35s cubic-bezier(.23, 1, .32, 1); }
+
+/* In short desktop windows, keep the whole workbench in view and let each
+   panel trim its own low-priority details instead of pushing the next row off
+   screen. The JS viewport probe also exposes the density for live resizing. */
+@media (min-width: 1041px) and (min-height: 901px) {
+  .workspace:has(.home-page:not([hidden])) { height: calc(100vh - var(--titlebar-height)); overflow: hidden; padding-top: 18px; padding-bottom: 14px; }
+  .home-page { height: 100%; min-height: 0; display: grid; grid-template-rows: 90px 150px minmax(210px, .9fr) minmax(260px, 1.1fr); gap: 12px; overflow: hidden; }
+  .home-progress-strip, .home-command-grid, .home-top-grid, .home-content-grid { min-height: 0; margin: 0; }
+  .home-next-event-card, .home-today-card { min-height: 0; padding: 18px; }
+  .home-today-list { max-height: 82px; }
+  .home-content-grid > section { min-height: 0; padding: 18px; overflow: hidden; }
+  .home-content-grid .day-card { min-height: 0; padding: 12px; }
+}
+
+@media (min-width: 1041px) and (max-height: 900px) {
+  .workspace:has(.home-page:not([hidden])) { height: calc(100vh - var(--titlebar-height)); overflow: hidden; padding-top: 14px; padding-bottom: 10px; }
+  .home-page { height: 100%; min-height: 0; display: grid; grid-template-rows: 78px 120px 188px minmax(0, 1fr); gap: 10px; overflow: hidden; }
+  .home-progress-strip, .home-command-grid, .home-top-grid, .home-content-grid { min-height: 0; margin: 0; }
+  .home-progress-strip { gap: 14px; padding: 10px 16px; }
+  .home-progress-copy { min-width: 214px; }
+  .home-progress-copy h1 { font-size: 20px; }
+  .home-progress-copy > p:last-child { margin-top: 3px; }
+  .home-progress-metrics { gap: 6px; }
+  .home-progress-metrics article { padding: 7px 9px; }
+  .home-progress-metrics strong { margin-top: 2px; font-size: 20px; }
+  .home-next-event-card, .home-today-card { min-height: 0; padding: 14px; }
+  .home-next-event-card .panel-heading, .home-today-card .panel-heading { margin-bottom: 9px; }
+  .next-event-content { min-height: 50px; }
+  .home-today-list { max-height: 62px; gap: 6px; }
+  .home-todo-progress { margin-top: 8px; }
+  .home-top-grid > section { height: 100%; min-height: 0; }
+  .home-focus-panel { padding: 14px; }
+  .home-focus-panel .panel-heading { margin-bottom: 8px; }
+  .home-focus-panel .focus-list { max-height: 125px; }
+  .focus-row { min-height: 38px; grid-template-columns: 8px 44px minmax(0, 1fr) auto; gap: 7px; padding: 5px; }
+  .home-focus-timer { padding: 14px; }
+  .home-focus-timer .focus-timer-body { grid-template-columns: 122px minmax(0, 1fr); gap: 10px; margin-top: 2px; }
+  .home-focus-timer .focus-ring { width: 116px; }
+  .home-focus-timer .focus-ring::before { width: 98px; }
+  .home-focus-timer .focus-ring time { font-size: 23px; }
+  .home-focus-timer .focus-timer-actions > p { min-height: 26px; margin: 5px 0 7px; line-height: 1.35; }
+  .home-content-grid > section { min-height: 0; padding: 14px; overflow: hidden; }
+  .home-content-grid .panel-heading { margin-bottom: 7px; }
+  .home-content-grid .day-overview { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 8px; }
+  .home-content-grid .day-card { min-height: 0; padding: 8px; }
+  .home-content-grid .day-card > header { margin-bottom: 7px; }
+  .home-content-grid .day-card > header strong { font-size: 12px; }
+  .home-content-grid .day-card > header span { margin-top: 1px; font-size: 9px; }
+  .home-content-grid .day-card > header b { width: 20px; height: 20px; font-size: 10px; }
+  .home-content-grid .day-mini-event { min-height: 27px; grid-template-columns: 32px minmax(0, 1fr); gap: 4px; margin-bottom: 4px; padding: 4px 5px; }
+  .home-content-grid .day-mini-event time { font-size: 9px; }
+  .home-content-grid .day-mini-event span { font-size: 10px; }
+  .home-content-grid .empty-mini { margin-top: 16px; font-size: 10px; }
+  .home-content-grid .latest-note { padding: 7px 4px; }
+  .home-content-grid .latest-note p { margin: 3px 0; }
+}
+
+@media (max-width: 1040px) {
+  .home-command-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-command-grid > .home-next-event-card { grid-column: span 2; }
+  .home-command-grid > .home-today-card { grid-column: span 1; }
+  .home-top-grid, .home-content-grid { grid-template-columns: 1fr; }
+  .home-content-grid .day-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+  .home-command-grid > .home-next-event-card { grid-column: auto; }
+}
+
 .appearance-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 14px 0 22px; }
 .appearance-choice { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--yanji-line); border-radius: 16px; cursor: pointer; }
 .appearance-choice:has(input:checked) { border-color: var(--yanji-accent); box-shadow: 0 0 0 3px rgba(31, 120, 152, .13); }
