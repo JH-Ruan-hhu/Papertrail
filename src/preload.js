@@ -25,9 +25,15 @@ contextBridge.exposeInMainWorld('paperTrail', {
   openScheduleWidgetMain: () => ipcRenderer.invoke('schedule-widget:open-main'),
   saveNote: (input) => ipcRenderer.invoke('notes:save', input),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
+  deleteNoteIfEmpty: (id) => ipcRenderer.invoke('notes:delete-if-empty', id),
+  addNoteAttachment: (id) => ipcRenderer.invoke('notes:add-attachment', id),
+  getNoteAttachment: (id, attachmentId) => ipcRenderer.invoke('notes:get-attachment', id, attachmentId),
+  deleteNoteAttachment: (id, attachmentId) => ipcRenderer.invoke('notes:delete-attachment', id, attachmentId),
   openStickyNote: (id) => ipcRenderer.invoke('notes:open-sticky', id),
   getStickyNote: (id) => ipcRenderer.invoke('notes:get-sticky', id),
   createStickyNote: () => ipcRenderer.invoke('notes:create-sticky'),
+  saveJobApplication: (input) => ipcRenderer.invoke('jobs:save', input),
+  deleteJobApplication: (id) => ipcRenderer.invoke('jobs:delete', id),
   saveMetadataFields: (fields) => ipcRenderer.invoke('metadata:save-fields', fields),
   clockAttendance: (action) => ipcRenderer.invoke('attendance:clock', action),
   saveAttendance: (input) => ipcRenderer.invoke('attendance:save', input),
@@ -118,6 +124,11 @@ contextBridge.exposeInMainWorld('paperTrail', {
     const listener = () => callback();
     ipcRenderer.on('capture:focus', listener);
     return () => ipcRenderer.removeListener('capture:focus', listener);
+  },
+  onStickyFocus: (callback) => {
+    const listener = () => callback();
+    ipcRenderer.on('sticky:focus', listener);
+    return () => ipcRenderer.removeListener('sticky:focus', listener);
   },
   onDeadlineShow: (callback) => {
     const listener = (_event, schedule) => callback(schedule);

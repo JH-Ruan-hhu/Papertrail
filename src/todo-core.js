@@ -1,5 +1,7 @@
 'use strict';
 
+const { TIME_NUMBER_PATTERN, parseMinuteToken } = require('./natural-time');
+
 // Todo is deliberately independent from the schedule model. A todo is an
 // outcome with an optional deadline; a schedule is a time block used to do it.
 const TODO_PRIORITIES = Object.freeze(['high', 'medium', 'low']);
@@ -78,7 +80,7 @@ function resolveHour(hour, dayPart = '') {
 
 function parseClock(rawHour, rawMinute, dayPart = '') {
   const hour = resolveHour(chineseNumber(rawHour), dayPart);
-  const minute = rawMinute ? chineseNumber(rawMinute) : 0;
+  const minute = rawMinute ? parseMinuteToken(rawMinute) : 0;
   if (hour == null || !Number.isInteger(minute) || minute < 0 || minute > 59) return null;
   return { hour, minute };
 }
@@ -189,9 +191,9 @@ function parseNaturalLanguageTodo(input, base = new Date()) {
 
   const dayPartMatch = original.match(/凌晨|早上|上午|中午|下午|傍晚|晚上|今晚/);
   const dayPart = dayPartMatch?.[0] || '';
-  const numberPattern = '[0-9零〇一二两三四五六七八九十]{1,3}';
-  const rangePattern = new RegExp(`(?:${dayPart || '凌晨|早上|上午|中午|下午|傍晚|晚上|今晚'})?\\s*(${numberPattern})(?:[:：点时](${numberPattern})?分?)?\\s*(?:到|至|[-–—~～])\\s*(凌晨|早上|上午|中午|下午|傍晚|晚上|今晚)?\\s*(${numberPattern})(?:[:：点时](${numberPattern})?分?)?`);
-  const singlePattern = new RegExp(`(凌晨|早上|上午|中午|下午|傍晚|晚上|今晚)?\\s*(${numberPattern})(?:[:：点时](${numberPattern})?分?)`);
+  const numberPattern = TIME_NUMBER_PATTERN;
+  const rangePattern = new RegExp(`(?:${dayPart || '凌晨|早上|上午|中午|下午|傍晚|晚上|今晚'})?\\s*(${numberPattern})(?:[:：点时](半|${numberPattern})?分?)?\\s*(?:到|至|[-–—~～])\\s*(凌晨|早上|上午|中午|下午|傍晚|晚上|今晚)?\\s*(${numberPattern})(?:[:：点时](半|${numberPattern})?分?)?`);
+  const singlePattern = new RegExp(`(凌晨|早上|上午|中午|下午|傍晚|晚上|今晚)?\\s*(${numberPattern})(?:[:：点时](半|${numberPattern})?分?)`);
   const range = original.match(rangePattern);
   const single = range ? null : original.match(singlePattern);
   const startClock = range

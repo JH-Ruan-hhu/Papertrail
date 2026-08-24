@@ -1,9 +1,12 @@
 'use strict';
 
 const { normalizeTodo } = require('./todo-core');
-const { normalizeSchedule } = require('./workbench-core');
+const { composeNoteContent, normalizeNote, normalizeSchedule } = require('./workbench-core');
+const { normalizeJobApplication } = require('./job-core');
 
-const DATA_VERSION = 8;
+const SCHEMA_8_VERSION = 8;
+const SCHEMA_9_VERSION = 9;
+const DATA_VERSION = 10;
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -61,7 +64,7 @@ function normalizeSettings(source, defaults) {
 function migrateSchema7To8(parsed, { defaultSettings, fallbackAt = new Date(0).toISOString() } = {}) {
   if (!asObject(parsed)) throw new Error('数据文件根节点必须是对象。');
   if (parsed.version != null && (!Number.isInteger(parsed.version) || parsed.version < 1)) throw new Error('数据文件版本号无效。');
-  if (Number(parsed.version || 1) > DATA_VERSION) throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
+  if (Number(parsed.version || 1) > SCHEMA_8_VERSION) throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
   for (const [key, label] of [
     ['settings', '设置'],
     ['papers', '稿件'],
@@ -154,7 +157,7 @@ function migrateSchema7To8(parsed, { defaultSettings, fallbackAt = new Date(0).t
   // silently lost during migration. Known collections below are authoritative.
   const data = {
     ...clone(parsed),
-    version: DATA_VERSION,
+    version: SCHEMA_8_VERSION,
     settings,
     schedules: linkedSchedules,
     todos,
@@ -167,4 +170,66 @@ function migrateSchema7To8(parsed, { defaultSettings, fallbackAt = new Date(0).t
   return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) };
 }
 
-module.exports = { DATA_VERSION, migrateSchema7To8, normalizeSettings };
+function mergeDailyNotes(notes) {
+  const merged = [];
+  const byDate = new Map();
+  for (const note of notes) {
+    if (note.kind !== 'daily') {
+      merged.push(note);
+      continue;
+    }
+    const existing = byDate.get(note.dateKey);
+    if (!existing) {
+      byDate.set(note.dateKey, note);
+      merged.push(note);
+      continue;
+    }
+    existing.entries = [...(existing.entries || []), ...(note.entries || [])]
+      .sort((a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || String(a.id).localeCompare(String(b.id)));
+    existing.attachments = [...(existing.attachments || []), ...(note.attachments || [])]
+      .filter((attachment, index, list) => list.findIndex((item) => item.id === attachment.id) === index);
+    existing.content = composeNoteContent(existing.entries, existing.content);
+    existing.metadata = { ...(existing.metadata || {}), ...(note.metadata || {}) };
+    existing.updatedAt = [existing.updatedAt, note.updatedAt].filter(Boolean).sort().at(-1) || existing.updatedAt;
+    existing.revision = Math.max(Number(existing.revision) || 0, Number(note.revision) || 0);
+  }
+  return merged;
+}
+
+function migrateSchema8To9(parsed, { fallbackAt = new Date(0).toISOString() } = {}) {
+  if (!asObject(parsed)) throw new Error('数据文件根节点必须是对象。');
+  if (parsed.version != null && (!Number.isInteger(parsed.version) || parsed.version < 1)) throw new Error('数据文件版本号无效。');
+  if (Number(parsed.version || SCHEMA_8_VERSION) > SCHEMA_9_VERSION) throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
+  if (parsed.notes != null && !Array.isArray(parsed.notes)) throw new Error('笔记列表格式无效。');
+  const notes = mergeDailyNotes((parsed.notes || []).map((note, index) => normalizeNote(note, index, fallbackAt)));
+  const data = {
+    ...clone(parsed),
+    version: SCHEMA_9_VERSION,
+    notes
+  };
+  return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) };
+}
+
+function migrateSchema9To10(parsed, { fallbackAt = new Date(0).toISOString() } = {}) {
+  if (!asObject(parsed)) throw new Error('数据文件根节点必须是对象。');
+  if (parsed.version != null && (!Number.isInteger(parsed.version) || parsed.version < 1)) throw new Error('数据文件版本号无效。');
+  if (Number(parsed.version || SCHEMA_9_VERSION) > DATA_VERSION) throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
+  if (parsed.jobApplications != null && !Array.isArray(parsed.jobApplications)) throw new Error('求职记录列表格式无效。');
+  const jobApplications = (parsed.jobApplications || []).map((item, index) => normalizeJobApplication(item, index, fallbackAt));
+  const data = {
+    ...clone(parsed),
+    version: DATA_VERSION,
+    jobApplications
+  };
+  return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) };
+}
+
+module.exports = {
+  DATA_VERSION,
+  SCHEMA_8_VERSION,
+  SCHEMA_9_VERSION,
+  migrateSchema7To8,
+  migrateSchema8To9,
+  migrateSchema9To10,
+  normalizeSettings
+};

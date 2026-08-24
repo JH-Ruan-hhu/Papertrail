@@ -7,6 +7,8 @@ const UPDATE_STATUSES = new Set([
   'up-to-date',
   'downloading',
   'downloaded',
+  'not-published',
+  'empty-feed',
   'error',
   'unavailable'
 ]);
@@ -37,6 +39,10 @@ function friendlyUpdateError(error) {
     return '更新文件校验失败，已停止安装。';
   }
   return source || '检查更新失败，请稍后重试。';
+}
+
+function isNotPublishedError(error) {
+  return /404|latest(?:-|\.)ya?ml|no published versions|cannot find|release.*not found|empty feed/i.test(String(error?.message || error || ''));
 }
 
 function createInitialUpdateState({ currentVersion, packaged, portable }) {
@@ -111,6 +117,15 @@ function nextUpdateState(current, event, payload = {}) {
       message: `当前 ${base.currentVersion} 已是最新版本。`,
       percent: null
     };
+  } else if (event === 'not-published' || event === 'empty-feed') {
+    next = {
+      ...base,
+      status: event,
+      latestVersion: null,
+      releaseDate: null,
+      message: '更新服务器暂未发布可下载版本。',
+      percent: null
+    };
   } else if (event === 'download-start') {
     next = { ...base, status: 'downloading', message: '正在下载更新…', percent: 0 };
   } else if (event === 'download-progress') {
@@ -146,5 +161,6 @@ module.exports = {
   cleanVersion,
   createInitialUpdateState,
   friendlyUpdateError,
+  isNotPublishedError,
   nextUpdateState
 };

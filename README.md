@@ -8,6 +8,16 @@ publisher-neutral.
 
 ## Version 1.1 workbench features
 
+Version 1.1.3 adds a local job-application pipeline from 待投递 through Offer,
+an at-a-glance Home summary, an eight-day rolling schedule board, automatic
+cleanup of empty notes, inline note images with full-size preview, and a
+restrained Liquid Glass appearance with solid content surfaces. The Windows
+window icon is now applied explicitly to every BrowserWindow.
+
+Version 1.1.2 adds date-keyed daily notes with timed entries, controlled image
+attachments, autosaved editor drafts, real todo reminder payloads, a responsive
+home command row with independent attendance, and a multi-size Windows ICO.
+
 Version 1.1.1 is the responsive layout patch: the home dashboard detects the
 available viewport, keeps its high-value content in view on short desktop
 windows, and uses shared grid boundaries so adjacent panels align cleanly.
@@ -179,11 +189,11 @@ Yanji stores `lastAttemptAt`, `lastSuccessfulAt`, `failureStreak`, and
 content, and read state. Archived papers keep their encrypted credential,
 history, DOI, and production events but are excluded from automatic refresh.
 
-Schema version 7 includes `schedules`, `notes`, reusable `metadataFields`,
+Schema version 10 includes `schedules`, `notes`, reusable `metadataFields`,
 multi-segment `attendance` records with per-application usage totals, and
-`focusSessions` while retaining manuscript details, tasks, revision rounds,
-and observed review events. Older data files are migrated locally on first
-successful load.
+`focusSessions`, plus local `jobApplications`, while retaining manuscript
+details, tasks, revision rounds, and observed review events. Older data files
+are migrated locally on first successful load.
 Existing encrypted credentials, history, unread updates, archives, and
 submission journeys are retained. Invalid JSON, unsupported future schema
 versions, and structurally damaged records are rejected without overwriting the

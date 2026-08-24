@@ -6,7 +6,8 @@ const {
   normalizeMetadataField,
   normalizeNote
 } = require('./workbench-core');
-const { DATA_VERSION, migrateSchema7To8 } = require('./migration-core');
+const { normalizeJobApplication } = require('./job-core');
+const { DATA_VERSION, migrateSchema7To8, migrateSchema8To9, migrateSchema9To10 } = require('./migration-core');
 
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
 const TASK_REMINDER_LEAD_MS = 48 * 60 * 60_000;
@@ -201,7 +202,14 @@ function migratePaper(paper, index = 0) {
 }
 
 function migrateData(parsed, defaultSettings) {
-  const migrated = migrateSchema7To8(parsed, { defaultSettings });
+  const sourceVersion = Number(parsed?.version || 1);
+  const v8 = sourceVersion <= 8
+    ? migrateSchema7To8(parsed, { defaultSettings })
+    : { data: parsed, changed: false };
+  const v9 = Number(v8.data.version || 8) <= 9
+    ? migrateSchema8To9(v8.data)
+    : { data: v8.data, changed: false };
+  const migrated = migrateSchema9To10(v9.data);
   const source = migrated.data;
   const settings = source.settings;
   const papers = (source.papers || []).map(migratePaper).map((paper) => (
@@ -213,6 +221,7 @@ function migrateData(parsed, defaultSettings) {
   const metadataFields = (source.metadataFields || []).map(normalizeMetadataField);
   const attendance = (source.attendance || []).map((record, index) => normalizeAttendance(record, index));
   const focusSessions = (source.focusSessions || []).map((session, index) => normalizeFocusSession(session, index));
+  const jobApplications = (source.jobApplications || []).map((item, index) => normalizeJobApplication(item, index));
   const data = {
     ...source,
     version: DATA_VERSION,
@@ -223,9 +232,10 @@ function migrateData(parsed, defaultSettings) {
     notes,
     metadataFields,
     attendance,
-    focusSessions
+    focusSessions,
+    jobApplications
   };
-  return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) || migrated.changed };
+  return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) || v8.changed || v9.changed || migrated.changed };
 }
 
 function retryDelayMs(failureStreak, refreshMinutes = 360) {

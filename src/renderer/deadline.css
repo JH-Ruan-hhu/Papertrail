@@ -15,7 +15,9 @@ body.medium main { background: rgba(255,250,235,.72); border-color: rgba(141,94,
 .signal::before { content: ''; width: 6px; height: 6px; background: currentColor; border-radius: 50%; box-shadow: 0 0 0 4px rgba(255,226,174,.12); }
 body.medium .signal { color: #855635; background: rgba(255,255,255,.48); border-color: rgba(133,86,53,.2); }
 h1 { margin: 30px 0 14px; font-size: clamp(38px, 6vw, 78px); line-height: 1.12; letter-spacing: -.04em; text-shadow: 0 4px 20px rgba(27,19,32,.18); }
-p { margin: 0 0 42px; font-size: clamp(16px,1.7vw,20px); opacity: .78; }
+p { margin: 0 0 18px; font-size: clamp(16px,1.7vw,20px); opacity: .78; }
+.deadline-notes { max-width: 650px; margin: 0 auto 14px; font-size: 15px; line-height: 1.65; opacity: .72; }
+.deadline-meta { margin: 0 auto 30px; color: currentColor; font-size: 13px; font-weight: 700; letter-spacing: .04em; opacity: .68; }
 button { display: inline-flex; align-items: center; justify-content: center; gap: 9px; padding: 14px 22px; color: #674250; background: #fff8ed; border: 1px solid rgba(255,255,255,.5); border-radius: 14px; box-shadow: 0 10px 30px rgba(17,13,24,.16); font: inherit; font-weight: 700; cursor: pointer; transition: transform 160ms var(--ease-out), box-shadow 180ms var(--ease-out); }
 button:active { transform: scale(.97); }
 .deadline-actions { display: flex; justify-content: center; gap: 10px; }

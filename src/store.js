@@ -12,7 +12,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   closeToTray: true,
   startAtLogin: false,
   autoCheckUpdates: true,
-  // Kept in the defaults as a read-compatibility marker; Schema 8 stores
+  // Kept in the defaults as a read-compatibility marker; Schema 9 stores
   // todayWidgetEnabled and getSettings exposes the old name as an alias.
   scheduleWidgetEnabled: false,
   todayWidgetEnabled: false,
@@ -31,6 +31,7 @@ const DEFAULT_SETTINGS = Object.freeze({
 class JsonStore {
   constructor(filePath) {
     this.filePath = filePath;
+    this.attachmentsDirectory = path.join(path.dirname(filePath), 'attachments');
     const initialSettings = { ...DEFAULT_SETTINGS };
     delete initialSettings.scheduleWidgetEnabled;
     this.data = {
@@ -42,12 +43,14 @@ class JsonStore {
       notes: [],
       metadataFields: [],
       attendance: [],
-      focusSessions: []
+      focusSessions: [],
+      jobApplications: []
     };
   }
 
   load() {
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
+    fs.mkdirSync(this.attachmentsDirectory, { recursive: true });
     if (!fs.existsSync(this.filePath)) {
       this.save();
       return this.data;
@@ -68,24 +71,25 @@ class JsonStore {
     this.data = migrated.data;
     const sourceVersion = Number(parsed.version || 1);
     if (migrated.changed) {
-      if (sourceVersion < DATA_VERSION) this.createMigrationBackup();
+      if (sourceVersion < DATA_VERSION) this.createMigrationBackup(sourceVersion);
       this.save();
     }
     return this.data;
   }
 
-  createMigrationBackup() {
+  createMigrationBackup(sourceVersion = 1) {
     const parsedPath = path.parse(this.filePath);
-    const base = `${parsedPath.name}.pre-v8`;
+    const safeSourceVersion = Number.isInteger(Number(sourceVersion)) && Number(sourceVersion) > 0 ? Number(sourceVersion) : 1;
+    const base = `${parsedPath.name}.pre-v${safeSourceVersion}`;
     let backupPath = path.join(parsedPath.dir, `${base}.${Date.now()}.json`);
     let suffix = 2;
     while (fs.existsSync(backupPath)) backupPath = path.join(parsedPath.dir, `${base}.${Date.now()}.${suffix++}.json`);
     try {
       // A failed backup must stop migration before the original is replaced.
       fs.writeFileSync(backupPath, fs.readFileSync(this.filePath), { flag: 'wx' });
-      console.info('[研迹] Schema 8 迁移前备份已创建: ' + backupPath);
+      console.info(`[研迹] Schema ${safeSourceVersion} 迁移前备份已创建: ${backupPath}`);
     } catch (error) {
-      throw new Error(`Schema 8 迁移前备份失败，原数据未修改：${error.message}`);
+      throw new Error(`Schema ${safeSourceVersion} 迁移前备份失败，原数据未修改：${error.message}`);
     }
     return backupPath;
   }
@@ -104,9 +108,19 @@ class JsonStore {
     if (fs.existsSync(targetPath)) {
       throw new Error('所选位置已经存在研迹数据文件。');
     }
+    const targetAttachments = path.join(path.dirname(targetPath), 'attachments');
+    if (fs.existsSync(targetAttachments)) throw new Error('所选位置已经存在研迹附件目录。');
     const copy = new JsonStore(targetPath);
     copy.data = JSON.parse(JSON.stringify(this.data));
-    copy.save();
+    try {
+      copy.save();
+      if (fs.existsSync(this.attachmentsDirectory)) fs.cpSync(this.attachmentsDirectory, targetAttachments, { recursive: true, errorOnExist: true });
+      else fs.mkdirSync(targetAttachments, { recursive: true });
+    } catch (error) {
+      try { if (fs.existsSync(targetPath)) fs.unlinkSync(targetPath); } catch { /* keep the original usable */ }
+      try { if (fs.existsSync(targetAttachments)) fs.rmSync(targetAttachments, { recursive: true, force: true }); } catch { /* best effort cleanup */ }
+      throw new Error(`研迹数据与附件复制失败，原目录未修改：${error.message}`);
+    }
     return targetPath;
   }
 
@@ -230,6 +244,16 @@ class JsonStore {
     this.data.focusSessions = focusSessions;
     this.save();
     return this.data.focusSessions;
+  }
+
+  listJobApplications() {
+    return this.data.jobApplications;
+  }
+
+  setJobApplications(jobApplications) {
+    this.data.jobApplications = jobApplications;
+    this.save();
+    return this.data.jobApplications;
   }
 }
 

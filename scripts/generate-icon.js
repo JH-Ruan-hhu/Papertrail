@@ -106,41 +106,64 @@ function pngChunk(type, data) {
   return Buffer.concat([length, typeBuffer, data, checksum]);
 }
 
-const scanlines = Buffer.alloc((width * 4 + 1) * height);
-for (let y = 0; y < height; y += 1) {
-  const outputOffset = y * (width * 4 + 1);
-  scanlines[outputOffset] = 0;
-  pixels.copy(scanlines, outputOffset + 1, y * width * 4, (y + 1) * width * 4);
+function encodePng(sourceWidth, sourceHeight, sourcePixels) {
+  const scanlines = Buffer.alloc((sourceWidth * 4 + 1) * sourceHeight);
+  for (let y = 0; y < sourceHeight; y += 1) {
+    const outputOffset = y * (sourceWidth * 4 + 1);
+    scanlines[outputOffset] = 0;
+    sourcePixels.copy(scanlines, outputOffset + 1, y * sourceWidth * 4, (y + 1) * sourceWidth * 4);
+  }
+  const ihdr = Buffer.alloc(13);
+  ihdr.writeUInt32BE(sourceWidth, 0);
+  ihdr.writeUInt32BE(sourceHeight, 4);
+  ihdr[8] = 8;
+  ihdr[9] = 6;
+  return Buffer.concat([
+    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    pngChunk('IHDR', ihdr),
+    pngChunk('IDAT', zlib.deflateSync(scanlines, { level: 9 })),
+    pngChunk('IEND', Buffer.alloc(0))
+  ]);
 }
 
-const ihdr = Buffer.alloc(13);
-ihdr.writeUInt32BE(width, 0);
-ihdr.writeUInt32BE(height, 4);
-ihdr[8] = 8;
-ihdr[9] = 6;
-const png = Buffer.concat([
-  Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-  pngChunk('IHDR', ihdr),
-  pngChunk('IDAT', zlib.deflateSync(scanlines, { level: 9 })),
-  pngChunk('IEND', Buffer.alloc(0))
-]);
+const png = encodePng(width, height, pixels);
 
 const buildDir = path.join(__dirname, '..', 'build');
 fs.mkdirSync(buildDir, { recursive: true });
 fs.writeFileSync(path.join(buildDir, 'icon.png'), png);
 
-// ICO files may embed a PNG-compressed 256x256 image. A zero width/height in
-// the directory represents 256 pixels.
-const icoHeader = Buffer.alloc(22);
+// Windows uses the smallest suitable frame for the shell/taskbar. Embed
+// actual PNG frames instead of asking Windows to shrink a single 256px image.
+const iconSizes = [16, 20, 24, 32, 40, 48, 64, 128, 256];
+const frames = iconSizes.map((size) => {
+  const resized = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y += 1) {
+    for (let x = 0; x < size; x += 1) {
+      const sourceX = Math.min(width - 1, Math.floor(x * width / size));
+      const sourceY = Math.min(height - 1, Math.floor(y * height / size));
+      const sourceOffset = (sourceY * width + sourceX) * 4;
+      const targetOffset = (y * size + x) * 4;
+      pixels.copy(resized, targetOffset, sourceOffset, sourceOffset + 4);
+    }
+  }
+  return { size, data: encodePng(size, size, resized) };
+});
+const icoHeaderLength = 6 + frames.length * 16;
+const icoHeader = Buffer.alloc(icoHeaderLength);
 icoHeader.writeUInt16LE(0, 0);
 icoHeader.writeUInt16LE(1, 2);
-icoHeader.writeUInt16LE(1, 4);
-icoHeader.writeUInt8(0, 6);
-icoHeader.writeUInt8(0, 7);
-icoHeader.writeUInt8(0, 8);
-icoHeader.writeUInt8(0, 9);
-icoHeader.writeUInt16LE(1, 10);
-icoHeader.writeUInt16LE(32, 12);
-icoHeader.writeUInt32LE(png.length, 14);
-icoHeader.writeUInt32LE(22, 18);
-fs.writeFileSync(path.join(buildDir, 'icon.ico'), Buffer.concat([icoHeader, png]));
+icoHeader.writeUInt16LE(frames.length, 4);
+let frameOffset = icoHeaderLength;
+frames.forEach((frame, index) => {
+  const offset = 6 + index * 16;
+  icoHeader.writeUInt8(frame.size === 256 ? 0 : frame.size, offset);
+  icoHeader.writeUInt8(frame.size === 256 ? 0 : frame.size, offset + 1);
+  icoHeader.writeUInt8(0, offset + 2);
+  icoHeader.writeUInt8(0, offset + 3);
+  icoHeader.writeUInt16LE(1, offset + 4);
+  icoHeader.writeUInt16LE(32, offset + 6);
+  icoHeader.writeUInt32LE(frame.data.length, offset + 8);
+  icoHeader.writeUInt32LE(frameOffset, offset + 12);
+  frameOffset += frame.data.length;
+});
+fs.writeFileSync(path.join(buildDir, 'icon.ico'), Buffer.concat([icoHeader, ...frames.map((frame) => frame.data)]));

@@ -2,6 +2,32 @@
 
 const { needsOverdueNotification, needsReminder } = require('./todo-core');
 
+function cleanReminderText(value, fallback = '') {
+  return String(value ?? fallback)
+    .replace(/https?:\/\/\S+/gi, '链接')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .slice(0, 240);
+}
+
+function normalizeReminderPayload(item, kind = 'todo', level = 'reminder') {
+  const source = item && typeof item === 'object' ? item : {};
+  const reminderKind = kind === 'schedule' ? 'schedule' : 'todo';
+  const scheduledAt = reminderKind === 'todo' ? source.dueAt || null : source.startAt || null;
+  const overdue = level === 'overdue' || (reminderKind === 'todo' && source.status === 'open' && scheduledAt && Date.parse(scheduledAt) < Date.now());
+  return {
+    kind: reminderKind,
+    level: level === 'overdue' ? 'overdue' : 'reminder',
+    id: source.id ? String(source.id) : null,
+    title: cleanReminderText(source.title, reminderKind === 'todo' ? '未命名待办' : '未命名日程'),
+    notesPreview: cleanReminderText(source.notes || source.note || '', ''),
+    priority: ['high', 'medium', 'low'].includes(source.priority) ? source.priority : 'low',
+    scheduledAt,
+    overdue: Boolean(overdue)
+  };
+}
+
 const EVENT_REMINDER_GRACE_MS = 15 * 60_000;
 
 function asTime(value) {
@@ -85,6 +111,7 @@ module.exports = {
   eventReminderAt,
   eventReminderDue,
   eventReminderNotificationDue,
+  normalizeReminderPayload,
   suppressDuplicate,
   todoOverdueNotificationDue,
   todoReminderDue

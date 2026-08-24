@@ -1,41 +1,185 @@
-/* Liquid glass is explicitly scoped so Classic remains a real fallback. */
+/*
+ * Liquid Glass appearance
+ *
+ * Glass is reserved for chrome, navigation, dialogs and transient controls.
+ * Reading surfaces use a calm, nearly opaque material so text never sits on
+ * glass-on-glass. This mirrors Apple's content / functional-layer separation.
+ */
 html[data-appearance="liquid-glass"] {
-  --glass-bg: rgba(236, 246, 251, .74);
-  --glass-panel: rgba(255, 255, 255, .57);
-  --glass-panel-strong: rgba(255, 255, 255, .76);
-  --glass-border: rgba(83, 132, 150, .22);
-  --glass-highlight: rgba(255, 255, 255, .72);
-  --glass-shadow: 0 22px 70px rgba(30, 69, 89, .16), 0 2px 8px rgba(30, 69, 89, .06);
-  --glass-blur: 22px;
-  --glass-saturation: 145%;
+  color-scheme: light;
+  --yanji-bg: #cfd8e5;
+  --yanji-surface: rgba(248, 251, 255, .92);
+  --yanji-surface-soft: rgba(238, 244, 250, .9);
+  --yanji-text: #132844;
+  --yanji-muted: #65758a;
+  --yanji-line: rgba(91, 116, 143, .18);
+  --yanji-accent: #2f86bd;
+  --yanji-accent-strong: #1d628d;
+  --glass-chrome: rgba(235, 242, 249, .62);
+  --glass-chrome-strong: rgba(245, 249, 253, .78);
+  --glass-line: rgba(255, 255, 255, .58);
+  --glass-edge: rgba(77, 108, 139, .18);
+  --glass-shadow: 0 18px 52px rgba(31, 53, 79, .12), 0 2px 8px rgba(31, 53, 79, .06);
+  --glass-blur: 24px;
+  --glass-saturation: 132%;
 }
 
 html[data-appearance="liquid-glass"] body {
+  color: var(--yanji-text);
   background:
-    radial-gradient(circle at 8% 0%, rgba(143, 202, 224, .54), transparent 32rem),
-    radial-gradient(circle at 94% 12%, rgba(194, 176, 232, .36), transparent 30rem),
-    linear-gradient(145deg, #dcecf2, #f4f8fa 54%, #e5e5f1);
+    radial-gradient(circle at 4% -8%, rgba(130, 215, 241, .56), transparent 34rem),
+    radial-gradient(circle at 98% 6%, rgba(202, 179, 239, .38), transparent 38rem),
+    radial-gradient(circle at 62% 110%, rgba(255, 207, 221, .25), transparent 30rem),
+    linear-gradient(145deg, #cbd8e5 0%, #edf2f7 48%, #d9dbe9 100%);
 }
-html[data-appearance="liquid-glass"] body::before { content: ''; position: fixed; inset: 0; pointer-events: none; opacity: .34; background: linear-gradient(125deg, transparent 0 42%, rgba(255,255,255,.3) 52%, transparent 64%); }
-html[data-appearance="liquid-glass"] .sidebar, html[data-appearance="liquid-glass"] .workspace, html[data-appearance="liquid-glass"] .settings-page { background: transparent; }
-html[data-appearance="liquid-glass"] .window-titlebar { color: #4b6c7c; background: rgba(235, 246, 251, .56); border-color: var(--glass-border); box-shadow: 0 1px 0 var(--glass-highlight); backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation)); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation)); }
-html[data-appearance="liquid-glass"] .sidebar { border-right-color: var(--glass-border); background: rgba(228, 241, 246, .44); backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation)); -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation)); }
-html[data-appearance="liquid-glass"] .panel, html[data-appearance="liquid-glass"] .content-section, html[data-appearance="liquid-glass"] .stats article, html[data-appearance="liquid-glass"] .home-progress-strip, html[data-appearance="liquid-glass"] .home-top-grid > *, html[data-appearance="liquid-glass"] .home-content-grid > *, html[data-appearance="liquid-glass"] .day-card, html[data-appearance="liquid-glass"] .schedule-today-panel, html[data-appearance="liquid-glass"] .schedule-board-shell, html[data-appearance="liquid-glass"] .schedule-board-column, html[data-appearance="liquid-glass"] .schedule-board-card, html[data-appearance="liquid-glass"] .focus-usage-panel, html[data-appearance="liquid-glass"] .attendance-summary article, html[data-appearance="liquid-glass"] .attendance-gantt-shell, html[data-appearance="liquid-glass"] .notes-toolbar, html[data-appearance="liquid-glass"] .note-card, html[data-appearance="liquid-glass"] .settings-shell, html[data-appearance="liquid-glass"] .home-next-event-card, html[data-appearance="liquid-glass"] .home-today-card, html[data-appearance="liquid-glass"] .todo-toolbar, html[data-appearance="liquid-glass"] .todo-card {
-  border-color: var(--glass-border);
-  background: var(--glass-panel);
-  box-shadow: var(--glass-shadow);
+
+html[data-appearance="liquid-glass"] body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, rgba(255,255,255,.14), transparent 38% 67%, rgba(255,255,255,.1));
+}
+
+html[data-appearance="liquid-glass"] .workspace,
+html[data-appearance="liquid-glass"] .settings-page { background: transparent; }
+
+/* Functional glass layer: titlebar, sidebar and floating controls only. */
+html[data-appearance="liquid-glass"] .window-titlebar,
+html[data-appearance="liquid-glass"] .sidebar {
+  background: var(--glass-chrome);
+  border-color: var(--glass-edge);
+  box-shadow: inset 0 1px 0 var(--glass-line);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
-html[data-appearance="liquid-glass"] .button.primary, html[data-appearance="liquid-glass"] .focus-clock-button.is-clocked-in { box-shadow: 0 10px 24px rgba(20, 102, 131, .24), inset 0 1px 0 var(--glass-highlight); }
-html[data-appearance="liquid-glass"] .modal, html[data-appearance="liquid-glass"] dialog { border-color: var(--glass-border); background: var(--glass-panel-strong); box-shadow: var(--glass-shadow); backdrop-filter: blur(28px) saturate(150%); -webkit-backdrop-filter: blur(28px) saturate(150%); }
-html[data-appearance="liquid-glass"] input, html[data-appearance="liquid-glass"] textarea, html[data-appearance="liquid-glass"] select { border-color: var(--glass-border); background: rgba(255,255,255,.55); }
-html[data-appearance="liquid-glass"] .nav-item.active { background: rgba(255,255,255,.62); box-shadow: inset 0 1px 0 rgba(255,255,255,.68), 0 9px 24px rgba(37, 78, 96, .1); }
+html[data-appearance="liquid-glass"] .window-titlebar { color: #4d657c; }
+html[data-appearance="liquid-glass"] .sidebar { border-right-color: var(--glass-edge); }
+html[data-appearance="liquid-glass"] .brand strong,
+html[data-appearance="liquid-glass"] .page-head-row h1,
+html[data-appearance="liquid-glass"] .workspace-header h1,
+html[data-appearance="liquid-glass"] .panel-heading h2 { color: var(--yanji-text); }
+
+html[data-appearance="liquid-glass"] .nav-item,
+html[data-appearance="liquid-glass"] .settings-entry,
+html[data-appearance="liquid-glass"] .quick-capture-tip { color: #526579; }
+html[data-appearance="liquid-glass"] .nav-item:hover,
+html[data-appearance="liquid-glass"] .settings-entry:hover,
+html[data-appearance="liquid-glass"] .quick-capture-tip:hover { background: rgba(255,255,255,.32); }
+html[data-appearance="liquid-glass"] .nav-item.active {
+  color: #15365a;
+  background: rgba(255,255,255,.58);
+  border: 1px solid rgba(255,255,255,.52);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 8px 22px rgba(42,68,96,.08);
+}
+
+/* Content layer: opaque enough for reliable text contrast, with only a soft
+   edge and shadow. No backdrop filter is applied to these surfaces. */
+html[data-appearance="liquid-glass"] :is(
+  .panel, .content-section, .stats article, .home-progress-strip,
+  .home-next-event-card, .home-today-card, .home-attendance-card,
+  .home-top-grid > *, .home-content-grid > section, .home-side-stack > section,
+  .schedule-today-panel, .schedule-board-shell, .focus-usage-panel,
+  .attendance-gantt-shell, .notes-toolbar, .note-card, .todo-toolbar,
+  .todo-card, .job-pipeline-panel, .job-signal-panel, .job-toolbar,
+  .job-stage-column
+) {
+  color: var(--yanji-text);
+  background: var(--yanji-surface);
+  border-color: var(--yanji-line);
+  box-shadow: 0 10px 30px rgba(38, 62, 87, .07), inset 0 1px 0 rgba(255,255,255,.56);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+html[data-appearance="liquid-glass"] .home-progress-metrics article,
+html[data-appearance="liquid-glass"] .job-card,
+html[data-appearance="liquid-glass"] .day-card { background: rgba(255,255,255,.72); border-color: var(--yanji-line); }
+html[data-appearance="liquid-glass"] .schedule-board-column { background: rgba(246,249,253,.88); border-color: var(--yanji-line); }
+html[data-appearance="liquid-glass"] .schedule-board-heading,
+html[data-appearance="liquid-glass"] .schedule-board-add,
+html[data-appearance="liquid-glass"] .job-stage-column > header,
+html[data-appearance="liquid-glass"] .job-stage-add { background: rgba(226,235,244,.68); border-color: var(--yanji-line); }
+
+/* Selective tint communicates hierarchy; neutral actions remain clear. */
+html[data-appearance="liquid-glass"] .button.primary,
+html[data-appearance="liquid-glass"] .focus-clock-button.is-clocked-in {
+  color: #fff;
+  background: linear-gradient(145deg, #3d96c8, #226f9d);
+  border-color: rgba(31, 99, 141, .38);
+  box-shadow: 0 9px 24px rgba(31, 100, 144, .2), inset 0 1px 0 rgba(255,255,255,.35);
+}
+html[data-appearance="liquid-glass"] .button.secondary,
+html[data-appearance="liquid-glass"] .button.tertiary,
+html[data-appearance="liquid-glass"] .focus-duration-options button,
+html[data-appearance="liquid-glass"] .usage-range-tabs button {
+  color: #365b77;
+  background: rgba(244,248,252,.7);
+  border-color: var(--glass-edge);
+}
+
+html[data-appearance="liquid-glass"] :is(input, textarea, select, .note-content-input) {
+  color: var(--yanji-text);
+  background: rgba(249,251,254,.82);
+  border-color: rgba(79,111,141,.22);
+  box-shadow: inset 0 1px 2px rgba(34,59,84,.035);
+}
+html[data-appearance="liquid-glass"] :is(input, textarea, select, .note-content-input):focus {
+  border-color: rgba(47,134,189,.72);
+  box-shadow: 0 0 0 3px rgba(47,134,189,.12);
+}
+
+/* Dialogs are the second functional glass layer. They float above content and
+   therefore receive deeper shadow and a stronger material. */
+html[data-appearance="liquid-glass"] :is(.modal, dialog) {
+  color: var(--yanji-text);
+  background: var(--glass-chrome-strong);
+  border-color: var(--glass-edge);
+  box-shadow: 0 28px 80px rgba(25,45,69,.22), inset 0 1px 0 rgba(255,255,255,.72);
+  backdrop-filter: blur(30px) saturate(138%);
+  -webkit-backdrop-filter: blur(30px) saturate(138%);
+}
+html[data-appearance="liquid-glass"] dialog::backdrop { background: rgba(29,43,61,.22); }
 
 html[data-appearance="classic"] body { background: #edf7fc; }
 html[data-appearance="classic"] .sidebar { background: #e4f1f6; }
-html[data-appearance="classic"] .home-next-event-card, html[data-appearance="classic"] .home-today-card, html[data-appearance="classic"] .todo-toolbar, html[data-appearance="classic"] .todo-card { box-shadow: 0 10px 28px rgba(26, 63, 79, .08); backdrop-filter: none; -webkit-backdrop-filter: none; }
+html[data-appearance="classic"] :is(.home-next-event-card, .home-today-card, .home-attendance-card, .todo-toolbar, .todo-card, .job-stage-column) {
+  box-shadow: 0 10px 28px rgba(26,63,79,.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
 
-@supports not ((backdrop-filter: blur(1px))) { html[data-appearance="liquid-glass"] .sidebar, html[data-appearance="liquid-glass"] .home-next-event-card, html[data-appearance="liquid-glass"] .home-today-card, html[data-appearance="liquid-glass"] .todo-toolbar, html[data-appearance="liquid-glass"] .todo-card { background: #eef7fa; } }
-@media (prefers-reduced-transparency: reduce) { html[data-appearance="liquid-glass"] .sidebar, html[data-appearance="liquid-glass"] .home-next-event-card, html[data-appearance="liquid-glass"] .home-today-card, html[data-appearance="liquid-glass"] .todo-toolbar, html[data-appearance="liquid-glass"] .todo-card { background: #f5fafc; backdrop-filter: none; -webkit-backdrop-filter: none; } }
-@media (forced-colors: active) { html[data-appearance="liquid-glass"] body, html[data-appearance="classic"] body { background: Canvas; color: CanvasText; } html[data-appearance="liquid-glass"] .home-next-event-card, html[data-appearance="liquid-glass"] .home-today-card, html[data-appearance="liquid-glass"] .todo-toolbar, html[data-appearance="liquid-glass"] .todo-card { background: Canvas; border: 1px solid CanvasText; box-shadow: none; } }
+@supports not ((backdrop-filter: blur(1px))) {
+  html[data-appearance="liquid-glass"] :is(.window-titlebar, .sidebar, .modal, dialog) { background: #eef3f8; }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  html[data-appearance="liquid-glass"] :is(.window-titlebar, .sidebar, .modal, dialog) {
+    background: #f3f6fa;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+@media (prefers-contrast: more) {
+  html[data-appearance="liquid-glass"] { --yanji-text: #071a31; --yanji-muted: #44566a; --yanji-line: rgba(37,61,86,.42); }
+  html[data-appearance="liquid-glass"] :is(.nav-item.active, input, textarea, select, .note-content-input) { border-width: 2px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html[data-appearance="liquid-glass"] *, html[data-appearance="liquid-glass"] *::before, html[data-appearance="liquid-glass"] *::after {
+    scroll-behavior: auto !important;
+    transition-duration: .01ms !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+@media (forced-colors: active) {
+  html[data-appearance="liquid-glass"] body, html[data-appearance="classic"] body { color: CanvasText; background: Canvas; }
+  html[data-appearance="liquid-glass"] :is(.window-titlebar, .sidebar, .modal, dialog, .home-progress-strip, .home-next-event-card, .home-today-card, .home-attendance-card, .todo-toolbar, .todo-card, .job-stage-column) {
+    color: CanvasText;
+    background: Canvas;
+    border: 1px solid CanvasText;
+    box-shadow: none;
+  }
+}

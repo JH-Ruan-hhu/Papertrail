@@ -164,7 +164,9 @@ editor.addEventListener('compositionend', () => {
 editor.addEventListener('scroll', syncScroll, { passive: true });
 document.addEventListener('keydown', (event) => {
   if (event.isComposing || composing || event.keyCode === 229) return;
-  if (event.key === 'Tab') {
+  if (mode === 'note' && window.YanjiListEditing?.applyListEditing(editor, event)) {
+    event.preventDefault();
+  } else if (event.key === 'Tab') {
     event.preventDefault();
     const modes = ['schedule', 'todo', 'note'];
     setMode(modes[(modes.indexOf(mode) + (event.shiftKey ? modes.length - 1 : 1)) % modes.length]);

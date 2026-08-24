@@ -33,6 +33,9 @@
           <button class="nav-item" data-workbench-page="notes" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h4M9 12h6M9 16h6"/></svg><span>笔记</span><b id="navNoteCount">0</b>
           </button>
+          <button class="nav-item" data-workbench-page="jobs" type="button">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3.5 12h17M10 12v2h4v-2"/></svg><span>求职</span><b id="navJobCount">0</b>
+          </button>
           <button class="nav-item" data-workbench-page="submissions" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v12H4zM8 7.5v-3h8v3"/><path d="M8 12h8M8 15.5h5"/></svg><span>投稿</span><b id="navPaperCount">0</b>
           </button>
@@ -77,6 +80,10 @@
               <div id="homeTodayTodoList" class="home-today-list"></div>
               <div class="home-todo-progress" id="homeTodoProgress" aria-label="今日待办完成进度"><i></i><span>0%</span></div>
             </article>
+            <article class="home-attendance-card" aria-label="今日打卡">
+              <div class="panel-heading"><div><p class="eyebrow">WORK SESSION</p><h2>今日打卡</h2></div><span class="status-dot" aria-hidden="true"></span></div>
+              <div class="home-attendance-content"><strong id="homeAttendanceStatus">尚未打卡</strong><span id="homeAttendanceMeta">记录今天的工作时段</span><button class="button compact primary focus-clock-button" id="homeClockButton" type="button">上班打卡</button></div>
+            </article>
           </section>
 
           <div class="home-top-grid">
@@ -85,7 +92,7 @@
               <div id="todayFocusList" class="focus-list"></div>
             </section>
             <section class="focus-timer-panel home-focus-timer">
-              <div class="panel-heading"><div class="heading-with-icon"><span class="heading-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span><div><h2>专注计时</h2><p id="focusTodaySummary">今日 0 分钟</p></div></div><button class="button compact primary focus-clock-button" id="homeClockButton" type="button">上班打卡</button></div>
+              <div class="panel-heading"><div class="heading-with-icon"><span class="heading-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span><div><h2>专注计时</h2><p id="focusTodaySummary">今日 0 分钟</p></div></div></div>
               <div class="focus-timer-body">
                 <div class="focus-ring" id="focusRing"><div><time id="focusTimeRemaining">50:00</time><span id="focusTimerCaption">准备专注</span></div></div>
                 <div class="focus-timer-actions">
@@ -104,10 +111,16 @@
               <div class="panel-heading"><div><h2>接下来四天</h2><p>昨天复盘，今天执行，未来提前安排</p></div><button class="button primary" id="quickScheduleButton" type="button">快速写日程</button></div>
               <div class="day-overview" id="homeDayOverview"></div>
             </section>
-            <section class="latest-notes-panel">
-              <div class="panel-heading"><div><h2>最新笔记</h2><p>最近写下的研究想法</p></div><div class="panel-heading-actions"><button class="button compact primary" id="quickNoteButton" type="button">快速写笔记</button><button class="text-button" data-go-page="notes" type="button">查看全部</button></div></div>
-              <div id="latestNotes" class="latest-notes"></div>
-            </section>
+            <div class="home-side-stack">
+              <section class="home-job-panel">
+                <div class="panel-heading"><div><p class="eyebrow">APPLICATIONS</p><h2>求职进展</h2></div><button class="text-button" data-go-page="jobs" type="button">查看全部</button></div>
+                <div id="homeJobSummary" class="home-job-summary"></div>
+              </section>
+              <section class="latest-notes-panel">
+                <div class="panel-heading"><div><h2>最新笔记</h2><p>最近写下的研究想法</p></div><div class="panel-heading-actions"><button class="button compact primary" id="quickNoteButton" type="button">快速写笔记</button><button class="text-button" data-go-page="notes" type="button">查看全部</button></div></div>
+                <div id="latestNotes" class="latest-notes"></div>
+              </section>
+            </div>
           </div>
 
         </section>
@@ -171,7 +184,7 @@
             <div><strong id="timelineDate"></strong><span id="timelineDateSubtitle"></span></div>
             <button id="nextDayButton" type="button" aria-label="后一天">›</button>
           </div>
-          <section class="schedule-board-shell" aria-label="一周日程看板">
+          <section class="schedule-board-shell" aria-label="八日日程看板">
             <div class="schedule-board" id="scheduleBoard"></div>
           </section>
         </section>
@@ -183,6 +196,30 @@
           </header>
           <div class="notes-toolbar"><label class="search-box" for="noteSearch"><input id="noteSearch" type="search" placeholder="搜索标题、正文或元数据"></label><span>点击“置顶”，将笔记悬浮在其他页面之上</span></div>
           <div id="notesGrid" class="notes-grid"></div>
+        </section>
+
+        <section class="workbench-page job-page" data-page="jobs" hidden>
+          <header class="page-head-row">
+            <div><p class="eyebrow">APPLICATION PIPELINE</p><h1>求职追踪</h1><p>把每次投递、笔试与面试放进一条清晰的推进路径</p></div>
+            <div class="page-actions"><button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 添加岗位</button></div>
+          </header>
+          <section class="job-overview-grid" aria-label="求职进展概览">
+            <article class="job-pipeline-panel">
+              <div class="panel-heading"><div><p class="eyebrow">PIPELINE</p><h2>投递进度</h2><p>按当前所处阶段统计，不重复计算</p></div></div>
+              <div id="jobPipelineSummary" class="job-pipeline-summary"></div>
+            </article>
+            <article class="job-signal-panel">
+              <div><small>进行中</small><strong id="jobActiveCount">0</strong><span>个机会正在推进</span></div>
+              <div><small>进入面试</small><strong id="jobInterviewCount">0</strong><span>个机会已到面试</span></div>
+              <div class="job-offer-signal"><small>Offer</small><strong id="jobOfferCount">0</strong><span>已收获的结果</span></div>
+              <div><small>最近下一步</small><strong id="jobNextAction">未安排</strong><span id="jobNextActionMeta">添加日期后在这里提醒</span></div>
+            </article>
+          </section>
+          <section class="job-toolbar" aria-label="求职记录筛选">
+            <label class="search-box" for="jobSearch"><input id="jobSearch" type="search" placeholder="搜索单位、岗位、地点或备注" autocomplete="off"></label>
+            <label class="job-filter-label" for="jobStatusFilter"><span>阶段</span><select id="jobStatusFilter"><option value="all">全部阶段</option><option value="pending">待投递</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></label>
+          </section>
+          <div id="jobBoard" class="job-board" aria-live="polite"></div>
         </section>
 
         <section class="workbench-page submissions-page" data-page="submissions" hidden>
@@ -222,7 +259,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.1.1</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.1.3</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -345,7 +382,7 @@
               <h2>更新</h2>
               <h3>版本</h3>
               <div class="settings-group update-group">
-                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.1.1</span></small></div></div>
+                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.1.3</span></small></div></div>
                 <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>
                 <div class="setting-row update-row">
                   <div class="update-copy"><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
@@ -435,7 +472,7 @@
 
     <dialog id="scheduleDialog" class="modal workbench-editor-modal">
       <form method="dialog" id="scheduleForm">
-        <div class="modal-head"><div class="modal-title-with-icon"><span class="modal-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3v5M16 3v5M4 10h16"/></svg></span><div><p class="eyebrow">SCHEDULE</p><h2 id="scheduleDialogTitle">新建日程</h2><p>安排时间范围，并决定何时提醒你</p></div></div><button class="close-button" id="closeScheduleButton" type="button">关闭</button></div>
+        <div class="modal-head"><div class="modal-title-with-icon"><span class="modal-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3v5M16 3v5M4 10h16"/></svg></span><div><p class="eyebrow">SCHEDULE</p><h2 id="scheduleDialogTitle">新建日程</h2><p>安排时间范围，并决定何时提醒你</p></div></div></div>
         <input id="scheduleId" type="hidden">
         <div class="form-grid schedule-form-grid">
           <div class="field full"><label for="scheduleTitle">日程内容</label><input id="scheduleTitle" maxlength="500" placeholder="例如：明天下午四点去污水厂采样"><small id="scheduleRecognition" class="schedule-recognition" hidden></small></div>
@@ -454,7 +491,7 @@
 
     <dialog id="scheduleConvertDialog" class="modal workbench-editor-modal conversion-modal">
       <form method="dialog" id="scheduleConvertForm">
-        <div class="modal-head"><div><p class="eyebrow">SCHEDULE → TODO</p><h2>日程转为待办</h2><p>保留时间块可以继续追踪执行结果</p></div><button class="close-button" id="closeScheduleConvertButton" type="button">关闭</button></div>
+        <div class="modal-head"><div><p class="eyebrow">SCHEDULE → TODO</p><h2>日程转为待办</h2><p>保留时间块可以继续追踪执行结果</p></div></div>
         <input id="convertScheduleId" type="hidden">
         <div class="form-grid">
           <div class="field full"><label for="convertScheduleTodoTitle">待办标题</label><input id="convertScheduleTodoTitle" maxlength="200"></div>
@@ -470,7 +507,7 @@
 
     <dialog id="todoDialog" class="modal workbench-editor-modal todo-editor-modal">
       <form method="dialog" id="todoForm">
-        <div class="modal-head"><div><p class="eyebrow">TODO</p><h2 id="todoDialogTitle">新建待办</h2><p>待办是要完成的结果，时间块请在日程中安排</p></div><button class="close-button" id="closeTodoButton" type="button">关闭</button></div>
+        <div class="modal-head"><div><p class="eyebrow">TODO</p><h2 id="todoDialogTitle">新建待办</h2><p>待办是要完成的结果，时间块请在日程中安排</p></div></div>
         <input id="todoId" type="hidden">
         <div class="form-grid todo-form-grid">
           <div class="field full"><label for="todoTitle">待办内容</label><input id="todoTitle" maxlength="200" placeholder="例如：周五前提交论文修改稿"><small id="todoRecognition" class="todo-recognition" hidden></small></div>
@@ -487,14 +524,44 @@
 
     <dialog id="noteDialog" class="modal workbench-editor-modal note-editor-modal">
       <form method="dialog" id="noteForm">
-        <div class="modal-head"><div><p class="eyebrow">NOTE</p><h2 id="noteDialogTitle">新建笔记</h2><p>元数据默认收起，不打断正常书写</p></div><button class="close-button" data-close-dialog="noteDialog" type="button">关闭</button></div>
+        <div class="modal-head"><div><p class="eyebrow">NOTE</p><h2 id="noteDialogTitle">新建笔记</h2><p>元数据默认收起，不打断正常书写</p></div></div>
         <input id="noteId" type="hidden">
+        <input id="noteEntryId" type="hidden">
         <input id="noteTitle" class="note-title-input" maxlength="300" placeholder="笔记标题">
-        <textarea id="noteContent" class="note-content-input" maxlength="100000" placeholder="记录实验想法、阅读摘录或下一步计划…"></textarea>
+        <div class="note-editor-toolbar"><span>正文</span><small>图片会插入到当前光标位置</small><button class="button tertiary compact" id="addNoteImageButton" type="button">插入图片</button></div>
+        <div id="noteContent" class="note-content-input" contenteditable="true" role="textbox" aria-multiline="true" data-maxlength="100000" data-placeholder="记录实验想法、阅读摘录或下一步计划…" spellcheck="true"></div>
         <button class="metadata-reveal" id="toggleNoteMetadataButton" type="button"><div><strong>笔记元数据</strong><small id="metadataSummary">点击展开并编辑属性</small></div></button>
         <section id="noteMetadataPanel" class="note-metadata-panel" hidden><div id="noteMetadataFields" class="note-metadata-fields"></div><button class="text-button" id="openMetadataManagerButton" type="button">＋ 添加或管理字段</button></section>
         <p id="noteError" class="form-error"></p>
-        <div class="modal-actions"><button class="button tertiary danger-quiet" id="deleteNoteButton" type="button" hidden>删除</button><button class="button tertiary" id="openStickyFromEditorButton" type="button" hidden>悬浮便笺</button><span class="modal-spacer"></span><button class="button secondary" data-close-dialog="noteDialog" type="button">取消</button><button class="button primary" id="saveNoteButton" type="button">保存笔记</button></div>
+        <div class="modal-actions"><span class="save-hint" id="noteSaveHint">输入后自动保存</span><button class="button tertiary danger-quiet" id="deleteNoteButton" type="button" hidden>删除</button><button class="button tertiary" id="openStickyFromEditorButton" type="button" hidden>悬浮便笺</button><span class="modal-spacer"></span><button class="button secondary" id="cancelNoteButton" data-close-dialog="noteDialog" type="button">取消</button><button class="button primary" id="saveNoteButton" type="button">保存笔记</button></div>
+      </form>
+    </dialog>
+
+    <dialog id="noteImagePreviewDialog" class="modal note-image-preview-modal" aria-labelledby="noteImagePreviewTitle">
+      <div class="note-image-preview-shell">
+        <div class="note-image-preview-head"><strong id="noteImagePreviewTitle">图片预览</strong><button class="close-button" data-close-dialog="noteImagePreviewDialog" type="button">关闭</button></div>
+        <img id="noteImagePreview" alt="">
+        <div class="note-image-preview-actions"><button class="button tertiary danger-quiet" id="removeNoteImageButton" type="button">删除图片</button></div>
+      </div>
+    </dialog>
+
+    <dialog id="jobDialog" class="modal workbench-editor-modal job-editor-modal">
+      <form method="dialog" id="jobForm">
+        <div class="modal-head"><div><p class="eyebrow">APPLICATION</p><h2 id="jobDialogTitle">添加求职岗位</h2><p>记录当前阶段与明确的下一步，减少重复翻找</p></div></div>
+        <input id="jobId" type="hidden">
+        <div class="form-grid job-form-grid">
+          <div class="field"><label for="jobCompany">单位名称</label><input id="jobCompany" maxlength="200" placeholder="例如：某某环保科技" required></div>
+          <div class="field"><label for="jobRole">岗位名称</label><input id="jobRole" maxlength="300" placeholder="例如：环境研发工程师" required></div>
+          <div class="field"><label for="jobStatus">当前阶段</label><select id="jobStatus"><option value="pending">待投递</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></div>
+          <div class="field"><label for="jobLocation">地点</label><input id="jobLocation" maxlength="200" placeholder="城市 / 远程"></div>
+          <div class="field"><label for="jobAppliedAt">投递日期</label><input id="jobAppliedAt" type="date"></div>
+          <div class="field"><label for="jobNextActionAt">下一步时间</label><input id="jobNextActionAt" type="datetime-local"></div>
+          <div class="field full"><label for="jobSourceUrl">招聘链接</label><input id="jobSourceUrl" type="url" maxlength="2048" placeholder="https://…"></div>
+          <div class="field full"><label for="jobContact">联系人 / 渠道</label><input id="jobContact" maxlength="300" placeholder="招聘平台、内推人或 HR 联系方式"></div>
+          <div class="field full"><label for="jobNotes">备注</label><textarea id="jobNotes" rows="4" maxlength="10000" placeholder="岗位亮点、准备重点、反馈与下一步"></textarea></div>
+        </div>
+        <p id="jobError" class="form-error"></p>
+        <div class="modal-actions"><button class="button tertiary danger-quiet" id="deleteJobButton" type="button" hidden>删除</button><span class="modal-spacer"></span><button class="button secondary" id="cancelJobButton" type="button">取消</button><button class="button primary" id="saveJobButton" type="button">保存岗位</button></div>
       </form>
     </dialog>
 
@@ -534,6 +601,7 @@
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="theme-runtime.js"></script>
     <script src="shared-ui.js"></script>
+    <script src="list-editing.js"></script>
     <script src="app.js"></script>
     <script src="todo-view.js"></script>
     <script src="workbench.js"></script>

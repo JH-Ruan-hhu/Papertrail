@@ -1,10 +1,15 @@
 'use strict';
 
+const { TIME_NUMBER_PATTERN, parseMinuteToken } = require('./natural-time');
+
 const SCHEDULE_PRIORITIES = Object.freeze(['high', 'medium', 'low']);
 const SCHEDULE_REMINDER_MINUTES = Object.freeze([null, 0, 5, 10, 15, 30, 60, 1440]);
 const METADATA_TYPES = Object.freeze(['text', 'select', 'checkbox']);
 const ATTENDANCE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 const FOCUS_STATUSES = Object.freeze(['active', 'completed', 'stopped']);
+const NOTE_KINDS = Object.freeze(['daily', 'standalone']);
+const NOTE_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const NOTE_ATTACHMENT_MIMES = Object.freeze(['image/png', 'image/jpeg', 'image/webp', 'image/gif']);
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -36,6 +41,56 @@ function addLocalDays(date, count) {
   result.setHours(12, 0, 0, 0);
   result.setDate(result.getDate() + count);
   return result;
+}
+
+function localDateKey(date = new Date()) {
+  const value = date instanceof Date ? date : new Date(date);
+  return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, '0')}-${String(value.getDate()).padStart(2, '0')}`;
+}
+
+function noteDateLabel(dateKey) {
+  const [year, month, day] = String(dateKey || '').split('-').map(Number);
+  if (!year || !month || !day) return '今日日记';
+  return `${year}年${month}月${day}日`;
+}
+
+function normalizeNoteAttachment(value, index = 0, fallbackAt = new Date(0).toISOString()) {
+  if (!asObject(value)) throw new Error(`第 ${index + 1} 个笔记附件格式无效。`);
+  const mimeType = NOTE_ATTACHMENT_MIMES.includes(value.mimeType) ? value.mimeType : null;
+  const storedName = cleanText(value.storedName, 240);
+  if (!mimeType || !storedName || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$/.test(storedName)) {
+    throw new Error(`第 ${index + 1} 个笔记附件元数据无效。`);
+  }
+  const size = Math.max(0, Math.min(12 * 1024 * 1024, Math.round(Number(value.size) || 0)));
+  return {
+    id: cleanText(value.id, 200) || `attachment-${index + 1}`,
+    storedName,
+    originalName: cleanText(value.originalName, 240) || storedName,
+    mimeType,
+    size,
+    createdAt: isoDate(value.createdAt, fallbackAt)
+  };
+}
+
+function normalizeNoteEntry(value, index = 0, fallbackAt = new Date(0).toISOString()) {
+  if (!asObject(value)) throw new Error(`第 ${index + 1} 条笔记内容格式无效。`);
+  const createdAt = isoDate(value.createdAt, fallbackAt);
+  const attachments = Array.isArray(value.attachments)
+    ? value.attachments.slice(0, 40).map((item, attachmentIndex) => normalizeNoteAttachment(item, attachmentIndex, createdAt))
+    : [];
+  return {
+    id: cleanText(value.id, 200) || `entry-${index + 1}`,
+    title: cleanText(value.title, 80) || new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(createdAt)),
+    createdAt,
+    updatedAt: isoDate(value.updatedAt, createdAt),
+    content: String(value.content || '').slice(0, 100_000),
+    attachments
+  };
+}
+
+function composeNoteContent(entries = [], fallback = '') {
+  const values = entries.map((entry) => String(entry?.content || '')).filter((value) => value.length > 0);
+  return values.length ? values.join('\n\n') : String(fallback || '').slice(0, 100_000);
 }
 
 function chineseNumber(value) {
@@ -98,7 +153,7 @@ function resolveDate(text, baseDate) {
 function parseClock(rawHour, rawMinute, dayPart) {
   const hour = resolveHour(chineseNumber(rawHour), dayPart);
   if (hour == null) return null;
-  let minute = rawMinute ? chineseNumber(rawMinute) : 0;
+  let minute = rawMinute ? parseMinuteToken(rawMinute) : 0;
   if (!Number.isFinite(minute) || minute < 0 || minute > 59) minute = 0;
   return { hour, minute };
 }
@@ -111,9 +166,9 @@ function parseNaturalLanguageSchedule(input, base = new Date()) {
   const resolvedDate = resolveDate(original, baseDate);
   const dayPartMatch = original.match(/凌晨|早上|上午|中午|下午|傍晚|晚上/);
   const dayPart = dayPartMatch?.[0] || '';
-  const numberPattern = '[0-9零〇一二两三四五六七八九十]{1,3}';
-  const rangePattern = new RegExp(`(${numberPattern})(?:[:：点时](${numberPattern})?分?)?\\s*(?:到|至|[-–—~～])\\s*(凌晨|早上|上午|中午|下午|傍晚|晚上)?\\s*(${numberPattern})(?:[:：点时](${numberPattern})?分?)?`);
-  const singlePattern = new RegExp(`(凌晨|早上|上午|中午|下午|傍晚|晚上)?\\s*(${numberPattern})(?:[:：点时](${numberPattern})?分?)`);
+  const numberPattern = TIME_NUMBER_PATTERN;
+  const rangePattern = new RegExp(`(${numberPattern})(?:[:：点时](半|${numberPattern})?分?)?\\s*(?:到|至|[-–—~～])\\s*(凌晨|早上|上午|中午|下午|傍晚|晚上)?\\s*(${numberPattern})(?:[:：点时](半|${numberPattern})?分?)?`);
+  const singlePattern = new RegExp(`(凌晨|早上|上午|中午|下午|傍晚|晚上)?\\s*(${numberPattern})(?:[:：点时](半|${numberPattern})?分?)`);
 
   const range = original.match(rangePattern);
   let startClock;
@@ -327,15 +382,40 @@ function normalizeNote(value, index = 0, fallbackAt = new Date(0).toISOString())
       ? fieldValue
       : cleanText(fieldValue, 2000);
   }
+  const kind = NOTE_KINDS.includes(value.kind) ? value.kind : 'standalone';
+  const dateKey = kind === 'daily' && NOTE_DATE_PATTERN.test(String(value.dateKey || ''))
+    ? String(value.dateKey)
+    : kind === 'daily' ? localDateKey(createdAt) : null;
+  const sourceEntries = Array.isArray(value.entries)
+    ? value.entries.slice(0, 200).map((entry, entryIndex) => normalizeNoteEntry(entry, entryIndex, createdAt))
+    : [];
   const content = String(value.content || '').slice(0, 100_000);
+  const entries = sourceEntries.length
+    ? sourceEntries
+    : (kind === 'daily' && content ? [normalizeNoteEntry({
+        id: value.entryId,
+        createdAt,
+        updatedAt: value.updatedAt || createdAt,
+        content,
+        attachments: value.attachments
+      }, 0, createdAt)] : []);
+  const attachments = Array.isArray(value.attachments)
+    ? value.attachments.slice(0, 40).map((item, attachmentIndex) => normalizeNoteAttachment(item, attachmentIndex, createdAt))
+    : entries.flatMap((entry) => entry.attachments || []).slice(0, 40);
+  const composedContent = kind === 'daily' ? composeNoteContent(entries, content) : content;
   return {
     id: cleanText(value.id, 200) || `note-${index + 1}`,
-    title: cleanText(value.title, 300) || cleanText(content.split(/\r?\n/)[0], 80) || '未命名笔记',
-    content,
+    kind,
+    dateKey,
+    title: cleanText(value.title, 300) || (kind === 'daily' ? noteDateLabel(dateKey) : '未命名笔记'),
+    content: composedContent,
+    entries,
+    attachments,
     metadata,
     pinned: Boolean(value.pinned),
     createdAt,
-    updatedAt: isoDate(value.updatedAt, createdAt)
+    updatedAt: isoDate(value.updatedAt, createdAt),
+    revision: Math.max(0, Math.floor(Number(value.revision) || 0))
   };
 }
 
@@ -457,16 +537,39 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
 
 function saveNote(list, input, now = new Date().toISOString(), makeId = () => `note-${Date.now()}`) {
   const existing = input?.id ? list.find((item) => item.id === String(input.id)) : null;
-  const candidate = normalizeNote({
+  const next = {
     ...existing,
     ...input,
     id: existing?.id || makeId(),
     createdAt: existing?.createdAt || now,
-    updatedAt: now
-  }, 0, now);
+    updatedAt: now,
+    revision: Math.max(0, Number(existing?.revision) || 0) + 1
+  };
+  if (existing?.kind === 'daily' && input && Object.prototype.hasOwnProperty.call(input, 'content')) {
+    const entryId = String(input.entryId || existing.entries?.at(-1)?.id || '');
+    const entries = (existing.entries || []).map((entry) => entry.id === entryId
+      ? { ...entry, content: String(input.content || '').slice(0, 100_000), updatedAt: now, attachments: input.attachments || entry.attachments || [] }
+      : entry);
+    next.entries = entries;
+    next.content = composeNoteContent(entries, input.content);
+  }
+  const candidate = normalizeNote(next, 0, now);
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
     : [candidate, ...list];
+}
+
+function noteBodyHasContent(note) {
+  if (!note) return false;
+  if ((note.attachments || []).length) return true;
+  const visible = String(note.content || '')
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&(?:nbsp|#160|#xA0);/gi, ' ')
+    .replace(/&[A-Za-z0-9#]+;/g, 'x')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+  return Boolean(visible);
 }
 
 function saveAttendance(list, input, now = new Date().toISOString(), makeId = () => `attendance-${Date.now()}`) {
@@ -499,13 +602,21 @@ function saveFocusSession(list, input, now = new Date().toISOString(), makeId = 
 
 module.exports = {
   METADATA_TYPES,
+  NOTE_ATTACHMENT_MIMES,
+  NOTE_KINDS,
   SCHEDULE_PRIORITIES,
   SCHEDULE_REMINDER_MINUTES,
   closeStaleAttendanceRecords,
   normalizeAttendance,
   normalizeFocusSession,
   normalizeMetadataField,
+  normalizeNoteAttachment,
+  normalizeNoteEntry,
   normalizeNote,
+  noteBodyHasContent,
+  composeNoteContent,
+  localDateKey,
+  noteDateLabel,
   normalizeSchedule,
   parseNaturalLanguageSchedule,
   parseNaturalLanguageSchedules,

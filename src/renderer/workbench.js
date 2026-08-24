@@ -7,13 +7,20 @@ const wb = {
   pendingTodoId: null,
   convertingTodoId: null,
   editingScheduleTodoId: null,
-  workspace: { schedules: [], todos: [], notes: [], metadataFields: [], attendance: [], focusSessions: [] },
+  workspace: { schedules: [], todos: [], notes: [], metadataFields: [], attendance: [], focusSessions: [], jobApplications: [] },
   selectedDate: new Date(),
   attendanceWeekStart: null,
   editingNote: null,
   scheduleRecognition: null,
   scheduleRecognitionRequest: 0,
-  usageRange: 'day'
+  usageRange: 'day',
+  noteSaveTimer: null,
+  noteSavePromise: null,
+  noteDirty: false,
+  noteEditGeneration: 0,
+  noteSelection: null,
+  previewingNoteImage: null,
+  scheduleDraftTimer: null
 };
 
 function syncViewportDensity() {
@@ -29,11 +36,14 @@ function syncViewportDensity() {
 
 syncViewportDensity();
 window.addEventListener('resize', syncViewportDensity, { passive: true });
+window.addEventListener('resize', () => requestAnimationFrame(fitHomeDayCards), { passive: true });
 window.visualViewport?.addEventListener('resize', syncViewportDensity, { passive: true });
 
-const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', submissions: '投稿', settings: '设置' });
+const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', jobs: '求职', submissions: '投稿', settings: '设置' });
 const SCHEDULE_DRAFT_KEY = 'yanji.scheduleDraft.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
+const JOB_STATUSES = Object.freeze(['pending', 'submitted', 'written-1', 'written-2', 'interview', 'offer']);
+const JOB_STATUS_LABELS = Object.freeze({ pending: '待投递', submitted: '已投递', 'written-1': '一轮笔试', 'written-2': '二轮笔试', interview: '面试', offer: 'Offer' });
 const UI_ICON_PATHS = Object.freeze({
   check: '<path d="m6 12 4 4 8-9"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
@@ -125,6 +135,9 @@ function closeWorkbenchDialog(dialog) {
 
 function switchWorkbenchPage(page) {
   if (!pageTitles[page]) return;
+  if (wb.page === 'notes' && document.getElementById('noteDialog')?.open) flushNoteEditor({ silent: true }).catch(() => {});
+  if (document.getElementById('scheduleDialog')?.open) flushScheduleDraft();
+  window.YanjiTodoView?.flushDraft?.();
   wb.page = page;
   document.querySelectorAll('[data-workbench-page]').forEach((button) => button.classList.toggle('active', button.dataset.workbenchPage === page));
   document.querySelectorAll('[data-page]').forEach((section) => { section.hidden = section.dataset.page !== page; });
@@ -132,6 +145,7 @@ function switchWorkbenchPage(page) {
   if (page === 'todos') window.YanjiTodoView?.render();
   if (page === 'attendance') renderAttendance();
   if (page === 'notes') renderNotes();
+  if (page === 'jobs') renderJobs();
 }
 
 function renderClock() {
@@ -169,10 +183,11 @@ function renderHome() {
   const overview = labels.map((label, index) => {
     const date = addDays(today, index - 1);
     const events = schedulesForDay(date);
-    const items = events.slice(0, 3).map((item) => `<button class="day-mini-event tone-${item.priority}" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${formatTime(item.startAt)}</time><span>${wbEscape(item.title)}</span></button>`).join('');
-    return `<article class="day-card ${index === 1 ? 'today' : ''}"><header><div><strong>${label}</strong><span>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date)}</span></div><b>${events.length}</b></header><div>${items || '<p class="empty-mini">暂时没有安排</p>'}${events.length > 3 ? `<small>还有 ${events.length - 3} 项</small>` : ''}</div></article>`;
+    const items = events.map((item) => `<button class="day-mini-event tone-${item.priority}" data-day-event="${wbEscape(item.id)}" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${formatTime(item.startAt)}</time><span>${wbEscape(item.title)}</span></button>`).join('');
+    return `<article class="day-card ${index === 1 ? 'today' : ''}"><header><div><strong>${label}</strong><span>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date)}</span></div><b>${events.length}</b></header><div>${items || '<p class="empty-mini">暂时没有安排</p>'}<small class="day-more" hidden></small></div></article>`;
   }).join('');
   document.getElementById('homeDayOverview').innerHTML = overview;
+  requestAnimationFrame(fitHomeDayCards);
   renderHomeProgress();
 
   const priorityRank = { high: 0, medium: 1, low: 2 };
@@ -182,13 +197,165 @@ function renderHome() {
   document.getElementById('todayFocusList').innerHTML = focus.length ? focus.map((item) => `<button class="focus-row" data-edit-schedule="${wbEscape(item.id)}" type="button"><span class="priority-dot ${item.priority}"></span><time>${item.allDay ? '全天' : formatTime(item.startAt)}</time><div><strong>${wbEscape(item.title)}</strong><small>${priorityLabels[item.priority]}优先级</small></div><i>${uiIcon('chevron')}</i></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('check')}</span><p>今天还没有安排，给自己留一点从容。</p></div>`;
 
   const notes = wb.workspace.notes.slice(0, 3);
-  document.getElementById('latestNotes').innerHTML = notes.length ? notes.map((note) => `<button class="latest-note" data-edit-note="${wbEscape(note.id)}" type="button"><strong>${wbEscape(note.title)}</strong><p>${wbEscape(note.content.slice(0, 90) || '空白笔记')}</p><span>${formatUpdated(note.updatedAt)}</span></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('note')}</span><p>还没有笔记，先记下一条想法吧。</p></div>`;
+  document.getElementById('latestNotes').innerHTML = notes.length ? notes.map((note) => `<button class="latest-note" data-edit-note="${wbEscape(note.id)}" type="button"><strong>${wbEscape(note.title)}</strong><p>${wbEscape(notePlainText(note.content).slice(0, 90) || '空白笔记')}</p><span>${formatUpdated(note.updatedAt)}</span></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('note')}</span><p>还没有笔记，先记下一条想法吧。</p></div>`;
   document.getElementById('navScheduleCount').textContent = String(wb.workspace.schedules.filter((item) => Date.parse(item.startAt) >= Date.now() - 86_400_000).length);
   document.getElementById('navTodoCount').textContent = String(wb.workspace.todos.filter((item) => item.status === 'open').length);
   document.getElementById('navNoteCount').textContent = String(wb.workspace.notes.length);
+  document.getElementById('navJobCount').textContent = String(wb.workspace.jobApplications.filter((item) => item.status !== 'offer').length);
   document.getElementById('navAttendanceCount').textContent = String(new Set(wb.workspace.attendance.filter((item) => item.date >= localDateKey(startOfWeek(new Date()))).map((item) => item.date)).size);
+  renderHomeJobs();
   renderHomeCommandCards(today);
   renderHomeAttendance();
+}
+
+function jobMeterClass(value, maximum) {
+  if (!value || !maximum) return 'job-width-0';
+  const percentage = Math.max(5, Math.min(100, Math.round(value / maximum * 20) * 5));
+  return `job-width-${percentage}`;
+}
+
+function jobDateLabel(value, options = { month: 'numeric', day: 'numeric' }) {
+  if (!value || !Number.isFinite(Date.parse(value))) return '';
+  return new Intl.DateTimeFormat('zh-CN', options).format(new Date(value));
+}
+
+function renderHomeJobs() {
+  const container = document.getElementById('homeJobSummary');
+  if (!container) return;
+  const jobs = wb.workspace.jobApplications || [];
+  if (!jobs.length) {
+    container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="pending" type="button">添加第一个岗位</button></div>';
+    return;
+  }
+  const groups = [
+    ['pending', '待投递'],
+    ['submitted', '已投递'],
+    ['interview', '面试'],
+    ['offer', 'Offer']
+  ];
+  const counts = groups.map(([status]) => jobs.filter((item) => item.status === status).length);
+  const maximum = Math.max(1, ...counts);
+  container.innerHTML = groups.map(([status, label], index) => `<button class="home-job-row" data-go-page="jobs" data-job-home-filter="${status}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[index], maximum)}"></b></i><strong>${counts[index]}</strong></button>`).join('');
+}
+
+function renderJobs() {
+  const jobs = wb.workspace.jobApplications || [];
+  const query = document.getElementById('jobSearch').value.trim().toLowerCase();
+  const statusFilter = document.getElementById('jobStatusFilter').value;
+  const counts = Object.fromEntries(JOB_STATUSES.map((status) => [status, jobs.filter((item) => item.status === status).length]));
+  const maximum = Math.max(1, ...Object.values(counts));
+  document.getElementById('jobPipelineSummary').innerHTML = JOB_STATUSES.map((status, index) => `<div class="job-pipeline-row"><span><b>${String(index + 1).padStart(2, '0')}</b>${JOB_STATUS_LABELS[status]}</span><i><b class="${jobMeterClass(counts[status], maximum)}"></b></i><strong>${counts[status]}</strong></div>`).join('');
+  const active = jobs.filter((item) => item.status !== 'offer').length;
+  document.getElementById('jobActiveCount').textContent = String(active);
+  document.getElementById('jobInterviewCount').textContent = String(counts.interview);
+  document.getElementById('jobOfferCount').textContent = String(counts.offer);
+  const next = jobs.filter((item) => item.nextActionAt && item.status !== 'offer').sort((a, b) => Date.parse(a.nextActionAt) - Date.parse(b.nextActionAt))[0];
+  document.getElementById('jobNextAction').textContent = next ? jobDateLabel(next.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '未安排';
+  document.getElementById('jobNextActionMeta').textContent = next ? `${next.company} · ${next.role}` : '添加日期后在这里提醒';
+
+  const visible = jobs.filter((item) => {
+    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
+    const searchable = `${item.company} ${item.role} ${item.location || ''} ${item.contact || ''} ${item.notes || ''}`.toLowerCase();
+    return matchesStatus && searchable.includes(query);
+  });
+  const statuses = statusFilter === 'all' ? JOB_STATUSES : [statusFilter];
+  document.getElementById('jobBoard').innerHTML = statuses.map((status) => {
+    const stageJobs = visible.filter((item) => item.status === status).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
+    const cards = stageJobs.map((item) => {
+      const nextStatus = JOB_STATUSES[JOB_STATUSES.indexOf(item.status) + 1];
+      const details = [item.location, item.appliedAt ? `投递 ${jobDateLabel(item.appliedAt)}` : null].filter(Boolean).join(' · ');
+      const nextAction = item.nextActionAt ? `<span class="job-next-action ${Date.parse(item.nextActionAt) < Date.now() ? 'is-overdue' : ''}">下一步 ${jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>` : '';
+      const sourceButton = item.sourceUrl ? `<button class="job-source-button" data-open-job-source="${wbEscape(item.sourceUrl)}" type="button" aria-label="打开 ${wbEscape(item.company)} 的招聘链接">${uiIcon('external')}</button>` : '';
+      const advanceButton = nextStatus ? `<button class="button compact secondary job-advance-button" data-advance-job="${wbEscape(item.id)}" type="button">推进至${JOB_STATUS_LABELS[nextStatus]}</button>` : '<span class="job-offer-badge">已获 Offer</span>';
+      return `<article class="job-card"><div class="job-card-head"><div><strong>${wbEscape(item.company)}</strong><h3>${wbEscape(item.role)}</h3></div>${sourceButton}</div>${details ? `<p class="job-card-meta">${wbEscape(details)}</p>` : ''}${item.notes ? `<p class="job-card-notes">${wbEscape(item.notes)}</p>` : ''}${nextAction}<div class="job-card-actions"><button class="text-button" data-edit-job="${wbEscape(item.id)}" type="button">编辑</button>${advanceButton}</div></article>`;
+    }).join('');
+    return `<section class="job-stage-column stage-${status}"><header><div><span>${JOB_STATUS_LABELS[status]}</span><small>${counts[status]} 个岗位</small></div><b>${counts[status]}</b></header><div class="job-stage-cards">${cards || '<div class="job-stage-empty">这个阶段还没有岗位</div>'}</div><button class="job-stage-add" data-add-job="${status}" type="button">＋ 添加到${JOB_STATUS_LABELS[status]}</button></section>`;
+  }).join('');
+}
+
+function openJobEditor(job = null, initialStatus = 'pending') {
+  const dialog = document.getElementById('jobDialog');
+  document.getElementById('jobForm').reset();
+  document.getElementById('jobId').value = job?.id || '';
+  document.getElementById('jobDialogTitle').textContent = job ? '编辑求职岗位' : '添加求职岗位';
+  document.getElementById('jobCompany').value = job?.company || '';
+  document.getElementById('jobRole').value = job?.role || '';
+  document.getElementById('jobStatus').value = job?.status || (JOB_STATUSES.includes(initialStatus) ? initialStatus : 'pending');
+  document.getElementById('jobLocation').value = job?.location || '';
+  document.getElementById('jobAppliedAt').value = job?.appliedAt?.slice(0, 10) || '';
+  document.getElementById('jobNextActionAt').value = localDateTimeInputValue(job?.nextActionAt);
+  document.getElementById('jobSourceUrl').value = job?.sourceUrl || '';
+  document.getElementById('jobContact').value = job?.contact || '';
+  document.getElementById('jobNotes').value = job?.notes || '';
+  document.getElementById('jobError').textContent = '';
+  document.getElementById('deleteJobButton').hidden = !job;
+  dialog.dataset.revision = String(job?.revision ?? '');
+  openWorkbenchDialog(dialog);
+  requestAnimationFrame(() => document.getElementById('jobCompany').focus());
+}
+
+async function saveJobFromEditor() {
+  const error = document.getElementById('jobError');
+  const nextActionValue = document.getElementById('jobNextActionAt').value;
+  const payload = {
+    id: document.getElementById('jobId').value || undefined,
+    company: document.getElementById('jobCompany').value,
+    role: document.getElementById('jobRole').value,
+    status: document.getElementById('jobStatus').value,
+    location: document.getElementById('jobLocation').value,
+    appliedAt: document.getElementById('jobAppliedAt').value || null,
+    nextActionAt: nextActionValue ? new Date(nextActionValue).toISOString() : null,
+    sourceUrl: document.getElementById('jobSourceUrl').value,
+    contact: document.getElementById('jobContact').value,
+    notes: document.getElementById('jobNotes').value,
+    revision: document.getElementById('jobDialog').dataset.revision || undefined
+  };
+  try {
+    const saved = await workbenchApi.saveJobApplication(payload);
+    wb.workspace.jobApplications = [saved, ...wb.workspace.jobApplications.filter((item) => item.id !== saved.id)];
+    closeWorkbenchDialog(document.getElementById('jobDialog'));
+    renderHome();
+    if (wb.page === 'jobs') renderJobs();
+    showWorkbenchToast('求职记录已保存');
+  } catch (exception) {
+    error.textContent = exception.message || '求职记录保存失败。';
+  }
+}
+
+async function advanceJob(id) {
+  const job = wb.workspace.jobApplications.find((item) => item.id === id);
+  if (!job) return;
+  const nextStatus = JOB_STATUSES[JOB_STATUSES.indexOf(job.status) + 1];
+  if (!nextStatus) return;
+  try {
+    const saved = await workbenchApi.saveJobApplication({ ...job, status: nextStatus });
+    wb.workspace.jobApplications = wb.workspace.jobApplications.map((item) => item.id === saved.id ? saved : item);
+    renderHome();
+    renderJobs();
+    showWorkbenchToast(`已推进至${JOB_STATUS_LABELS[nextStatus]}`);
+  } catch (exception) {
+    showWorkbenchToast(exception.message || '阶段更新失败。', 'error');
+  }
+}
+
+function fitHomeDayCards() {
+  document.querySelectorAll('#homeDayOverview .day-card').forEach((card) => {
+    const body = card.querySelector(':scope > div');
+    const events = [...card.querySelectorAll('[data-day-event]')];
+    const more = card.querySelector('.day-more');
+    if (!body || !more) return;
+    events.forEach((event) => { event.hidden = false; });
+    more.hidden = true;
+    if (body.scrollHeight <= body.clientHeight) return;
+    more.hidden = false;
+    let hidden = 0;
+    for (let index = events.length - 1; index >= 0 && body.scrollHeight > body.clientHeight; index -= 1) {
+      events[index].hidden = true;
+      hidden += 1;
+    }
+    more.textContent = hidden ? `还有 ${hidden} 项` : '';
+    more.hidden = hidden === 0;
+  });
 }
 
 function linkedTodoForSchedule(schedule) {
@@ -226,12 +393,18 @@ function renderHomeAttendance() {
   if (!button || !wb.workspace) return;
   const todayKey = localDateKey(new Date());
   const openRecord = wb.workspace.attendance.find((item) => !item.clockOutAt && item.date === todayKey);
+  const todayRecords = wb.workspace.attendance.filter((item) => item.date === todayKey);
+  const elapsed = todayRecords.reduce((sum, item) => sum + attendanceElapsedMs(item), 0);
   button.textContent = openRecord ? '下班打卡' : '上班打卡';
   button.dataset.clockAction = openRecord ? 'out' : 'in';
   button.classList.toggle('is-clocked-in', Boolean(openRecord));
   button.setAttribute('aria-pressed', String(Boolean(openRecord)));
   button.title = openRecord ? '结束当前工作并下班打卡' : '开始工作并上班打卡';
   button.setAttribute('aria-label', openRecord ? '结束当前工作并下班打卡' : '开始工作并上班打卡');
+  const status = document.getElementById('homeAttendanceStatus');
+  const meta = document.getElementById('homeAttendanceMeta');
+  if (status) status.textContent = openRecord ? '正在工作' : elapsed ? '今日已记录' : '尚未打卡';
+  if (meta) meta.textContent = elapsed ? `${openRecord ? '已工作' : '累计工作'} ${formatDuration(elapsed)}` : '记录今天的工作时段';
 }
 
 function renderHomeProgress() {
@@ -285,10 +458,10 @@ function renderTimeline() {
   const selected = wb.selectedDate;
   renderTodaySchedule();
   const rangeStart = addDays(selected, -2);
-  const rangeEnd = addDays(selected, 4);
+  const rangeEnd = addDays(selected, 5);
   document.getElementById('timelineDate').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(rangeStart)} — ${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(rangeEnd)}`;
-  document.getElementById('timelineDateSubtitle').textContent = `${sameDay(selected, new Date()) ? '今天前两天至后四天' : '所选日期前两天至后四天'} · 点击日期查看并编辑安排`;
-  document.getElementById('scheduleBoard').innerHTML = Array.from({ length: 7 }, (_, index) => {
+  document.getElementById('timelineDateSubtitle').textContent = `${sameDay(selected, new Date()) ? '今天前两天至后五天' : '所选日期前两天至后五天'} · 点击日期查看并编辑安排`;
+  document.getElementById('scheduleBoard').innerHTML = Array.from({ length: 8 }, (_, index) => {
     const date = addDays(rangeStart, index);
     const dateKey = localDateKey(date);
     const events = schedulesForDay(date);
@@ -373,7 +546,10 @@ function renderAttendanceUsage() {
   document.getElementById('focusUsageTotal').textContent = `${wb.usageRange === 'week' ? '本周' : '今天'} ${formatDuration(total * 1000)}`;
   document.querySelectorAll('[data-usage-range]').forEach((button) => button.classList.toggle('active', button.dataset.usageRange === wb.usageRange));
   list.innerHTML = entries.length
-    ? entries.map(([name, seconds]) => `<div class="focus-usage-row"><div><strong>${wbEscape(name)}</strong><time>${formatDuration(seconds * 1000)}</time></div><span><i style="width:${Math.max(3, seconds / max * 100)}%"></i></span></div>`).join('')
+    ? entries.map(([name, seconds]) => {
+      const width = Math.max(5, Math.min(100, Math.round((seconds / max) * 20) * 5));
+      return `<div class="focus-usage-row"><div><strong>${wbEscape(name)}</strong><time>${formatDuration(seconds * 1000)}</time></div><span><i class="usage-width-${width}" aria-hidden="true"></i></span></div>`;
+    }).join('')
     : `<p class="focus-usage-empty">${wb.usageRange === 'week' ? '本周' : '今天'}还没有打卡期间的应用记录</p>`;
 }
 
@@ -502,7 +678,7 @@ function openScheduleEditor(schedule = null, sourceTodo = null, options = {}) {
   wb.pendingTodoId = null;
   document.getElementById('scheduleLinkedTodoPanel').hidden = !linkedTodo;
   document.getElementById('scheduleLinkedTodoTitle').textContent = linkedTodo?.title || '';
-  wb.scheduleRecognition = !schedule && !convertingTodo && draft?.recognition?.input === draft?.title ? draft.recognition : null;
+  wb.scheduleRecognition = !schedule && !convertingTodo && draft && draft.recognition?.input === draft.title ? draft.recognition : null;
   wb.scheduleRecognitionRequest += 1;
   document.getElementById('scheduleRecognition').hidden = true;
   document.getElementById('scheduleRecognition').textContent = '';
@@ -538,7 +714,7 @@ function captureScheduleDraft() {
 function closeScheduleEditorPreservingDraft() {
   const dialog = document.getElementById('scheduleDialog');
   if (!document.getElementById('scheduleId').value) {
-    localStorage.setItem(SCHEDULE_DRAFT_KEY, JSON.stringify(captureScheduleDraft()));
+    flushScheduleDraft();
     showWorkbenchToast('日程草稿已保留。');
   }
   closeWorkbenchDialog(dialog);
@@ -547,6 +723,7 @@ function closeScheduleEditorPreservingDraft() {
 }
 
 function cancelScheduleEditor() {
+  clearTimeout(wb.scheduleDraftTimer);
   if (!document.getElementById('scheduleId').value) localStorage.removeItem(SCHEDULE_DRAFT_KEY);
   closeWorkbenchDialog(document.getElementById('scheduleDialog'));
   wb.editingScheduleTodoId = null;
@@ -554,7 +731,18 @@ function cancelScheduleEditor() {
 }
 
 function clearScheduleDraft() {
+  clearTimeout(wb.scheduleDraftTimer);
+  wb.scheduleDraftTimer = null;
   localStorage.removeItem(SCHEDULE_DRAFT_KEY);
+}
+
+function flushScheduleDraft() {
+  clearTimeout(wb.scheduleDraftTimer);
+  wb.scheduleDraftTimer = null;
+  const dialog = document.getElementById('scheduleDialog');
+  if (dialog?.open && !document.getElementById('scheduleId').value) {
+    localStorage.setItem(SCHEDULE_DRAFT_KEY, JSON.stringify(captureScheduleDraft()));
+  }
 }
 
 function scheduleConflicts(candidate) {
@@ -760,12 +948,116 @@ function metadataValueText(note) {
   return Object.values(note.metadata || {}).filter((value) => value !== false && value !== '').join(' ');
 }
 
+const NOTE_ALLOWED_TAGS = new Set(['A', 'B', 'BR', 'DIV', 'EM', 'I', 'IMG', 'LI', 'OL', 'P', 'S', 'SPAN', 'STRONG', 'U', 'UL']);
+const NOTE_ATTACHMENT_ID_PATTERN = /^[A-Za-z0-9._:-]{1,200}$/;
+
+function noteContentLooksRich(value) {
+  return /<(?:a|b|br|div|em|i|img|li|ol|p|s|span|strong|u|ul)(?:\s|\/?>)/i.test(String(value || ''));
+}
+
+function noteSourceHtml(value) {
+  const source = String(value || '');
+  return noteContentLooksRich(source) ? source : wbEscape(source).replace(/\r\n?|\n/g, '<br>');
+}
+
+function sanitizeNoteHtml(value) {
+  const root = document.createElement('div');
+  root.innerHTML = noteSourceHtml(value);
+  const clean = (parent) => {
+    [...parent.childNodes].forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) return;
+      if (child.nodeType !== Node.ELEMENT_NODE) {
+        child.remove();
+        return;
+      }
+      const tag = child.tagName;
+      if (!NOTE_ALLOWED_TAGS.has(tag)) {
+        const fragment = document.createDocumentFragment();
+        while (child.firstChild) fragment.appendChild(child.firstChild);
+        child.replaceWith(fragment);
+        clean(parent);
+        return;
+      }
+      [...child.attributes].forEach((attribute) => {
+        const allowed = tag === 'IMG' && ['alt', 'data-note-attachment'].includes(attribute.name);
+        if (!allowed) child.removeAttribute(attribute.name);
+      });
+      if (tag === 'A') child.removeAttribute('href');
+      if (tag === 'IMG') {
+        const id = child.getAttribute('data-note-attachment') || '';
+        if (!NOTE_ATTACHMENT_ID_PATTERN.test(id)) {
+          child.remove();
+          return;
+        }
+        // The renderer hydrates local images from the attachment store. Never
+        // persist a data URL or an arbitrary source inside the note body.
+        child.removeAttribute('src');
+      }
+      clean(child);
+    });
+  };
+  clean(root);
+  return root.innerHTML;
+}
+
+function noteContentToEditorHtml(content, attachments = []) {
+  const root = document.createElement('div');
+  root.innerHTML = sanitizeNoteHtml(content);
+  const available = new Map((attachments || []).map((attachment) => [String(attachment.id), attachment]));
+  const referenced = new Set();
+  root.querySelectorAll('img[data-note-attachment]').forEach((image) => {
+    const id = image.dataset.noteAttachment;
+    if (!available.has(id)) {
+      image.remove();
+      return;
+    }
+    referenced.add(id);
+    image.classList.add('note-inline-image');
+    image.alt = image.alt || available.get(id).originalName || '笔记图片';
+    image.removeAttribute('src');
+  });
+  // Older 1.1.2 notes stored images in a separate attachment list. Bring
+  // those images into the text flow once, so reopening a note does not hide
+  // them in a second panel.
+  for (const [id, attachment] of available) {
+    if (referenced.has(id)) continue;
+    const paragraph = document.createElement('p');
+    const image = document.createElement('img');
+    image.className = 'note-inline-image';
+    image.dataset.noteAttachment = id;
+    image.alt = attachment.originalName || '笔记图片';
+    paragraph.appendChild(image);
+    root.appendChild(paragraph);
+  }
+  return root.innerHTML;
+}
+
+function notePlainText(value) {
+  const root = document.createElement('div');
+  root.innerHTML = sanitizeNoteHtml(value);
+  const blockTags = new Set(['DIV', 'LI', 'P']);
+  const read = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return node.nodeValue || '';
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    if (node.tagName === 'BR') return '\n';
+    if (node.tagName === 'IMG') return '[图片]';
+    const text = [...node.childNodes].map(read).join('');
+    return blockTags.has(node.tagName) ? `${text}\n` : text;
+  };
+  return read(root).replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function readNoteEditorContent() {
+  const editor = document.getElementById('noteContent');
+  return sanitizeNoteHtml(editor?.innerHTML || '').slice(0, 100_000);
+}
+
 function renderNotes() {
   const query = document.getElementById('noteSearch').value.trim().toLowerCase();
-  const notes = wb.workspace.notes.filter((note) => `${note.title} ${note.content} ${metadataValueText(note)}`.toLowerCase().includes(query));
+  const notes = wb.workspace.notes.filter((note) => `${note.title} ${notePlainText(note.content)} ${metadataValueText(note)}`.toLowerCase().includes(query));
   document.getElementById('notesGrid').innerHTML = notes.length ? notes.map((note) => {
     const metadata = wb.workspace.metadataFields.filter((field) => note.metadata?.[field.id] !== undefined && note.metadata[field.id] !== '' && note.metadata[field.id] !== false).slice(0, 3);
-    return `<article class="note-card" data-edit-note="${wbEscape(note.id)}"><header><span>${formatUpdated(note.updatedAt)}</span><button data-sticky-note="${wbEscape(note.id)}" type="button">置顶</button></header><h3>${wbEscape(note.title)}</h3><p>${wbEscape(note.content.slice(0, 220) || '空白笔记')}</p><footer>${metadata.map((field) => `<span>${wbEscape(field.name)} · ${wbEscape(note.metadata[field.id] === true ? '是' : note.metadata[field.id])}</span>`).join('')}</footer></article>`;
+    return `<article class="note-card" data-edit-note="${wbEscape(note.id)}"><header><span>${formatUpdated(note.updatedAt)}</span><button data-sticky-note="${wbEscape(note.id)}" type="button">置顶</button></header><h3>${wbEscape(note.title)}</h3><p>${wbEscape(notePlainText(note.content).slice(0, 220) || '空白笔记')}</p><footer>${metadata.map((field) => `<span>${wbEscape(field.name)} · ${wbEscape(note.metadata[field.id] === true ? '是' : note.metadata[field.id])}</span>`).join('')}</footer></article>`;
   }).join('') : '<div class="workbench-empty notes-empty"><span>✎</span><h3>还没有笔记</h3><p>新建一条笔记，或用全局快捷键随手记录。</p></div>';
 }
 
@@ -782,19 +1074,206 @@ function renderNoteMetadata(note) {
   document.getElementById('metadataSummary').textContent = fields.length ? `${fields.length} 个字段，已填写 ${populated} 个` : '尚未设置属性字段';
 }
 
+function readNoteDraft() {
+  try { return JSON.parse(localStorage.getItem('yanji.noteDraft.v1') || 'null'); } catch { return null; }
+}
+
+function noteEditorHasContent() {
+  const editor = document.getElementById('noteContent');
+  return Boolean(
+    document.getElementById('noteTitle').value.trim()
+    || editor?.textContent.trim()
+    || editor?.querySelector('img[data-note-attachment]')
+  );
+}
+
+function noteEditorPayload() {
+  return {
+    id: document.getElementById('noteId').value || undefined,
+    entryId: document.getElementById('noteEntryId').value || undefined,
+    kind: wb.editingNote?.kind || 'daily',
+    dateKey: wb.editingNote?.dateKey || localDateKey(new Date()),
+    title: document.getElementById('noteTitle').value,
+    content: readNoteEditorContent(),
+    metadata: readNoteMetadata(),
+    attachments: wb.editingNote?.attachments || [],
+    revision: wb.editingNote?.revision
+  };
+}
+
+function persistNoteDraftLocally() {
+  if (document.getElementById('noteId').value || !noteEditorHasContent()) return;
+  const payload = noteEditorPayload();
+  localStorage.setItem('yanji.noteDraft.v1', JSON.stringify({
+    title: payload.title,
+    content: payload.content,
+    metadata: payload.metadata,
+    attachments: []
+  }));
+}
+
+function clearNoteDraftLocally() {
+  localStorage.removeItem('yanji.noteDraft.v1');
+}
+
+async function hydrateInlineNoteImages(note = wb.editingNote) {
+  const editor = document.getElementById('noteContent');
+  if (!editor || !note?.id) return;
+  const attachments = new Map((note.attachments || []).map((attachment) => [String(attachment.id), attachment]));
+  const images = [...editor.querySelectorAll('img[data-note-attachment]')];
+  await Promise.all(images.map(async (image) => {
+    const attachment = attachments.get(image.dataset.noteAttachment);
+    if (!attachment) {
+      image.remove();
+      return;
+    }
+    try {
+      const result = await workbenchApi.getNoteAttachment(note.id, attachment.id);
+      if (!image.isConnected || document.getElementById('noteContent') !== editor || !result?.dataUrl) return;
+      image.src = result.dataUrl;
+      image.alt = image.alt || attachment.originalName || '笔记图片';
+      image.classList.remove('is-missing');
+    } catch {
+      if (!image.isConnected) return;
+      image.alt = `${attachment.originalName || '笔记图片'}（图片不可用）`;
+      image.classList.add('is-missing');
+    }
+  }));
+}
+
+function rememberNoteEditorSelection() {
+  const editor = document.getElementById('noteContent');
+  const selection = window.getSelection();
+  if (!editor || !selection?.rangeCount) return;
+  const range = selection.getRangeAt(0);
+  if (editor.contains(range.commonAncestorContainer)) wb.noteSelection = range.cloneRange();
+}
+
+function restoreNoteEditorSelection() {
+  const editor = document.getElementById('noteContent');
+  if (!editor) return null;
+  const selection = window.getSelection();
+  if (wb.noteSelection && editor.contains(wb.noteSelection.commonAncestorContainer)) {
+    selection.removeAllRanges();
+    selection.addRange(wb.noteSelection);
+    return wb.noteSelection;
+  }
+  const range = document.createRange();
+  range.selectNodeContents(editor);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  return range;
+}
+
+function insertInlineNoteAttachment(attachment, dataUrl) {
+  const editor = document.getElementById('noteContent');
+  if (!editor || !attachment?.id) return;
+  editor.focus();
+  const range = restoreNoteEditorSelection();
+  if (!range) return;
+  range.deleteContents();
+  const image = document.createElement('img');
+  image.className = 'note-inline-image';
+  image.dataset.noteAttachment = attachment.id;
+  image.alt = attachment.originalName || '笔记图片';
+  if (dataUrl) image.src = dataUrl;
+  range.insertNode(image);
+  let caretNode = image;
+  if (!image.nextSibling) {
+    const lineBreak = document.createElement('br');
+    image.parentNode.insertBefore(lineBreak, image.nextSibling);
+    caretNode = lineBreak;
+  }
+  const caret = document.createRange();
+  caret.setStartAfter(caretNode);
+  caret.collapse(true);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(caret);
+  wb.noteSelection = caret.cloneRange();
+  queueNoteAutoSave();
+}
+
+function openNoteImagePreview(src, alt = '图片预览') {
+  const dialog = document.getElementById('noteImagePreviewDialog');
+  const image = document.getElementById('noteImagePreview');
+  if (!dialog || !image || !src) return;
+  image.src = src;
+  image.alt = alt;
+  document.getElementById('noteImagePreviewTitle').textContent = alt || '图片预览';
+  document.getElementById('removeNoteImageButton').hidden = !wb.previewingNoteImage?.attachmentId;
+  openWorkbenchDialog(dialog);
+}
+
+function queueNoteAutoSave() {
+  wb.noteDirty = true;
+  wb.noteEditGeneration += 1;
+  persistNoteDraftLocally();
+  document.getElementById('noteSaveHint').textContent = '正在保存…';
+  clearTimeout(wb.noteSaveTimer);
+  wb.noteSaveTimer = setTimeout(() => flushNoteEditor({ silent: true }).catch(() => {}), 350);
+}
+
+async function flushNoteEditor({ silent = false } = {}) {
+  const dialog = document.getElementById('noteDialog');
+  if (!dialog?.open || !wb.noteDirty || !noteEditorHasContent()) return wb.editingNote;
+  if (wb.noteSavePromise) return wb.noteSavePromise;
+  const generation = wb.noteEditGeneration;
+  const payload = noteEditorPayload();
+  wb.noteSavePromise = (async () => {
+    try {
+      const note = await workbenchApi.saveNote(payload);
+      wb.editingNote = note;
+      document.getElementById('noteId').value = note.id;
+      document.getElementById('noteEntryId').value = note.kind === 'daily' ? (note.entries?.at(-1)?.id || '') : '';
+      document.getElementById('deleteNoteButton').hidden = false;
+      document.getElementById('openStickyFromEditorButton').hidden = false;
+      document.getElementById('addNoteImageButton').disabled = false;
+      if (generation === wb.noteEditGeneration) {
+        wb.noteDirty = false;
+        clearNoteDraftLocally();
+        document.getElementById('noteSaveHint').textContent = '已自动保存';
+      }
+      return note;
+    } catch (error) {
+      document.getElementById('noteError').textContent = error.message || '笔记保存失败，草稿仍保留。';
+      document.getElementById('noteSaveHint').textContent = '保存失败，草稿仍保留';
+      if (!silent) throw error;
+      return null;
+    } finally {
+      wb.noteSavePromise = null;
+    }
+  })();
+  return wb.noteSavePromise;
+}
+
 function openNoteEditor(note = null) {
+  const draft = note ? null : readNoteDraft();
   wb.editingNote = note;
+  wb.noteSelection = null;
+  wb.previewingNoteImage = null;
+  const latestEntry = note?.kind === 'daily' ? note.entries?.at(-1) : null;
   document.getElementById('noteId').value = note?.id || '';
-  document.getElementById('noteTitle').value = note?.title || '';
-  document.getElementById('noteContent').value = note?.content || '';
-  document.getElementById('noteDialogTitle').textContent = note ? '编辑笔记' : '新建笔记';
+  document.getElementById('noteEntryId').value = latestEntry?.id || '';
+  document.getElementById('noteTitle').value = note?.title || draft?.title || '';
+  document.getElementById('noteContent').innerHTML = noteContentToEditorHtml(latestEntry?.content ?? note?.content ?? draft?.content ?? '', note?.attachments || []);
+  document.getElementById('noteTitle').readOnly = note?.kind === 'daily';
+  document.getElementById('noteDialogTitle').textContent = note ? '编辑笔记' : '新建今日日记';
   document.getElementById('deleteNoteButton').hidden = !note;
   document.getElementById('openStickyFromEditorButton').hidden = !note;
+  document.getElementById('addNoteImageButton').disabled = false;
   document.getElementById('noteMetadataPanel').hidden = true;
   document.getElementById('noteError').textContent = '';
-  renderNoteMetadata(note || { metadata: {} });
+  document.getElementById('noteSaveHint').textContent = note ? '已保存' : '输入后自动保存';
+  renderNoteMetadata(note || { metadata: draft?.metadata || {} });
+  wb.noteDirty = false;
+  clearTimeout(wb.noteSaveTimer);
   openWorkbenchDialog(document.getElementById('noteDialog'));
-  setTimeout(() => (note ? document.getElementById('noteContent') : document.getElementById('noteTitle')).focus(), 20);
+  setTimeout(() => {
+    (note ? document.getElementById('noteContent') : document.getElementById('noteTitle')).focus();
+    hydrateInlineNoteImages(note).catch(() => {});
+  }, 20);
 }
 
 function readNoteMetadata() {
@@ -807,18 +1286,23 @@ function readNoteMetadata() {
 
 async function saveNoteFromEditor() {
   try {
-    const note = await workbenchApi.saveNote({
-      id: document.getElementById('noteId').value || undefined,
-      title: document.getElementById('noteTitle').value,
-      content: document.getElementById('noteContent').value,
-      metadata: readNoteMetadata()
-    });
+    wb.noteDirty = true;
+    wb.noteEditGeneration += 1;
+    const note = await flushNoteEditor();
     wb.editingNote = note;
+    const deleted = note?.id ? await workbenchApi.deleteNoteIfEmpty(note.id) : false;
     closeWorkbenchDialog(document.getElementById('noteDialog'));
-    showWorkbenchToast('笔记已保存。');
+    showWorkbenchToast(deleted ? '空白笔记已自动删除' : '笔记已保存。');
   } catch (exception) {
     document.getElementById('noteError').textContent = exception.message || '笔记保存失败。';
   }
+}
+
+async function closeNoteEditorAfterAutoSave(dialog) {
+  const note = await flushNoteEditor({ silent: true });
+  const id = note?.id || document.getElementById('noteId').value;
+  if (id) await workbenchApi.deleteNoteIfEmpty(id);
+  if (dialog.open) closeWorkbenchDialog(dialog);
 }
 
 function renderMetadataManager() {
@@ -875,12 +1359,14 @@ async function refreshWorkspace(workspace = null) {
   wb.workspace.todos ||= [];
   wb.workspace.attendance ||= [];
   wb.workspace.focusSessions ||= [];
+  wb.workspace.jobApplications ||= [];
   renderHome();
   window.YanjiTodoView?.setWorkspace(wb.workspace);
   if (wb.page === 'schedule') renderTimeline();
   if (wb.page === 'todos') window.YanjiTodoView?.render();
   if (wb.page === 'attendance') renderAttendance();
   if (wb.page === 'notes') renderNotes();
+  if (wb.page === 'jobs') renderJobs();
 }
 
 function bindWorkbenchEvents() {
@@ -889,6 +1375,28 @@ function bindWorkbenchEvents() {
   document.getElementById('quickScheduleButton').addEventListener('click', () => openScheduleEditor());
   document.getElementById('quickNoteButton').addEventListener('click', () => openNoteEditor());
   document.getElementById('addScheduleButton').addEventListener('click', () => openScheduleEditor());
+  document.getElementById('addJobButton').addEventListener('click', () => openJobEditor());
+  document.getElementById('saveJobButton').addEventListener('click', saveJobFromEditor);
+  document.getElementById('cancelJobButton').addEventListener('click', () => closeWorkbenchDialog(document.getElementById('jobDialog')));
+  document.getElementById('jobSearch').addEventListener('input', renderJobs);
+  document.getElementById('jobStatusFilter').addEventListener('change', renderJobs);
+  document.getElementById('deleteJobButton').addEventListener('click', async () => {
+    const id = document.getElementById('jobId').value;
+    const accepted = id && await window.yanjiConfirm({ title: '删除求职记录', message: '这条岗位记录将被永久删除，此操作无法撤销', confirmText: '删除记录', tone: 'danger' });
+    if (!accepted) return;
+    try {
+      await workbenchApi.deleteJobApplication(id);
+      wb.workspace.jobApplications = wb.workspace.jobApplications.filter((item) => item.id !== id);
+      closeWorkbenchDialog(document.getElementById('jobDialog'));
+      renderHome();
+      renderJobs();
+      showWorkbenchToast('求职记录已删除');
+    } catch (exception) {
+      document.getElementById('jobError').textContent = exception.message || '删除失败。';
+    }
+  });
+  document.getElementById('jobDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget); });
+  document.getElementById('jobDialog').addEventListener('cancel', (event) => { event.preventDefault(); closeWorkbenchDialog(event.currentTarget); });
   window.YanjiTodoView?.init();
   document.getElementById('scheduleTodayButton').addEventListener('click', () => { wb.selectedDate = new Date(); renderTimeline(); });
   document.getElementById('previousDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, -1); renderTimeline(); });
@@ -918,10 +1426,8 @@ function bindWorkbenchEvents() {
   });
   document.getElementById('saveScheduleConvertButton').addEventListener('click', saveScheduleConversion);
   document.getElementById('cancelScheduleConvertButton').addEventListener('click', closeScheduleConvertDialog);
-  document.getElementById('closeScheduleConvertButton').addEventListener('click', closeScheduleConvertDialog);
   document.getElementById('scheduleConvertDialog').addEventListener('cancel', (event) => { event.preventDefault(); closeScheduleConvertDialog(); });
   document.getElementById('scheduleConvertDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeScheduleConvertDialog(); });
-  document.getElementById('closeScheduleButton').addEventListener('click', closeScheduleEditorPreservingDraft);
   document.getElementById('cancelScheduleButton').addEventListener('click', cancelScheduleEditor);
   document.getElementById('scheduleDialog').addEventListener('click', (event) => {
     if (event.target === event.currentTarget) closeScheduleEditorPreservingDraft();
@@ -1046,7 +1552,102 @@ function bindWorkbenchEvents() {
     const panel = document.getElementById('noteMetadataPanel');
     panel.hidden = !panel.hidden;
   });
-  document.getElementById('openStickyFromEditorButton').addEventListener('click', () => workbenchApi.openStickyNote(document.getElementById('noteId').value));
+  document.getElementById('noteTitle').addEventListener('input', queueNoteAutoSave);
+  const noteEditor = document.getElementById('noteContent');
+  noteEditor.addEventListener('input', queueNoteAutoSave);
+  noteEditor.addEventListener('mouseup', rememberNoteEditorSelection);
+  noteEditor.addEventListener('keyup', rememberNoteEditorSelection);
+  noteEditor.addEventListener('keydown', (event) => {
+    if (event.isComposing || event.keyCode === 229) return;
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      wb.noteDirty = true;
+      wb.noteEditGeneration += 1;
+      flushNoteEditor().catch(() => {});
+    }
+  });
+  noteEditor.addEventListener('click', async (event) => {
+    const image = event.target.closest('img[data-note-attachment]');
+    if (!image) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const attachmentId = image.dataset.noteAttachment;
+    const attachment = (wb.editingNote?.attachments || []).find((item) => String(item.id) === String(attachmentId));
+    let src = image.currentSrc || image.src;
+    if (!src && attachment && wb.editingNote?.id) {
+      try { src = (await workbenchApi.getNoteAttachment(wb.editingNote.id, attachment.id))?.dataUrl; } catch { /* show no preview when the file is unavailable */ }
+    }
+    if (!src) return;
+    wb.previewingNoteImage = { attachmentId, noteId: wb.editingNote?.id || '', alt: image.alt || attachment?.originalName || '笔记图片' };
+    openNoteImagePreview(src, wb.previewingNoteImage.alt);
+  });
+  document.getElementById('noteDialog').addEventListener('input', (event) => {
+    if (event.target.matches('[data-metadata-value]')) queueNoteAutoSave();
+  });
+  document.getElementById('noteDialog').addEventListener('change', (event) => {
+    if (event.target.matches('[data-metadata-value]')) queueNoteAutoSave();
+  });
+  document.getElementById('addNoteImageButton').addEventListener('click', async () => {
+    try {
+      rememberNoteEditorSelection();
+      if (!document.getElementById('noteId').value && noteEditorHasContent()) {
+        wb.noteDirty = true;
+        wb.noteEditGeneration += 1;
+        await flushNoteEditor();
+      }
+      if (!document.getElementById('noteId').value) {
+        const note = await workbenchApi.saveNote(noteEditorPayload());
+        wb.editingNote = note;
+        document.getElementById('noteId').value = note.id;
+        document.getElementById('noteEntryId').value = note.kind === 'daily' ? (note.entries?.at(-1)?.id || '') : '';
+        document.getElementById('deleteNoteButton').hidden = false;
+        document.getElementById('openStickyFromEditorButton').hidden = false;
+      }
+      const id = document.getElementById('noteId').value;
+      const attachment = await workbenchApi.addNoteAttachment(id);
+      if (!attachment) return;
+      wb.editingNote = { ...(wb.editingNote || {}), attachments: [...(wb.editingNote?.attachments || []), attachment], revision: Number(wb.editingNote?.revision || 0) + 1 };
+      const image = await workbenchApi.getNoteAttachment(id, attachment.id);
+      insertInlineNoteAttachment(attachment, image?.dataUrl);
+      document.getElementById('noteSaveHint').textContent = '图片已插入，正在保存…';
+    } catch (error) {
+      document.getElementById('noteError').textContent = error.message || '图片添加失败';
+    }
+  });
+  document.getElementById('removeNoteImageButton').addEventListener('click', async () => {
+    const preview = wb.previewingNoteImage;
+    const noteId = document.getElementById('noteId').value;
+    if (!preview?.attachmentId || !noteId) return;
+    try {
+      await workbenchApi.deleteNoteAttachment(noteId, preview.attachmentId);
+      const image = [...noteEditor.querySelectorAll('img[data-note-attachment]')].find((item) => item.dataset.noteAttachment === preview.attachmentId);
+      image?.remove();
+      wb.editingNote = { ...wb.editingNote, attachments: (wb.editingNote?.attachments || []).filter((item) => String(item.id) !== String(preview.attachmentId)), revision: Number(wb.editingNote?.revision || 0) + 1 };
+      wb.previewingNoteImage = null;
+      queueNoteAutoSave();
+      closeWorkbenchDialog(document.getElementById('noteImagePreviewDialog'));
+      document.getElementById('noteSaveHint').textContent = '图片已删除，正在保存…';
+    } catch (error) {
+      document.getElementById('noteError').textContent = error.message || '图片删除失败';
+    }
+  });
+  document.getElementById('openStickyFromEditorButton').addEventListener('click', async () => {
+    try {
+      wb.noteDirty = true;
+      wb.noteEditGeneration += 1;
+      await flushNoteEditor();
+      await workbenchApi.openStickyNote(document.getElementById('noteId').value);
+    } catch (error) {
+      document.getElementById('noteError').textContent = error.message || '无法打开悬浮便笺';
+    }
+  });
+  document.getElementById('cancelNoteButton').addEventListener('click', async () => {
+    clearNoteDraftLocally();
+    wb.noteDirty = false;
+    const id = document.getElementById('noteId').value;
+    if (id) await workbenchApi.deleteNoteIfEmpty(id).catch(() => false);
+    closeWorkbenchDialog(document.getElementById('noteDialog'));
+  });
   document.getElementById('manageMetadataButton').addEventListener('click', openMetadataManager);
   document.getElementById('openMetadataManagerButton').addEventListener('click', openMetadataManager);
   document.getElementById('addMetadataFieldButton').addEventListener('click', () => {
@@ -1090,11 +1691,65 @@ function bindWorkbenchEvents() {
     clearTimeout(scheduleRecognitionTimer);
     scheduleRecognitionTimer = setTimeout(recognizeScheduleEditorInput, 260);
   });
+  document.querySelectorAll('#scheduleDialog input, #scheduleDialog select').forEach((input) => input.addEventListener('input', () => {
+    clearTimeout(wb.scheduleDraftTimer);
+    wb.scheduleDraftTimer = setTimeout(() => {
+      if (document.getElementById('scheduleDialog').open && !document.getElementById('scheduleId').value) localStorage.setItem(SCHEDULE_DRAFT_KEY, JSON.stringify(captureScheduleDraft()));
+    }, 350);
+  }));
   document.getElementById('noteDialog').addEventListener('click', (event) => {
+    if (event.target === event.currentTarget) {
+      const dialog = event.currentTarget;
+      closeNoteEditorAfterAutoSave(dialog).catch((error) => {
+        document.getElementById('noteError').textContent = error.message || '笔记保存失败，窗口仍保持打开。';
+      });
+    }
+  });
+  document.getElementById('noteDialog').addEventListener('cancel', (event) => {
+    event.preventDefault();
+    const dialog = event.currentTarget;
+    closeNoteEditorAfterAutoSave(dialog).catch((error) => {
+      document.getElementById('noteError').textContent = error.message || '笔记保存失败，窗口仍保持打开。';
+    });
+  });
+  document.getElementById('noteImagePreviewDialog').addEventListener('click', (event) => {
     if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget);
   });
-  document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => closeWorkbenchDialog(document.getElementById(button.dataset.closeDialog))));
+  document.getElementById('noteImagePreviewDialog').addEventListener('close', () => {
+    wb.previewingNoteImage = null;
+    document.getElementById('noteImagePreview').removeAttribute('src');
+  });
+  document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => {
+    if (button.dataset.closeDialog === 'noteDialog') return;
+    closeWorkbenchDialog(document.getElementById(button.dataset.closeDialog));
+  }));
+  window.addEventListener('blur', () => {
+    if (document.getElementById('noteDialog')?.open) flushNoteEditor({ silent: true }).catch(() => {});
+    if (document.getElementById('scheduleDialog')?.open) flushScheduleDraft();
+    window.YanjiTodoView?.flushDraft?.();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') {
+      if (document.getElementById('noteDialog')?.open) flushNoteEditor({ silent: true }).catch(() => {});
+      if (document.getElementById('scheduleDialog')?.open) flushScheduleDraft();
+      window.YanjiTodoView?.flushDraft?.();
+    }
+  });
   document.body.addEventListener('click', async (event) => {
+    const homeJobFilter = event.target.closest('[data-job-home-filter]');
+    if (homeJobFilter) {
+      switchWorkbenchPage('jobs');
+      document.getElementById('jobStatusFilter').value = homeJobFilter.dataset.jobHomeFilter;
+      return renderJobs();
+    }
+    const addJobTarget = event.target.closest('[data-add-job]');
+    if (addJobTarget) return openJobEditor(null, addJobTarget.dataset.addJob);
+    const editJobTarget = event.target.closest('[data-edit-job]');
+    if (editJobTarget) return openJobEditor(wb.workspace.jobApplications.find((item) => item.id === editJobTarget.dataset.editJob));
+    const advanceJobTarget = event.target.closest('[data-advance-job]');
+    if (advanceJobTarget) return advanceJob(advanceJobTarget.dataset.advanceJob);
+    const sourceJobTarget = event.target.closest('[data-open-job-source]');
+    if (sourceJobTarget) return workbenchApi.openExternal(sourceJobTarget.dataset.openJobSource);
     const selectedDateTarget = event.target.closest('[data-select-schedule-date]');
     if (selectedDateTarget) {
       wb.selectedDate = dateFromKey(selectedDateTarget.dataset.selectScheduleDate);
@@ -1141,7 +1796,14 @@ async function initializeWorkbench() {
   await refreshWorkspace();
   workbenchApi.onWorkspaceChanged(refreshWorkspace);
   workbenchApi.onSettingsChanged((settings) => { wb.settings = settings || wb.settings; });
-  workbenchApi.onWorkspaceNavigate(switchWorkbenchPage);
+  workbenchApi.onWorkspaceNavigate((target) => {
+    const page = typeof target === 'string' ? target : target?.page;
+    if (!page) return;
+    switchWorkbenchPage(page);
+    if (page === 'todos' && target?.todoId) {
+      setTimeout(() => window.YanjiTodoView?.openEditDialog(wb.workspace.todos.find((todo) => todo.id === target.todoId)), 0);
+    }
+  });
   workbenchApi.onFocusChanged((sessions) => {
     wb.workspace.focusSessions = sessions || [];
     renderFocus();

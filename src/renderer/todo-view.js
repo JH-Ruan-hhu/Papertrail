@@ -3,7 +3,7 @@
 (function installTodoView() {
   const api = window.paperTrail;
   const DRAFT_KEY = 'yanji.todoDraft.v1';
-  const state = { workspace: { todos: [], schedules: [] }, view: 'today', query: '', parseRequest: 0, bound: false };
+  const state = { workspace: { todos: [], schedules: [] }, view: 'today', query: '', parseRequest: 0, bound: false, draftTimer: null };
 
   function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]); }
   function localKey(date) { const d = date instanceof Date ? date : new Date(date); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
@@ -78,7 +78,19 @@
     list.innerHTML = todos.length ? [...groups.entries()].map(([label, items]) => `<section class="todo-group"><div class="todo-group-heading"><strong>${label}</strong><span>${items.length} 项</span></div>${items.map(card).join('')}</section>`).join('') : '<div class="todo-empty"><strong>这一组还没有待办</strong><span>按 Ctrl + J 快速记录，或点击右上角新建待办</span></div>';
   }
   function readDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; } }
-  function writeDraft() { const id = document.getElementById('todoId').value; if (id) return; localStorage.setItem(DRAFT_KEY, JSON.stringify({ title: document.getElementById('todoTitle').value, notes: document.getElementById('todoNotes').value, dueAt: document.getElementById('todoDueAt').value, reminderAt: document.getElementById('todoReminderAt').value, reminderMode: document.getElementById('todoReminderMode').value, priority: document.querySelector('input[name="todoPriority"]:checked')?.value || 'medium' })); }
+  function writeDraft() {
+    if (!document.getElementById('todoDialog')?.open) return;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({
+      id: document.getElementById('todoId').value || '',
+      title: document.getElementById('todoTitle').value,
+      notes: document.getElementById('todoNotes').value,
+      dueAt: document.getElementById('todoDueAt').value,
+      reminderAt: document.getElementById('todoReminderAt').value,
+      reminderMode: document.getElementById('todoReminderMode').value,
+      priority: document.querySelector('input[name="todoPriority"]:checked')?.value || 'medium'
+    }));
+  }
+  function queueDraft() { clearTimeout(state.draftTimer); state.draftTimer = setTimeout(writeDraft, 350); }
   function clearDraft() { localStorage.removeItem(DRAFT_KEY); }
   function setDateInput(value) {
     if (!value) { document.getElementById('todoDueAt').value = ''; return; }
@@ -96,8 +108,9 @@
     document.getElementById('todoReminderAtField').hidden = document.getElementById('todoReminderMode').value !== 'custom';
   }
   function openEditor(todo = null) {
-    const draft = todo ? null : readDraft();
-    const source = todo || draft || {};
+    const storedDraft = readDraft();
+    const draft = todo ? (storedDraft?.id === todo.id ? storedDraft : null) : storedDraft;
+    const source = draft || todo || {};
     document.getElementById('todoId').value = todo?.id || '';
     document.getElementById('todoTitle').value = source.title || '';
     document.getElementById('todoNotes').value = source.notes || '';
@@ -180,17 +193,30 @@
     document.getElementById('saveTodoButton').addEventListener('click', save);
     document.getElementById('todoForm').addEventListener('submit', (event) => { event.preventDefault(); save(); });
     document.getElementById('cancelTodoButton').addEventListener('click', () => { clearDraft(); document.getElementById('todoDialog').close(); api.setModalWindowState(false).catch(() => {}); });
-    document.getElementById('closeTodoButton').addEventListener('click', () => { writeDraft(); document.getElementById('todoDialog').close(); api.setModalWindowState(false).catch(() => {}); });
     document.getElementById('deleteTodoButton').addEventListener('click', () => action(document.getElementById('todoId').value, 'delete').then(() => { if (document.getElementById('todoDialog').open) document.getElementById('todoDialog').close(); }));
     document.getElementById('todoDialog').addEventListener('cancel', (event) => { event.preventDefault(); writeDraft(); event.currentTarget.close(); api.setModalWindowState(false).catch(() => {}); });
+    document.getElementById('todoDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) { writeDraft(); event.currentTarget.close(); api.setModalWindowState(false).catch(() => {}); } });
     let timer;
-    document.getElementById('todoTitle').addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(parseTitle, 180); });
+    document.getElementById('todoTitle').addEventListener('input', () => { queueDraft(); clearTimeout(timer); timer = setTimeout(parseTitle, 180); });
+    document.querySelectorAll('#todoDialog input, #todoDialog textarea, #todoDialog select').forEach((input) => input.addEventListener('change', queueDraft));
+    document.querySelectorAll('#todoTitle, #todoNotes').forEach((input) => input.addEventListener('keydown', (event) => {
+      if (event.isComposing || event.keyCode === 229) return;
+      if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        save();
+        return;
+      }
+      if (input === document.getElementById('todoNotes') && window.YanjiListEditing?.applyListEditing(input, event)) {
+        event.preventDefault();
+      }
+    }));
     document.getElementById('todoReminderMode').addEventListener('change', syncReminderInput);
     document.addEventListener('keydown', (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f' && !event.target.matches('input,textarea')) { event.preventDefault(); document.getElementById('todoSearch').focus(); } });
   }
   window.YanjiTodoView = {
     init() { bind(); render(); },
     setWorkspace(workspace) { state.workspace = workspace || state.workspace; render(); },
+    flushDraft() { if (document.getElementById('todoDialog')?.open) writeDraft(); },
     render,
     openCreateDialog: () => openEditor(),
     openEditDialog: openEditor

@@ -164,6 +164,34 @@ let smokeWorkspace = {
       updatedAt: new Date(now - 86_400_000).toISOString()
     }
   ],
+  todos: [
+    {
+      id: 'todo-today',
+      title: '核对质控回收率',
+      notes: '整理今天的实验记录',
+      dueAt: todayAt(14, 30),
+      reminderAt: todayAt(14, 30),
+      reminderMode: 'at-due',
+      priority: 'high',
+      status: 'open',
+      completedAt: null,
+      createdAt: todayAt(8, 0),
+      updatedAt: todayAt(8, 0)
+    },
+    {
+      id: 'todo-inbox',
+      title: '补充方法学说明',
+      notes: '',
+      dueAt: null,
+      reminderAt: null,
+      reminderMode: 'none',
+      priority: 'medium',
+      status: 'open',
+      completedAt: null,
+      createdAt: todayAt(8, 10),
+      updatedAt: todayAt(8, 10)
+    }
+  ],
   notes: [
     { id: 'note-1', title: 'PFAS 方法学想法', content: '下一轮实验需要同步核对回收率与基质效应。', metadata: { topic: '实验' }, pinned: false, createdAt: new Date(now - 7200_000).toISOString(), updatedAt: new Date(now - 3600_000).toISOString() }
   ],
@@ -174,6 +202,14 @@ let smokeWorkspace = {
   ],
   focusSessions: [
     { id: 'focus-today', startedAt: todayAt(10, 0), endedAt: todayAt(10, 50), plannedMinutes: 50, status: 'completed', appUsage: { WINWORD: 1260, chrome: 980, Zotero: 510 }, suppressNotifications: true, notificationsSuppressed: true, notificationRestore: null, notificationRestoredAt: todayAt(10, 50), notificationError: null, createdAt: todayAt(10, 0), updatedAt: todayAt(10, 50) }
+  ],
+  jobApplications: [
+    { id: 'job-pending-1', company: '江河环境研究院', role: '水环境研发工程师', status: 'pending', location: '南京', sourceUrl: 'https://jobs.example.com/1', contact: '官网', appliedAt: null, nextActionAt: todayAt(19, 0), notes: '补充项目经历后投递', createdAt: todayAt(8, 0), updatedAt: todayAt(8, 0), revision: 1 },
+    { id: 'job-pending-2', company: '蓝源科技', role: '环境咨询顾问', status: 'pending', location: '上海', sourceUrl: null, contact: null, appliedAt: null, nextActionAt: null, notes: null, createdAt: todayAt(8, 5), updatedAt: todayAt(8, 5), revision: 1 },
+    { id: 'job-pending-3', company: '城市水务集团', role: '研发专员', status: 'pending', location: '苏州', sourceUrl: null, contact: null, appliedAt: null, nextActionAt: null, notes: null, createdAt: todayAt(8, 10), updatedAt: todayAt(8, 10), revision: 1 },
+    { id: 'job-submitted-1', company: '清研检测', role: 'LC-MS/MS 分析工程师', status: 'submitted', location: '杭州', sourceUrl: null, contact: '招聘平台', appliedAt: todayAt(9, 0), nextActionAt: null, notes: '等待筛选反馈', createdAt: todayAt(8, 15), updatedAt: todayAt(9, 0), revision: 1 },
+    { id: 'job-interview-1', company: '生态规划院', role: '环境科研岗', status: 'interview', location: '南京', sourceUrl: null, contact: 'HR', appliedAt: todayAt(9, 10), nextActionAt: todayAt(16, 0), notes: '准备科研项目陈述', createdAt: todayAt(8, 20), updatedAt: todayAt(9, 10), revision: 1 },
+    { id: 'job-offer-1', company: '水安全中心', role: '技术研究员', status: 'offer', location: '无锡', sourceUrl: null, contact: '邮件', appliedAt: todayAt(9, 20), nextActionAt: null, notes: '评估入职时间', createdAt: todayAt(8, 25), updatedAt: todayAt(9, 20), revision: 1 }
   ]
 };
 let smokeUpdateState = {
@@ -215,12 +251,48 @@ contextBridge.exposeInMainWorld('paperTrail', {
   closeScheduleWidget: async () => { document.body.dataset.closeRequested = 'true'; return true; },
   openScheduleWidgetMain: async () => { document.body.dataset.openMainRequested = 'true'; return true; },
   saveNote: async (input) => input,
+  saveTodo: async (input) => {
+    const todo = { ...input, id: input?.id || 'todo-new', status: input?.status || 'open', updatedAt: new Date().toISOString() };
+    smokeWorkspace.todos = [todo, ...(smokeWorkspace.todos || []).filter((item) => item.id !== todo.id)];
+    return todo;
+  },
+  parseTodo: async (input) => ({ valid: true, title: String(input || '').replace(/明天.*?点半?/u, '').trim(), dueAt: null, reminderMode: 'none', priority: 'medium' }),
+  deleteTodo: async (id) => { smokeWorkspace.todos = smokeWorkspace.todos.filter((todo) => todo.id !== id); return true; },
+  reopenTodo: async () => true,
+  cancelTodo: async () => true,
+  snoozeTodo: async () => true,
+  scheduleTodo: async () => true,
+  convertTodoToSchedule: async () => true,
+  getLinkedSchedules: async () => [],
+  addNoteAttachment: async () => null,
+  getNoteAttachment: async () => null,
+  deleteNoteAttachment: async () => true,
+  deleteNoteIfEmpty: async (id) => {
+    const note = (smokeWorkspace.notes || []).find((item) => item.id === id);
+    const empty = Boolean(note) && !String(note.content || '').replace(/<[^>]*>/g, '').trim() && !(note.attachments || []).length;
+    if (empty) smokeWorkspace.notes = smokeWorkspace.notes.filter((item) => item.id !== id);
+    return empty;
+  },
   getStickyNote: async (id) => (smokeWorkspace.notes || []).find((note) => note.id === id) || null,
   closeSticky: async () => { document.body.dataset.closeRequested = 'true'; return true; },
   setStickyAlwaysOnTop: async () => true,
   deleteNote: async () => { document.body.dataset.deletedNoteCount = String(Number(document.body.dataset.deletedNoteCount || 0) + 1); return true; },
   openStickyNote: async () => true,
   createStickyNote: async () => ({ id: 'new-sticky-note', title: '便笺', content: '' }),
+  saveJobApplication: async (input) => {
+    const existing = (smokeWorkspace.jobApplications || []).find((item) => item.id === input?.id);
+    const saved = {
+      ...existing,
+      ...input,
+      id: existing?.id || `job-smoke-${Date.now()}`,
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      revision: Number(existing?.revision || 0) + 1
+    };
+    smokeWorkspace.jobApplications = [saved, ...smokeWorkspace.jobApplications.filter((item) => item.id !== saved.id)];
+    return saved;
+  },
+  deleteJobApplication: async (id) => { smokeWorkspace.jobApplications = smokeWorkspace.jobApplications.filter((item) => item.id !== id); return true; },
   saveMetadataFields: async (fields) => fields,
   clockAttendance: async () => smokeWorkspace.attendance[0],
   saveAttendance: async (input) => input,
@@ -328,6 +400,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   onPapersChanged: () => () => {},
   onRefreshState: () => () => {},
   onUpdateState: () => () => {}
+  ,onSettingsChanged: () => () => {}
   ,onWorkspaceChanged: () => () => {}
   ,onWorkspaceNavigate: () => () => {}
   ,onFocusChanged: () => () => {}

@@ -23,8 +23,10 @@ const {
 const { autoUpdater } = require('electron-updater');
 const { JsonStore } = require('./store');
 const { createPlanningService } = require('./planning-service');
-const { collectReminderCandidates } = require('./reminder-core');
+const { collectReminderCandidates, normalizeReminderPayload } = require('./reminder-core');
+const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
+const { deleteJobApplication, saveJobApplication } = require('./job-core');
 const {
   parseTrackingInput,
   normalizeTrackerPayload,
@@ -43,6 +45,9 @@ const { importantChanges } = require('./notification-core');
 const {
   closeStaleAttendanceRecords,
   normalizeMetadataField,
+  normalizeNote,
+  noteBodyHasContent,
+  NOTE_ATTACHMENT_MIMES,
   parseNaturalLanguageSchedules,
   saveAttendance,
   saveFocusSession,
@@ -74,6 +79,7 @@ const {
 } = require('./paper-core');
 const {
   createInitialUpdateState,
+  isNotPublishedError,
   nextUpdateState
 } = require('./update-core');
 
@@ -81,10 +87,18 @@ const APP_NAME = '研迹 · 科研工作台';
 const BUILD_DIR = path.join(__dirname, '..', 'build');
 const APP_ICON_PNG_PATH = path.join(BUILD_DIR, 'icon.png');
 const APP_ICON_PATH = process.platform === 'win32' ? path.join(BUILD_DIR, 'icon.ico') : APP_ICON_PNG_PATH;
+
+function createAppWindowIcon() {
+  const image = nativeImage.createFromPath(APP_ICON_PNG_PATH);
+  return image.isEmpty() ? APP_ICON_PATH : image;
+}
 const MAX_HISTORY = 100;
 const FETCH_TIMEOUT_MS = 20_000;
 const DATA_FILE_NAME = 'papertrail-data.json';
 const STORAGE_POINTER_NAME = 'papertrail-storage.json';
+const ATTACHMENTS_DIRECTORY_NAME = 'attachments';
+const MAX_NOTE_ATTACHMENT_SIZE = 12 * 1024 * 1024;
+const MAX_NOTE_ATTACHMENTS_TOTAL = 50 * 1024 * 1024;
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
 const DEFAULT_QUICK_CAPTURE_SHORTCUT = 'CommandOrControl+Shift+Space';
@@ -220,6 +234,36 @@ function storagePointerPath() {
 
 function defaultDataFilePath() {
   return path.join(app.getPath('userData'), DATA_FILE_NAME);
+}
+
+function noteAttachmentsDirectory() {
+  return store?.attachmentsDirectory || path.join(path.dirname(store.filePath), ATTACHMENTS_DIRECTORY_NAME);
+}
+
+function safeStoredAttachmentPath(storedName) {
+  const name = String(storedName || '');
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$/.test(name)) throw new Error('附件引用无效。');
+  const root = path.resolve(noteAttachmentsDirectory());
+  const target = path.resolve(root, name);
+  if (path.dirname(target) !== root) throw new Error('附件引用无效。');
+  return target;
+}
+
+function noteAttachmentExtension(mimeType) {
+  return ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif' })[mimeType] || null;
+}
+
+function detectImageMime(buffer) {
+  if (!buffer || buffer.length < 12) return null;
+  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+  if (buffer.subarray(0, 6).toString('ascii') === 'GIF87a' || buffer.subarray(0, 6).toString('ascii') === 'GIF89a') return 'image/gif';
+  if (buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP') return 'image/webp';
+  return null;
+}
+
+function noteAttachmentBytes(note) {
+  return (note?.attachments || []).reduce((total, attachment) => total + Math.max(0, Number(attachment.size) || 0), 0);
 }
 
 function readStoragePointer() {
@@ -411,6 +455,10 @@ async function checkForAppUpdate() {
     }
     return updateStateForRenderer();
   } catch (error) {
+    if (isNotPublishedError(error)) {
+      setUpdateState('not-published', { error });
+      return updateStateForRenderer();
+    }
     if (updateState.status !== 'error') setUpdateState('error', { error });
     throw new Error(updateState.message);
   }
@@ -482,6 +530,7 @@ async function chooseDataDirectory(request = {}) {
     nextStore = new JsonStore(targetFile);
     nextStore.load();
   }
+  fs.mkdirSync(nextStore.attachmentsDirectory, { recursive: true });
 
   const nextBackups = normalizeBackupFiles([...knownBackupFiles(), previousDataFile], targetFile);
   writeStoragePointer(selectedDirectory, nextBackups, targetFile);
@@ -572,7 +621,8 @@ function workspaceForRenderer() {
     attendance: [...store.listAttendance()]
       .map((record) => record.id === activeAttendance?.id ? { ...record, appUsage: { ...attendanceUsageLive } } : record)
       .sort((a, b) => b.date.localeCompare(a.date) || Date.parse(b.clockInAt) - Date.parse(a.clockInAt)),
-    focusSessions: focusSessionsForRenderer()
+    focusSessions: focusSessionsForRenderer(),
+    jobApplications: [...store.listJobApplications()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
   };
 }
 
@@ -632,24 +682,114 @@ function setWorkspaceScheduleCompleted(id, completed) {
 }
 
 function saveWorkspaceNote(input) {
-  const notes = saveNote(
-    store.listNotes(),
-    input,
-    new Date().toISOString(),
-    () => crypto.randomUUID()
-  );
-  store.setNotes(notes);
+  const requested = input && typeof input === 'object' ? { ...input } : {};
+  const now = new Date().toISOString();
+  const notes = store.listNotes();
+  const existing = requested.id ? notes.find((item) => item.id === String(requested.id)) : null;
+  if (requested.id && !existing) throw new Error('找不到这条笔记。');
+  if (existing && requested.revision != null && Number(requested.revision) !== Number(existing.revision || 0)) {
+    throw new Error('这条笔记已在其他窗口更新，请重新载入后再保存。');
+  }
+
+  // New quick captures and empty sticky notes are always attached to the
+  // local-day record. The single-process lookup makes dateKey de-duplication
+  // atomic across the main editor, sticky note and quick capture windows.
+  if (!existing && requested.kind !== 'standalone') {
+    const dateKey = requested.dateKey || localDateKey(new Date(now));
+    const daily = notes.find((item) => item.kind === 'daily' && item.dateKey === dateKey);
+    if (daily) {
+      if (String(requested.content || '').length || (requested.attachments || []).length) {
+        const entry = {
+          id: crypto.randomUUID(),
+          createdAt: now,
+          updatedAt: now,
+          content: String(requested.content || '').slice(0, 100_000),
+          attachments: Array.isArray(requested.attachments) ? requested.attachments : []
+        };
+        const updated = normalizeNote({
+          ...daily,
+          entries: [...(daily.entries || []), entry],
+          content: [...(daily.entries || []).map((item) => item.content), entry.content].filter(Boolean).join('\n\n'),
+          updatedAt: now,
+          revision: Number(daily.revision || 0) + 1
+        }, 0, now);
+        store.setNotes(notes.map((item) => item.id === daily.id ? updated : item));
+        broadcastWorkspace();
+        return updated;
+      }
+      return daily;
+    }
+    requested.kind = 'daily';
+    requested.dateKey = dateKey;
+    requested.title = requested.title || `${dateKey.slice(0, 4)}年${Number(dateKey.slice(5, 7))}月${Number(dateKey.slice(8, 10))}日`;
+  }
+
+  const savedNotes = saveNote(notes, {
+    ...requested,
+    revision: Number(existing?.revision || 0)
+  }, now, () => crypto.randomUUID());
+  const saved = savedNotes.find((item) => item.id === String(requested.id || savedNotes[0].id)) || savedNotes[0];
+  store.setNotes(savedNotes);
   broadcastWorkspace();
-  return notes.find((item) => item.id === String(input?.id || '')) || notes[0];
+  return saved;
 }
 
 function deleteWorkspaceNote(id) {
   const notes = store.listNotes();
-  if (!notes.some((item) => item.id === id)) throw new Error('找不到这条笔记。');
-  store.setNotes(notes.filter((item) => item.id !== id));
+  const target = notes.find((item) => item.id === id);
+  if (!target) throw new Error('找不到这条笔记。');
+  const staged = [];
+  try {
+    for (const attachment of target.attachments || []) {
+      const source = safeStoredAttachmentPath(attachment.storedName);
+      if (!fs.existsSync(source)) continue;
+      const temporary = `${source}.delete-${crypto.randomUUID()}`;
+      fs.renameSync(source, temporary);
+      staged.push({ source, temporary });
+    }
+    store.setNotes(notes.filter((item) => item.id !== id));
+  } catch (error) {
+    for (const item of staged.reverse()) {
+      try { if (fs.existsSync(item.temporary)) fs.renameSync(item.temporary, item.source); } catch { /* preserve the recoverable staged file */ }
+    }
+    throw new Error(`笔记删除失败，原记录仍保留：${error.message}`);
+  }
+  for (const item of staged) {
+    try { fs.unlinkSync(item.temporary); } catch { /* orphaned delete staging remains recoverable */ }
+  }
   const sticky = stickyWindows.get(id);
   if (sticky && !sticky.isDestroyed()) sticky.close();
   stickyWindows.delete(id);
+  broadcastWorkspace();
+  return true;
+}
+
+function deleteWorkspaceNoteIfEmpty(id) {
+  const note = store.listNotes().find((item) => item.id === String(id || ''));
+  if (!note || noteBodyHasContent(note)) return false;
+  deleteWorkspaceNote(note.id);
+  return true;
+}
+
+function saveWorkspaceJobApplication(input) {
+  const requested = input && typeof input === 'object' ? { ...input } : {};
+  const jobs = store.listJobApplications();
+  const existing = requested.id ? jobs.find((item) => item.id === String(requested.id)) : null;
+  if (requested.id && !existing) throw new Error('找不到这条求职记录。');
+  if (existing && requested.revision != null && Number(requested.revision) !== Number(existing.revision || 0)) {
+    throw new Error('这条求职记录已在其他窗口更新，请重新载入后再保存。');
+  }
+  const now = new Date().toISOString();
+  const savedJobs = saveJobApplication(jobs, requested, now, () => crypto.randomUUID());
+  const saved = savedJobs.find((item) => item.id === String(requested.id || savedJobs[0].id)) || savedJobs[0];
+  store.setJobApplications(savedJobs);
+  broadcastWorkspace();
+  return saved;
+}
+
+function deleteWorkspaceJobApplication(id) {
+  const jobs = deleteJobApplication(store.listJobApplications(), id);
+  store.setJobApplications(jobs);
   broadcastWorkspace();
   return true;
 }
@@ -682,6 +822,92 @@ function reconcileStaleAttendance(now = new Date()) {
     attendanceUsageLive = {};
     stopUsageSamplerIfIdle();
   }
+  return true;
+}
+
+async function addNoteAttachment(noteId) {
+  const id = String(noteId || '');
+  const note = store.listNotes().find((item) => item.id === id);
+  if (!note) throw new Error('请先保存笔记，再添加图片。');
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '添加笔记图片',
+    buttonLabel: '添加图片',
+    properties: ['openFile'],
+    filters: [{ name: '图片', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }]
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const sourcePath = path.resolve(result.filePaths[0]);
+  const stat = fs.statSync(sourcePath);
+  if (!stat.isFile() || stat.size <= 0 || stat.size > MAX_NOTE_ATTACHMENT_SIZE) {
+    throw new Error(`图片大小必须在 1 字节至 ${Math.round(MAX_NOTE_ATTACHMENT_SIZE / 1024 / 1024)} MB 之间。`);
+  }
+  const bytes = fs.readFileSync(sourcePath);
+  const mimeType = detectImageMime(bytes);
+  const extension = noteAttachmentExtension(mimeType);
+  if (!mimeType || !NOTE_ATTACHMENT_MIMES.includes(mimeType) || !extension) throw new Error('图片格式或文件签名无效，仅支持 PNG、JPEG、WebP、GIF。');
+  if (noteAttachmentBytes(note) + stat.size > MAX_NOTE_ATTACHMENTS_TOTAL) {
+    throw new Error(`单条笔记图片总大小不能超过 ${Math.round(MAX_NOTE_ATTACHMENTS_TOTAL / 1024 / 1024)} MB。`);
+  }
+  fs.mkdirSync(noteAttachmentsDirectory(), { recursive: true });
+  const attachment = {
+    id: crypto.randomUUID(),
+    storedName: `${crypto.randomUUID()}.${extension}`,
+    originalName: path.basename(sourcePath).slice(0, 240),
+    mimeType,
+    size: stat.size,
+    createdAt: new Date().toISOString()
+  };
+  const target = safeStoredAttachmentPath(attachment.storedName);
+  fs.copyFileSync(sourcePath, target, fs.constants.COPYFILE_EXCL);
+  try {
+    const updatedAt = new Date().toISOString();
+    const updated = normalizeNote({
+      ...note,
+      attachments: [...(note.attachments || []), attachment],
+      updatedAt,
+      revision: Number(note.revision || 0) + 1
+    }, 0, updatedAt);
+    store.setNotes(store.listNotes().map((item) => item.id === note.id ? updated : item));
+    broadcastWorkspace();
+    return attachment;
+  } catch (error) {
+    try { fs.unlinkSync(target); } catch { /* leave no renderer-visible reference */ }
+    throw error;
+  }
+}
+
+function getNoteAttachment(noteId, attachmentId) {
+  const note = store.listNotes().find((item) => item.id === String(noteId || ''));
+  const attachment = note?.attachments?.find((item) => item.id === String(attachmentId || ''));
+  if (!note || !attachment) throw new Error('找不到这张笔记图片。');
+  const bytes = fs.readFileSync(safeStoredAttachmentPath(attachment.storedName));
+  return { mimeType: attachment.mimeType, dataUrl: `data:${attachment.mimeType};base64,${bytes.toString('base64')}` };
+}
+
+function deleteNoteAttachment(noteId, attachmentId) {
+  const notes = store.listNotes();
+  const note = notes.find((item) => item.id === String(noteId || ''));
+  const attachment = note?.attachments?.find((item) => item.id === String(attachmentId || ''));
+  if (!note || !attachment) throw new Error('找不到这张笔记图片。');
+  const source = safeStoredAttachmentPath(attachment.storedName);
+  const temporary = `${source}.delete-${crypto.randomUUID()}`;
+  if (fs.existsSync(source)) fs.renameSync(source, temporary);
+  try {
+    const updatedAt = new Date().toISOString();
+    const updated = normalizeNote({
+      ...note,
+      attachments: (note.attachments || []).filter((item) => item.id !== attachment.id),
+      entries: (note.entries || []).map((entry) => ({ ...entry, attachments: (entry.attachments || []).filter((item) => item.id !== attachment.id) })),
+      updatedAt,
+      revision: Number(note.revision || 0) + 1
+    }, 0, updatedAt);
+    store.setNotes(notes.map((item) => item.id === note.id ? updated : item));
+  } catch (error) {
+    try { if (fs.existsSync(temporary)) fs.renameSync(temporary, source); } catch { /* retain staged file for recovery */ }
+    throw new Error(`图片删除失败，笔记仍保留：${error.message}`);
+  }
+  try { if (fs.existsSync(temporary)) fs.unlinkSync(temporary); } catch { /* recoverable orphan */ }
+  broadcastWorkspace();
   return true;
 }
 
@@ -1021,6 +1247,7 @@ function createQuickCaptureWindow() {
     alwaysOnTop: true,
     skipTaskbar: true,
     backgroundColor: '#00000000',
+    icon: createAppWindowIcon(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1075,14 +1302,21 @@ function registerWorkbenchShortcuts(settings = store?.getSettings(), { allowFall
   return registered;
 }
 
-function openStickyNote(noteId) {
+async function focusStickyWindow(window) {
+  if (!window || window.isDestroyed()) return;
+  window.show();
+  window.focus();
+  if (typeof window.webContents.focus === 'function') window.webContents.focus();
+  if (!window.webContents.isLoading()) window.webContents.send('sticky:focus');
+}
+
+async function openStickyNote(noteId) {
   const id = String(noteId || '');
   const note = store.listNotes().find((item) => item.id === id);
   if (!note) throw new Error('找不到这条笔记。');
   const existing = stickyWindows.get(id);
   if (existing && !existing.isDestroyed()) {
-    existing.show();
-    existing.focus();
+    await focusStickyWindow(existing);
     return true;
   }
   const window = new BrowserWindow({
@@ -1094,6 +1328,7 @@ function openStickyNote(noteId) {
     alwaysOnTop: true,
     skipTaskbar: false,
     backgroundColor: '#f5fbff',
+    icon: createAppWindowIcon(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1103,18 +1338,19 @@ function openStickyNote(noteId) {
     }
   });
   stickyWindows.set(id, window);
-  window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id, appearance: store.getSettings().appearanceTheme } });
-  window.on('closed', () => stickyWindows.delete(id));
+  await window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id, appearance: store.getSettings().appearanceTheme } });
+  await focusStickyWindow(window);
+  window.on('closed', () => {
+    stickyWindows.delete(id);
+    try { deleteWorkspaceNoteIfEmpty(id); } catch (error) { console.warn(`[研迹] 空便笺清理失败: ${error.message}`); }
+  });
   return true;
 }
 
-function createNewStickyNote() {
+async function createNewStickyNote() {
   const now = new Date();
-  const note = saveWorkspaceNote({
-    title: `便笺 ${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(now)}`,
-    content: ''
-  });
-  openStickyNote(note.id);
+  const note = saveWorkspaceNote({ kind: 'daily', dateKey: localDateKey(now), content: '' });
+  await openStickyNote(note.id);
   return note;
 }
 
@@ -1303,8 +1539,12 @@ exit 1
 
 async function showScheduleWidget() {
   if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
-    scheduleWidgetWindow.showInactive();
-    return { attached: Boolean(scheduleWidgetWindow.yanjiDesktopAttached) };
+    if (!scheduleWidgetWindow.isVisible()) scheduleWidgetWindow.showInactive();
+    return desktopWidgetPresentation({
+      attached: Boolean(scheduleWidgetWindow.yanjiDesktopAttached),
+      attempts: scheduleWidgetWindow.yanjiDesktopDiagnostic?.attempts || 0,
+      supported: process.platform === 'win32'
+    });
   }
   const display = screen.getPrimaryDisplay();
   const { workArea, scaleFactor } = display;
@@ -1327,6 +1567,7 @@ async function showScheduleWidget() {
     skipTaskbar: true,
     hasShadow: false,
     backgroundColor: '#00000000',
+    icon: createAppWindowIcon(),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -1340,18 +1581,35 @@ async function showScheduleWidget() {
     if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
   });
   await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'), { query: { appearance: store.getSettings().appearanceTheme } });
-  window.yanjiDesktopAttached = await attachWindowToDesktop(window, {
+  const targetSize = {
     width: Math.round(width * scaleFactor),
     height: Math.round(height * scaleFactor)
-  });
-  if (window.yanjiDesktopAttached) {
+  };
+  let attached = false;
+  const diagnostics = [];
+  for (let attempt = 1; attempt <= 3 && !attached; attempt += 1) {
+    attached = await attachWindowToDesktop(window, targetSize);
+    if (!attached) {
+      diagnostics.push(`attempt-${attempt}-failed`);
+      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
+    }
+  }
+  window.yanjiDesktopAttached = attached;
+  const widgetPresentation = desktopWidgetPresentation({ attached, attempts: diagnostics.length, supported: process.platform === 'win32' });
+  window.yanjiDesktopDiagnostic = widgetPresentation.diagnostic;
+  if (attached) {
     window.webContents.setZoomFactor(scaleFactor);
     await new Promise((resolve) => setTimeout(resolve, 80));
   } else {
     window.setSize(width, height);
+    window.setAlwaysOnTop(true, 'floating');
+    window.setSkipTaskbar(true);
+    if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
+      console.warn(`DESKTOP_WIDGET_STATE ${JSON.stringify(window.yanjiDesktopDiagnostic)}`);
+    }
   }
   window.showInactive();
-  return { attached: window.yanjiDesktopAttached };
+  return widgetPresentation;
 }
 
 function showScheduleNotification(schedule) {
@@ -1369,13 +1627,14 @@ function showScheduleNotification(schedule) {
   notification.show();
 }
 
-function showDeadlineWindow(item, kind = 'todo') {
-  const existing = deadlineWindows.get(item.id);
+function showDeadlineWindow(item, kind = 'todo', level = 'reminder') {
+  const payload = normalizeReminderPayload(item, kind, level);
+  const existing = deadlineWindows.get(payload.id);
   if (existing && [...existing].some((window) => !window.isDestroyed())) return;
-  const urgent = item.priority === 'high';
+  const urgent = payload.priority === 'high';
   const displays = urgent ? screen.getAllDisplays() : [screen.getDisplayNearestPoint(screen.getCursorScreenPoint())];
   const windows = new Set();
-  deadlineWindows.set(item.id, windows);
+  deadlineWindows.set(payload.id, windows);
   displays.forEach((display, index) => {
     const bounds = display.bounds;
     const window = new BrowserWindow({
@@ -1390,6 +1649,7 @@ function showDeadlineWindow(item, kind = 'todo') {
       minimizable: false,
       maximizable: false,
       backgroundColor: urgent ? '#332735' : '#f3cf8f',
+      icon: createAppWindowIcon(),
       webPreferences: {
         preload: path.join(__dirname, 'preload.js'),
         contextIsolation: true,
@@ -1397,12 +1657,12 @@ function showDeadlineWindow(item, kind = 'todo') {
         sandbox: true
       }
     });
-    window.yanjiDeadlineId = item.id;
+    window.yanjiDeadlineId = payload.id;
     window.yanjiDeadlineKind = kind;
     windows.add(window);
     window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'), { query: { appearance: store.getSettings().appearanceTheme } });
     window.webContents.once('did-finish-load', () => {
-      window.webContents.send('deadline:show', { ...item, reminderKind: kind });
+      window.webContents.send('deadline:show', payload);
       window.setAlwaysOnTop(true, 'screen-saver');
       window.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
       window.show();
@@ -1410,7 +1670,7 @@ function showDeadlineWindow(item, kind = 'todo') {
     });
     window.on('closed', () => {
       windows.delete(window);
-      if (!windows.size) deadlineWindows.delete(item.id);
+      if (!windows.size) deadlineWindows.delete(payload.id);
     });
   });
 }
@@ -1424,16 +1684,20 @@ function dismissDeadlineWindows(id) {
 
 function showTodoNotification(todo, level = 'reminder') {
   if (!store.getSettings().notifications || !store.getSettings().todoNotifications || !Notification.isSupported()) return;
-  const overdue = level === 'overdue';
+  const payload = normalizeReminderPayload(todo, 'todo', level);
+  const overdue = payload.overdue;
+  const dueText = payload.scheduledAt
+    ? new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(payload.scheduledAt))
+    : '无截止时间';
   const notification = new Notification({
     title: overdue ? '待办已逾期' : '待办提醒',
-    body: overdue ? `${todo.title} 已逾期` : todo.title,
-    urgency: todo.priority === 'high' ? 'critical' : 'normal',
+    body: `${payload.title}${overdue ? ' 已逾期' : ` · ${dueText}`}`,
+    urgency: payload.priority === 'high' ? 'critical' : 'normal',
     icon: APP_ICON_PNG_PATH
   });
   notification.on('click', () => {
     showMainWindow();
-    mainWindow?.webContents.send('workspace:navigate', 'todos');
+    mainWindow?.webContents.send('workspace:navigate', { page: 'todos', todoId: payload.id });
   });
   notification.show();
 }
@@ -1441,7 +1705,16 @@ function showTodoNotification(todo, level = 'reminder') {
 function stickyNoteForRenderer(noteId) {
   const id = String(noteId || '');
   const note = store.listNotes().find((item) => item.id === id);
-  return note ? { id: note.id, title: note.title, content: note.content } : null;
+  if (!note) return null;
+  const latestEntry = note.kind === 'daily' ? note.entries?.at(-1) : null;
+  return {
+    id: note.id,
+    title: note.title,
+    content: latestEntry?.content ?? note.content,
+    entryId: latestEntry?.id || null,
+    revision: note.revision || 0,
+    kind: note.kind
+  };
 }
 
 function runWorkspaceReminders(now = new Date()) {
@@ -1464,7 +1737,7 @@ function runWorkspaceReminders(now = new Date()) {
       continue;
     }
     const todo = candidate.item;
-    if (todo.priority === 'high') showDeadlineWindow(todo, 'todo');
+    if (todo.priority === 'high') showDeadlineWindow(todo, 'todo', candidate.level);
     else showTodoNotification(todo, candidate.level);
     store.updateWorkspace((workspace) => {
       workspace.todos = workspace.todos.map((item) => item.id === todo.id
@@ -1801,7 +2074,7 @@ function createWindow() {
     show: !process.argv.includes('--hidden'),
     backgroundColor: '#edf7fc',
     title: APP_NAME,
-    icon: APP_ICON_PATH,
+    icon: createAppWindowIcon(),
     autoHideMenuBar: true,
     titleBarStyle: 'hidden',
     titleBarOverlay: TITLE_BAR_NORMAL,
@@ -1814,6 +2087,7 @@ function createWindow() {
     }
   });
 
+  mainWindow.setIcon(createAppWindowIcon());
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { appearance: store.getSettings().appearanceTheme } });
   mainWindow.webContents.once('did-finish-load', () => {
     if (!process.argv.includes('--hidden')) {
@@ -2066,9 +2340,15 @@ function registerIpc() {
   });
   ipcMain.handle('notes:save', (_event, input) => saveWorkspaceNote(input));
   ipcMain.handle('notes:delete', (_event, id) => deleteWorkspaceNote(String(id)));
+  ipcMain.handle('notes:delete-if-empty', (_event, id) => deleteWorkspaceNoteIfEmpty(String(id)));
+  ipcMain.handle('notes:add-attachment', (_event, id) => addNoteAttachment(String(id)));
+  ipcMain.handle('notes:get-attachment', (_event, id, attachmentId) => getNoteAttachment(String(id), String(attachmentId)));
+  ipcMain.handle('notes:delete-attachment', (_event, id, attachmentId) => deleteNoteAttachment(String(id), String(attachmentId)));
   ipcMain.handle('notes:open-sticky', (_event, id) => openStickyNote(String(id)));
   ipcMain.handle('notes:get-sticky', (_event, id) => stickyNoteForRenderer(String(id)));
   ipcMain.handle('notes:create-sticky', () => createNewStickyNote());
+  ipcMain.handle('jobs:save', (_event, input) => saveWorkspaceJobApplication(input));
+  ipcMain.handle('jobs:delete', (_event, id) => deleteWorkspaceJobApplication(String(id)));
   ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
   ipcMain.handle('attendance:clock', (_event, action) => clockWorkspaceAttendance(String(action || '')));
   ipcMain.handle('attendance:save', (_event, input) => saveWorkspaceAttendance(input));
@@ -2224,6 +2504,7 @@ if (!gotLock) {
   app.on('second-instance', showMainWindow);
   app.whenReady().then(async () => {
     try {
+      app.setName('研迹');
       app.setAppUserModelId('io.papertrail.desktop');
       store = new JsonStore(configuredDataFilePath());
       store.load();

@@ -744,7 +744,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '1.1.1';
+  const version = settings.appVersion || '1.1.3';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   const expirations = Array.isArray(settings.backupExpiresAt) ? settings.backupExpiresAt : [];
@@ -775,6 +775,8 @@ function renderUpdateStatus() {
     downloading: ['正在下载更新', `下载中 ${Math.round(percent)}%`, true],
     downloaded: ['更新已准备好', '安装并重启', false],
     error: ['更新检查失败', '重试', false],
+    'not-published': ['暂未发布可下载版本', '重新检查', false],
+    'empty-feed': ['暂未发布可下载版本', '重新检查', false],
     unavailable: [update.portable ? '便携版更新' : '当前无法检查更新', update.portable ? '打开发布页' : '当前不可用', !update.portable]
   }[status] || ['检查研迹更新', '检查更新', false];
 
@@ -790,6 +792,7 @@ function renderUpdateStatus() {
   elements.updateGroup.classList.toggle('is-current', status === 'up-to-date');
   elements.updateGroup.classList.toggle('is-ready', ['available', 'downloaded'].includes(status));
   elements.updateGroup.classList.toggle('is-error', status === 'error');
+  elements.updateGroup.classList.toggle('is-neutral', ['not-published', 'empty-feed'].includes(status));
 }
 
 async function handleUpdateAction() {

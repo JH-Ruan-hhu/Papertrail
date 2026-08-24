@@ -179,7 +179,7 @@ test('does not overwrite the original file when workflow migration fails', (t) =
   assert.equal(fs.readFileSync(filePath, 'utf8'), original);
 });
 
-test('backs up Schema 7 before the first Schema 8 write and keeps unknown root fields', (t) => {
+test('backs up the source schema before the first current-schema write and keeps unknown root fields', (t) => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'papertrail-store-v8-'));
   t.after(() => fs.rmSync(directory, { recursive: true, force: true }));
   const filePath = path.join(directory, 'papertrail-data.json');
@@ -198,8 +198,9 @@ test('backs up Schema 7 before the first Schema 8 write and keeps unknown root f
   const store = new JsonStore(filePath);
   store.load();
   const migrated = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  const backups = fs.readdirSync(directory).filter((name) => name.startsWith('papertrail-data.pre-v8.') && name.endsWith('.json'));
-  assert.equal(migrated.version, 8);
+  const backups = fs.readdirSync(directory).filter((name) => name.startsWith('papertrail-data.pre-v7.') && name.endsWith('.json'));
+  assert.equal(migrated.version, 10);
+  assert.deepEqual(migrated.jobApplications, []);
   assert.deepEqual(migrated.unknownRoot, original.unknownRoot);
   assert.equal(backups.length, 1);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(directory, backups[0]), 'utf8')), original);

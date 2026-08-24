@@ -13,6 +13,9 @@ const path = require('node:path');
 const { app, BrowserWindow } = require('electron');
 
 app.disableHardwareAcceleration();
+app.commandLine.appendSwitch('disable-gpu');
+app.commandLine.appendSwitch('disable-gpu-compositing');
+app.commandLine.appendSwitch('in-process-gpu');
 app.setPath('userData', path.join(__dirname, '..', 'work', 'smoke-data-1.0.0'));
 
 app.whenReady().then(async () => {
@@ -27,18 +30,31 @@ app.whenReady().then(async () => {
       preload: path.join(__dirname, 'smoke-preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true
+      sandbox: false
     }
   });
+  window.webContents.on('did-fail-load', (_event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    console.error(`DID_FAIL_LOAD ${JSON.stringify({ errorCode, errorDescription, validatedURL, isMainFrame })}`);
+  });
+  window.webContents.on('render-process-gone', (_event, details) => {
+    console.error(`RENDERER_GONE ${JSON.stringify(details)}`);
+  });
   await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await window.webContents.executeJavaScript(`document.documentElement.dataset.appearance = ${JSON.stringify(process.env.PAPERTRAIL_SMOKE_APPEARANCE || 'liquid-glass')}`);
   await new Promise((resolve) => setTimeout(resolve, 700));
   const captureStablePage = async (output) => {
-    window.webContents.invalidate();
-    await new Promise((resolve) => setTimeout(resolve, 90));
-    await window.webContents.capturePage();
-    await new Promise((resolve) => setTimeout(resolve, 50));
-    const image = await window.webContents.capturePage();
-    fs.writeFileSync(output, image.toPNG());
+    const wasVisible = window.isVisible();
+    if (!wasVisible) window.showInactive();
+    try {
+      window.webContents.invalidate();
+      await new Promise((resolve) => setTimeout(resolve, 140));
+      await window.webContents.capturePage();
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      const image = await window.webContents.capturePage();
+      fs.writeFileSync(output, image.toPNG());
+    } finally {
+      if (!wasVisible && !window.isDestroyed()) window.hide();
+    }
   };
   if (process.env.PAPERTRAIL_EMPTY_SMOKE === '1') {
     const emptyResult = await window.webContents.executeJavaScript(`
@@ -303,6 +319,7 @@ app.whenReady().then(async () => {
   }
   if (process.env.PAPERTRAIL_SMOKE_OUTPUT) {
     await window.webContents.executeJavaScript(`document.querySelector('[data-workbench-page="submissions"]').click(); document.getElementById('allNavButton').click(); window.scrollTo(0, 0)`);
+    await new Promise((resolve) => setTimeout(resolve, 160));
     await captureStablePage(process.env.PAPERTRAIL_SMOKE_OUTPUT);
   }
   if (process.env.PAPERTRAIL_IMPORTANT_OUTPUT) {
@@ -367,7 +384,7 @@ app.whenReady().then(async () => {
         const localKey = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
         const today = new Date();
         const twoDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2);
-        const fourDaysLater = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 4);
+        const fiveDaysLater = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5);
         const boardDates = [...document.querySelectorAll('#scheduleBoard .schedule-board-column')].map((column) => column.dataset.boardDate);
         const shellRect = document.querySelector('.schedule-board-shell').getBoundingClientRect();
         const cards = [...document.querySelectorAll('#scheduleBoard .schedule-board-card')];
@@ -381,7 +398,7 @@ app.whenReady().then(async () => {
         const scheduleDialog = document.getElementById('scheduleDialog');
         const draftTitle = document.getElementById('scheduleTitle');
         draftTitle.value = '后天上午十点整理草稿';
-        document.getElementById('closeScheduleButton').click();
+      scheduleDialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
         const closePreserved = !scheduleDialog.open
           && JSON.parse(localStorage.getItem('yanji.scheduleDraft.v1')).title === '后天上午十点整理草稿'
           && !document.body.dataset.savedScheduleCount;
@@ -404,10 +421,10 @@ app.whenReady().then(async () => {
         const modalScrollbarHidden = getComputedStyle(document.getElementById('scheduleDialog')).getPropertyValue('scrollbar-width') === 'none';
         document.getElementById('saveScheduleButton').click();
         await new Promise((resolve) => setTimeout(resolve, 80));
-        return {
+        const result = {
           pageVisible: !document.querySelector('[data-page="schedule"]').hidden,
           dayColumns: document.querySelectorAll('#scheduleBoard .schedule-board-column').length,
-          centeredSevenDays: boardDates[0] === localKey(twoDaysAgo) && boardDates[2] === localKey(today) && boardDates[6] === localKey(fourDaysLater),
+          centeredEightDays: boardDates[0] === localKey(twoDaysAgo) && boardDates[2] === localKey(today) && boardDates[7] === localKey(fiveDaysLater),
           scheduleCards: cards.length,
           intersectsBoard,
           closePreserved,
@@ -421,12 +438,15 @@ app.whenReady().then(async () => {
           modalScrollbarHidden,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
+        document.querySelector('[data-workbench-page="home"]').click();
+        return result;
       })()
     `);
-    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 7 || !scheduleResult.centeredSevenDays || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
+    await window.webContents.executeJavaScript(`document.querySelector('[data-workbench-page="schedule"]').click(); window.scrollTo(0, 0)`);
     await new Promise((resolve) => setTimeout(resolve, 240));
     await captureStablePage(process.env.WORKBENCH_SCHEDULE_OUTPUT);
   }
@@ -448,13 +468,14 @@ app.whenReady().then(async () => {
         const homePage = document.querySelector('[data-page="home"]');
         const schedule = rect(document.querySelector('.home-schedule-panel'));
         const notes = rect(document.querySelector('.latest-notes-panel'));
+        const side = rect(document.querySelector('.home-side-stack'));
         const progress = rect(document.querySelector('.home-progress-strip'));
         const command = rect(document.querySelector('.home-command-grid'));
         const focus = rect(document.querySelector('.home-top-grid'));
         const content = rect(document.querySelector('.home-content-grid'));
         const commandCards = [...document.querySelectorAll('.home-command-grid > article')].map(rect);
         const commandWidths = commandCards.map((card) => card.width);
-        return {
+        const result = {
           viewportWidth: innerWidth,
           viewportHeight: innerHeight,
           homeScrollHeight: homePage.scrollHeight,
@@ -470,24 +491,52 @@ app.whenReady().then(async () => {
           pageVisible: !document.querySelector('[data-page="home"]').hidden,
           focusFirst: Boolean(document.querySelector('.home-top-grid #todayFocusList')),
           focusTimerHome: Boolean(document.querySelector('.home-focus-timer #focusTimeRemaining')),
-          clockInsideFocus: Boolean(document.querySelector('.home-focus-timer #homeClockButton')),
-          clockOnly: !document.querySelector('.home-attendance-panel')
-            && !document.getElementById('homeAttendanceStatus')
-            && document.getElementById('homeClockButton')?.textContent === '上班打卡',
+          clockOutsideFocus: !document.querySelector('.home-focus-timer #homeClockButton')
+            && Boolean(document.querySelector('.home-attendance-card #homeClockButton')),
+          attendanceStatus: Boolean(document.getElementById('homeAttendanceStatus')),
+          todoCardLarger: (document.querySelector('.home-today-todo-card')?.getBoundingClientRect().width || 0)
+            > (document.querySelector('.home-next-event-card')?.getBoundingClientRect().width || 0),
+          commandCardsTopAligned: commandCards.every((card) => Math.abs(card.top - commandCards[0].top) <= 1),
+          attendanceIndependent: Boolean(document.querySelector('.home-attendance-card')),
           quickNote: Boolean(document.getElementById('quickNoteButton')),
           fourDayCards: document.querySelectorAll('#homeDayOverview .day-card').length,
-          notesRight: notes.left > schedule.left,
-          aligned: Math.abs(notes.top - schedule.top) <= 1,
+          notesRight: side.left > schedule.left,
+          aligned: Math.abs(side.top - schedule.top) <= 1,
+          jobSummaryVisible: Boolean(document.querySelector('.home-job-panel #homeJobSummary .home-job-row')),
           homeContentFits: homePage.scrollHeight <= innerHeight && content.bottom <= innerHeight - 8,
           homeRowsAligned: command.top >= progress.bottom - 1
             && focus.top >= command.bottom - 1
             && content.top >= focus.bottom - 1,
           homeColumnsAligned: Math.abs(focus.left - content.left) <= 1
             && Math.abs(focus.right - content.right) <= 1,
-          commandCardsAligned: commandWidths.length >= 2
-            && Math.max(...commandWidths) - Math.min(...commandWidths) <= 1,
+          commandCardsAligned: commandCards.length === 4
+            && commandCards.every((card) => Math.abs(card.top - commandCards[0].top) <= 1),
+          fourDayMatrix: (() => {
+            const cards = [...document.querySelectorAll('#homeDayOverview .day-card')];
+            return cards.length === 4 && cards.every((card) => card.getBoundingClientRect().width > 0 && card.getBoundingClientRect().height > 0);
+          })(),
+          navCountReadable: (() => {
+            const count = document.querySelector('.nav-item.active b');
+            if (!count) return true;
+            const style = getComputedStyle(count);
+            return style.color !== style.backgroundColor && Number(style.fontSize.replace('px', '')) >= 10;
+          })(),
+          headerAligned: (() => {
+            document.querySelector('[data-workbench-page="notes"]').click();
+            const notesHead = document.querySelector('.notes-page .page-head-row').getBoundingClientRect();
+            document.querySelector('[data-workbench-page="attendance"]').click();
+            const attendanceHead = document.querySelector('.attendance-page .page-head-row').getBoundingClientRect();
+            return Math.abs(notesHead.top - attendanceHead.top) <= 3;
+          })(),
+          scheduleWraps: (() => {
+            document.querySelector('[data-workbench-page="schedule"]').click();
+            const board = document.getElementById('scheduleBoard');
+            return getComputedStyle(board).gridTemplateColumns.split(' ').length >= 2 && getComputedStyle(document.querySelector('.schedule-board-shell')).overflowX !== 'scroll';
+          })(),
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
+        document.querySelector('[data-workbench-page="home"]').click();
+        return result;
       })()
     `);
     const homeLayoutNumbers = new Set([
@@ -518,11 +567,15 @@ app.whenReady().then(async () => {
           ganttRows: document.querySelectorAll('#attendanceGanttRows .attendance-gantt-row').length,
           ganttBars: document.querySelectorAll('#attendanceGanttRows .attendance-bar').length,
           appRows: document.querySelectorAll('#focusUsageList .focus-usage-row').length,
+          usageWidths: [...document.querySelectorAll('#focusUsageList .focus-usage-row i')].map((item) => Math.round(item.getBoundingClientRect().width)),
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!attendanceResult.pageVisible || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 2 || attendanceResult.appRows < 1 || attendanceResult.horizontalOverflow) {
+    const usagePixelWidths = attendanceResult.usageWidths;
+    const usageWidthsAreProportional = usagePixelWidths.length < 2
+      || Math.max(...usagePixelWidths) - Math.min(...usagePixelWidths) >= 8;
+    if (!attendanceResult.pageVisible || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 2 || attendanceResult.appRows < 1 || !usageWidthsAreProportional || attendanceResult.horizontalOverflow) {
       throw new Error(`Workbench attendance smoke failed: ${JSON.stringify(attendanceResult)}`);
     }
     console.log(`WORKBENCH_ATTENDANCE_OK ${JSON.stringify(attendanceResult)}`);
@@ -546,6 +599,7 @@ app.whenReady().then(async () => {
         document.getElementById('quickNoteButton').click();
         const noteOpened = document.getElementById('noteDialog').open;
         document.getElementById('noteDialog').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 40));
         const noteBackdropClosed = !document.getElementById('noteDialog').open;
         document.querySelector('#notesGrid .note-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await new Promise((resolve) => setTimeout(resolve, 40));
@@ -571,6 +625,42 @@ app.whenReady().then(async () => {
     console.log(`WORKBENCH_NOTES_OK ${JSON.stringify(notesResult)}`);
     await new Promise((resolve) => setTimeout(resolve, 240));
     await captureStablePage(process.env.WORKBENCH_NOTES_OUTPUT);
+  }
+  if (process.env.WORKBENCH_JOBS_OUTPUT) {
+    const jobsResult = await window.webContents.executeJavaScript(`
+      (async () => {
+        document.querySelector('[data-workbench-page="jobs"]').click();
+        window.scrollTo(0, 0);
+        const initialCards = document.querySelectorAll('#jobBoard .job-card').length;
+        const meterWidths = [...document.querySelectorAll('#jobPipelineSummary .job-pipeline-row > i > b')].map((bar) => Math.round(bar.getBoundingClientRect().width));
+        document.getElementById('addJobButton').click();
+        document.getElementById('jobCompany').value = '新增环保公司';
+        document.getElementById('jobRole').value = '研发工程师';
+        document.getElementById('jobStatus').value = 'submitted';
+        document.getElementById('saveJobButton').click();
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const added = document.querySelectorAll('#jobBoard .job-card').length === initialCards + 1;
+        const advance = document.querySelector('[data-advance-job="job-submitted-1"]');
+        advance?.click();
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        return {
+          pageVisible: !document.querySelector('[data-page="jobs"]').hidden,
+          sixStages: document.querySelectorAll('#jobBoard .job-stage-column').length === 6,
+          initialCards,
+          proportionalMeters: new Set(meterWidths).size >= 2,
+          added,
+          advanced: Boolean(document.querySelector('.stage-written-1 [data-edit-job="job-submitted-1"]')),
+          homeSummary: document.querySelectorAll('#homeJobSummary .home-job-row').length === 4,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!jobsResult.pageVisible || !jobsResult.sixStages || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+      throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
+    }
+    console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);
+    await new Promise((resolve) => setTimeout(resolve, 180));
+    await captureStablePage(process.env.WORKBENCH_JOBS_OUTPUT);
   }
   if (process.env.WORKBENCH_CAPTURE_OUTPUT) {
     window.setSize(720, 290);

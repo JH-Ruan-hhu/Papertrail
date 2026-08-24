@@ -7,6 +7,7 @@ const {
   normalizeAttendance,
   normalizeFocusSession,
   normalizeMetadataField,
+  noteBodyHasContent,
   parseNaturalLanguageSchedule,
   parseNaturalLanguageSchedules,
   saveAttendance,
@@ -122,9 +123,17 @@ test('allows an edited schedule to turn its reminder off explicitly', () => {
 test('notes preserve typed metadata and metadata fields support custom selects', () => {
   const field = normalizeMetadataField({ id: 'method', name: '实验方法', type: 'select', options: ['LC-MS/MS', 'LC-MS/MS', 'GC-MS'] });
   assert.deepEqual(field.options, ['LC-MS/MS', 'GC-MS']);
-  const notes = saveNote([], { content: '今天完成质控', metadata: { method: 'LC-MS/MS', reviewed: true } }, '2026-08-22T02:00:00.000Z', () => 'note-1');
-  assert.equal(notes[0].title, '今天完成质控');
+  const notes = saveNote([], { kind: 'daily', dateKey: '2026-08-22', content: '今天完成质控', metadata: { method: 'LC-MS/MS', reviewed: true } }, '2026-08-22T02:00:00.000Z', () => 'note-1');
+  assert.equal(notes[0].title, '2026年8月22日');
+  assert.equal(notes[0].entries[0].title, '10:00');
   assert.equal(notes[0].metadata.reviewed, true);
+});
+
+test('detects empty rich note bodies while preserving text and image notes', () => {
+  assert.equal(noteBodyHasContent({ content: '<p><br></p>&nbsp;\u200B', attachments: [] }), false);
+  assert.equal(noteBodyHasContent({ title: '只有标题', content: '', attachments: [] }), false);
+  assert.equal(noteBodyHasContent({ content: '<p>实验记录</p>', attachments: [] }), true);
+  assert.equal(noteBodyHasContent({ content: '', attachments: [{ id: 'image-1' }] }), true);
 });
 
 test('attendance supports multiple work segments per day and validates clock order', () => {
