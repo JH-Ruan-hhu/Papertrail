@@ -79,6 +79,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   openUpdateReleasePage: () => ipcRenderer.invoke('updates:open-release-page'),
   copyText: (text) => ipcRenderer.invoke('system:copy-text', text),
   openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
+  restartApp: () => ipcRenderer.invoke('system:restart-app'),
   setModalWindowState: (active) => ipcRenderer.invoke('window:set-modal-state', Boolean(active)),
   onPapersChanged: (callback) => {
     const listener = (_event, papers) => callback(papers);

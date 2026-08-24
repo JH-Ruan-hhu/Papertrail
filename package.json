@@ -1,6 +1,6 @@
 {
   "name": "papertrail-desktop",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "Yanji contributors",
@@ -25,7 +25,9 @@
     "productName": "研迹",
     "asar": true,
     "asarUnpack": [
-      "src/windows-desktop-icons.ps1"
+      "src/windows-desktop-icons.ps1",
+      "build/icon.ico",
+      "build/icon.png"
     ],
     "compression": "maximum",
     "directories": {

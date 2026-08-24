@@ -82,7 +82,7 @@ html[data-appearance="liquid-glass"] :is(
   .schedule-today-panel, .schedule-board-shell, .focus-usage-panel,
   .attendance-gantt-shell, .notes-toolbar, .note-card, .todo-toolbar,
   .todo-card, .job-pipeline-panel, .job-signal-panel, .job-toolbar,
-  .job-stage-column, .job-metric-strip article, .job-board-panel,
+  .job-metric-strip article, .job-board-panel,
   .job-interview-panel, .job-glance-panel
 ) {
   color: var(--yanji-text);
@@ -93,13 +93,23 @@ html[data-appearance="liquid-glass"] :is(
   -webkit-backdrop-filter: none;
 }
 html[data-appearance="liquid-glass"] .home-progress-metrics article,
-html[data-appearance="liquid-glass"] .job-card,
 html[data-appearance="liquid-glass"] .day-card { background: rgba(255,255,255,.72); border-color: var(--yanji-line); }
+html[data-appearance="liquid-glass"] .job-stage-column {
+  background: var(--job-stage-surface);
+  border-color: var(--job-stage-line);
+}
+html[data-appearance="liquid-glass"] .job-card {
+  background: rgba(255,255,255,.76);
+  border-color: var(--job-stage-line);
+}
 html[data-appearance="liquid-glass"] .schedule-board-column { background: rgba(246,249,253,.88); border-color: var(--yanji-line); }
 html[data-appearance="liquid-glass"] .schedule-board-heading,
-html[data-appearance="liquid-glass"] .schedule-board-add,
+html[data-appearance="liquid-glass"] .schedule-board-add { background: rgba(226,235,244,.68); border-color: var(--yanji-line); }
 html[data-appearance="liquid-glass"] .job-stage-column > header,
-html[data-appearance="liquid-glass"] .job-stage-add { background: rgba(226,235,244,.68); border-color: var(--yanji-line); }
+html[data-appearance="liquid-glass"] .job-stage-add {
+  background: var(--job-stage-soft);
+  border-color: var(--job-stage-line);
+}
 
 /* Selective tint communicates hierarchy; neutral actions remain clear. */
 html[data-appearance="liquid-glass"] .button.primary,

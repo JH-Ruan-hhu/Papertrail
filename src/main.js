@@ -27,6 +27,7 @@ const { collectReminderCandidates, normalizeReminderPayload, reminderPresentatio
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
 const { deleteJobApplication, saveJobApplication } = require('./job-core');
+const { resolveStableUserDataPath } = require('./user-data-path');
 const {
   parseTrackingInput,
   normalizeTrackerPayload,
@@ -85,7 +86,9 @@ const {
 
 const APP_NAME = '研迹 · 科研工作台';
 const APP_ID = 'io.papertrail.desktop';
-const BUILD_DIR = path.join(__dirname, '..', 'build');
+const BUILD_DIR = app.isPackaged
+  ? path.join(process.resourcesPath, 'app.asar.unpacked', 'build')
+  : path.join(__dirname, '..', 'build');
 const APP_ICON_PNG_PATH = path.join(BUILD_DIR, 'icon.png');
 const APP_ICON_PATH = process.platform === 'win32' ? path.join(BUILD_DIR, 'icon.ico') : APP_ICON_PNG_PATH;
 
@@ -538,9 +541,15 @@ async function chooseDataDirectory(request = {}) {
   const nextBackups = normalizeBackupFiles([...knownBackupFiles(), previousDataFile], targetFile);
   writeStoragePointer(selectedDirectory, nextBackups, targetFile);
   store = nextStore;
+  planningService = createPlanningService({
+    store,
+    makeId: () => crypto.randomUUID(),
+    onWorkspaceChanged: () => broadcastWorkspace()
+  });
   updateLoginItemSetting(store.getSettings().startAtLogin);
   broadcastPapers();
-  return { canceled: false, settings: settingsForRenderer() };
+  broadcastWorkspace();
+  return { canceled: false, restartRequired: true, settings: settingsForRenderer() };
 }
 
 async function deleteDataBackups(confirmed = false) {
@@ -2601,6 +2610,12 @@ function registerIpc() {
     await shell.openExternal(url.toString());
     return true;
   });
+  ipcMain.handle('system:restart-app', () => {
+    isQuitting = true;
+    app.relaunch();
+    app.exit(0);
+    return true;
+  });
   ipcMain.handle('window:set-modal-state', (_event, active) => {
     setModalTitleBar(Boolean(active));
     return true;
@@ -2609,6 +2624,8 @@ function registerIpc() {
 
 if (process.env.YANJI_QA_USER_DATA) {
   app.setPath('userData', path.resolve(process.env.YANJI_QA_USER_DATA));
+} else {
+  app.setPath('userData', resolveStableUserDataPath(app.getPath('appData')));
 }
 
 // Set the Windows identity before the single-instance lock and before any

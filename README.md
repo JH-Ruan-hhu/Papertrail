@@ -8,6 +8,16 @@ publisher-neutral.
 
 ## Version 1.2 workbench features
 
+Version 1.2.3 is a storage-path compatibility hotfix. It restores discovery of
+the legacy `papertrail-desktop` user-data directory after the v1.2.2 Windows
+identity change, while preserving data created by genuinely new v1.2.2
+installations. Changing the data location now refreshes every workspace view
+and explicitly offers to restart the app. The All Manuscripts heading also
+uses the same baseline and spacing as the other workbench pages. Packaged
+windows now load their taskbar icon from an unpacked ICO resource, and the six
+job-pipeline stages use distinct low-saturation colors with a consistent
+company, role, location, and notes hierarchy.
+
 Version 1.2.2 reduces background resource use by throttling hidden renderers,
 pausing invisible-page refresh work, and releasing the main window after it
 has remained in the tray. It also adds full-workspace note editing while

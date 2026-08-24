@@ -744,7 +744,7 @@ async function addPaper() {
 
 function populateSettingsMetadata() {
   const settings = state.settings || {};
-  const version = settings.appVersion || '1.2.1';
+  const version = settings.appVersion || '1.2.3';
   const backupCount = Number(settings.backupCount || 0);
   const backupFiles = Array.isArray(settings.backupFiles) ? settings.backupFiles : [];
   const expirations = Array.isArray(settings.backupExpiresAt) ? settings.backupExpiresAt : [];
@@ -939,7 +939,21 @@ async function changeDataDirectory() {
       state.settings = result.settings;
       populateSettingsMetadata();
     }
-    if (!result?.canceled) showToast('数据存储位置已更新，原位置的数据仍保留为备份。');
+    if (result?.restartRequired) {
+      const restartNow = await window.yanjiConfirm({
+        title: '需要重启研迹',
+        message: '数据存储位置已切换。请重启研迹，确保全部页面、后台提醒和桌面组件都使用新位置。',
+        confirmText: '立即重启',
+        cancelText: '稍后重启'
+      });
+      if (restartNow) {
+        await api.restartApp();
+        return;
+      }
+      showToast('数据位置已切换，请稍后重启研迹。');
+    } else if (!result?.canceled) {
+      showToast('当前已经在使用这个数据存储位置。');
+    }
   } catch (error) {
     elements.settingsError.textContent = getErrorMessage(error);
   } finally {

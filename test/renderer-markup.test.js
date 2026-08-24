@@ -394,3 +394,32 @@ test('hidden renderer work is throttled and the close-to-tray window is released
   assert.match(appJs, /document\.visibilityState === 'visible'\) render\(\)/);
   assert.match(workbenchJs, /document\.visibilityState === 'visible'\) renderClock\(\)/);
 });
+
+test('storage location changes require a restart and legacy user data remains discoverable', () => {
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  assert.ok(mainJs.indexOf("app.setPath('userData'") < mainJs.indexOf("app.setName('研迹')"));
+  assert.match(mainJs, /resolveStableUserDataPath\(app\.getPath\('appData'\)\)/);
+  assert.match(mainJs, /restartRequired:\s*true/);
+  assert.match(mainJs, /system:restart-app/);
+  assert.match(preloadJs, /restartApp/);
+  assert.match(appJs, /title:\s*'需要重启研迹'/);
+  assert.match(appJs, /confirmText:\s*'立即重启'/);
+});
+
+test('the submissions heading uses the same page header baseline as other workbench pages', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  assert.match(indexHtml, /class="workspace-header page-head-row submissions-page-head"/);
+  assert.match(css, /\.submissions-page > \.page-head-row/);
+});
+
+test('packaged BrowserWindows load the unpacked Yanji taskbar icon', () => {
+  const packageJson = fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(packageJson, /"build\/icon\.ico"/);
+  assert.match(packageJson, /"build\/icon\.png"/);
+  assert.match(mainJs, /app\.isPackaged[\s\S]*app\.asar\.unpacked[\s\S]*build/);
+  assert.match(mainJs, /mainWindow\.setIcon\(createAppWindowIcon\(\)\)/);
+});

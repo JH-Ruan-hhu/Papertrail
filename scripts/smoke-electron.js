@@ -738,6 +738,13 @@ app.whenReady().then(async () => {
         window.scrollTo(0, 0);
         const initialCards = document.querySelectorAll('#jobBoard .job-card').length;
         const stageHeights = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => Math.round(column.getBoundingClientRect().height));
+        const stageColors = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => getComputedStyle(column).backgroundColor);
+        const cardAnatomy = [...document.querySelectorAll('#jobBoard .job-card')].every((card) => (
+          card.querySelector('.job-card-company')
+          && card.querySelector('.job-card-role')
+          && card.querySelector('.job-card-location')
+          && card.querySelector('.job-card-notes')
+        ));
         const meterWidths = [...document.querySelectorAll('#jobPipelineSummary .job-pipeline-row > i > b')].map((bar) => Math.round(bar.getBoundingClientRect().width));
         document.getElementById('addJobButton').click();
         document.getElementById('jobCompany').value = '新增环保公司';
@@ -752,6 +759,9 @@ app.whenReady().then(async () => {
         return {
           pageVisible: !document.querySelector('[data-page="jobs"]').hidden,
           sixStages: document.querySelectorAll('#jobBoard .job-stage-column').length === 6,
+          stageColors,
+          sixStageColors: new Set(stageColors).size === 6,
+          cardAnatomy,
           fixedStageHeights: new Set(stageHeights).size === 1 && stageHeights[0] === 340,
           upcomingPanelRemoved: !document.querySelector('.job-upcoming-panel') && !document.getElementById('jobUpcomingCount'),
           salaryMetric: document.getElementById('jobMaxSalary')?.textContent === '41.1万',
@@ -764,7 +774,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || !jobsResult.sixStages || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || !jobsResult.sixStages || !jobsResult.sixStageColors || !jobsResult.cardAnatomy || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);
