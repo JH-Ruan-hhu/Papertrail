@@ -24,6 +24,9 @@
     "appId": "io.papertrail.desktop",
     "productName": "研迹",
     "asar": true,
+    "asarUnpack": [
+      "src/windows-desktop-icons.ps1"
+    ],
     "compression": "maximum",
     "directories": {
       "output": "outputs"

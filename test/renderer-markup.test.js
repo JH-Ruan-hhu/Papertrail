@@ -256,7 +256,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /Math\.round\(width \* scaleFactor\)/);
   assert.match(mainJs, /Math\.round\(height \* scaleFactor\)/);
   assert.match(mainJs, /webContents\.setZoomFactor\(scaleFactor\)/);
-  assert.match(mainJs, /scheduleWidgetEnabled: true/);
+  assert.match(mainJs, /scheduleWidgetEnabled: result\.attached/);
   assert.match(mainJs, /scheduleWidgetEnabled: false/);
   assert.match(mainJs, /getSettings\(\)\.scheduleWidgetEnabled/);
   assert.match(storeJs, /scheduleWidgetEnabled: false/);
@@ -312,6 +312,10 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /jobs:save/);
   assert.match(mainJs, /deleteWorkspaceNoteIfEmpty/);
   assert.match(mainJs, /createAppWindowIcon/);
+  assert.match(mainJs, /reserveDesktopIcons/);
+  assert.match(mainJs, /restoreDesktopIconsSync/);
+  assert.doesNotMatch(mainJs, /setAlwaysOnTop\(true, 'floating'\)/);
+  assert.match(indexHtml, /占据桌面图标网格；关闭主窗口后仍保留/);
   assert.doesNotMatch(indexHtml, /id="closeScheduleButton"|id="closeScheduleConvertButton"|id="closeTodoButton"/);
   assert.match(indexHtml, /id="cancelScheduleButton"/);
   assert.match(indexHtml, /id="cancelTodoButton"/);

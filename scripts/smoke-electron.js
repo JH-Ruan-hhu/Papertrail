@@ -499,6 +499,7 @@ app.whenReady().then(async () => {
           pageVisible: !document.querySelector('[data-page="home"]').hidden,
           todayFocusRemoved: !document.getElementById('todayFocusList') && !document.body.textContent.includes('今日重点'),
           focusTimerHome: Boolean(document.querySelector('.home-focus-timer #focusTimeRemaining')),
+          focusPanelCompact: document.querySelector('.home-focus-timer').getBoundingClientRect().height <= (innerHeight <= 900 ? 126 : 156),
           focusNotificationVisible: (() => {
             const option = document.querySelector('.home-focus-timer .focus-notification-option');
             const status = document.getElementById('focusNotificationStatus');

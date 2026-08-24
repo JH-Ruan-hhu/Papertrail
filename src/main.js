@@ -118,6 +118,7 @@ let updateState;
 let updaterInitialized = false;
 let quickCaptureWindow;
 let scheduleWidgetWindow;
+let desktopIconReservation;
 let quickCaptureHasContent = false;
 let focusTimer;
 let focusSampler;
@@ -1538,11 +1539,78 @@ exit 1
   return attached;
 }
 
+function desktopIconHelperPath() {
+  if (app.isPackaged) return path.join(process.resourcesPath, 'app.asar.unpacked', 'src', 'windows-desktop-icons.ps1');
+  return path.join(__dirname, 'windows-desktop-icons.ps1');
+}
+
+function runDesktopIconHelper(operation, extraEnv = {}, { synchronous = false } = {}) {
+  const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', desktopIconHelperPath()];
+  const options = {
+    windowsHide: true,
+    env: { ...process.env, YANJI_DESKTOP_ICON_OPERATION: operation, ...extraEnv },
+    encoding: 'utf8'
+  };
+  if (synchronous) return spawnSync('powershell.exe', args, { ...options, timeout: 8_000 });
+  return new Promise((resolve) => {
+    const child = spawn('powershell.exe', args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '';
+    let stderr = '';
+    let settled = false;
+    const finish = (value) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      resolve(value);
+    };
+    const timeout = setTimeout(() => {
+      child.kill();
+      finish({ status: null, signal: 'TIMEOUT', stdout, stderr, error: new Error(`desktop icon ${operation} timed out`) });
+    }, 8_000);
+    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+    child.on('error', (error) => finish({ status: null, signal: null, stdout, stderr, error }));
+    child.on('close', (status, signal) => finish({ status, signal, stdout, stderr }));
+  });
+}
+
+async function reserveDesktopIcons(window) {
+  if (process.platform !== 'win32' || process.env.YANJI_DESKTOP_WIDGET_NO_ICON_REFLOW || process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) return { reserved: true, movedIcons: 0, snapshot: null };
+  const result = await runDesktopIconHelper('reserve', { YANJI_DESKTOP_CHILD_HANDLE: nativeWindowHandleValue(window) });
+  const match = String(result.stdout || '').match(/YANJI_DESKTOP_RESERVATION=([^\r\n]+)/);
+  if (result.status !== 0 || !match) {
+    console.warn(`[研迹] 桌面图标占位失败: ${String(result.stderr || result.error?.message || 'unknown').trim()}`);
+    return { reserved: false, movedIcons: 0, snapshot: null };
+  }
+  const decoded = Buffer.from(match[1], 'base64').toString('utf8');
+  const movedIcons = decoded.includes('|') && decoded.split('|')[1] ? decoded.split('|')[1].split(';').filter(Boolean).length : 0;
+  return { reserved: true, movedIcons, snapshot: match[1] };
+}
+
+async function restoreDesktopIcons() {
+  const snapshot = desktopIconReservation;
+  desktopIconReservation = null;
+  if (!snapshot || process.platform !== 'win32') return true;
+  const result = await runDesktopIconHelper('restore', { YANJI_DESKTOP_ICON_SNAPSHOT: snapshot });
+  if (result.status !== 0) console.warn(`[研迹] 桌面图标位置恢复失败: ${String(result.stderr || result.error?.message || result.status).trim()}`);
+  return result.status === 0;
+}
+
+function restoreDesktopIconsSync() {
+  const snapshot = desktopIconReservation;
+  desktopIconReservation = null;
+  if (!snapshot || process.platform !== 'win32') return true;
+  const result = runDesktopIconHelper('restore', { YANJI_DESKTOP_ICON_SNAPSHOT: snapshot }, { synchronous: true });
+  return result.status === 0;
+}
+
 async function showScheduleWidget() {
   if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
     if (!scheduleWidgetWindow.isVisible()) scheduleWidgetWindow.showInactive();
     return desktopWidgetPresentation({
       attached: Boolean(scheduleWidgetWindow.yanjiDesktopAttached),
+      reserved: Boolean(scheduleWidgetWindow.yanjiDesktopReserved),
+      movedIcons: Number(scheduleWidgetWindow.yanjiMovedDesktopIcons) || 0,
       attempts: scheduleWidgetWindow.yanjiDesktopDiagnostic?.attempts || 0,
       supported: process.platform === 'win32'
     });
@@ -1579,6 +1647,7 @@ async function showScheduleWidget() {
   });
   scheduleWidgetWindow = window;
   window.on('closed', () => {
+    restoreDesktopIcons().catch(() => {});
     if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
   });
   await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'), { query: { appearance: store.getSettings().appearanceTheme } });
@@ -1596,18 +1665,21 @@ async function showScheduleWidget() {
     }
   }
   window.yanjiDesktopAttached = attached;
-  const widgetPresentation = desktopWidgetPresentation({ attached, attempts: diagnostics.length, supported: process.platform === 'win32' });
+  const reservation = attached ? await reserveDesktopIcons(window) : { reserved: false, movedIcons: 0, snapshot: null };
+  desktopIconReservation = reservation.snapshot;
+  window.yanjiDesktopReserved = reservation.reserved;
+  window.yanjiMovedDesktopIcons = reservation.movedIcons;
+  const widgetPresentation = desktopWidgetPresentation({ attached, reserved: reservation.reserved, movedIcons: reservation.movedIcons, attempts: diagnostics.length, supported: process.platform === 'win32' });
   window.yanjiDesktopDiagnostic = widgetPresentation.diagnostic;
   if (attached) {
     window.webContents.setZoomFactor(scaleFactor);
     await new Promise((resolve) => setTimeout(resolve, 80));
   } else {
-    window.setSize(width, height);
-    window.setAlwaysOnTop(true, 'floating');
-    window.setSkipTaskbar(true);
     if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
       console.warn(`DESKTOP_WIDGET_STATE ${JSON.stringify(window.yanjiDesktopDiagnostic)}`);
     }
+    window.close();
+    return widgetPresentation;
   }
   window.showInactive();
   return widgetPresentation;
@@ -2106,7 +2178,8 @@ function createWindow() {
     }
   });
   mainWindow.on('close', (event) => {
-    if (!isQuitting && store.getSettings().closeToTray && tray) {
+    const widgetKeepsHostAlive = Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) || store.getSettings().todayWidgetEnabled === true;
+    if (!isQuitting && tray && (store.getSettings().closeToTray || widgetKeepsHostAlive)) {
       event.preventDefault();
       mainWindow.hide();
     } else if (!isQuitting) {
@@ -2324,7 +2397,7 @@ function registerIpc() {
   ipcMain.handle('todos:convert-to-schedule', (_event, id, input) => getPlanningService().convertTodoToSchedule(String(id), input || {}));
   ipcMain.handle('schedule-widget:show', async () => {
     const result = await showScheduleWidget();
-    store.updateSettings({ todayWidgetEnabled: true, scheduleWidgetEnabled: true });
+    store.updateSettings({ todayWidgetEnabled: result.attached, scheduleWidgetEnabled: result.attached });
     broadcastSettings();
     return result;
   });
@@ -2540,14 +2613,17 @@ if (!gotLock) {
       }
       if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
         const result = await showScheduleWidget();
+        mainWindow.close();
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        const persistsWithoutMainWindow = !mainWindow.isVisible() && Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed() && scheduleWidgetWindow.isVisible());
         const bounds = scheduleWidgetWindow.getBounds();
         const [contentWidth, contentHeight] = scheduleWidgetWindow.getContentSize();
         const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
         const layout = await scheduleWidgetWindow.webContents.executeJavaScript(`(() => { const close = document.getElementById('closeWidgetButton').getBoundingClientRect(); const footer = document.querySelector('footer').getBoundingClientRect(); return { innerWidth, innerHeight, closeRight: close.right, footerBottom: footer.bottom }; })()`);
         const expectedWidth = Math.round(360 * scaleFactor);
         const expectedHeight = Math.round(480 * scaleFactor);
-        console.log(`DESKTOP_WIDGET_ATTACH_OK ${JSON.stringify({ attached: result.attached, scaleFactor, contentWidth, contentHeight, outerWidth: bounds.width, outerHeight: bounds.height, layout, alwaysOnTop: scheduleWidgetWindow.isAlwaysOnTop(), skipTaskbar: true })}`);
-        if (!result.attached || contentWidth !== expectedWidth || contentHeight !== expectedHeight || Math.abs(layout.innerWidth - 360) > 1 || Math.abs(layout.innerHeight - 480) > 1 || layout.closeRight > layout.innerWidth || layout.footerBottom > layout.innerHeight || scheduleWidgetWindow.isAlwaysOnTop()) {
+        console.log(`DESKTOP_WIDGET_ATTACH_OK ${JSON.stringify({ attached: result.attached, reserved: result.reserved, movedIcons: result.movedIcons, persistsWithoutMainWindow, scaleFactor, contentWidth, contentHeight, outerWidth: bounds.width, outerHeight: bounds.height, layout, alwaysOnTop: scheduleWidgetWindow.isAlwaysOnTop(), skipTaskbar: true })}`);
+        if (!result.attached || !result.reserved || !persistsWithoutMainWindow || contentWidth !== expectedWidth || contentHeight !== expectedHeight || Math.abs(layout.innerWidth - 360) > 1 || Math.abs(layout.innerHeight - 480) > 1 || layout.closeRight > layout.innerWidth || layout.footerBottom > layout.innerHeight || scheduleWidgetWindow.isAlwaysOnTop()) {
           throw new Error('桌面日程组件没有按 3:4 非置顶桌面层模式打开。');
         }
         try {
@@ -2576,6 +2652,7 @@ if (!gotLock) {
 app.on('activate', showMainWindow);
 app.on('before-quit', () => {
   isQuitting = true;
+  restoreDesktopIconsSync();
   if (scheduler) clearInterval(scheduler);
   const active = store && activeFocusSession();
   if (active) {
@@ -2596,7 +2673,8 @@ app.on('before-quit', () => {
   globalShortcut.unregisterAll();
 });
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin' && (isQuitting || !store?.getSettings().closeToTray || !tray)) {
+  const widgetKeepsHostAlive = Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) || store?.getSettings().todayWidgetEnabled === true;
+  if (process.platform !== 'darwin' && (isQuitting || (!store?.getSettings().closeToTray && !widgetKeepsHostAlive) || !tray)) {
     isQuitting = true;
     app.quit();
   }

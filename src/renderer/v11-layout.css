@@ -843,13 +843,13 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 166px minmax(0, 1fr);
+  grid-template-rows: 154px minmax(0, 1fr);
   gap: 18px;
 }
 .home-utility-stack > section { min-width: 0; min-height: 0; overflow: hidden; }
 .home-content-grid { grid-template-columns: minmax(0, 1fr); }
 .home-content-grid > .home-job-panel { width: 100%; }
-.home-focus-timer { padding: 13px 15px; }
+.home-focus-timer { padding: 10px 15px; }
 .home-focus-timer .panel-heading { margin-bottom: 2px; }
 .home-focus-timer .heading-icon { width: 28px; height: 28px; }
 .home-focus-timer .focus-timer-body {
@@ -872,8 +872,8 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .home-utility-stack .latest-notes { height: calc(100% - 48px); }
 
 @media (min-width: 1041px) and (max-height: 900px) {
-  .home-utility-stack { grid-template-rows: 136px minmax(0, 1fr); gap: 12px; }
-  .home-focus-timer { padding: 9px 11px; }
+  .home-utility-stack { grid-template-rows: 124px minmax(0, 1fr); gap: 12px; }
+  .home-focus-timer { padding: 6px 11px; }
   .home-focus-timer .panel-heading { display: none; }
   .home-focus-timer .focus-timer-body { min-height: 100%; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; }
   .home-focus-timer .focus-ring { width: 80px; }

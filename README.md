@@ -52,7 +52,12 @@ days after it; navigation shifts by one day instead of one calendar week. New
 schedule dialogs preserve drafts on Close, backdrop click, or Escape while
 Cancel discards them. The desktop schedule widget remembers whether it is
 enabled across cold starts, disables that behavior from its close button, and
-uses DPI-aware native sizing so all 360 x 480 content remains visible.
+uses DPI-aware native sizing so all 360 x 480 content remains visible. On
+Windows it is hosted in the desktop Shell instead of falling back to an
+always-on-top window, reserves its icon-grid rectangle, moves only overlapping
+icons to the nearest free cells, and restores their positions when the widget
+closes. Closing the main workbench keeps an enabled widget and the tray host
+running; choosing Exit from the tray closes both.
 
 Version 1.0.4 replaces the scroll-linked Settings sections with exact tabs,
 separates manuscript polling from general workbench behavior, and organizes
