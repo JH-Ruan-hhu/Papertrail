@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { applyListEditing, markerForLevel, nextMarker, parseListPrefix } = require('../src/renderer/list-editing');
+const { applyListEditing, continuationForLine, markerForLevel, nextMarker, parseListPrefix } = require('../src/renderer/list-editing');
 
 function textarea(value, start = value.length, end = start) {
   return {
@@ -40,4 +40,11 @@ test('Enter continues and exits lists while Tab transforms selected lines', () =
   assert.match(selected.value, /^1\. 第一项\n2\. 第二项$/);
   const composing = textarea('1. 中文');
   assert.equal(applyListEditing(composing, { key: 'Enter', isComposing: true }), false);
+});
+
+test('contenteditable notes derive Word-like list continuation text', () => {
+  assert.deepEqual(continuationForLine('1. 第一项'), { insertion: '\n2. ', exitList: false });
+  assert.deepEqual(continuationForLine('3、 第三项'), { insertion: '\n4、 ', exitList: false });
+  assert.deepEqual(continuationForLine('- 项目'), { insertion: '\n- ', exitList: false });
+  assert.deepEqual(continuationForLine('普通正文'), null);
 });

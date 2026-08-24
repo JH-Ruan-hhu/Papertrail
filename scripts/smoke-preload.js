@@ -264,8 +264,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
   scheduleTodo: async () => true,
   convertTodoToSchedule: async () => true,
   getLinkedSchedules: async () => [],
-  addNoteAttachment: async () => null,
-  getNoteAttachment: async () => null,
+  addNoteAttachment: async () => ({ id: 'smoke-wide-image', storedName: 'smoke-wide.png', originalName: 'wide-workbench-image.png', mimeType: 'image/png', size: 2048, createdAt: new Date().toISOString() }),
+  getNoteAttachment: async () => ({ mimeType: 'image/svg+xml', dataUrl: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="1600" height="240" viewBox="0 0 1600 240"%3E%3Crect width="1600" height="240" fill="%235874c8"/%3E%3C/svg%3E' }),
   deleteNoteAttachment: async () => true,
   deleteNoteIfEmpty: async (id) => {
     const note = (smokeWorkspace.notes || []).find((item) => item.id === id);

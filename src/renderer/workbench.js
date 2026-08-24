@@ -435,31 +435,8 @@ function renderHomeProgress() {
   document.getElementById('homeProgressFocus').textContent = String(Math.round(focusMs / 60_000));
 }
 
-function renderTodaySchedule() {
-  const today = new Date();
-  const events = schedulesForDay(today);
-  const allDayEvents = events.filter((item) => item.allDay);
-  const timedEvents = events.filter((item) => !item.allDay);
-  document.getElementById('todayScheduleTitle').textContent = new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric', weekday: 'long' }).format(today);
-  document.getElementById('todayScheduleSubtitle').textContent = events.length ? `${events.length} 个时间块 · 按开始时间排列` : '今天还没有安排，先留出一个时间块';
-  const renderItem = (item, allDay = false) => {
-    const timing = scheduleTimeForDay(item, today);
-    const linkedTodo = linkedTodoForSchedule(item);
-    const linkedLabel = linkedTodo
-      ? (linkedTodo.status === 'completed' ? '关联待办已完成' : `来自待办：${linkedTodo.title}`)
-      : '';
-    const linkedButton = linkedTodo ? `<button class="schedule-linked-todo-button" data-open-linked-todo="${wbEscape(linkedTodo.id)}" type="button">${wbEscape(linkedLabel)}</button>` : '';
-    return `<article class="today-schedule-item tone-${item.priority} ${allDay ? 'is-all-day' : ''}"><time>${allDay ? '全天' : timing.label}</time><div><strong>${wbEscape(item.title)}</strong><small>${priorityLabels[item.priority]}优先级${timing.spansDay ? ' · 跨日' : ''}</small>${linkedButton}</div><button class="today-schedule-edit" data-edit-schedule="${wbEscape(item.id)}" type="button">编辑</button></article>`;
-  };
-  const allDayList = document.getElementById('todayAllDayList');
-  allDayList.hidden = !allDayEvents.length;
-  allDayList.innerHTML = allDayEvents.map((item) => renderItem(item, true)).join('');
-  document.getElementById('todayScheduleList').innerHTML = timedEvents.length ? timedEvents.map((item) => renderItem(item)).join('') : '<div class="today-schedule-empty"><span>今日</span><p>还没有安排，给今天留下一件最重要的事</p></div>';
-}
-
 function renderTimeline() {
   const selected = wb.selectedDate;
-  renderTodaySchedule();
   const rangeStart = addDays(selected, -2);
   const rangeEnd = addDays(selected, 5);
   document.getElementById('timelineDate').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(rangeStart)} — ${new Intl.DateTimeFormat('zh-CN', { month: 'long', day: 'numeric' }).format(rangeEnd)}`;
@@ -549,9 +526,9 @@ function renderAttendanceUsage() {
   document.getElementById('focusUsageTotal').textContent = `${wb.usageRange === 'week' ? '本周' : '今天'} ${formatDuration(total * 1000)}`;
   document.querySelectorAll('[data-usage-range]').forEach((button) => button.classList.toggle('active', button.dataset.usageRange === wb.usageRange));
   list.innerHTML = entries.length
-    ? entries.map(([name, seconds]) => {
+    ? entries.map(([name, seconds], index) => {
       const width = Math.max(5, Math.min(100, Math.round((seconds / max) * 20) * 5));
-      return `<div class="focus-usage-row"><div><strong>${wbEscape(name)}</strong><time>${formatDuration(seconds * 1000)}</time></div><span><i class="usage-width-${width}" aria-hidden="true"></i></span></div>`;
+      return `<div class="focus-usage-row usage-tone-${(index % 8) + 1}"><div><strong>${wbEscape(name)}</strong><time>${formatDuration(seconds * 1000)}</time></div><span><i class="usage-width-${width}" aria-hidden="true"></i></span></div>`;
     }).join('')
     : `<p class="focus-usage-empty">${wb.usageRange === 'week' ? '本周' : '今天'}还没有打卡期间的应用记录</p>`;
 }
@@ -1059,8 +1036,8 @@ function renderNotes() {
   const query = document.getElementById('noteSearch').value.trim().toLowerCase();
   const notes = wb.workspace.notes.filter((note) => `${note.title} ${notePlainText(note.content)} ${metadataValueText(note)}`.toLowerCase().includes(query));
   document.getElementById('notesGrid').innerHTML = notes.length ? notes.map((note) => {
-    const metadata = wb.workspace.metadataFields.filter((field) => note.metadata?.[field.id] !== undefined && note.metadata[field.id] !== '' && note.metadata[field.id] !== false).slice(0, 3);
-    return `<article class="note-card" data-edit-note="${wbEscape(note.id)}"><header><span>${formatUpdated(note.updatedAt)}</span><button data-sticky-note="${wbEscape(note.id)}" type="button">置顶</button></header><h3>${wbEscape(note.title)}</h3><p>${wbEscape(notePlainText(note.content).slice(0, 220) || '空白笔记')}</p><footer>${metadata.map((field) => `<span>${wbEscape(field.name)} · ${wbEscape(note.metadata[field.id] === true ? '是' : note.metadata[field.id])}</span>`).join('')}</footer></article>`;
+    const metadata = wb.workspace.metadataFields.filter((field) => note.metadata?.[field.id] !== undefined && note.metadata[field.id] !== '' && note.metadata[field.id] !== false).slice(0, 6);
+    return `<article class="note-card" data-edit-note="${wbEscape(note.id)}"><header><span>${formatUpdated(note.updatedAt)}</span><button data-sticky-note="${wbEscape(note.id)}" type="button">置顶</button></header><h3>${wbEscape(note.title)}</h3><p>${wbEscape(notePlainText(note.content).slice(0, 220) || '空白笔记')}</p><footer class="note-metadata-tiles">${metadata.map((field, index) => `<span class="note-metadata-tile tone-${(index % 6) + 1}"><small>${wbEscape(field.name)}</small><b>${wbEscape(note.metadata[field.id] === true ? '是' : note.metadata[field.id])}</b></span>`).join('')}</footer></article>`;
   }).join('') : '<div class="workbench-empty notes-empty"><span>✎</span><h3>还没有笔记</h3><p>新建一条笔记，或用全局快捷键随手记录。</p></div>';
 }
 
@@ -1176,20 +1153,19 @@ function insertInlineNoteAttachment(attachment, dataUrl) {
   const range = restoreNoteEditorSelection();
   if (!range) return;
   range.deleteContents();
+  const imageBlock = document.createElement('div');
   const image = document.createElement('img');
   image.className = 'note-inline-image';
   image.dataset.noteAttachment = attachment.id;
   image.alt = attachment.originalName || '笔记图片';
   if (dataUrl) image.src = dataUrl;
-  range.insertNode(image);
-  let caretNode = image;
-  if (!image.nextSibling) {
-    const lineBreak = document.createElement('br');
-    image.parentNode.insertBefore(lineBreak, image.nextSibling);
-    caretNode = lineBreak;
-  }
+  imageBlock.appendChild(image);
+  range.insertNode(imageBlock);
+  const trailingLine = document.createElement('div');
+  trailingLine.appendChild(document.createElement('br'));
+  imageBlock.parentNode.insertBefore(trailingLine, imageBlock.nextSibling);
   const caret = document.createRange();
-  caret.setStartAfter(caretNode);
+  caret.setStart(trailingLine, 0);
   caret.collapse(true);
   const selection = window.getSelection();
   selection.removeAllRanges();
@@ -1269,6 +1245,7 @@ function openNoteEditor(note = null) {
   document.getElementById('noteMetadataPanel').hidden = true;
   document.getElementById('noteError').textContent = '';
   document.getElementById('noteSaveHint').textContent = note ? '已保存' : '输入后自动保存';
+  setNoteEditorFullscreen(false);
   renderNoteMetadata(note || { metadata: draft?.metadata || {} });
   wb.noteDirty = false;
   clearTimeout(wb.noteSaveTimer);
@@ -1277,6 +1254,15 @@ function openNoteEditor(note = null) {
     (note ? document.getElementById('noteContent') : document.getElementById('noteTitle')).focus();
     hydrateInlineNoteImages(note).catch(() => {});
   }, 20);
+}
+
+function setNoteEditorFullscreen(enabled) {
+  const dialog = document.getElementById('noteDialog');
+  const button = document.getElementById('toggleNoteFullscreenButton');
+  const active = Boolean(enabled);
+  dialog.classList.toggle('is-workspace-fullscreen', active);
+  button.setAttribute('aria-pressed', String(active));
+  button.textContent = active ? '退出全屏' : '全屏编辑';
 }
 
 function readNoteMetadata() {
@@ -1556,6 +1542,10 @@ function bindWorkbenchEvents() {
     panel.hidden = !panel.hidden;
   });
   document.getElementById('noteTitle').addEventListener('input', queueNoteAutoSave);
+  document.getElementById('toggleNoteFullscreenButton').addEventListener('click', () => {
+    setNoteEditorFullscreen(!document.getElementById('noteDialog').classList.contains('is-workspace-fullscreen'));
+    document.getElementById('noteContent').focus();
+  });
   const noteEditor = document.getElementById('noteContent');
   noteEditor.addEventListener('input', queueNoteAutoSave);
   noteEditor.addEventListener('mouseup', rememberNoteEditorSelection);
@@ -1567,6 +1557,10 @@ function bindWorkbenchEvents() {
       wb.noteDirty = true;
       wb.noteEditGeneration += 1;
       flushNoteEditor().catch(() => {});
+      return;
+    }
+    if (window.YanjiListEditing?.applyContentEditableListEditing(noteEditor, event)) {
+      event.preventDefault();
     }
   });
   noteEditor.addEventListener('click', async (event) => {
@@ -1711,10 +1705,15 @@ function bindWorkbenchEvents() {
   document.getElementById('noteDialog').addEventListener('cancel', (event) => {
     event.preventDefault();
     const dialog = event.currentTarget;
+    if (dialog.classList.contains('is-workspace-fullscreen')) {
+      setNoteEditorFullscreen(false);
+      return;
+    }
     closeNoteEditorAfterAutoSave(dialog).catch((error) => {
       document.getElementById('noteError').textContent = error.message || '笔记保存失败，窗口仍保持打开。';
     });
   });
+  document.getElementById('noteDialog').addEventListener('close', () => setNoteEditorFullscreen(false));
   document.getElementById('noteImagePreviewDialog').addEventListener('click', (event) => {
     if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget);
   });
@@ -1791,7 +1790,12 @@ function bindWorkbenchEvents() {
 async function initializeWorkbench() {
   bindWorkbenchEvents();
   renderClock();
-  setInterval(renderClock, 15_000);
+  setInterval(() => {
+    if (document.visibilityState === 'visible') renderClock();
+  }, 15_000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') renderClock();
+  });
   const settings = await workbenchApi.getSettings().catch(() => null);
   wb.settings = settings || {};
   if (settings?.quickCaptureShortcut) document.getElementById('shortcutTip').textContent = settings.quickCaptureShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');

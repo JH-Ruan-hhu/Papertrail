@@ -36,6 +36,8 @@ test('uses a sidebar layout with settings at the bottom and two add modes', () =
   assert.match(html, /id="productionReference"/);
   assert.match(html, /id="authorLastName"/);
   assert.match(html, /允许工作台提醒/);
+  assert.match(html, /id="todayWidgetEnabled"/);
+  assert.match(html, /data-reminder-dependent/);
   assert.match(html, /id="changeDataDirectoryButton"/);
   assert.match(html, /id="dataDirectory"/);
   assert.match(html, /id="currentVersion"/);
@@ -214,7 +216,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /id="homeProgressRateBar"/);
   assert.match(indexHtml, /id="homeDayOverview"/);
   assert.match(indexHtml, /id="scheduleBoard"/);
-  assert.match(indexHtml, /class="schedule-today-panel"[\s\S]*id="todayScheduleList"/);
+  assert.doesNotMatch(indexHtml, /class="schedule-today-panel"|id="todayScheduleList"/);
   assert.doesNotMatch(indexHtml, /id="agendaList"/);
   assert.match(indexHtml, /id="scheduleRecognition"/);
   assert.match(indexHtml, /id="attendanceGanttRows"/);
@@ -231,12 +233,14 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /id="noteContent"[^>]*contenteditable="true"/);
   assert.match(indexHtml, /id="addNoteImageButton"[^>]*>插入图片</);
   assert.match(indexHtml, /id="noteImagePreviewDialog"/);
+  assert.match(indexHtml, /id="toggleNoteFullscreenButton"[^>]*>全屏编辑</);
   assert.match(indexHtml, /id="jobBoard"/);
   assert.match(indexHtml, /id="homeJobSummary"/);
   assert.match(indexHtml, /id="jobDialog"/);
   assert.match(workbenchJs, /insertInlineNoteAttachment/);
   assert.match(workbenchJs, /workbenchApi\.getNoteAttachment/);
   assert.match(layoutCss, /\.note-inline-image/);
+  assert.match(layoutCss, /\.note-editor-modal\.is-workspace-fullscreen/);
   assert.match(indexHtml, /#1 · 多屏星空提醒/);
   assert.match(mainJs, /globalShortcut\.register/);
   assert.match(mainJs, /registerWorkbenchShortcuts/);
@@ -300,7 +304,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(workbenchJs, /button\.classList\.toggle\('is-clocked-in'/);
   assert.match(workbenchJs, /item\.date === todayKey/);
   assert.match(workbenchJs, /const record = await workbenchApi\.clockAttendance\(action\)/);
-  assert.match(workbenchJs, /renderTodaySchedule/);
+  assert.doesNotMatch(workbenchJs, /renderTodaySchedule/);
   assert.doesNotMatch(workbenchJs, /title: '删除日程'.*无法撤销。/);
   assert.doesNotMatch(workbenchJs, /title: '删除打卡记录'.*无法撤销。/);
   assert.doesNotMatch(workbenchJs, /title: '删除笔记'.*无法撤销。/);
@@ -378,4 +382,15 @@ test('destructive workbench actions use the Yanji confirmation dialog', () => {
   assert.match(indexHtml, /id="yanjiConfirmDialog"/);
   assert.match(sharedUiJs, /window\.yanjiConfirm/);
   assert.doesNotMatch(workbenchJs, /\bconfirm\s*\(/);
+});
+
+test('hidden renderer work is throttled and the close-to-tray window is released', () => {
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  assert.match(mainJs, /backgroundThrottling:\s*true/);
+  assert.match(mainJs, /scheduleHiddenMainWindowRelease\(\)/);
+  assert.match(mainJs, /!candidate\.isVisible\(\)\) candidate\.destroy\(\)/);
+  assert.match(appJs, /document\.visibilityState === 'visible'\) render\(\)/);
+  assert.match(workbenchJs, /document\.visibilityState === 'visible'\) renderClock\(\)/);
 });

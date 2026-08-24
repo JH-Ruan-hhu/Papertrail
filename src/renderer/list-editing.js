@@ -54,6 +54,72 @@ function nextMarker(prefix) {
   return prefix.marker;
 }
 
+function continuationForLine(line) {
+  const prefix = parseListPrefix(line);
+  if (!prefix) return null;
+  const body = String(line || '').slice(prefix.contentStart).trim();
+  return body
+    ? { insertion: `\n${prefix.indent}${nextMarker(prefix)} `, exitList: false }
+    : { insertion: prefix.indent, exitList: true };
+}
+
+function insertContentEditableText(editor, text) {
+  const selection = editor?.ownerDocument?.defaultView?.getSelection?.();
+  if (!selection?.rangeCount) return false;
+  const range = selection.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) return false;
+  range.deleteContents();
+  const node = editor.ownerDocument.createTextNode(text);
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  selection.removeAllRanges();
+  selection.addRange(range);
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
+
+function currentContentEditableLine(editor) {
+  const selection = editor?.ownerDocument?.defaultView?.getSelection?.();
+  if (!selection?.rangeCount || !selection.isCollapsed) return null;
+  const caret = selection.getRangeAt(0);
+  if (!editor.contains(caret.commonAncestorContainer)) return null;
+  const anchorElement = caret.endContainer.nodeType === 1 ? caret.endContainer : caret.endContainer.parentElement;
+  const block = anchorElement?.closest?.('p, div, li');
+  if (block && block !== editor && editor.contains(block)) {
+    const beforeBlockCaret = caret.cloneRange();
+    beforeBlockCaret.selectNodeContents(block);
+    beforeBlockCaret.setEnd(caret.endContainer, caret.endOffset);
+    return beforeBlockCaret.toString().split('\n').at(-1) || '';
+  }
+  const before = caret.cloneRange();
+  before.selectNodeContents(editor);
+  before.setEnd(caret.endContainer, caret.endOffset);
+  return before.toString().split('\n').at(-1) || '';
+}
+
+function exitContentEditableList(editor, indentation = '') {
+  const selection = editor?.ownerDocument?.defaultView?.getSelection?.();
+  if (!selection?.rangeCount || !selection.isCollapsed) return false;
+  const caret = selection.getRangeAt(0);
+  const node = caret.endContainer;
+  if (node.nodeType !== 3 || !editor.contains(node)) return false;
+  const lineStart = node.nodeValue.lastIndexOf('\n', Math.max(0, caret.endOffset - 1)) + 1;
+  const replacement = caret.cloneRange();
+  replacement.setStart(node, lineStart);
+  replacement.deleteContents();
+  return insertContentEditableText(editor, indentation);
+}
+
+function applyContentEditableListEditing(editor, event) {
+  if (!editor || event?.isComposing || event?.keyCode === 229 || event?.key !== 'Enter') return false;
+  const line = currentContentEditableLine(editor);
+  const continuation = continuationForLine(line);
+  if (!continuation) return false;
+  if (continuation.exitList) return exitContentEditableList(editor, continuation.insertion);
+  return insertContentEditableText(editor, continuation.insertion);
+}
+
 function lineBounds(value, start, end = start) {
   const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
   let lineEnd = value.indexOf('\n', end);
@@ -123,6 +189,6 @@ function applyListEditing(textarea, event) {
   return false;
 }
 
-const listEditingApi = { applyListEditing, parseListPrefix, markerForLevel, nextMarker };
+const listEditingApi = { applyContentEditableListEditing, applyListEditing, continuationForLine, parseListPrefix, markerForLevel, nextMarker };
 if (typeof window !== 'undefined') window.YanjiListEditing = listEditingApi;
 if (typeof module !== 'undefined' && module.exports) module.exports = listEditingApi;

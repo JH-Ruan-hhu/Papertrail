@@ -12,6 +12,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { app, BrowserWindow } = require('electron');
 
+function exitSmoke(code) {
+  for (const window of BrowserWindow.getAllWindows()) {
+    if (!window.isDestroyed()) window.destroy();
+  }
+  app.exit(code);
+}
+
 app.disableHardwareAcceleration();
 app.commandLine.appendSwitch('disable-gpu');
 app.commandLine.appendSwitch('disable-gpu-compositing');
@@ -172,6 +179,18 @@ app.whenReady().then(async () => {
       document.getElementById('settingsButton').click();
       document.querySelector('[data-settings-section="notifications"]').click();
       const notificationsVisible = !document.querySelector('[data-settings-panel="notifications"]').hidden;
+      const reminderMaster = document.getElementById('notifications');
+      reminderMaster.checked = false;
+      reminderMaster.dispatchEvent(new Event('change', { bubbles: true }));
+      const reminderDependents = [...document.querySelectorAll('[data-reminder-dependent] input, [data-reminder-dependent] select')];
+      const remindersClosedTogether = reminderDependents.every((control) => control.disabled)
+        && !document.getElementById('eventNotifications').checked
+        && !document.getElementById('todoNotifications').checked;
+      reminderMaster.checked = true;
+      reminderMaster.dispatchEvent(new Event('change', { bubbles: true }));
+      const remindersStayOffWhenReenabled = reminderDependents.every((control) => !control.disabled)
+        && !document.getElementById('eventNotifications').checked
+        && !document.getElementById('todoNotifications').checked;
       document.querySelector('[data-settings-section="tracking"]').click();
       const trackingVisible = !document.querySelector('[data-settings-panel="tracking"]').hidden;
       document.querySelector('[data-settings-section="storage"]').click();
@@ -192,6 +211,11 @@ app.whenReady().then(async () => {
         && document.getElementById('updateProgress').getAttribute('aria-valuenow') === '100';
       document.querySelector('[data-settings-section="general"]').click();
       const generalVisible = !document.querySelector('[data-settings-panel="general"]').hidden;
+      const todayOverviewSwitchVisible = document.getElementById('todayWidgetEnabled').getBoundingClientRect().height > 0;
+      const widgetMaster = document.getElementById('todayWidgetEnabled');
+      widgetMaster.checked = false;
+      widgetMaster.dispatchEvent(new Event('change', { bubbles: true }));
+      const widgetChildrenDisabled = [...document.querySelectorAll('[data-widget-dependent] input')].every((control) => control.disabled);
       const startAtLogin = document.getElementById('startAtLogin');
       startAtLogin.checked = true;
       document.querySelector('[data-settings-section="storage"]').click();
@@ -199,7 +223,7 @@ app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 180));
       const draftPreserved = startAtLogin.checked;
       document.querySelector('[data-workbench-page="home"]').click();
-      return { notificationsVisible, trackingVisible, storageVisible, storageSelectedExactly, updatesVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, draftPreserved };
+      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, trackingVisible, storageVisible, storageSelectedExactly, updatesVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, todayOverviewSwitchVisible, widgetChildrenDisabled, draftPreserved };
     })()
   `);
   if (!Object.values(settingsDraftResult).every(Boolean)) {
@@ -426,6 +450,7 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 80));
         const result = {
           pageVisible: !document.querySelector('[data-page="schedule"]').hidden,
+          todayPanelRemoved: !document.querySelector('.schedule-today-panel'),
           dayColumns: document.querySelectorAll('#scheduleBoard .schedule-board-column').length,
           centeredEightDays: boardDates[0] === localKey(twoDaysAgo) && boardDates[2] === localKey(today) && boardDates[7] === localKey(fiveDaysLater),
           scheduleCards: cards.length,
@@ -449,7 +474,7 @@ app.whenReady().then(async () => {
         return result;
       })()
     `);
-    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
@@ -606,6 +631,7 @@ app.whenReady().then(async () => {
           ganttBars: document.querySelectorAll('#attendanceGanttRows .attendance-bar').length,
           appRows: document.querySelectorAll('#focusUsageList .focus-usage-row').length,
           usageWidths: [...document.querySelectorAll('#focusUsageList .focus-usage-row i')].map((item) => Math.round(item.getBoundingClientRect().width)),
+          usageColors: [...document.querySelectorAll('#focusUsageList .focus-usage-row i')].map((item) => getComputedStyle(item).backgroundImage),
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
@@ -613,7 +639,8 @@ app.whenReady().then(async () => {
     const usagePixelWidths = attendanceResult.usageWidths;
     const usageWidthsAreProportional = usagePixelWidths.length < 2
       || Math.max(...usagePixelWidths) - Math.min(...usagePixelWidths) >= 8;
-    if (!attendanceResult.pageVisible || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 2 || attendanceResult.appRows < 1 || !usageWidthsAreProportional || attendanceResult.horizontalOverflow) {
+    const usageColorsAreDistinct = attendanceResult.usageColors.length < 2 || new Set(attendanceResult.usageColors).size > 1;
+    if (!attendanceResult.pageVisible || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 2 || attendanceResult.appRows < 1 || !usageWidthsAreProportional || !usageColorsAreDistinct || attendanceResult.horizontalOverflow) {
       throw new Error(`Workbench attendance smoke failed: ${JSON.stringify(attendanceResult)}`);
     }
     console.log(`WORKBENCH_ATTENDANCE_OK ${JSON.stringify(attendanceResult)}`);
@@ -634,6 +661,39 @@ app.whenReady().then(async () => {
         metadataRow.querySelector('[data-option-draft]').dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
         const multiOptions = metadataRow.querySelectorAll('[data-option-chips] span').length === initialOptions + 2;
         document.querySelector('[data-close-dialog="metadataDialog"]').click();
+        document.querySelector('#notesGrid .note-card').click();
+        const noteEditor = document.getElementById('noteContent');
+        document.getElementById('toggleNoteFullscreenButton').click();
+        const fullscreenDialog = document.getElementById('noteDialog');
+        const fullscreenRect = fullscreenDialog.getBoundingClientRect();
+        const sidebarRect = document.querySelector('.sidebar').getBoundingClientRect();
+        const fullscreenExcludesSidebar = fullscreenDialog.classList.contains('is-workspace-fullscreen')
+          && fullscreenRect.left >= sidebarRect.right - 1
+          && fullscreenRect.right >= innerWidth - 1;
+        fullscreenDialog.dispatchEvent(new Event('cancel', { bubbles: true, cancelable: true }));
+        const escapeOnlyExitsFullscreen = fullscreenDialog.open && !fullscreenDialog.classList.contains('is-workspace-fullscreen');
+        noteEditor.innerHTML = '1. 第一项';
+        const listRange = document.createRange();
+        listRange.selectNodeContents(noteEditor);
+        listRange.collapse(false);
+        const listSelection = getSelection();
+        listSelection.removeAllRanges();
+        listSelection.addRange(listRange);
+        noteEditor.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' }));
+        const automaticNumbering = noteEditor.textContent.includes('\\n2. ');
+        document.getElementById('addNoteImageButton').click();
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        await flushNoteEditor();
+        const savedWideNote = wb.editingNote;
+        openNoteEditor(savedWideNote);
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const wideImage = noteEditor.querySelector('img[data-note-attachment="smoke-wide-image"]');
+        const wideImagePersists = Boolean(wideImage?.src);
+        const wideImageFits = Boolean(wideImage) && wideImage.getBoundingClientRect().width <= noteEditor.clientWidth;
+        const wideImageOwnRow = Boolean(wideImage?.parentElement) && wideImage.parentElement.getBoundingClientRect().width >= noteEditor.clientWidth - 34;
+        const serializedNote = readNoteEditorContent();
+        const controlledImageSource = serializedNote.includes('data-note-attachment="smoke-wide-image"') && !serializedNote.includes('data:image');
+        document.getElementById('cancelNoteButton').click();
         document.getElementById('quickNoteButton').click();
         const noteOpened = document.getElementById('noteDialog').open;
         document.getElementById('noteDialog').dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -649,6 +709,13 @@ app.whenReady().then(async () => {
           noteCards: document.querySelectorAll('#notesGrid .note-card').length,
           metadataButton: Boolean(document.getElementById('manageMetadataButton')),
           multiOptions,
+          fullscreenExcludesSidebar,
+          escapeOnlyExitsFullscreen,
+          automaticNumbering,
+          wideImagePersists,
+          wideImageFits,
+          wideImageOwnRow,
+          controlledImageSource,
           noteOpened,
           noteBackdropClosed,
           rightClickConfirmation,
@@ -657,7 +724,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || !notesResult.multiOptions || !notesResult.noteOpened || !notesResult.noteBackdropClosed || !notesResult.rightClickConfirmation || !notesResult.rightClickDeleted || notesResult.horizontalOverflow) {
+    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || !notesResult.multiOptions || !notesResult.fullscreenExcludesSidebar || !notesResult.escapeOnlyExitsFullscreen || !notesResult.automaticNumbering || !notesResult.wideImagePersists || !notesResult.wideImageFits || !notesResult.wideImageOwnRow || !notesResult.controlledImageSource || !notesResult.noteOpened || !notesResult.noteBackdropClosed || !notesResult.rightClickConfirmation || !notesResult.rightClickDeleted || notesResult.horizontalOverflow) {
       throw new Error(`Workbench notes smoke failed: ${JSON.stringify(notesResult)}`);
     }
     console.log(`WORKBENCH_NOTES_OK ${JSON.stringify(notesResult)}`);
@@ -785,13 +852,15 @@ app.whenReady().then(async () => {
     console.log(`WORKBENCH_STICKY_OK ${JSON.stringify(stickyResult)}`);
     await captureStablePage(process.env.WORKBENCH_STICKY_OUTPUT);
   }
-  if (!process.env.PAPERTRAIL_SMOKE_OUTPUT) {
+  const captureWasRequested = Object.entries(process.env).some(([key, value]) => (
+    key.endsWith('_OUTPUT') && Boolean(value)
+  ));
+  if (!captureWasRequested) {
     window.webContents.invalidate();
     await window.webContents.capturePage();
   }
-  window.destroy();
-  app.quit();
+  exitSmoke(0);
 }).catch((error) => {
   console.error(`SMOKE_FAILED ${error?.stack || error}`);
-  app.exit(1);
+  exitSmoke(1);
 });

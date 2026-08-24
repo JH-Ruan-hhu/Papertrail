@@ -839,7 +839,28 @@ function populateSettings() {
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
   document.getElementById('quickCaptureShortcut').value = settings.quickCaptureShortcut || 'CommandOrControl+Shift+Space';
   document.getElementById('stickyNoteShortcut').value = settings.stickyNoteShortcut || 'CommandOrControl+Alt+N';
+  syncReminderSettings();
+  syncTodayWidgetSettings();
   populateSettingsMetadata();
+}
+
+function syncReminderSettings() {
+  const enabled = document.getElementById('notifications').checked;
+  document.querySelectorAll('[data-reminder-dependent]').forEach((row) => {
+    row.classList.toggle('is-setting-disabled', !enabled);
+    row.querySelectorAll('input, select, button').forEach((control) => {
+      if (!enabled && control.type === 'checkbox') control.checked = false;
+      control.disabled = !enabled;
+    });
+  });
+}
+
+function syncTodayWidgetSettings() {
+  const enabled = document.getElementById('todayWidgetEnabled').checked;
+  document.querySelectorAll('[data-widget-dependent]').forEach((row) => {
+    row.classList.toggle('is-setting-disabled', !enabled);
+    row.querySelectorAll('input, select, button').forEach((control) => { control.disabled = !enabled; });
+  });
 }
 
 const SETTINGS_SECTION_COPY = Object.freeze({
@@ -1176,6 +1197,8 @@ function bindEvents() {
   elements.changeDataDirectoryButton.addEventListener('click', changeDataDirectory);
   elements.deleteBackupsButton.addEventListener('click', deleteDataBackups);
   elements.updateActionButton.addEventListener('click', handleUpdateAction);
+  document.getElementById('notifications').addEventListener('change', syncReminderSettings);
+  document.getElementById('todayWidgetEnabled').addEventListener('change', syncTodayWidgetSettings);
   elements.addDialog.addEventListener('click', closeOnBackdrop);
   elements.journeyDialog.addEventListener('click', closeOnBackdrop);
   elements.workflowDialog.addEventListener('click', closeOnBackdrop);
@@ -1213,7 +1236,12 @@ async function initialize() {
       state.settings = settings;
       if (!elements.settingsDialog.hidden) populateSettings();
     });
-    setInterval(render, 60_000);
+    setInterval(() => {
+      if (document.visibilityState === 'visible') render();
+    }, 60_000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') render();
+    });
   } catch (error) {
     showToast(getErrorMessage(error), 'error');
   }

@@ -169,13 +169,6 @@
             <div><p class="eyebrow">WEEKLY SCHEDULE</p><h1>日程</h1><p>按日期浏览完整安排，也可把当日清单放到桌面</p></div>
             <div class="page-actions"><button class="button secondary" id="openScheduleWidgetButton" type="button" title="以 3×4 桌面组件显示当日日程">放到桌面</button><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
           </header>
-          <section class="schedule-today-panel" aria-label="今日安排">
-            <div class="schedule-today-heading">
-              <div><p class="eyebrow">TODAY</p><h2 id="todayScheduleTitle">今日安排</h2><p id="todayScheduleSubtitle">今天还没有安排</p></div>
-            </div>
-            <div id="todayAllDayList" class="today-all-day-list" hidden></div>
-            <div id="todayScheduleList" class="today-schedule-list"></div>
-          </section>
           <div class="timeline-datebar schedule-weekbar">
             <button id="previousDayButton" type="button" aria-label="前一天">‹</button>
             <div><strong id="timelineDate"></strong><span id="timelineDateSubtitle"></span></div>
@@ -334,6 +327,12 @@
                 <div class="setting-row"><div><strong>关闭时驻留托盘</strong><small>关闭主窗口后继续运行日程提醒、便笺和投稿检查</small></div><label class="switch"><input id="closeToTray" type="checkbox"><span></span></label></div>
                 <div class="setting-row"><div><strong>登录 Windows 后启动</strong><small>自动启动研迹工作台并驻留系统托盘</small></div><label class="switch"><input id="startAtLogin" type="checkbox"><span></span></label></div>
               </div>
+              <h3>今日概览</h3>
+              <div class="settings-group" id="todayWidgetSettingsGroup">
+                <div class="setting-row"><div><strong>打开今日概览</strong><small>占据桌面图标网格；关闭主窗口后仍保留</small></div><label class="switch"><input id="todayWidgetEnabled" type="checkbox"><span></span></label></div>
+                <div class="setting-row" data-widget-dependent><div><strong>显示日程</strong></div><label class="switch"><input id="widgetShowSchedules" type="checkbox"><span></span></label></div>
+                <div class="setting-row" data-widget-dependent><div><strong>显示待办</strong></div><label class="switch"><input id="widgetShowTodos" type="checkbox"><span></span></label></div>
+              </div>
               <h3>快捷操作</h3>
               <div class="settings-group">
                 <div class="setting-row stacked"><label for="quickCaptureShortcut"><strong>即写即走快捷键</strong><small>全局唤醒屏幕中央快捷输入窗</small></label><input id="quickCaptureShortcut" type="text" value="CommandOrControl+Shift+Space" spellcheck="false"></div>
@@ -348,7 +347,6 @@
                 <label class="appearance-choice"><input type="radio" name="appearanceTheme" value="liquid-glass"><span class="appearance-preview liquid-preview"><i></i><b></b></span><strong>液态玻璃</strong><small>半透明层次、柔和光晕与流畅过渡</small></label>
                 <label class="appearance-choice"><input type="radio" name="appearanceTheme" value="classic"><span class="appearance-preview classic-preview"><i></i><b></b></span><strong>经典</strong><small>保留 v1.0.5 的不透明工作台风格</small></label>
               </div>
-              <div class="settings-group"><div class="setting-row"><div><strong>桌面今日概览</strong><small>占据桌面图标网格；关闭主窗口后仍保留</small></div><label class="switch"><input id="todayWidgetEnabled" type="checkbox"><span></span></label></div><div class="setting-row"><div><strong>桌面显示日程</strong></div><label class="switch"><input id="widgetShowSchedules" type="checkbox"><span></span></label></div><div class="setting-row"><div><strong>桌面显示待办</strong></div><label class="switch"><input id="widgetShowTodos" type="checkbox"><span></span></label></div></div>
             </section>
 
             <section class="settings-panel" data-settings-panel="notifications" role="tabpanel" hidden>
@@ -356,10 +354,10 @@
               <h3>Windows 通知</h3>
               <div class="settings-group">
                 <div class="setting-row"><div><strong>允许工作台提醒</strong><small>用于日程、待办、稿件截止任务和投稿状态变化</small></div><label class="switch"><input id="notifications" type="checkbox"><span></span></label></div>
-                <div class="setting-row"><div><strong>日程提醒</strong><small>时间块到点前提醒一次</small></div><label class="switch"><input id="eventNotifications" type="checkbox"><span></span></label></div>
-                <div class="setting-row"><div><strong>待办提醒</strong><small>待办到期或逾期时提醒</small></div><label class="switch"><input id="todoNotifications" type="checkbox"><span></span></label></div>
-                <div class="setting-row stacked"><label for="defaultEventReminderMinutes"><strong>默认日程提醒</strong><small>新建日程时使用，可单独修改</small></label><select id="defaultEventReminderMinutes"><option value="null">不提醒</option><option value="0">到点</option><option value="5">提前 5 分钟</option><option value="10">提前 10 分钟</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></div>
-                <div class="setting-row stacked"><label for="defaultTodoReminderMode"><strong>默认待办提醒</strong><small>无截止日期的待办不会产生提醒</small></label><select id="defaultTodoReminderMode"><option value="none">不提醒</option><option value="at-due">到期时</option><option value="15m-before">提前 15 分钟</option><option value="1h-before">提前 1 小时</option><option value="1d-before">提前 1 天</option></select></div>
+                <div class="setting-row" data-reminder-dependent><div><strong>日程提醒</strong><small>时间块到点前提醒一次</small></div><label class="switch"><input id="eventNotifications" type="checkbox"><span></span></label></div>
+                <div class="setting-row" data-reminder-dependent><div><strong>待办提醒</strong><small>待办到期或逾期时提醒</small></div><label class="switch"><input id="todoNotifications" type="checkbox"><span></span></label></div>
+                <div class="setting-row stacked" data-reminder-dependent><label for="defaultEventReminderMinutes"><strong>默认日程提醒</strong><small>新建日程时使用，可单独修改</small></label><select id="defaultEventReminderMinutes"><option value="null">不提醒</option><option value="0">到点</option><option value="5">提前 5 分钟</option><option value="10">提前 10 分钟</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></div>
+                <div class="setting-row stacked" data-reminder-dependent><label for="defaultTodoReminderMode"><strong>默认待办提醒</strong><small>无截止日期的待办不会产生提醒</small></label><select id="defaultTodoReminderMode"><option value="none">不提醒</option><option value="at-due">到期时</option><option value="15m-before">提前 15 分钟</option><option value="1h-before">提前 1 小时</option><option value="1d-before">提前 1 天</option></select></div>
               </div>
             </section>
 
@@ -531,7 +529,7 @@
 
     <dialog id="noteDialog" class="modal workbench-editor-modal note-editor-modal">
       <form method="dialog" id="noteForm">
-        <div class="modal-head"><div><p class="eyebrow">NOTE</p><h2 id="noteDialogTitle">新建笔记</h2><p>元数据默认收起，不打断正常书写</p></div></div>
+        <div class="modal-head"><div><p class="eyebrow">NOTE</p><h2 id="noteDialogTitle">新建笔记</h2><p>元数据默认收起，不打断正常书写</p></div><button class="button secondary compact" id="toggleNoteFullscreenButton" type="button" aria-pressed="false">全屏编辑</button></div>
         <input id="noteId" type="hidden">
         <input id="noteEntryId" type="hidden">
         <input id="noteTitle" class="note-title-input" maxlength="300" placeholder="笔记标题">

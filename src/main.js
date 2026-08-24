@@ -108,6 +108,7 @@ const TITLE_BAR_NORMAL = Object.freeze({ color: '#eaf5fb', symbolColor: '#35566b
 const TITLE_BAR_MODAL = Object.freeze({ color: '#9dabb6', symbolColor: '#f5fbfe', height: 38 });
 
 let mainWindow;
+let mainWindowReleaseTimer;
 let tray;
 let store;
 let planningService;
@@ -1255,7 +1256,8 @@ function createQuickCaptureWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      devTools: !app.isPackaged
+      devTools: !app.isPackaged,
+      backgroundThrottling: true
     }
   });
   quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'), { query: { appearance: store.getSettings().appearanceTheme } });
@@ -2100,6 +2102,10 @@ function validateSettings(patch) {
   ]) {
     if (key in patch) allowed[key] = Boolean(patch[key]);
   }
+  if (allowed.notifications === false) {
+    allowed.eventNotifications = false;
+    allowed.todoNotifications = false;
+  }
   for (const key of ['quickCaptureShortcut', 'stickyNoteShortcut']) {
     if (!(key in patch)) continue;
     const shortcut = String(patch[key] || '').trim();
@@ -2158,16 +2164,20 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      devTools: !app.isPackaged
+      devTools: !app.isPackaged,
+      backgroundThrottling: true
     }
   });
 
   mainWindow.setIcon(createAppWindowIcon());
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { appearance: store.getSettings().appearanceTheme } });
   mainWindow.webContents.once('did-finish-load', () => {
-    if (!process.argv.includes('--hidden')) {
+    const startsHidden = process.argv.includes('--hidden');
+    if (!startsHidden) {
       if (!mainWindow.isMaximized()) mainWindow.maximize();
       mainWindow.show();
+    } else {
+      scheduleHiddenMainWindowRelease();
     }
     if (coldStartRefreshStarted || !store.getSettings().refreshOnStartup) return;
     coldStartRefreshStarted = true;
@@ -2184,10 +2194,27 @@ function createWindow() {
     if (!isQuitting && tray && (store.getSettings().closeToTray || widgetKeepsHostAlive)) {
       event.preventDefault();
       mainWindow.hide();
+      mainWindow.webContents.setAudioMuted(true);
+      scheduleHiddenMainWindowRelease();
     } else if (!isQuitting) {
       isQuitting = true;
     }
   });
+  mainWindow.on('closed', () => {
+    clearTimeout(mainWindowReleaseTimer);
+    mainWindowReleaseTimer = null;
+    mainWindow = null;
+  });
+}
+
+function scheduleHiddenMainWindowRelease() {
+  clearTimeout(mainWindowReleaseTimer);
+  const candidate = mainWindow;
+  mainWindowReleaseTimer = setTimeout(() => {
+    mainWindowReleaseTimer = null;
+    if (!isQuitting && candidate && !candidate.isDestroyed() && !candidate.isVisible()) candidate.destroy();
+  }, 30_000);
+  mainWindowReleaseTimer.unref?.();
 }
 
 function createTrayIcon() {
@@ -2217,7 +2244,10 @@ function createTray() {
 }
 
 function showMainWindow() {
+  clearTimeout(mainWindowReleaseTimer);
+  mainWindowReleaseTimer = null;
   if (!mainWindow || mainWindow.isDestroyed()) createWindow();
+  mainWindow.webContents.setAudioMuted(false);
   if (mainWindow.isMinimized()) mainWindow.restore();
   if (!mainWindow.isMaximized()) mainWindow.maximize();
   mainWindow.show();
@@ -2527,17 +2557,25 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle('settings:get', () => settingsForRenderer());
-  ipcMain.handle('settings:update', (_event, patch) => {
+  ipcMain.handle('settings:update', async (_event, patch) => {
     const validated = validateSettings(patch);
+    const previousSettings = store.getSettings();
     if ('quickCaptureShortcut' in validated || 'stickyNoteShortcut' in validated) {
-      const previousSettings = store.getSettings();
       const registered = registerWorkbenchShortcuts({ ...previousSettings, ...validated });
       if (!registered) {
         registerWorkbenchShortcuts(previousSettings, { allowFallback: true });
         throw new Error('快捷键无效、重复或已被其他软件占用，请更换后重试。');
       }
     }
-    const updated = store.updateSettings(validated);
+    let updated = store.updateSettings(validated);
+    const widgetSettingChanged = 'todayWidgetEnabled' in validated
+      && Boolean(previousSettings.todayWidgetEnabled) !== Boolean(validated.todayWidgetEnabled);
+    if (widgetSettingChanged && validated.todayWidgetEnabled) {
+      const result = await showScheduleWidget();
+      if (!result.attached) updated = store.updateSettings({ todayWidgetEnabled: false, scheduleWidgetEnabled: false });
+    } else if (widgetSettingChanged && scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
+      scheduleWidgetWindow.close();
+    }
     updateLoginItemSetting(updated.startAtLogin);
     broadcastSettings();
     if (Object.keys(validated).some((key) => ['todayWidgetEnabled', 'scheduleWidgetEnabled', 'widgetShowSchedules', 'widgetShowTodos', 'widgetShowCompletedTodos'].includes(key))) broadcastWorkspace();
@@ -2573,6 +2611,12 @@ if (process.env.YANJI_QA_USER_DATA) {
   app.setPath('userData', path.resolve(process.env.YANJI_QA_USER_DATA));
 }
 
+// Set the Windows identity before the single-instance lock and before any
+// BrowserWindow exists, so taskbar grouping resolves the packaged Yanji icon
+// instead of inheriting Electron's executable identity.
+app.setName('研迹');
+app.setAppUserModelId(APP_ID);
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
@@ -2580,8 +2624,6 @@ if (!gotLock) {
   app.on('second-instance', showMainWindow);
   app.whenReady().then(async () => {
     try {
-      app.setName('研迹');
-      app.setAppUserModelId(APP_ID);
       store = new JsonStore(configuredDataFilePath());
       store.load();
       planningService = createPlanningService({
