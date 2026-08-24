@@ -8,6 +8,11 @@ publisher-neutral.
 
 ## Version 1.2 workbench features
 
+Version 1.2.1 removes the colored halo outside Quick Capture. The capture card
+now fills its frameless window as one fixed material surface, keeps only its
+own rounded border, and no longer inherits the workspace Liquid Glass
+background.
+
 Version 1.2.0 removes the duplicate upcoming-schedule panel from the Job
 workspace and gives the six-stage application board the full content width.
 Every job record can now store an estimated annual salary in ten-thousands of
