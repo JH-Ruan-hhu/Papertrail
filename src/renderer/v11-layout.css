@@ -569,7 +569,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .panel-heading .eyebrow { margin: 0 0 3px; color: #7889b7; font-size: 8px; letter-spacing: .13em; }
 
 .home-schedule-panel .day-overview {
-  height: calc(100% - 50px);
+  height: calc(100% - 58px);
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -640,7 +640,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .latest-notes-panel { min-height: 0; }
 .latest-notes-panel .panel-heading-actions { flex: 0 0 auto; gap: 7px; }
 .latest-notes {
-  height: calc(100% - 52px);
+  height: calc(100% - 60px);
   min-height: 0;
   display: grid;
   grid-template-columns: 1fr;
@@ -799,7 +799,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   .home-focus-timer,
   .home-job-panel,
   .latest-notes-panel { padding: 13px 14px; }
-  .home-schedule-panel .day-overview { height: calc(100% - 43px); gap: 6px; }
+  .home-schedule-panel .day-overview { height: calc(100% - 51px); gap: 6px; }
   .home-schedule-panel .day-card { padding: 8px; }
   .home-schedule-panel .empty-mini { margin-top: 14px; }
   .home-focus-timer .focus-timer-body { grid-template-columns: 100px minmax(0, 1fr); gap: 8px; }
@@ -884,7 +884,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   .home-utility-stack .latest-notes-panel .panel-heading { margin-bottom: 4px; }
   .home-utility-stack .latest-notes-panel .panel-heading .eyebrow,
   .home-utility-stack .latest-notes-panel .panel-heading p { display: none; }
-  .home-utility-stack .latest-notes { height: calc(100% - 29px); grid-template-rows: 1fr; }
+  .home-utility-stack .latest-notes { height: calc(100% - 37px); grid-template-rows: 1fr; }
   .home-utility-stack .latest-note:nth-child(n+2) { display: none; }
 }
 

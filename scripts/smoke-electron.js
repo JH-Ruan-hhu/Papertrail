@@ -519,6 +519,13 @@ app.whenReady().then(async () => {
           jobSummaryVisible: Boolean(document.querySelector('.home-job-panel #homeJobSummary .home-job-row')),
           sixStageHomePipeline: document.querySelectorAll('#homeJobSummary .home-job-row').length === 6,
           startsToday: document.querySelector('#homeDayOverview .day-card strong')?.textContent === '今天',
+          comfortableBottomInset: (() => {
+            const dayCards = [...document.querySelectorAll('#homeDayOverview .day-card')].map(rect);
+            const noteCards = [...document.querySelectorAll('#latestNotes > *')].map(rect);
+            const dayBottom = Math.max(...dayCards.map((card) => card.bottom));
+            const noteBottom = Math.max(...noteCards.map((card) => card.bottom));
+            return schedule.bottom - dayBottom >= 8 && notes.bottom - noteBottom >= 8;
+          })(),
           latestNotesNoScroll: (() => {
             const list = document.getElementById('latestNotes');
             return getComputedStyle(list).overflowY === 'hidden' && list.scrollWidth <= list.clientWidth;

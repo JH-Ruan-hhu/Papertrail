@@ -264,6 +264,8 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /showDeadlineWindow/);
   assert.match(mainJs, /new Notification/);
   assert.match(mainJs, /APP_ICON_PATH = process\.platform === 'win32'/);
+  assert.match(mainJs, /nativeImage\.createFromPath\(APP_ICON_PATH\)/);
+  assert.match(mainJs, /app\.setAppUserModelId\(APP_ID\)/);
   assert.match(mainJs, /if \(!mainWindow\.isMaximized\(\)\) mainWindow\.maximize\(\)/);
   assert.match(mainJs, /closeStaleAttendanceRecords/);
   assert.match(mainJs, /reconcileStaleAttendance/);

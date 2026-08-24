@@ -13,7 +13,8 @@ cool-gray/indigo Liquid Glass palette. Home now starts its four-day schedule at
 today, uses a compact focus timer, shows note excerpts without scrollbars, and
 places the complete six-stage application pipeline across the page. The Job
 workspace is redesigned as a career dashboard with key metrics, a stage board,
-upcoming actions, interview management, and a data overview.
+upcoming actions, interview management, and a data overview. Windows windows
+now load the bundled multi-size ICO directly so the taskbar uses the Yanji icon.
 
 Version 1.1.3 adds a local job-application pipeline from 待投递 through Offer,
 an at-a-glance Home summary, an eight-day rolling schedule board, automatic

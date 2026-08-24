@@ -84,12 +84,13 @@ const {
 } = require('./update-core');
 
 const APP_NAME = '研迹 · 科研工作台';
+const APP_ID = 'io.papertrail.desktop';
 const BUILD_DIR = path.join(__dirname, '..', 'build');
 const APP_ICON_PNG_PATH = path.join(BUILD_DIR, 'icon.png');
 const APP_ICON_PATH = process.platform === 'win32' ? path.join(BUILD_DIR, 'icon.ico') : APP_ICON_PNG_PATH;
 
 function createAppWindowIcon() {
-  const image = nativeImage.createFromPath(APP_ICON_PNG_PATH);
+  const image = nativeImage.createFromPath(APP_ICON_PATH);
   return image.isEmpty() ? APP_ICON_PATH : image;
 }
 const MAX_HISTORY = 100;
@@ -2505,7 +2506,7 @@ if (!gotLock) {
   app.whenReady().then(async () => {
     try {
       app.setName('研迹');
-      app.setAppUserModelId('io.papertrail.desktop');
+      app.setAppUserModelId(APP_ID);
       store = new JsonStore(configuredDataFilePath());
       store.load();
       planningService = createPlanningService({
