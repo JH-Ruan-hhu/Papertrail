@@ -193,6 +193,31 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
   assert.match(appJs, /setTimeout\(finishEntering, 60\)/);
 });
 
+test('pointer sidebar navigation rises subtly while keyboard navigation stays immediate', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*workbench-page-rise 160ms var\(--ease-out\)/s);
+  assert.match(css, /@keyframes workbench-page-rise\s*\{[^}]*translateY\(6px\)/s);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*workbench-page-fade 120ms/);
+  assert.match(workbenchJs, /animate:\s*event\.detail\s*>\s*0/);
+  assert.match(workbenchJs, /previousPage !== page/);
+});
+
+test('installer and updater use Yanji-owned simplified interfaces', () => {
+  const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+  const installer = fs.readFileSync(path.join(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  assert.equal(packageJson.build.nsis.include, 'build/installer.nsh');
+  assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, false);
+  assert.match(installer, /Page custom YanjiInstallPageCreate YanjiInstallPageLeave/);
+  assert.match(installer, /立即安装/);
+  assert.match(installer, /安装不会移动或清除你的科研数据/);
+  assert.match(indexHtml, /class="update-journey"/);
+  assert.match(indexHtml, /检查版本[\s\S]*安全下载[\s\S]*重启升级/);
+  assert.match(appJs, /updateGroup\.dataset\.updateStatus = status/);
+});
+
 test('research workbench exposes home, rolling schedule board, metadata notes and quick capture', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');

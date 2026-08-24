@@ -8,6 +8,12 @@ publisher-neutral.
 
 ## Version 1.2 workbench features
 
+Current `main` adds Yanji-owned install and update experiences: a compact
+single-page NSIS installer with an editable destination and desktop-shortcut
+choice, a three-stage in-app updater, and subtle pointer-only page-rise motion
+for sidebar navigation. Keyboard navigation remains immediate and reduced
+motion falls back to opacity only.
+
 Version 1.2.4 turns the job pipeline into a single six-column horizontal board.
 Job cards open the editor directly, keep their advance action in the top-right
 corner, and use larger Company, Role, City, and Notes typography. The only

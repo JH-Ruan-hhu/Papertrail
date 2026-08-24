@@ -765,6 +765,7 @@ function renderUpdateStatus() {
   const update = state.updateStatus;
   if (!update || !elements.updateActionButton) return;
   const status = update.status || 'idle';
+  elements.updateGroup.dataset.updateStatus = status;
   const percent = Math.min(100, Math.max(0, Number(update.percent) || 0));
   const latestVersion = update.latestVersion ? `v${update.latestVersion}` : '';
   const display = {

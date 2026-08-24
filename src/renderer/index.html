@@ -385,14 +385,22 @@
             <section class="settings-panel" data-settings-panel="updates" role="tabpanel" hidden>
               <h2>更新</h2>
               <h3>版本</h3>
-              <div class="settings-group update-group">
-                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.2.4</span></small></div></div>
-                <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>
-                <div class="setting-row update-row">
-                  <div class="update-copy"><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
-                  <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button tertiary" id="updateActionButton" type="button">检查更新</button></div>
+              <div class="settings-group update-group" data-update-status="idle">
+                <div class="update-hero">
+                  <span class="update-app-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h8l3 3V20H7z"/><path d="M15 3.5V7h3M10 11h5M10 14.5h5"/><path d="m10.2 18 1.4 1.4 3-3"/></svg></span>
+                  <div class="update-copy"><span class="update-kicker">YANJI UPDATE</span><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
+                  <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button primary" id="updateActionButton" type="button">检查更新</button></div>
+                </div>
+                <div class="update-journey" aria-label="更新流程">
+                  <span class="stage-check"><i>1</i><b>检查版本</b></span><em></em>
+                  <span class="stage-download"><i>2</i><b>安全下载</b></span><em></em>
+                  <span class="stage-install"><i>3</i><b>重启升级</b></span>
                 </div>
                 <div class="update-progress" id="updateProgress" role="progressbar" aria-label="更新下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="updateProgressBar"></span></div>
+                <div class="update-preferences">
+                  <div><strong>研迹 v<span id="currentVersion">1.2.4</span></strong><small>升级只替换程序文件，不移动科研数据</small></div>
+                  <label><span>启动时自动检查</span><span class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></span></label>
+                </div>
               </div>
             </section>
           </div>

@@ -133,14 +133,24 @@ function closeWorkbenchDialog(dialog) {
   workbenchApi.setModalWindowState(anyOpen).catch(() => {});
 }
 
-function switchWorkbenchPage(page) {
+function switchWorkbenchPage(page, { animate = false } = {}) {
   if (!pageTitles[page]) return;
+  const previousPage = wb.page;
   if (wb.page === 'notes' && document.getElementById('noteDialog')?.open) flushNoteEditor({ silent: true }).catch(() => {});
   if (document.getElementById('scheduleDialog')?.open) flushScheduleDraft();
   window.YanjiTodoView?.flushDraft?.();
   wb.page = page;
   document.querySelectorAll('[data-workbench-page]').forEach((button) => button.classList.toggle('active', button.dataset.workbenchPage === page));
-  document.querySelectorAll('[data-page]').forEach((section) => { section.hidden = section.dataset.page !== page; });
+  const sections = [...document.querySelectorAll('[data-page]')];
+  sections.forEach((section) => {
+    section.classList.remove('page-entering');
+    section.hidden = section.dataset.page !== page;
+  });
+  const activeSection = sections.find((section) => section.dataset.page === page);
+  if (animate && previousPage !== page && activeSection) {
+    activeSection.classList.add('page-entering');
+    activeSection.addEventListener('animationend', () => activeSection.classList.remove('page-entering'), { once: true });
+  }
   if (page === 'schedule') renderTimeline();
   if (page === 'todos') window.YanjiTodoView?.render();
   if (page === 'attendance') renderAttendance();
@@ -1360,7 +1370,9 @@ async function refreshWorkspace(workspace = null) {
 }
 
 function bindWorkbenchEvents() {
-  document.querySelectorAll('[data-workbench-page]').forEach((button) => button.addEventListener('click', () => switchWorkbenchPage(button.dataset.workbenchPage)));
+  document.querySelectorAll('[data-workbench-page]').forEach((button) => button.addEventListener('click', (event) => {
+    switchWorkbenchPage(button.dataset.workbenchPage, { animate: event.detail > 0 });
+  }));
   document.querySelectorAll('[data-go-page]').forEach((button) => button.addEventListener('click', () => switchWorkbenchPage(button.dataset.goPage)));
   document.getElementById('quickScheduleButton').addEventListener('click', () => openScheduleEditor());
   document.getElementById('quickNoteButton').addEventListener('click', () => openNoteEditor());
