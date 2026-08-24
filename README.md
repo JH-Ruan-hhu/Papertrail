@@ -8,6 +8,14 @@ publisher-neutral.
 
 ## Version 1.2 workbench features
 
+Version 1.2.2 reduces background resource use by throttling hidden renderers,
+pausing invisible-page refresh work, and releasing the main window after it
+has remained in the tray. It also adds full-workspace note editing while
+keeping the sidebar visible, Word-like automatic list continuation, durable
+full-row note images, an eight-day schedule, linked reminder controls, and a
+more consistent Liquid Glass layout, corner system, metadata presentation,
+Home dashboard, and application-usage palette.
+
 Version 1.2.1 removes the colored halo outside Quick Capture. The capture card
 now fills its frameless window as one fixed material surface, keeps only its
 own rounded border, and no longer inherits the workspace Liquid Glass
