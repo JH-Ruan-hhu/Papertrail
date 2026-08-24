@@ -6,6 +6,23 @@ into one desktop app. The manuscript connectors cover Elsevier Author Hub and
 Elsevier accepted-article production pages; local workflow records remain
 publisher-neutral.
 
+## Version 1.2 workbench features
+
+Version 1.2.0 removes the duplicate upcoming-schedule panel from the Job
+workspace and gives the six-stage application board the full content width.
+Every job record can now store an estimated annual salary in ten-thousands of
+RMB; the dashboard calculates the highest entered amount automatically and
+shows a dash until salary data exists. High-priority `#1` schedules always get
+an at-time reminder and open the existing multi-display full-screen alert;
+`#2` schedules use the pinned overlay, while `#3` schedules keep the standard
+Windows notification.
+
+The desktop Today widget is hosted in the Windows desktop icon layer, reserves
+its icon-grid rectangle, and remains available when the main workbench window
+is closed. Version 1.2.0 also includes the Home spacing, focus-timer, notes,
+eight-day schedule, proportional usage bars, unified corner system, inline
+note-image, Settings-surface, and Windows icon corrections from the 1.1 series.
+
 ## Version 1.1 workbench features
 
 Version 1.1.4 rebuilds Home around a consistent spacing rhythm and a calmer

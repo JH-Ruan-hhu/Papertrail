@@ -28,6 +28,14 @@ function normalizeReminderPayload(item, kind = 'todo', level = 'reminder') {
   };
 }
 
+function reminderPresentation(item, kind = 'todo') {
+  const priority = ['high', 'medium', 'low'].includes(item?.priority) ? item.priority : 'low';
+  if (kind === 'schedule' && priority === 'high') return 'fullscreen';
+  if (kind === 'schedule' && priority === 'medium') return 'overlay';
+  if (kind === 'todo' && priority === 'high') return 'fullscreen';
+  return 'notification';
+}
+
 const EVENT_REMINDER_GRACE_MS = 15 * 60_000;
 
 function asTime(value) {
@@ -112,6 +120,7 @@ module.exports = {
   eventReminderDue,
   eventReminderNotificationDue,
   normalizeReminderPayload,
+  reminderPresentation,
   suppressDuplicate,
   todoOverdueNotificationDue,
   todoReminderDue

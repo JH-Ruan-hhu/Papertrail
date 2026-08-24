@@ -43,6 +43,14 @@ function safeSourceUrl(value) {
   }
 }
 
+function annualSalaryWan(value) {
+  if (value == null || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 && parsed <= 10_000
+    ? Math.round(parsed * 10) / 10
+    : null;
+}
+
 function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toISOString()) {
   const input = asObject(value);
   if (!input) throw new Error(`第 ${index + 1} 条求职记录格式无效。`);
@@ -54,6 +62,7 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
     role: cleanText(input.role, 300) || '未命名岗位',
     status,
     location: cleanText(input.location, 200) || null,
+    annualSalaryWan: annualSalaryWan(input.annualSalaryWan),
     sourceUrl: safeSourceUrl(input.sourceUrl),
     contact: cleanText(input.contact, 300) || null,
     appliedAt: isoDate(input.appliedAt),
@@ -71,6 +80,9 @@ function saveJobApplication(list, input, now = new Date().toISOString(), makeId 
   const role = cleanText(source.role, 300);
   if (!company || !role) throw new Error('请填写单位名称和岗位名称。');
   if (source.sourceUrl && !safeSourceUrl(source.sourceUrl)) throw new Error('招聘链接必须是有效的 http 或 https 地址。');
+  if (source.annualSalaryWan != null && source.annualSalaryWan !== '' && annualSalaryWan(source.annualSalaryWan) == null) {
+    throw new Error('预估年薪需填写 0 至 10000 之间的万元数值。');
+  }
   const existing = source.id ? list.find((item) => item.id === String(source.id)) : null;
   if (source.id && !existing) throw new Error('找不到这条求职记录。');
   const status = JOB_STATUSES.includes(source.status) ? source.status : (existing?.status || 'pending');

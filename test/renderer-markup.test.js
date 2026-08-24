@@ -353,6 +353,13 @@ test('settings omit promotional and explanatory introduction cards', () => {
   assert.doesNotMatch(indexHtml, /class="privacy-note"/);
 });
 
+test('job dashboard uses salary metric without a duplicate upcoming schedule panel', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  assert.match(indexHtml, /id="jobMaxSalary"/);
+  assert.match(indexHtml, /id="jobAnnualSalaryWan"/);
+  assert.doesNotMatch(indexHtml, /job-upcoming-panel|jobUpcomingCount|>近期日程</);
+});
+
 test('settings render as a workspace page with exact horizontal tabs', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');

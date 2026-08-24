@@ -6,8 +6,16 @@ const {
   collectReminderCandidates,
   eventReminderAt,
   eventReminderDue,
-  suppressDuplicate
+  suppressDuplicate,
+  reminderPresentation
 } = require('../src/reminder-core');
+
+test('routes schedule priorities to full-screen, overlay and notification reminders', () => {
+  assert.equal(reminderPresentation({ priority: 'high' }, 'schedule'), 'fullscreen');
+  assert.equal(reminderPresentation({ priority: 'medium' }, 'schedule'), 'overlay');
+  assert.equal(reminderPresentation({ priority: 'low' }, 'schedule'), 'notification');
+  assert.equal(reminderPresentation({ priority: 'high' }, 'todo'), 'fullscreen');
+});
 
 const now = new Date('2026-08-22T10:00:00.000Z');
 

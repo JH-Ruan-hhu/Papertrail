@@ -83,7 +83,7 @@ html[data-appearance="liquid-glass"] :is(
   .attendance-gantt-shell, .notes-toolbar, .note-card, .todo-toolbar,
   .todo-card, .job-pipeline-panel, .job-signal-panel, .job-toolbar,
   .job-stage-column, .job-metric-strip article, .job-board-panel,
-  .job-upcoming-panel, .job-interview-panel, .job-glance-panel
+  .job-interview-panel, .job-glance-panel
 ) {
   color: var(--yanji-text);
   background: var(--yanji-surface);

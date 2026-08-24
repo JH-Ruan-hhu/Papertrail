@@ -1,6 +1,6 @@
 {
   "name": "papertrail-desktop",
-  "version": "1.1.4",
+  "version": "1.2.0",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "Yanji contributors",
@@ -45,7 +45,9 @@
       "target": [
         {
           "target": "nsis",
-          "arch": ["x64"]
+          "arch": [
+            "x64"
+          ]
         }
       ]
     },

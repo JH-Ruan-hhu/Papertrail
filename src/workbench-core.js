@@ -515,7 +515,11 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
   const nextStartAt = hasInput('startAt') ? input.startAt : existing?.startAt;
   const nextEndAt = hasInput('endAt') ? input.endAt : existing?.endAt;
   const nextAllDay = hasInput('allDay') ? input.allDay : existing?.allDay;
-  const nextReminderMinutes = hasInput('reminderMinutesBefore') ? input.reminderMinutesBefore : existing?.reminderMinutesBefore;
+  const nextPriority = hasInput('priority') ? input.priority : existing?.priority;
+  const requestedReminderMinutes = hasInput('reminderMinutesBefore') ? input.reminderMinutesBefore : existing?.reminderMinutesBefore;
+  const nextReminderMinutes = requestedReminderMinutes == null && ['high', 'medium'].includes(nextPriority)
+    ? 0
+    : requestedReminderMinutes;
   const sameReminderIdentity = Boolean(existing
     && existing.startAt === nextStartAt
     && existing.endAt === nextEndAt
@@ -525,6 +529,7 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
   const candidate = normalizeSchedule({
     ...existing,
     ...input,
+    reminderMinutesBefore: nextReminderMinutes,
     id: existing?.id || makeId(),
     createdAt: existing?.createdAt || now,
     updatedAt: now,

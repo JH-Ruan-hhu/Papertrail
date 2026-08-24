@@ -23,7 +23,7 @@ const {
 const { autoUpdater } = require('electron-updater');
 const { JsonStore } = require('./store');
 const { createPlanningService } = require('./planning-service');
-const { collectReminderCandidates, normalizeReminderPayload } = require('./reminder-core');
+const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
 const { deleteJobApplication, saveJobApplication } = require('./job-core');
@@ -1800,7 +1800,9 @@ function runWorkspaceReminders(now = new Date()) {
   if (!candidates.length) return [];
   for (const candidate of candidates) {
     if (candidate.type === 'event') {
-      showScheduleNotification(candidate.item);
+      const presentation = reminderPresentation(candidate.item, 'schedule');
+      if (presentation === 'fullscreen' || presentation === 'overlay') showDeadlineWindow(candidate.item, 'schedule');
+      else showScheduleNotification(candidate.item);
       store.updateWorkspace((workspace) => {
         workspace.schedules = workspace.schedules.map((item) => item.id === candidate.item.id
           ? { ...item, reminderSentAt: now.toISOString(), updatedAt: now.toISOString() }
@@ -1810,7 +1812,7 @@ function runWorkspaceReminders(now = new Date()) {
       continue;
     }
     const todo = candidate.item;
-    if (todo.priority === 'high') showDeadlineWindow(todo, 'todo', candidate.level);
+    if (reminderPresentation(todo, 'todo') === 'fullscreen') showDeadlineWindow(todo, 'todo', candidate.level);
     else showTodoNotification(todo, candidate.level);
     store.updateWorkspace((workspace) => {
       workspace.todos = workspace.todos.map((item) => item.id === todo.id

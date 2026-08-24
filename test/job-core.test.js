@@ -16,11 +16,13 @@ test('normalizes a local job application and constrains its source URL', () => {
     company: '  环境科技公司  ',
     role: '研发工程师',
     status: 'interview',
+    annualSalaryWan: '41.14',
     sourceUrl: 'https://jobs.example.com/role?id=1',
     createdAt: '2026-08-24T00:00:00.000Z'
   });
   assert.equal(job.company, '环境科技公司');
   assert.equal(job.status, 'interview');
+  assert.equal(job.annualSalaryWan, 41.1);
   assert.equal(job.sourceUrl, 'https://jobs.example.com/role?id=1');
   assert.equal(normalizeJobApplication({ sourceUrl: 'file:///secret' }).sourceUrl, null);
 });
@@ -43,5 +45,6 @@ test('creates, advances, updates and deletes job applications', () => {
 test('rejects incomplete records, unsupported URLs and missing deletes', () => {
   assert.throws(() => saveJobApplication([], { company: '', role: '工程师' }), /单位名称和岗位名称/);
   assert.throws(() => saveJobApplication([], { company: '公司', role: '工程师', sourceUrl: 'javascript:alert(1)' }), /http 或 https/);
+  assert.throws(() => saveJobApplication([], { company: '公司', role: '工程师', annualSalaryWan: '-1' }), /预估年薪/);
   assert.throws(() => deleteJobApplication([], 'missing'), /找不到/);
 });

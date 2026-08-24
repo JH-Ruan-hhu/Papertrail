@@ -197,13 +197,13 @@
 
         <section class="workbench-page job-page" data-page="jobs" hidden>
           <header class="page-head-row">
-            <div><p class="eyebrow">CAREER DASHBOARD</p><h1>求职驾驶舱</h1><p>从投递到 Offer，把每一次推进和近期安排放在同一张图上</p></div>
+            <div><p class="eyebrow">CAREER DASHBOARD</p><h1>求职驾驶舱</h1><p>从投递到 Offer，把每一次推进集中在同一张看板上</p></div>
             <div class="page-actions"><button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 添加岗位</button></div>
           </header>
           <section class="job-metric-strip" aria-label="求职关键指标">
             <article class="tone-offer"><span>Offer 数</span><strong id="jobOfferCount">0</strong><small>已收获结果</small></article>
             <article class="tone-interview"><span>面试数量</span><strong id="jobInterviewCount">0</strong><small>当前面试阶段</small></article>
-            <article class="tone-calendar"><span>日程待办</span><strong id="jobUpcomingCount">0</strong><small>未来 7 天</small></article>
+            <article class="tone-salary"><span>最高预估年薪</span><strong id="jobMaxSalary">—</strong><small>按岗位合约估算</small></article>
             <article class="tone-submitted"><span>已投递机会</span><strong id="jobSubmittedCount">0</strong><small>含后续推进阶段</small></article>
             <article class="tone-rate"><span>推进转化率</span><strong id="jobAdvanceRate">0%</strong><small>投递后进入下一阶段</small></article>
           </section>
@@ -215,10 +215,6 @@
                 <label class="job-filter-label" for="jobStatusFilter"><span>阶段</span><select id="jobStatusFilter"><option value="all">全部阶段</option><option value="pending">待投递</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></label>
               </section>
               <div id="jobBoard" class="job-board" aria-live="polite"></div>
-            </section>
-            <section class="job-upcoming-panel">
-              <div class="panel-heading"><div><p class="eyebrow">UPCOMING</p><h2>近期日程</h2><p>按时间排序的下一步</p></div></div>
-              <div id="jobUpcomingList" class="job-upcoming-list"></div>
             </section>
           </div>
           <div class="job-insight-grid">
@@ -270,7 +266,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.1.4</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.2.0</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -393,7 +389,7 @@
               <h2>更新</h2>
               <h3>版本</h3>
               <div class="settings-group update-group">
-                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.1.4</span></small></div></div>
+                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.2.0</span></small></div></div>
                 <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>
                 <div class="setting-row update-row">
                   <div class="update-copy"><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
@@ -565,6 +561,7 @@
           <div class="field"><label for="jobRole">岗位名称</label><input id="jobRole" maxlength="300" placeholder="例如：环境研发工程师" required></div>
           <div class="field"><label for="jobStatus">当前阶段</label><select id="jobStatus"><option value="pending">待投递</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></div>
           <div class="field"><label for="jobLocation">地点</label><input id="jobLocation" maxlength="200" placeholder="城市 / 远程"></div>
+          <div class="field"><label for="jobAnnualSalaryWan">预估年薪（万元）</label><input id="jobAnnualSalaryWan" type="number" min="0.1" max="10000" step="0.1" inputmode="decimal" placeholder="例如：41.1"></div>
           <div class="field"><label for="jobAppliedAt">投递日期</label><input id="jobAppliedAt" type="date"></div>
           <div class="field"><label for="jobNextActionAt">下一步时间</label><input id="jobNextActionAt" type="datetime-local"></div>
           <div class="field full"><label for="jobSourceUrl">招聘链接</label><input id="jobSourceUrl" type="url" maxlength="2048" placeholder="https://…"></div>

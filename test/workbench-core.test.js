@@ -57,6 +57,24 @@ test('marks urgent deadline text and gives a one-hour default duration', () => {
   assert.equal(Date.parse(parsed.endAt) - Date.parse(parsed.startAt), 60 * 60_000);
 });
 
+test('high and medium schedules default to an at-time reminder', () => {
+  const high = saveSchedule([], {
+    title: '全屏提醒',
+    startAt: '2026-08-24T06:40:00.000Z',
+    endAt: '2026-08-24T07:40:00.000Z',
+    priority: 'high'
+  }, '2026-08-24T06:00:00.000Z', () => 'high-reminder');
+  const medium = saveSchedule([], {
+    title: '置顶提醒',
+    startAt: '2026-08-24T08:00:00.000Z',
+    endAt: '2026-08-24T09:00:00.000Z',
+    priority: 'medium',
+    reminderMinutesBefore: null
+  }, '2026-08-24T06:00:00.000Z', () => 'medium-reminder');
+  assert.equal(high[0].reminderMinutesBefore, 0);
+  assert.equal(medium[0].reminderMinutesBefore, 0);
+});
+
 test('uses compact priority tags and defaults untagged capture to green', () => {
   const now = new Date(2026, 7, 22, 10, 0);
   const high = parseNaturalLanguageSchedule('今天下午六点处理样品 #1', now);

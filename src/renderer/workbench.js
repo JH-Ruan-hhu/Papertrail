@@ -246,12 +246,11 @@ function renderJobs() {
   document.getElementById('jobOfferCount').textContent = String(counts.offer);
   const submitted = jobs.filter((item) => JOB_STATUSES.indexOf(item.status) >= JOB_STATUSES.indexOf('submitted')).length;
   const advanced = jobs.filter((item) => JOB_STATUSES.indexOf(item.status) > JOB_STATUSES.indexOf('submitted')).length;
-  const upcomingDeadline = Date.now() + 7 * 86_400_000;
-  const upcoming = jobs.filter((item) => item.nextActionAt && Date.parse(item.nextActionAt) >= Date.now() && Date.parse(item.nextActionAt) <= upcomingDeadline).sort((a, b) => Date.parse(a.nextActionAt) - Date.parse(b.nextActionAt));
-  document.getElementById('jobUpcomingCount').textContent = String(upcoming.length);
+  const salaries = jobs.map((item) => Number(item.annualSalaryWan)).filter((value) => Number.isFinite(value) && value > 0);
+  const maxSalary = salaries.length ? Math.max(...salaries) : null;
+  document.getElementById('jobMaxSalary').textContent = maxSalary == null ? '—' : `${Number.isInteger(maxSalary) ? maxSalary : maxSalary.toFixed(1)}万`;
   document.getElementById('jobSubmittedCount').textContent = String(submitted);
   document.getElementById('jobAdvanceRate').textContent = `${submitted ? Math.round(advanced / submitted * 100) : 0}%`;
-  document.getElementById('jobUpcomingList').innerHTML = upcoming.length ? upcoming.slice(0, 5).map((item) => `<button class="job-upcoming-row" data-edit-job="${wbEscape(item.id)}" type="button"><time>${jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric' })}<small>${jobDateLabel(item.nextActionAt, { hour: '2-digit', minute: '2-digit', hour12: false })}</small></time><span><strong>${wbEscape(item.role)}</strong><small>${wbEscape(item.company)}</small></span><b>${JOB_STATUS_LABELS[item.status]}</b></button>`).join('') : '<div class="job-panel-empty">未来 7 天还没有求职日程</div>';
   const interviews = jobs.filter((item) => item.status === 'interview').sort((a, b) => Date.parse(a.nextActionAt || a.updatedAt) - Date.parse(b.nextActionAt || b.updatedAt));
   document.getElementById('jobInterviewList').innerHTML = interviews.length ? interviews.slice(0, 4).map((item) => `<button class="job-interview-row" data-edit-job="${wbEscape(item.id)}" type="button"><span class="job-company-monogram">${wbEscape(item.company.slice(0, 1))}</span><span><strong>${wbEscape(item.role)}</strong><small>${wbEscape(item.company)}${item.location ? ` · ${wbEscape(item.location)}` : ''}</small></span><time>${item.nextActionAt ? jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '待安排'}</time><b>面试中</b></button>`).join('') : '<div class="job-panel-empty">还没有进入面试的岗位</div>';
 
@@ -265,7 +264,7 @@ function renderJobs() {
     const stageJobs = visible.filter((item) => item.status === status).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
     const cards = stageJobs.map((item) => {
       const nextStatus = JOB_STATUSES[JOB_STATUSES.indexOf(item.status) + 1];
-      const details = [item.location, item.appliedAt ? `投递 ${jobDateLabel(item.appliedAt)}` : null].filter(Boolean).join(' · ');
+      const details = [item.location, item.annualSalaryWan ? `预估 ${item.annualSalaryWan} 万/年` : null, item.appliedAt ? `投递 ${jobDateLabel(item.appliedAt)}` : null].filter(Boolean).join(' · ');
       const nextAction = item.nextActionAt ? `<span class="job-next-action ${Date.parse(item.nextActionAt) < Date.now() ? 'is-overdue' : ''}">下一步 ${jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>` : '';
       const sourceButton = item.sourceUrl ? `<button class="job-source-button" data-open-job-source="${wbEscape(item.sourceUrl)}" type="button" aria-label="打开 ${wbEscape(item.company)} 的招聘链接">${uiIcon('external')}</button>` : '';
       const advanceButton = nextStatus ? `<button class="button compact secondary job-advance-button" data-advance-job="${wbEscape(item.id)}" type="button">推进至${JOB_STATUS_LABELS[nextStatus]}</button>` : '<span class="job-offer-badge">已获 Offer</span>';
@@ -284,6 +283,7 @@ function openJobEditor(job = null, initialStatus = 'pending') {
   document.getElementById('jobRole').value = job?.role || '';
   document.getElementById('jobStatus').value = job?.status || (JOB_STATUSES.includes(initialStatus) ? initialStatus : 'pending');
   document.getElementById('jobLocation').value = job?.location || '';
+  document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobAppliedAt').value = job?.appliedAt?.slice(0, 10) || '';
   document.getElementById('jobNextActionAt').value = localDateTimeInputValue(job?.nextActionAt);
   document.getElementById('jobSourceUrl').value = job?.sourceUrl || '';
@@ -305,6 +305,7 @@ async function saveJobFromEditor() {
     role: document.getElementById('jobRole').value,
     status: document.getElementById('jobStatus').value,
     location: document.getElementById('jobLocation').value,
+    annualSalaryWan: document.getElementById('jobAnnualSalaryWan').value,
     appliedAt: document.getElementById('jobAppliedAt').value || null,
     nextActionAt: nextActionValue ? new Date(nextActionValue).toISOString() : null,
     sourceUrl: document.getElementById('jobSourceUrl').value,

@@ -204,12 +204,12 @@ let smokeWorkspace = {
     { id: 'focus-today', startedAt: todayAt(10, 0), endedAt: todayAt(10, 50), plannedMinutes: 50, status: 'completed', appUsage: { WINWORD: 1260, chrome: 980, Zotero: 510 }, suppressNotifications: true, notificationsSuppressed: true, notificationRestore: null, notificationRestoredAt: todayAt(10, 50), notificationError: null, createdAt: todayAt(10, 0), updatedAt: todayAt(10, 50) }
   ],
   jobApplications: [
-    { id: 'job-pending-1', company: '江河环境研究院', role: '水环境研发工程师', status: 'pending', location: '南京', sourceUrl: 'https://jobs.example.com/1', contact: '官网', appliedAt: null, nextActionAt: todayAt(19, 0), notes: '补充项目经历后投递', createdAt: todayAt(8, 0), updatedAt: todayAt(8, 0), revision: 1 },
+    { id: 'job-pending-1', company: '江河环境研究院', role: '水环境研发工程师', status: 'pending', location: '南京', annualSalaryWan: 32, sourceUrl: 'https://jobs.example.com/1', contact: '官网', appliedAt: null, nextActionAt: todayAt(19, 0), notes: '补充项目经历后投递', createdAt: todayAt(8, 0), updatedAt: todayAt(8, 0), revision: 1 },
     { id: 'job-pending-2', company: '蓝源科技', role: '环境咨询顾问', status: 'pending', location: '上海', sourceUrl: null, contact: null, appliedAt: null, nextActionAt: null, notes: null, createdAt: todayAt(8, 5), updatedAt: todayAt(8, 5), revision: 1 },
     { id: 'job-pending-3', company: '城市水务集团', role: '研发专员', status: 'pending', location: '苏州', sourceUrl: null, contact: null, appliedAt: null, nextActionAt: null, notes: null, createdAt: todayAt(8, 10), updatedAt: todayAt(8, 10), revision: 1 },
     { id: 'job-submitted-1', company: '清研检测', role: 'LC-MS/MS 分析工程师', status: 'submitted', location: '杭州', sourceUrl: null, contact: '招聘平台', appliedAt: todayAt(9, 0), nextActionAt: null, notes: '等待筛选反馈', createdAt: todayAt(8, 15), updatedAt: todayAt(9, 0), revision: 1 },
     { id: 'job-interview-1', company: '生态规划院', role: '环境科研岗', status: 'interview', location: '南京', sourceUrl: null, contact: 'HR', appliedAt: todayAt(9, 10), nextActionAt: todayAt(16, 0), notes: '准备科研项目陈述', createdAt: todayAt(8, 20), updatedAt: todayAt(9, 10), revision: 1 },
-    { id: 'job-offer-1', company: '水安全中心', role: '技术研究员', status: 'offer', location: '无锡', sourceUrl: null, contact: '邮件', appliedAt: todayAt(9, 20), nextActionAt: null, notes: '评估入职时间', createdAt: todayAt(8, 25), updatedAt: todayAt(9, 20), revision: 1 }
+    { id: 'job-offer-1', company: '水安全中心', role: '技术研究员', status: 'offer', location: '无锡', annualSalaryWan: 41.1, sourceUrl: null, contact: '邮件', appliedAt: todayAt(9, 20), nextActionAt: null, notes: '评估入职时间', createdAt: todayAt(8, 25), updatedAt: todayAt(9, 20), revision: 1 }
   ]
 };
 let smokeUpdateState = {

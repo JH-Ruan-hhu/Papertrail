@@ -670,6 +670,7 @@ app.whenReady().then(async () => {
         document.querySelector('[data-workbench-page="jobs"]').click();
         window.scrollTo(0, 0);
         const initialCards = document.querySelectorAll('#jobBoard .job-card').length;
+        const stageHeights = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => Math.round(column.getBoundingClientRect().height));
         const meterWidths = [...document.querySelectorAll('#jobPipelineSummary .job-pipeline-row > i > b')].map((bar) => Math.round(bar.getBoundingClientRect().width));
         document.getElementById('addJobButton').click();
         document.getElementById('jobCompany').value = '新增环保公司';
@@ -684,6 +685,9 @@ app.whenReady().then(async () => {
         return {
           pageVisible: !document.querySelector('[data-page="jobs"]').hidden,
           sixStages: document.querySelectorAll('#jobBoard .job-stage-column').length === 6,
+          fixedStageHeights: new Set(stageHeights).size === 1 && stageHeights[0] === 340,
+          upcomingPanelRemoved: !document.querySelector('.job-upcoming-panel') && !document.getElementById('jobUpcomingCount'),
+          salaryMetric: document.getElementById('jobMaxSalary')?.textContent === '41.1万',
           initialCards,
           proportionalMeters: new Set(meterWidths).size >= 2,
           added,
@@ -693,7 +697,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || !jobsResult.sixStages || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || !jobsResult.sixStages || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);
