@@ -727,21 +727,33 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-interview-panel > .panel-heading,
 .job-glance-panel > .panel-heading { margin-bottom: 12px; }
 .job-board-panel .job-toolbar { margin: 0 0 12px; padding: 7px; background: rgba(238,241,247,.7); border: 0; box-shadow: none; }
-.job-board-panel .job-board { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
-.job-stage-column { --job-stage-accent: #7390d7; --job-stage-soft: rgba(221,231,253,.74); --job-stage-surface: rgba(241,245,253,.76); --job-stage-line: rgba(104,132,196,.25); --job-stage-text: #4865a8; height: 340px; min-height: 340px; grid-template-rows: 52px minmax(0, 1fr) 36px; background: var(--job-stage-surface); border-color: var(--job-stage-line); border-radius: 11px; box-shadow: none; }
+.job-board-panel .job-board { grid-template-columns: repeat(6, minmax(198px, 1fr)); gap: 9px; overflow-x: auto; padding-bottom: 5px; }
+.job-stage-column { --job-stage-accent: #7390d7; --job-stage-soft: rgba(221,231,253,.74); --job-stage-surface: rgba(241,245,253,.76); --job-stage-line: rgba(104,132,196,.25); --job-stage-text: #4865a8; height: 420px; min-height: 420px; grid-template-rows: 62px minmax(0, 1fr); background: var(--job-stage-surface); border-color: var(--job-stage-line); border-radius: 11px; box-shadow: none; }
 .job-stage-column.stage-submitted { --job-stage-accent: #5ca8b4; --job-stage-soft: rgba(214,240,242,.76); --job-stage-surface: rgba(239,249,249,.78); --job-stage-line: rgba(73,151,162,.24); --job-stage-text: #357782; }
 .job-stage-column.stage-written-1 { --job-stage-accent: #dc9a55; --job-stage-soft: rgba(252,232,208,.8); --job-stage-surface: rgba(253,247,238,.8); --job-stage-line: rgba(195,128,57,.24); --job-stage-text: #a16328; }
 .job-stage-column.stage-written-2 { --job-stage-accent: #9a82cf; --job-stage-soft: rgba(235,228,250,.8); --job-stage-surface: rgba(247,243,252,.8); --job-stage-line: rgba(126,100,182,.23); --job-stage-text: #6e55a5; }
 .job-stage-column.stage-interview { --job-stage-accent: #647fd1; --job-stage-soft: rgba(222,229,250,.8); --job-stage-surface: rgba(242,245,252,.8); --job-stage-line: rgba(86,110,185,.24); --job-stage-text: #465fae; }
 .job-stage-column.stage-offer { --job-stage-accent: #56a27d; --job-stage-soft: rgba(216,241,228,.82); --job-stage-surface: rgba(240,250,245,.82); --job-stage-line: rgba(57,139,99,.24); --job-stage-text: #327653; }
-.job-stage-column > header { min-height: 52px; padding: 9px 11px; background: var(--job-stage-soft); border-bottom-color: var(--job-stage-line); }
-.job-stage-column > header > b { color: var(--job-stage-text); }
+.job-stage-column > header { min-height: 62px; padding: 9px 10px; background: var(--job-stage-soft); border-bottom-color: var(--job-stage-line); }
+.job-stage-header-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+.job-stage-header-actions > b { width: 25px; height: 25px; display: grid; place-items: center; flex: 0 0 auto; color: var(--job-stage-text); background: rgba(255,255,255,.82); border-radius: 50%; font-size: 10px; }
+.job-stage-create { min-height: 30px; padding: 0 8px; color: #fff; background: var(--job-stage-accent); border: 1px solid rgba(255,255,255,.42); border-radius: 9px; font-size: 9px; font-weight: 720; cursor: pointer; white-space: nowrap; }
+.job-stage-create:focus-visible { outline: 2px solid var(--job-stage-text); outline-offset: 2px; }
 .job-stage-cards { min-height: 0; max-height: none; overflow-y: auto; scrollbar-width: thin; }
-.job-card { position: relative; background: rgba(255,255,255,.82); border-color: var(--job-stage-line); box-shadow: 0 4px 12px rgba(42,50,73,.04); }
+.job-card { position: relative; padding: 13px 11px; background: rgba(255,255,255,.82); border-color: var(--job-stage-line); box-shadow: 0 4px 12px rgba(42,50,73,.04); cursor: pointer; }
+.job-card:hover { border-color: var(--job-stage-accent); box-shadow: 0 7px 18px rgba(42,50,73,.09); }
+.job-card:focus-visible { outline: 2px solid var(--job-stage-accent); outline-offset: 2px; }
 .job-card::before { content: ''; position: absolute; inset: 9px auto 9px 0; width: 3px; background: var(--job-stage-accent); border-radius: 0 3px 3px 0; }
-.job-card-company { font-weight: 760; }
-.job-card-role { min-height: 1.4em; }
-.job-stage-add { color: var(--job-stage-text); background: var(--job-stage-soft); border-top-color: var(--job-stage-line); }
+.job-card-head { gap: 5px; }
+.job-card-head > div:first-child { min-width: 0; flex: 1; }
+.job-card-company { font-size: 13px !important; font-weight: 780; }
+.job-card-role { min-height: 1.4em; font-size: 12px !important; }
+.job-card-top-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 4px; flex: 0 0 auto; }
+.job-card-location { font-size: 10.5px; }
+.job-card-notes { min-height: 2.9em; font-size: 10.5px; }
+.job-card-facts span, .job-next-action { font-size: 9px; }
+.job-advance-button { min-height: 26px; max-width: 88px; padding-inline: 6px; color: var(--job-stage-text) !important; border-color: var(--job-stage-line) !important; font-size: 8.5px; line-height: 1.15; white-space: normal; }
+.job-offer-badge { padding: 4px 6px; color: var(--job-stage-text); background: var(--job-stage-soft); border-radius: 7px; font-size: 9px; white-space: nowrap; }
 
 .job-interview-list { min-height: 174px; display: grid; align-content: start; gap: 4px; }
 .job-interview-row {
@@ -826,8 +838,8 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 @media (max-width: 720px) {
   .home-command-grid > article { grid-column: 1 / -1 !important; }
   .home-schedule-panel .day-overview,
-  .job-metric-strip,
-  .job-board-panel .job-board { grid-template-columns: 1fr; }
+  .job-metric-strip { grid-template-columns: 1fr; }
+  .job-board-panel .job-board { grid-template-columns: repeat(6, minmax(198px, 1fr)); }
   .home-focus-timer .focus-timer-body { grid-template-columns: 96px minmax(0, 1fr); }
   .job-interview-row { grid-template-columns: 32px minmax(0, 1fr) auto; }
   .job-interview-row > b { display: none; }

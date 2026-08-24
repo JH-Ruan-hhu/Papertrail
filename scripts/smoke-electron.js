@@ -738,15 +738,24 @@ app.whenReady().then(async () => {
         window.scrollTo(0, 0);
         const initialCards = document.querySelectorAll('#jobBoard .job-card').length;
         const stageHeights = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => Math.round(column.getBoundingClientRect().height));
+        const stageWidths = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => Math.round(column.getBoundingClientRect().width));
         const stageColors = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => getComputedStyle(column).backgroundColor);
+        const stageTops = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => Math.round(column.getBoundingClientRect().top));
         const cardAnatomy = [...document.querySelectorAll('#jobBoard .job-card')].every((card) => (
           card.querySelector('.job-card-company')
           && card.querySelector('.job-card-role')
           && card.querySelector('.job-card-location')
           && card.querySelector('.job-card-notes')
         ));
+        const cardsAreEditors = [...document.querySelectorAll('#jobBoard .job-card')].every((card) => card.matches('[data-edit-job][tabindex="0"]'));
+        const editButtonsRemoved = !document.querySelector('#jobBoard .job-card-actions, #jobBoard .job-card .text-button');
+        const advancesAtTop = [...document.querySelectorAll('#jobBoard [data-advance-job]')].every((button) => button.closest('.job-card-top-actions'));
+        const pendingAddOnly = document.querySelectorAll('#jobBoard [data-add-job]').length === 1 && Boolean(document.querySelector('.stage-pending > header [data-add-job="pending"]'));
         const meterWidths = [...document.querySelectorAll('#jobPipelineSummary .job-pipeline-row > i > b')].map((bar) => Math.round(bar.getBoundingClientRect().width));
-        document.getElementById('addJobButton').click();
+        document.querySelector('#jobBoard .job-card').click();
+        const cardClickOpensEditor = document.getElementById('jobDialog').open;
+        document.getElementById('cancelJobButton').click();
+        document.querySelector('.stage-pending > header [data-add-job="pending"]').click();
         document.getElementById('jobCompany').value = '新增环保公司';
         document.getElementById('jobRole').value = '研发工程师';
         document.getElementById('jobStatus').value = 'submitted';
@@ -761,8 +770,15 @@ app.whenReady().then(async () => {
           sixStages: document.querySelectorAll('#jobBoard .job-stage-column').length === 6,
           stageColors,
           sixStageColors: new Set(stageColors).size === 6,
+          singleStageRow: new Set(stageTops).size === 1,
           cardAnatomy,
-          fixedStageHeights: new Set(stageHeights).size === 1 && stageHeights[0] === 340,
+          cardsAreEditors,
+          editButtonsRemoved,
+          advancesAtTop,
+          pendingAddOnly,
+          cardClickOpensEditor,
+          readableStageWidths: stageWidths.every((width) => width >= 198),
+          fixedStageHeights: new Set(stageHeights).size === 1 && stageHeights[0] === 420,
           upcomingPanelRemoved: !document.querySelector('.job-upcoming-panel') && !document.getElementById('jobUpcomingCount'),
           salaryMetric: document.getElementById('jobMaxSalary')?.textContent === '41.1万',
           initialCards,
@@ -774,7 +790,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || !jobsResult.sixStages || !jobsResult.sixStageColors || !jobsResult.cardAnatomy || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || !jobsResult.sixStages || !jobsResult.sixStageColors || !jobsResult.singleStageRow || !jobsResult.cardAnatomy || !jobsResult.cardsAreEditors || !jobsResult.editButtonsRemoved || !jobsResult.advancesAtTop || !jobsResult.pendingAddOnly || !jobsResult.cardClickOpensEditor || !jobsResult.readableStageWidths || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);

@@ -8,6 +8,12 @@ publisher-neutral.
 
 ## Version 1.2 workbench features
 
+Version 1.2.4 turns the job pipeline into a single six-column horizontal board.
+Job cards open the editor directly, keep their advance action in the top-right
+corner, and use larger Company, Role, City, and Notes typography. The only
+board-level create action now sits in the Pending column header; redundant
+Edit labels, page-header creation, and per-column footer actions are removed.
+
 Version 1.2.3 is a storage-path compatibility hotfix. It restores discovery of
 the legacy `papertrail-desktop` user-data directory after the v1.2.2 Windows
 identity change, while preserving data created by genuinely new v1.2.2

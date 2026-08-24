@@ -268,9 +268,10 @@ function renderJobs() {
       const nextAction = item.nextActionAt ? `<span class="job-next-action ${Date.parse(item.nextActionAt) < Date.now() ? 'is-overdue' : ''}">下一步 ${jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>` : '';
       const sourceButton = item.sourceUrl ? `<button class="job-source-button" data-open-job-source="${wbEscape(item.sourceUrl)}" type="button" aria-label="打开 ${wbEscape(item.company)} 的招聘链接">${uiIcon('external')}</button>` : '';
       const advanceButton = nextStatus ? `<button class="button compact secondary job-advance-button" data-advance-job="${wbEscape(item.id)}" type="button">推进至${JOB_STATUS_LABELS[nextStatus]}</button>` : '<span class="job-offer-badge">已获 Offer</span>';
-      return `<article class="job-card"><div class="job-card-head"><div><strong class="job-card-company">${wbEscape(item.company)}</strong><h3 class="job-card-role">${wbEscape(item.role)}</h3></div>${sourceButton}</div><p class="job-card-location">${wbEscape(item.location || '地点待确认')}</p><p class="job-card-notes${item.notes ? '' : ' is-empty'}">${wbEscape(item.notes || '暂无备注')}</p>${facts.length ? `<div class="job-card-facts">${facts.map((fact) => `<span>${wbEscape(fact)}</span>`).join('')}</div>` : ''}${nextAction}<div class="job-card-actions"><button class="text-button" data-edit-job="${wbEscape(item.id)}" type="button">编辑</button>${advanceButton}</div></article>`;
+      return `<article class="job-card" data-edit-job="${wbEscape(item.id)}" role="button" tabindex="0" aria-label="编辑 ${wbEscape(item.company)} ${wbEscape(item.role)}"><div class="job-card-head"><div><strong class="job-card-company">${wbEscape(item.company)}</strong><h3 class="job-card-role">${wbEscape(item.role)}</h3></div><div class="job-card-top-actions">${sourceButton}${advanceButton}</div></div><p class="job-card-location">${wbEscape(item.location || '地点待确认')}</p><p class="job-card-notes${item.notes ? '' : ' is-empty'}">${wbEscape(item.notes || '暂无备注')}</p>${facts.length ? `<div class="job-card-facts">${facts.map((fact) => `<span>${wbEscape(fact)}</span>`).join('')}</div>` : ''}${nextAction}</article>`;
     }).join('');
-    return `<section class="job-stage-column stage-${status}"><header><div><span>${JOB_STATUS_LABELS[status]}</span><small>${counts[status]} 个岗位</small></div><b>${counts[status]}</b></header><div class="job-stage-cards">${cards || '<div class="job-stage-empty">这个阶段还没有岗位</div>'}</div><button class="job-stage-add" data-add-job="${status}" type="button">＋ 添加到${JOB_STATUS_LABELS[status]}</button></section>`;
+    const createButton = status === 'pending' ? '<button class="job-stage-create" data-add-job="pending" type="button">＋ 新增岗位</button>' : '';
+    return `<section class="job-stage-column stage-${status}"><header><div><span>${JOB_STATUS_LABELS[status]}</span><small>${counts[status]} 个岗位</small></div><div class="job-stage-header-actions"><b>${counts[status]}</b>${createButton}</div></header><div class="job-stage-cards">${cards || '<div class="job-stage-empty">这个阶段还没有岗位</div>'}</div></section>`;
   }).join('');
 }
 
@@ -1364,7 +1365,6 @@ function bindWorkbenchEvents() {
   document.getElementById('quickScheduleButton').addEventListener('click', () => openScheduleEditor());
   document.getElementById('quickNoteButton').addEventListener('click', () => openNoteEditor());
   document.getElementById('addScheduleButton').addEventListener('click', () => openScheduleEditor());
-  document.getElementById('addJobButton').addEventListener('click', () => openJobEditor());
   document.getElementById('saveJobButton').addEventListener('click', saveJobFromEditor);
   document.getElementById('cancelJobButton').addEventListener('click', () => closeWorkbenchDialog(document.getElementById('jobDialog')));
   document.getElementById('jobSearch').addEventListener('input', renderJobs);
@@ -1746,12 +1746,12 @@ function bindWorkbenchEvents() {
     }
     const addJobTarget = event.target.closest('[data-add-job]');
     if (addJobTarget) return openJobEditor(null, addJobTarget.dataset.addJob);
-    const editJobTarget = event.target.closest('[data-edit-job]');
-    if (editJobTarget) return openJobEditor(wb.workspace.jobApplications.find((item) => item.id === editJobTarget.dataset.editJob));
-    const advanceJobTarget = event.target.closest('[data-advance-job]');
-    if (advanceJobTarget) return advanceJob(advanceJobTarget.dataset.advanceJob);
     const sourceJobTarget = event.target.closest('[data-open-job-source]');
     if (sourceJobTarget) return workbenchApi.openExternal(sourceJobTarget.dataset.openJobSource);
+    const advanceJobTarget = event.target.closest('[data-advance-job]');
+    if (advanceJobTarget) return advanceJob(advanceJobTarget.dataset.advanceJob);
+    const editJobTarget = event.target.closest('[data-edit-job]');
+    if (editJobTarget) return openJobEditor(wb.workspace.jobApplications.find((item) => item.id === editJobTarget.dataset.editJob));
     const selectedDateTarget = event.target.closest('[data-select-schedule-date]');
     if (selectedDateTarget) {
       wb.selectedDate = dateFromKey(selectedDateTarget.dataset.selectScheduleDate);
@@ -1774,6 +1774,12 @@ function bindWorkbenchEvents() {
     if (stickyTarget) { event.stopPropagation(); return workbenchApi.openStickyNote(stickyTarget.dataset.stickyNote); }
     const noteTarget = event.target.closest('[data-edit-note]');
     if (noteTarget) return openNoteEditor(wb.workspace.notes.find((item) => item.id === noteTarget.dataset.editNote));
+  });
+  document.body.addEventListener('keydown', (event) => {
+    const card = event.target.closest('.job-card[data-edit-job]');
+    if (!card || event.target !== card || !['Enter', ' '].includes(event.key)) return;
+    event.preventDefault();
+    openJobEditor(wb.workspace.jobApplications.find((item) => item.id === card.dataset.editJob));
   });
   document.getElementById('openQuickCaptureButton').addEventListener('click', () => workbenchApi.showCapture());
   document.getElementById('createStickyNoteButton').addEventListener('click', () => workbenchApi.createStickyNote());
