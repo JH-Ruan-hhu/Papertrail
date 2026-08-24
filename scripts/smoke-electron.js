@@ -419,6 +419,9 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 360));
         const multiPreview = document.getElementById('scheduleRecognition').textContent.includes('将创建 2 条日程');
         const modalScrollbarHidden = getComputedStyle(document.getElementById('scheduleDialog')).getPropertyValue('scrollbar-width') === 'none';
+        const allDayInputRect = document.getElementById('scheduleAllDayInput').getBoundingClientRect();
+        const allDayRowRect = document.querySelector('.schedule-all-day-row').getBoundingClientRect();
+        const allDayCompact = allDayInputRect.width <= 20 && allDayInputRect.height <= 20 && allDayRowRect.height <= 48;
         document.getElementById('saveScheduleButton').click();
         await new Promise((resolve) => setTimeout(resolve, 80));
         const result = {
@@ -436,13 +439,17 @@ app.whenReady().then(async () => {
           multiSaved: document.body.dataset.savedScheduleCount === '2',
           draftClearedAfterSave: !localStorage.getItem('yanji.scheduleDraft.v1'),
           modalScrollbarHidden,
+          allDayCompact,
+          allDayInputWidth: Math.round(allDayInputRect.width),
+          allDayInputHeight: Math.round(allDayInputRect.height),
+          allDayRowHeight: Math.round(allDayRowRect.height),
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
         document.querySelector('[data-workbench-page="home"]').click();
         return result;
       })()
     `);
-    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
