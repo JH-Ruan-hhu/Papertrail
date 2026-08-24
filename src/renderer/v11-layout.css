@@ -870,16 +870,16 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .home-utility-stack .latest-notes { height: calc(100% - 48px); }
 
 @media (min-width: 1041px) and (max-height: 900px) {
-  .home-utility-stack { grid-template-rows: 112px minmax(0, 1fr); gap: 12px; }
+  .home-utility-stack { grid-template-rows: 136px minmax(0, 1fr); gap: 12px; }
   .home-focus-timer { padding: 9px 11px; }
   .home-focus-timer .panel-heading { display: none; }
-  .home-focus-timer .focus-timer-body { min-height: 100%; grid-template-columns: 76px minmax(0, 1fr); gap: 7px; }
-  .home-focus-timer .focus-ring { width: 72px; }
-  .home-focus-timer .focus-ring::before { width: 60px; }
-  .home-focus-timer .focus-ring time { font-size: 16px; }
-  .home-focus-timer .focus-notification-option,
-  .home-focus-timer .focus-timer-actions > p { display: none; }
-  .home-focus-timer .focus-timer-actions .button { min-width: 82px; min-height: 29px; padding-inline: 11px; font-size: 9px; }
+  .home-focus-timer .focus-timer-body { min-height: 100%; grid-template-columns: 84px minmax(0, 1fr); gap: 8px; }
+  .home-focus-timer .focus-ring { width: 80px; }
+  .home-focus-timer .focus-ring::before { width: 67px; }
+  .home-focus-timer .focus-ring time { font-size: 18px; }
+  .home-focus-timer .focus-notification-option { display: flex; font-size: 9px; line-height: 1.2; }
+  .home-focus-timer .focus-timer-actions > p { display: block; font-size: 8px; line-height: 1.25; }
+  .home-focus-timer .focus-timer-actions .button { min-width: 90px; min-height: 32px; padding-inline: 13px; font-size: 10px; }
   .home-utility-stack .latest-notes-panel { padding: 9px 11px; }
   .home-utility-stack .latest-notes-panel .panel-heading { margin-bottom: 4px; }
   .home-utility-stack .latest-notes-panel .panel-heading .eyebrow,

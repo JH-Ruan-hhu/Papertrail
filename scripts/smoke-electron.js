@@ -492,6 +492,11 @@ app.whenReady().then(async () => {
           pageVisible: !document.querySelector('[data-page="home"]').hidden,
           todayFocusRemoved: !document.getElementById('todayFocusList') && !document.body.textContent.includes('今日重点'),
           focusTimerHome: Boolean(document.querySelector('.home-focus-timer #focusTimeRemaining')),
+          focusNotificationVisible: (() => {
+            const option = document.querySelector('.home-focus-timer .focus-notification-option');
+            const status = document.getElementById('focusNotificationStatus');
+            return option?.getBoundingClientRect().height > 0 && status?.getBoundingClientRect().height > 0;
+          })(),
           clockOutsideFocus: !document.querySelector('.home-focus-timer #homeClockButton')
             && Boolean(document.querySelector('.home-attendance-card #homeClockButton')),
           attendanceStatus: Boolean(document.getElementById('homeAttendanceStatus')),
