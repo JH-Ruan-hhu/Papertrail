@@ -179,25 +179,19 @@ function scheduleTimeForDay(schedule, date) {
 
 function renderHome() {
   const today = new Date();
-  const labels = ['昨天', '今天', '明天', '后天'];
+  const labels = ['今天', '明天', '后天', '三天后'];
   const overview = labels.map((label, index) => {
-    const date = addDays(today, index - 1);
+    const date = addDays(today, index);
     const events = schedulesForDay(date);
     const items = events.map((item) => `<button class="day-mini-event tone-${item.priority}" data-day-event="${wbEscape(item.id)}" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${formatTime(item.startAt)}</time><span>${wbEscape(item.title)}</span></button>`).join('');
-    return `<article class="day-card ${index === 1 ? 'today' : ''}"><header><div><strong>${label}</strong><span>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date)}</span></div><b>${events.length}</b></header><div>${items || '<p class="empty-mini">暂时没有安排</p>'}<small class="day-more" hidden></small></div></article>`;
+    return `<article class="day-card ${index === 0 ? 'today' : ''}"><header><div><strong>${label}</strong><span>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date)}</span></div><b>${events.length}</b></header><div>${items || '<p class="empty-mini">暂时没有安排</p>'}<small class="day-more" hidden></small></div></article>`;
   }).join('');
   document.getElementById('homeDayOverview').innerHTML = overview;
   requestAnimationFrame(fitHomeDayCards);
   renderHomeProgress();
 
-  const priorityRank = { high: 0, medium: 1, low: 2 };
-  const focus = schedulesForDay(today)
-    .sort((a, b) => priorityRank[a.priority] - priorityRank[b.priority] || Date.parse(a.startAt) - Date.parse(b.startAt))
-    .slice(0, 5);
-  document.getElementById('todayFocusList').innerHTML = focus.length ? focus.map((item) => `<button class="focus-row" data-edit-schedule="${wbEscape(item.id)}" type="button"><span class="priority-dot ${item.priority}"></span><time>${item.allDay ? '全天' : formatTime(item.startAt)}</time><div><strong>${wbEscape(item.title)}</strong><small>${priorityLabels[item.priority]}优先级</small></div><i>${uiIcon('chevron')}</i></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('check')}</span><p>今天还没有安排，给自己留一点从容。</p></div>`;
-
   const notes = wb.workspace.notes.slice(0, 3);
-  document.getElementById('latestNotes').innerHTML = notes.length ? notes.map((note) => `<button class="latest-note" data-edit-note="${wbEscape(note.id)}" type="button"><strong>${wbEscape(note.title)}</strong><p>${wbEscape(notePlainText(note.content).slice(0, 90) || '空白笔记')}</p><span>${formatUpdated(note.updatedAt)}</span></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('note')}</span><p>还没有笔记，先记下一条想法吧。</p></div>`;
+  document.getElementById('latestNotes').innerHTML = notes.length ? notes.map((note) => `<button class="latest-note" data-edit-note="${wbEscape(note.id)}" type="button"><strong>${wbEscape(note.title)}</strong><p>${wbEscape(notePlainText(note.content).slice(0, 72) || '空白笔记')}</p><span>${formatUpdated(note.updatedAt)}</span></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('note')}</span><p>还没有笔记，先记下一条想法吧。</p></div>`;
   document.getElementById('navScheduleCount').textContent = String(wb.workspace.schedules.filter((item) => Date.parse(item.startAt) >= Date.now() - 86_400_000).length);
   document.getElementById('navTodoCount').textContent = String(wb.workspace.todos.filter((item) => item.status === 'open').length);
   document.getElementById('navNoteCount').textContent = String(wb.workspace.notes.length);
@@ -230,6 +224,8 @@ function renderHomeJobs() {
   const groups = [
     ['pending', '待投递'],
     ['submitted', '已投递'],
+    ['written-1', '一轮笔试'],
+    ['written-2', '二轮笔试'],
     ['interview', '面试'],
     ['offer', 'Offer']
   ];
@@ -246,12 +242,18 @@ function renderJobs() {
   const maximum = Math.max(1, ...Object.values(counts));
   document.getElementById('jobPipelineSummary').innerHTML = JOB_STATUSES.map((status, index) => `<div class="job-pipeline-row"><span><b>${String(index + 1).padStart(2, '0')}</b>${JOB_STATUS_LABELS[status]}</span><i><b class="${jobMeterClass(counts[status], maximum)}"></b></i><strong>${counts[status]}</strong></div>`).join('');
   const active = jobs.filter((item) => item.status !== 'offer').length;
-  document.getElementById('jobActiveCount').textContent = String(active);
   document.getElementById('jobInterviewCount').textContent = String(counts.interview);
   document.getElementById('jobOfferCount').textContent = String(counts.offer);
-  const next = jobs.filter((item) => item.nextActionAt && item.status !== 'offer').sort((a, b) => Date.parse(a.nextActionAt) - Date.parse(b.nextActionAt))[0];
-  document.getElementById('jobNextAction').textContent = next ? jobDateLabel(next.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '未安排';
-  document.getElementById('jobNextActionMeta').textContent = next ? `${next.company} · ${next.role}` : '添加日期后在这里提醒';
+  const submitted = jobs.filter((item) => JOB_STATUSES.indexOf(item.status) >= JOB_STATUSES.indexOf('submitted')).length;
+  const advanced = jobs.filter((item) => JOB_STATUSES.indexOf(item.status) > JOB_STATUSES.indexOf('submitted')).length;
+  const upcomingDeadline = Date.now() + 7 * 86_400_000;
+  const upcoming = jobs.filter((item) => item.nextActionAt && Date.parse(item.nextActionAt) >= Date.now() && Date.parse(item.nextActionAt) <= upcomingDeadline).sort((a, b) => Date.parse(a.nextActionAt) - Date.parse(b.nextActionAt));
+  document.getElementById('jobUpcomingCount').textContent = String(upcoming.length);
+  document.getElementById('jobSubmittedCount').textContent = String(submitted);
+  document.getElementById('jobAdvanceRate').textContent = `${submitted ? Math.round(advanced / submitted * 100) : 0}%`;
+  document.getElementById('jobUpcomingList').innerHTML = upcoming.length ? upcoming.slice(0, 5).map((item) => `<button class="job-upcoming-row" data-edit-job="${wbEscape(item.id)}" type="button"><time>${jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric' })}<small>${jobDateLabel(item.nextActionAt, { hour: '2-digit', minute: '2-digit', hour12: false })}</small></time><span><strong>${wbEscape(item.role)}</strong><small>${wbEscape(item.company)}</small></span><b>${JOB_STATUS_LABELS[item.status]}</b></button>`).join('') : '<div class="job-panel-empty">未来 7 天还没有求职日程</div>';
+  const interviews = jobs.filter((item) => item.status === 'interview').sort((a, b) => Date.parse(a.nextActionAt || a.updatedAt) - Date.parse(b.nextActionAt || b.updatedAt));
+  document.getElementById('jobInterviewList').innerHTML = interviews.length ? interviews.slice(0, 4).map((item) => `<button class="job-interview-row" data-edit-job="${wbEscape(item.id)}" type="button"><span class="job-company-monogram">${wbEscape(item.company.slice(0, 1))}</span><span><strong>${wbEscape(item.role)}</strong><small>${wbEscape(item.company)}${item.location ? ` · ${wbEscape(item.location)}` : ''}</small></span><time>${item.nextActionAt ? jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '待安排'}</time><b>面试中</b></button>`).join('') : '<div class="job-panel-empty">还没有进入面试的岗位</div>';
 
   const visible = jobs.filter((item) => {
     const matchesStatus = statusFilter === 'all' || item.status === statusFilter;

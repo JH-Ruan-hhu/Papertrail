@@ -468,7 +468,8 @@ app.whenReady().then(async () => {
         const homePage = document.querySelector('[data-page="home"]');
         const schedule = rect(document.querySelector('.home-schedule-panel'));
         const notes = rect(document.querySelector('.latest-notes-panel'));
-        const side = rect(document.querySelector('.home-side-stack'));
+        const job = rect(document.querySelector('.home-job-panel'));
+        const utility = rect(document.querySelector('.home-utility-stack'));
         const progress = rect(document.querySelector('.home-progress-strip'));
         const command = rect(document.querySelector('.home-command-grid'));
         const focus = rect(document.querySelector('.home-top-grid'));
@@ -489,7 +490,7 @@ app.whenReady().then(async () => {
           contentTop: Math.round(content.top),
           contentBottom: Math.round(content.bottom),
           pageVisible: !document.querySelector('[data-page="home"]').hidden,
-          focusFirst: Boolean(document.querySelector('.home-top-grid #todayFocusList')),
+          todayFocusRemoved: !document.getElementById('todayFocusList') && !document.body.textContent.includes('今日重点'),
           focusTimerHome: Boolean(document.querySelector('.home-focus-timer #focusTimeRemaining')),
           clockOutsideFocus: !document.querySelector('.home-focus-timer #homeClockButton')
             && Boolean(document.querySelector('.home-attendance-card #homeClockButton')),
@@ -500,13 +501,25 @@ app.whenReady().then(async () => {
           attendanceIndependent: Boolean(document.querySelector('.home-attendance-card')),
           quickNote: Boolean(document.getElementById('quickNoteButton')),
           fourDayCards: document.querySelectorAll('#homeDayOverview .day-card').length,
-          notesRight: side.left > schedule.left,
-          aligned: Math.abs(side.top - schedule.top) <= 1,
+          notesRight: notes.left > schedule.left,
+          aligned: Math.abs(utility.top - schedule.top) <= 1,
+          fullWidthPipeline: Math.abs(job.left - content.left) <= 1 && Math.abs(job.right - content.right) <= 1,
           jobSummaryVisible: Boolean(document.querySelector('.home-job-panel #homeJobSummary .home-job-row')),
+          sixStageHomePipeline: document.querySelectorAll('#homeJobSummary .home-job-row').length === 6,
+          startsToday: document.querySelector('#homeDayOverview .day-card strong')?.textContent === '今天',
+          latestNotesNoScroll: (() => {
+            const list = document.getElementById('latestNotes');
+            return getComputedStyle(list).overflowY === 'hidden' && list.scrollWidth <= list.clientWidth;
+          })(),
+          navJobBelowSubmissions: (() => {
+            const submission = document.querySelector('[data-workbench-page="submissions"]');
+            const jobs = document.querySelector('[data-workbench-page="jobs"]');
+            return submission.compareDocumentPosition(jobs) & Node.DOCUMENT_POSITION_FOLLOWING;
+          })() > 0,
           homeContentFits: homePage.scrollHeight <= innerHeight && content.bottom <= innerHeight - 8,
           homeRowsAligned: command.top >= progress.bottom - 1
-            && focus.top >= command.bottom - 1
-            && content.top >= focus.bottom - 1,
+            && focus.top - command.bottom >= 10
+            && content.top - focus.bottom >= 10,
           homeColumnsAligned: Math.abs(focus.left - content.left) <= 1
             && Math.abs(focus.right - content.right) <= 1,
           commandCardsAligned: commandCards.length === 4
@@ -650,7 +663,7 @@ app.whenReady().then(async () => {
           proportionalMeters: new Set(meterWidths).size >= 2,
           added,
           advanced: Boolean(document.querySelector('.stage-written-1 [data-edit-job="job-submitted-1"]')),
-          homeSummary: document.querySelectorAll('#homeJobSummary .home-job-row').length === 4,
+          homeSummary: document.querySelectorAll('#homeJobSummary .home-job-row').length === 6,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()

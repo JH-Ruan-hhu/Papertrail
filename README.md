@@ -8,6 +8,13 @@ publisher-neutral.
 
 ## Version 1.1 workbench features
 
+Version 1.1.4 rebuilds Home around a consistent spacing rhythm and a calmer
+cool-gray/indigo Liquid Glass palette. Home now starts its four-day schedule at
+today, uses a compact focus timer, shows note excerpts without scrollbars, and
+places the complete six-stage application pipeline across the page. The Job
+workspace is redesigned as a career dashboard with key metrics, a stage board,
+upcoming actions, interview management, and a data overview.
+
 Version 1.1.3 adds a local job-application pipeline from 待投递 through Offer,
 an at-a-glance Home summary, an eight-day rolling schedule board, automatic
 cleanup of empty notes, inline note images with full-size preview, and a
@@ -83,9 +90,9 @@ saved schedule title.
 - Run a 25, 50, or 90 minute focus session from Home. Yanji can
   temporarily pause application toast notifications, restore the previous
   Windows policy afterward, and retain the focus session locally.
-- Keep today's priorities at the top of Home beside focus controls. The
-  four-day schedule and latest notes share the next row, with quick-create
-  actions for both schedules and notes.
+- Review today and the following three days beside compact focus controls and
+  note excerpts. Home also shows the full six-stage application pipeline with
+  proportional progress bars.
 - Show high-priority deadlines on every connected display with a low-stimulus
   star-field treatment; reduced-motion preferences disable decorative motion.
 - Add multiple reusable options to note select metadata through a tag editor.
@@ -103,9 +110,8 @@ saved schedule title.
 
 - Use a unified home, schedule, notes, submission-management, and settings
   workspace with a focused left navigation and a home focus timer.
-- Review yesterday, today, tomorrow, and the day after tomorrow from the home
-  page, create a schedule quickly, and see the latest notes without changing
-  pages.
+- Review today and the following three days from Home, create a schedule
+  quickly, and see clipped note excerpts without changing pages.
 - See today's schedule at the top of the Schedule page with completion progress,
   then review a compact seven-day date-column board. Each event card shows its
   time range, priority, deadline, completion state, and cross-midnight status.

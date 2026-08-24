@@ -33,11 +33,11 @@
           <button class="nav-item" data-workbench-page="notes" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h4M9 12h6M9 16h6"/></svg><span>笔记</span><b id="navNoteCount">0</b>
           </button>
-          <button class="nav-item" data-workbench-page="jobs" type="button">
-            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3.5 12h17M10 12v2h4v-2"/></svg><span>求职</span><b id="navJobCount">0</b>
-          </button>
           <button class="nav-item" data-workbench-page="submissions" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v12H4zM8 7.5v-3h8v3"/><path d="M8 12h8M8 15.5h5"/></svg><span>投稿</span><b id="navPaperCount">0</b>
+          </button>
+          <button class="nav-item" data-workbench-page="jobs" type="button">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3.5 12h17M10 12v2h4v-2"/></svg><span>求职</span><b id="navJobCount">0</b>
           </button>
         </nav>
 
@@ -87,40 +87,36 @@
           </section>
 
           <div class="home-top-grid">
-            <section class="focus-panel home-focus-panel">
-              <div class="panel-heading"><div><h2>今日重点</h2><p>把注意力留给真正重要的事</p></div><button class="text-button" data-go-page="schedule" type="button">打开时间轴</button></div>
-              <div id="todayFocusList" class="focus-list"></div>
-            </section>
-            <section class="focus-timer-panel home-focus-timer">
-              <div class="panel-heading"><div class="heading-with-icon"><span class="heading-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span><div><h2>专注计时</h2><p id="focusTodaySummary">今日 0 分钟</p></div></div></div>
-              <div class="focus-timer-body">
-                <div class="focus-ring" id="focusRing"><div><time id="focusTimeRemaining">50:00</time><span id="focusTimerCaption">准备专注</span></div></div>
-                <div class="focus-timer-actions">
-                  <input id="focusDuration" type="hidden" value="50">
-                  <div class="focus-duration-options" aria-label="专注时长"><button data-focus-minutes="25" type="button">25 分钟</button><button class="active" data-focus-minutes="50" type="button">50 分钟</button><button data-focus-minutes="90" type="button">90 分钟</button></div>
-                  <label class="focus-notification-option"><input id="focusSuppressNotifications" type="checkbox" checked><span>暂停其他软件通知</span></label>
-                  <p id="focusNotificationStatus">仅在计时期间生效，结束后自动恢复</p>
-                  <div><button class="button primary" id="startFocusButton" type="button">开始专注</button><button class="button secondary" id="stopFocusButton" type="button" hidden>结束专注</button></div>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          <div class="home-content-grid">
             <section class="home-schedule-panel">
-              <div class="panel-heading"><div><h2>接下来四天</h2><p>昨天复盘，今天执行，未来提前安排</p></div><button class="button primary" id="quickScheduleButton" type="button">快速写日程</button></div>
+              <div class="panel-heading"><div><p class="eyebrow">UPCOMING</p><h2>未来四天</h2><p>从今天开始，提前看见接下来的安排</p></div><button class="button compact primary" id="quickScheduleButton" type="button">快速写日程</button></div>
               <div class="day-overview" id="homeDayOverview"></div>
             </section>
-            <div class="home-side-stack">
-              <section class="home-job-panel">
-                <div class="panel-heading"><div><p class="eyebrow">APPLICATIONS</p><h2>求职进展</h2></div><button class="text-button" data-go-page="jobs" type="button">查看全部</button></div>
-                <div id="homeJobSummary" class="home-job-summary"></div>
+            <div class="home-utility-stack">
+              <section class="focus-timer-panel home-focus-timer">
+                <div class="panel-heading"><div class="heading-with-icon"><span class="heading-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7v5l3 2"/></svg></span><div><h2>专注计时</h2><p id="focusTodaySummary">今日 0 分钟</p></div></div></div>
+                <div class="focus-timer-body">
+                  <div class="focus-ring" id="focusRing"><div><time id="focusTimeRemaining">50:00</time><span id="focusTimerCaption">准备专注</span></div></div>
+                  <div class="focus-timer-actions">
+                    <input id="focusDuration" type="hidden" value="50">
+                    <div class="focus-duration-options" aria-label="专注时长"><button data-focus-minutes="25" type="button">25 分钟</button><button class="active" data-focus-minutes="50" type="button">50 分钟</button><button data-focus-minutes="90" type="button">90 分钟</button></div>
+                    <label class="focus-notification-option"><input id="focusSuppressNotifications" type="checkbox" checked><span>暂停其他软件通知</span></label>
+                    <p id="focusNotificationStatus">仅在计时期间生效，结束后自动恢复</p>
+                    <div><button class="button primary" id="startFocusButton" type="button">开始专注</button><button class="button secondary" id="stopFocusButton" type="button" hidden>结束专注</button></div>
+                  </div>
+                </div>
               </section>
               <section class="latest-notes-panel">
-                <div class="panel-heading"><div><h2>最新笔记</h2><p>最近写下的研究想法</p></div><div class="panel-heading-actions"><button class="button compact primary" id="quickNoteButton" type="button">快速写笔记</button><button class="text-button" data-go-page="notes" type="button">查看全部</button></div></div>
+                <div class="panel-heading"><div><p class="eyebrow">RECENT NOTES</p><h2>最新笔记</h2><p>摘要预览，点击继续编辑</p></div><div class="panel-heading-actions"><button class="button compact primary" id="quickNoteButton" type="button">新建</button><button class="text-button" data-go-page="notes" type="button">全部</button></div></div>
                 <div id="latestNotes" class="latest-notes"></div>
               </section>
             </div>
+          </div>
+
+          <div class="home-content-grid">
+            <section class="home-job-panel">
+              <div class="panel-heading"><div><p class="eyebrow">APPLICATION PIPELINE</p><h2>投递进度</h2><p>按当前所处阶段统计，不重复计算</p></div><button class="text-button" data-go-page="jobs" type="button">查看全部</button></div>
+              <div id="homeJobSummary" class="home-job-summary"></div>
+            </section>
           </div>
 
         </section>
@@ -200,26 +196,40 @@
 
         <section class="workbench-page job-page" data-page="jobs" hidden>
           <header class="page-head-row">
-            <div><p class="eyebrow">APPLICATION PIPELINE</p><h1>求职追踪</h1><p>把每次投递、笔试与面试放进一条清晰的推进路径</p></div>
+            <div><p class="eyebrow">CAREER DASHBOARD</p><h1>求职驾驶舱</h1><p>从投递到 Offer，把每一次推进和近期安排放在同一张图上</p></div>
             <div class="page-actions"><button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 添加岗位</button></div>
           </header>
-          <section class="job-overview-grid" aria-label="求职进展概览">
-            <article class="job-pipeline-panel">
-              <div class="panel-heading"><div><p class="eyebrow">PIPELINE</p><h2>投递进度</h2><p>按当前所处阶段统计，不重复计算</p></div></div>
+          <section class="job-metric-strip" aria-label="求职关键指标">
+            <article class="tone-offer"><span>Offer 数</span><strong id="jobOfferCount">0</strong><small>已收获结果</small></article>
+            <article class="tone-interview"><span>面试数量</span><strong id="jobInterviewCount">0</strong><small>当前面试阶段</small></article>
+            <article class="tone-calendar"><span>日程待办</span><strong id="jobUpcomingCount">0</strong><small>未来 7 天</small></article>
+            <article class="tone-submitted"><span>已投递机会</span><strong id="jobSubmittedCount">0</strong><small>含后续推进阶段</small></article>
+            <article class="tone-rate"><span>推进转化率</span><strong id="jobAdvanceRate">0%</strong><small>投递后进入下一阶段</small></article>
+          </section>
+          <div class="job-dashboard-grid">
+            <section class="job-board-panel">
+              <div class="panel-heading"><div><p class="eyebrow">PIPELINE BOARD</p><h2>投递看板</h2><p>按阶段管理岗位，直接推进下一步</p></div></div>
+              <section class="job-toolbar" aria-label="求职记录筛选">
+                <label class="search-box" for="jobSearch"><input id="jobSearch" type="search" placeholder="搜索单位、岗位、地点或备注" autocomplete="off"></label>
+                <label class="job-filter-label" for="jobStatusFilter"><span>阶段</span><select id="jobStatusFilter"><option value="all">全部阶段</option><option value="pending">待投递</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></label>
+              </section>
+              <div id="jobBoard" class="job-board" aria-live="polite"></div>
+            </section>
+            <section class="job-upcoming-panel">
+              <div class="panel-heading"><div><p class="eyebrow">UPCOMING</p><h2>近期日程</h2><p>按时间排序的下一步</p></div></div>
+              <div id="jobUpcomingList" class="job-upcoming-list"></div>
+            </section>
+          </div>
+          <div class="job-insight-grid">
+            <section class="job-interview-panel">
+              <div class="panel-heading"><div><p class="eyebrow">INTERVIEWS</p><h2>面试管理</h2><p>集中查看已进入面试的机会</p></div></div>
+              <div id="jobInterviewList" class="job-interview-list"></div>
+            </section>
+            <section class="job-glance-panel">
+              <div class="panel-heading"><div><p class="eyebrow">DATA GLANCE</p><h2>数据速览</h2><p>六阶段分布与推进情况</p></div></div>
               <div id="jobPipelineSummary" class="job-pipeline-summary"></div>
-            </article>
-            <article class="job-signal-panel">
-              <div><small>进行中</small><strong id="jobActiveCount">0</strong><span>个机会正在推进</span></div>
-              <div><small>进入面试</small><strong id="jobInterviewCount">0</strong><span>个机会已到面试</span></div>
-              <div class="job-offer-signal"><small>Offer</small><strong id="jobOfferCount">0</strong><span>已收获的结果</span></div>
-              <div><small>最近下一步</small><strong id="jobNextAction">未安排</strong><span id="jobNextActionMeta">添加日期后在这里提醒</span></div>
-            </article>
-          </section>
-          <section class="job-toolbar" aria-label="求职记录筛选">
-            <label class="search-box" for="jobSearch"><input id="jobSearch" type="search" placeholder="搜索单位、岗位、地点或备注" autocomplete="off"></label>
-            <label class="job-filter-label" for="jobStatusFilter"><span>阶段</span><select id="jobStatusFilter"><option value="all">全部阶段</option><option value="pending">待投递</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></label>
-          </section>
-          <div id="jobBoard" class="job-board" aria-live="polite"></div>
+            </section>
+          </div>
         </section>
 
         <section class="workbench-page submissions-page" data-page="submissions" hidden>
@@ -259,7 +269,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.1.3</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.1.4</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -382,7 +392,7 @@
               <h2>更新</h2>
               <h3>版本</h3>
               <div class="settings-group update-group">
-                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.1.3</span></small></div></div>
+                <div class="setting-row"><div><strong>当前版本</strong><small>研迹 v<span id="currentVersion">1.1.4</span></small></div></div>
                 <div class="setting-row"><div><strong>启动时自动检测更新</strong><small>仅检查 GitHub Release，不会自动下载或安装</small></div><label class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></label></div>
                 <div class="setting-row update-row">
                   <div class="update-copy"><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
