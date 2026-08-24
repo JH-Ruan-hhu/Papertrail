@@ -6,13 +6,14 @@ into one desktop app. The manuscript connectors cover Elsevier Author Hub and
 Elsevier accepted-article production pages; local workflow records remain
 publisher-neutral.
 
-## Version 1.2 workbench features
+## Release highlights
 
-Current `main` adds Yanji-owned install and update experiences: a compact
+Version 1.3.0 introduces Yanji-owned install and update experiences: a compact
 single-page NSIS installer with an editable destination and desktop-shortcut
 choice, a three-stage in-app updater, and subtle pointer-only page-rise motion
-for sidebar navigation. Keyboard navigation remains immediate and reduced
-motion falls back to opacity only.
+for sidebar navigation. It also includes the six-stage horizontal career board,
+storage-path compatibility recovery, packaged taskbar icon correction, note
+editor improvements, and the v1.2 performance work.
 
 Version 1.2.4 turns the job pipeline into a single six-column horizontal board.
 Job cards open the editor directly, keep their advance action in the top-right
