@@ -705,7 +705,7 @@ app.whenReady().then(async () => {
     await captureStablePage(process.env.WORKBENCH_JOBS_OUTPUT);
   }
   if (process.env.WORKBENCH_CAPTURE_OUTPUT) {
-    window.setSize(720, 290);
+    window.setSize(720, 222);
     await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'capture.html'));
     await new Promise((resolve) => setTimeout(resolve, 150));
     const captureResult = await window.webContents.executeJavaScript(`
@@ -730,7 +730,11 @@ app.whenReady().then(async () => {
         editor.value = '明天下午 3 点到 5 点组会 #1';
         editor.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 180));
-        return { compositionPreserved, priorityRendered, highlighted, emptyBlurClosed };
+        const card = document.querySelector('.capture-card').getBoundingClientRect();
+        const singleSurface = card.left === 0 && card.top === 0 && card.right === innerWidth && card.bottom === innerHeight;
+        const transparentRoot = getComputedStyle(document.body).backgroundColor === 'rgba(0, 0, 0, 0)'
+          && getComputedStyle(document.body).backgroundImage === 'none';
+        return { compositionPreserved, priorityRendered, highlighted, emptyBlurClosed, singleSurface, transparentRoot };
       })()
     `);
     if (!Object.values(captureResult).every(Boolean)) throw new Error(`Workbench capture smoke failed: ${JSON.stringify(captureResult)}`);

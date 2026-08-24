@@ -1239,7 +1239,7 @@ function createQuickCaptureWindow() {
   if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) return quickCaptureWindow;
   quickCaptureWindow = new BrowserWindow({
     width: 720,
-    height: 250,
+    height: 222,
     show: false,
     frame: false,
     transparent: true,
