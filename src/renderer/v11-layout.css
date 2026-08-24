@@ -616,7 +616,10 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .home-focus-timer .focus-duration-options button.active { color: #fff; background: #5b74c5; border-color: #5b74c5; }
 .home-focus-timer .focus-notification-option { font-size: 10px; }
 .home-focus-timer .focus-notification-option input { accent-color: #5b74c5; }
-.home-focus-timer .focus-timer-actions > p { min-height: 0; margin: 0; font-size: 9px; line-height: 1.35; }
+.home-focus-timer .focus-control-row { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 10px; }
+.home-focus-timer .focus-notification-copy { min-width: 0; }
+.home-focus-timer .focus-notification-copy > p { min-height: 0; margin: 4px 0 0; color: var(--yanji-muted); font-size: 9px; line-height: 1.35; }
+.home-focus-timer .focus-primary-actions { display: flex; justify-content: flex-end; }
 .home-focus-timer .focus-timer-actions .button { min-height: 31px; }
 
 .home-job-panel .panel-heading { margin-bottom: 8px; }
@@ -862,8 +865,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .home-focus-timer .focus-duration-options { gap: 4px; }
 .home-focus-timer .focus-duration-options button { min-height: 23px; font-size: 8px; }
 .home-focus-timer .focus-notification-option { font-size: 9px; }
-.home-focus-timer .focus-timer-actions > p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.home-focus-timer .focus-timer-actions > div:last-child { display: flex; justify-content: flex-end; margin-top: 1px; }
+.home-focus-timer .focus-notification-copy > p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .home-focus-timer .focus-timer-actions .button { min-width: 94px; min-height: 33px; padding-inline: 15px; font-size: 11px; font-weight: 720; }
 .home-utility-stack .latest-notes-panel { padding: 13px 15px; }
 .home-utility-stack .latest-notes-panel .panel-heading { margin-bottom: 7px; }
@@ -878,7 +880,8 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   .home-focus-timer .focus-ring::before { width: 67px; }
   .home-focus-timer .focus-ring time { font-size: 18px; }
   .home-focus-timer .focus-notification-option { display: flex; font-size: 9px; line-height: 1.2; }
-  .home-focus-timer .focus-timer-actions > p { display: block; font-size: 8px; line-height: 1.25; }
+  .home-focus-timer .focus-control-row { gap: 7px; }
+  .home-focus-timer .focus-notification-copy > p { display: block; font-size: 8px; line-height: 1.25; }
   .home-focus-timer .focus-timer-actions .button { min-width: 90px; min-height: 32px; padding-inline: 13px; font-size: 10px; }
   .home-utility-stack .latest-notes-panel { padding: 9px 11px; }
   .home-utility-stack .latest-notes-panel .panel-heading { margin-bottom: 4px; }

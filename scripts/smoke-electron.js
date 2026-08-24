@@ -504,6 +504,11 @@ app.whenReady().then(async () => {
             const status = document.getElementById('focusNotificationStatus');
             return option?.getBoundingClientRect().height > 0 && status?.getBoundingClientRect().height > 0;
           })(),
+          focusControlInline: (() => {
+            const copy = document.querySelector('.home-focus-timer .focus-notification-copy')?.getBoundingClientRect();
+            const button = document.getElementById('startFocusButton')?.getBoundingClientRect();
+            return Boolean(copy && button && button.left > copy.left && Math.abs((copy.top + copy.bottom) / 2 - (button.top + button.bottom) / 2) <= 3);
+          })(),
           clockOutsideFocus: !document.querySelector('.home-focus-timer #homeClockButton')
             && Boolean(document.querySelector('.home-attendance-card #homeClockButton')),
           attendanceStatus: Boolean(document.getElementById('homeAttendanceStatus')),

@@ -99,9 +99,10 @@
                   <div class="focus-timer-actions">
                     <input id="focusDuration" type="hidden" value="50">
                     <div class="focus-duration-options" aria-label="专注时长"><button data-focus-minutes="25" type="button">25 分钟</button><button class="active" data-focus-minutes="50" type="button">50 分钟</button><button data-focus-minutes="90" type="button">90 分钟</button></div>
-                    <label class="focus-notification-option"><input id="focusSuppressNotifications" type="checkbox" checked><span>暂停其他软件通知</span></label>
-                    <p id="focusNotificationStatus">仅在计时期间生效，结束后自动恢复</p>
-                    <div><button class="button primary" id="startFocusButton" type="button">开始专注</button><button class="button secondary" id="stopFocusButton" type="button" hidden>结束专注</button></div>
+                    <div class="focus-control-row">
+                      <div class="focus-notification-copy"><label class="focus-notification-option"><input id="focusSuppressNotifications" type="checkbox" checked><span>暂停其他软件通知</span></label><p id="focusNotificationStatus">仅在计时期间生效，结束后自动恢复</p></div>
+                      <div class="focus-primary-actions"><button class="button primary" id="startFocusButton" type="button">开始专注</button><button class="button secondary" id="stopFocusButton" type="button" hidden>结束专注</button></div>
+                    </div>
                   </div>
                 </div>
               </section>
