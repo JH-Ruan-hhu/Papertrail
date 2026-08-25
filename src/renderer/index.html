@@ -194,7 +194,7 @@
           </header>
           <section class="job-metric-strip" aria-label="求职关键指标">
             <article class="tone-offer"><span>Offer 数</span><strong id="jobOfferCount">0</strong><small>已收获结果</small></article>
-            <article class="tone-interview"><span>面试数量</span><strong id="jobInterviewCount">0</strong><small>当前面试阶段</small></article>
+            <article class="tone-interview"><span>面试数量</span><strong id="jobInterviewCount">0</strong><small>含已进入后续阶段</small></article>
             <article class="tone-salary"><span>最高预估年薪</span><strong id="jobMaxSalary">—</strong><small>按岗位合约估算</small></article>
             <article class="tone-submitted"><span>已投递机会</span><strong id="jobSubmittedCount">0</strong><small>含后续推进阶段</small></article>
             <article class="tone-rate"><span>推进转化率</span><strong id="jobAdvanceRate">0%</strong><small>投递后进入下一阶段</small></article>
@@ -215,7 +215,7 @@
               <div id="jobInterviewList" class="job-interview-list"></div>
             </section>
             <section class="job-glance-panel">
-              <div class="panel-heading"><div><p class="eyebrow">DATA GLANCE</p><h2>数据速览</h2><p>六阶段分布与推进情况</p></div></div>
+              <div class="panel-heading"><div><p class="eyebrow">PROGRESS FUNNEL</p><h2>累计进度</h2><p>岗位推进后，已完成阶段仍保留计数</p></div></div>
               <div id="jobPipelineSummary" class="job-pipeline-summary"></div>
             </section>
           </div>
@@ -258,7 +258,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.3.0</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.2.4</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -383,13 +383,17 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="updates" role="tabpanel" hidden>
-              <h2>更新</h2>
-              <h3>版本</h3>
+              <div class="update-section-heading"><div><p class="eyebrow">RELEASE CENTER</p><h2>更新中心</h2><p>在这里完成检查、下载与安装，过程清晰可控</p></div><span class="update-safety-pill">本地数据不受影响</span></div>
               <div class="settings-group update-group" data-update-status="idle">
                 <div class="update-hero">
-                  <span class="update-app-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 3.5h8l3 3V20H7z"/><path d="M15 3.5V7h3M10 11h5M10 14.5h5"/><path d="m10.2 18 1.4 1.4 3-3"/></svg></span>
-                  <div class="update-copy"><span class="update-kicker">YANJI UPDATE</span><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
+                  <span class="update-app-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8.5 10.5 3.5 3.5 3.5-3.5"/><path d="M5 17.5h14"/></svg><i></i></span>
+                  <div class="update-copy"><span class="update-kicker">YANJI DESKTOP</span><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
                   <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button primary" id="updateActionButton" type="button">检查更新</button></div>
+                </div>
+                <div class="update-version-overview" aria-label="版本信息">
+                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.3.0</span></strong><small>正在使用</small></div>
+                  <span class="update-version-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
+                  <div class="update-version-card target"><span>可用版本</span><strong id="updateTargetVersion">等待检查</strong><small>来自 GitHub Release</small></div>
                 </div>
                 <div class="update-journey" aria-label="更新流程">
                   <span class="stage-check"><i>1</i><b>检查版本</b></span><em></em>
@@ -398,7 +402,7 @@
                 </div>
                 <div class="update-progress" id="updateProgress" role="progressbar" aria-label="更新下载进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><span id="updateProgressBar"></span></div>
                 <div class="update-preferences">
-                  <div><strong>研迹 v<span id="currentVersion">1.3.0</span></strong><small>升级只替换程序文件，不移动科研数据</small></div>
+                  <div><strong>安全更新</strong><small>只替换程序文件，不移动日程、笔记、投稿或求职数据</small></div>
                   <label><span>启动时自动检查</span><span class="switch"><input id="autoCheckUpdates" type="checkbox"><span></span></span></label>
                 </div>
               </div>

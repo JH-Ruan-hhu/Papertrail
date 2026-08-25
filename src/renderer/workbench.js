@@ -223,6 +223,15 @@ function jobDateLabel(value, options = { month: 'numeric', day: 'numeric' }) {
   return new Intl.DateTimeFormat('zh-CN', options).format(new Date(value));
 }
 
+function cumulativeJobCounts(jobs) {
+  return Object.fromEntries(JOB_STATUSES.map((status, index) => [
+    status,
+    status === 'pending'
+      ? jobs.filter((item) => item.status === status).length
+      : jobs.filter((item) => JOB_STATUSES.indexOf(item.status) >= index).length
+  ]));
+}
+
 function renderHomeJobs() {
   const container = document.getElementById('homeJobSummary');
   if (!container) return;
@@ -239,7 +248,8 @@ function renderHomeJobs() {
     ['interview', '面试'],
     ['offer', 'Offer']
   ];
-  const counts = groups.map(([status]) => jobs.filter((item) => item.status === status).length);
+  const cumulativeCounts = cumulativeJobCounts(jobs);
+  const counts = groups.map(([status]) => cumulativeCounts[status]);
   const maximum = Math.max(1, ...counts);
   container.innerHTML = groups.map(([status, label], index) => `<button class="home-job-row" data-go-page="jobs" data-job-home-filter="${status}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[index], maximum)}"></b></i><strong>${counts[index]}</strong></button>`).join('');
 }
@@ -249,12 +259,13 @@ function renderJobs() {
   const query = document.getElementById('jobSearch').value.trim().toLowerCase();
   const statusFilter = document.getElementById('jobStatusFilter').value;
   const counts = Object.fromEntries(JOB_STATUSES.map((status) => [status, jobs.filter((item) => item.status === status).length]));
-  const maximum = Math.max(1, ...Object.values(counts));
-  document.getElementById('jobPipelineSummary').innerHTML = JOB_STATUSES.map((status, index) => `<div class="job-pipeline-row"><span><b>${String(index + 1).padStart(2, '0')}</b>${JOB_STATUS_LABELS[status]}</span><i><b class="${jobMeterClass(counts[status], maximum)}"></b></i><strong>${counts[status]}</strong></div>`).join('');
+  const cumulativeCounts = cumulativeJobCounts(jobs);
+  const maximum = Math.max(1, ...Object.values(cumulativeCounts));
+  document.getElementById('jobPipelineSummary').innerHTML = JOB_STATUSES.map((status, index) => `<div class="job-pipeline-row"><span><b>${String(index + 1).padStart(2, '0')}</b>${JOB_STATUS_LABELS[status]}</span><i><b class="${jobMeterClass(cumulativeCounts[status], maximum)}"></b></i><strong>${cumulativeCounts[status]}</strong></div>`).join('');
   const active = jobs.filter((item) => item.status !== 'offer').length;
-  document.getElementById('jobInterviewCount').textContent = String(counts.interview);
+  document.getElementById('jobInterviewCount').textContent = String(cumulativeCounts.interview);
   document.getElementById('jobOfferCount').textContent = String(counts.offer);
-  const submitted = jobs.filter((item) => JOB_STATUSES.indexOf(item.status) >= JOB_STATUSES.indexOf('submitted')).length;
+  const submitted = cumulativeCounts.submitted;
   const advanced = jobs.filter((item) => JOB_STATUSES.indexOf(item.status) > JOB_STATUSES.indexOf('submitted')).length;
   const salaries = jobs.map((item) => Number(item.annualSalaryWan)).filter((value) => Number.isFinite(value) && value > 0);
   const maxSalary = salaries.length ? Math.max(...salaries) : null;

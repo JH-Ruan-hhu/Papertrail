@@ -762,9 +762,11 @@ app.whenReady().then(async () => {
         document.getElementById('saveJobButton').click();
         await new Promise((resolve) => setTimeout(resolve, 80));
         const added = document.querySelectorAll('#jobBoard .job-card').length === initialCards + 1;
+        const submittedBeforeAdvance = document.getElementById('jobSubmittedCount')?.textContent;
         const advance = document.querySelector('[data-advance-job="job-submitted-1"]');
         advance?.click();
         await new Promise((resolve) => setTimeout(resolve, 80));
+        const submittedAfterAdvance = document.getElementById('jobSubmittedCount')?.textContent;
         return {
           pageVisible: !document.querySelector('[data-page="jobs"]').hidden,
           sixStages: document.querySelectorAll('#jobBoard .job-stage-column').length === 6,
@@ -784,13 +786,14 @@ app.whenReady().then(async () => {
           initialCards,
           proportionalMeters: new Set(meterWidths).size >= 2,
           added,
+          submittedRetained: submittedBeforeAdvance === submittedAfterAdvance && Number(submittedAfterAdvance) >= 4,
           advanced: Boolean(document.querySelector('.stage-written-1 [data-edit-job="job-submitted-1"]')),
           homeSummary: document.querySelectorAll('#homeJobSummary .home-job-row').length === 6,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!jobsResult.pageVisible || !jobsResult.sixStages || !jobsResult.sixStageColors || !jobsResult.singleStageRow || !jobsResult.cardAnatomy || !jobsResult.cardsAreEditors || !jobsResult.editButtonsRemoved || !jobsResult.advancesAtTop || !jobsResult.pendingAddOnly || !jobsResult.cardClickOpensEditor || !jobsResult.readableStageWidths || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || !jobsResult.sixStages || !jobsResult.sixStageColors || !jobsResult.singleStageRow || !jobsResult.cardAnatomy || !jobsResult.cardsAreEditors || !jobsResult.editButtonsRemoved || !jobsResult.advancesAtTop || !jobsResult.pendingAddOnly || !jobsResult.cardClickOpensEditor || !jobsResult.readableStageWidths || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.submittedRetained || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);

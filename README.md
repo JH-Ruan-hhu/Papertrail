@@ -10,10 +10,14 @@ publisher-neutral.
 
 Version 1.3.0 introduces Yanji-owned install and update experiences: a compact
 single-page NSIS installer with an editable destination and desktop-shortcut
-choice, a three-stage in-app updater, and subtle pointer-only page-rise motion
-for sidebar navigation. It also includes the six-stage horizontal career board,
-storage-path compatibility recovery, packaged taskbar icon correction, note
-editor improvements, and the v1.2 performance work.
+choice, and an in-app release center that compares installed and available
+versions before guiding users through checking, safe download, and restart.
+Career summaries now use cumulative funnel counts, so reaching an interview or
+Offer never removes that opportunity from the submitted total; the horizontal
+board still shows each opportunity only once at its current stage. The release
+also includes pointer-only page-rise motion, storage-path compatibility
+recovery, packaged taskbar icon correction, note editor improvements, and the
+v1.2 performance work.
 
 Version 1.2.4 turns the job pipeline into a single six-column horizontal board.
 Job cards open the editor directly, keep their advance action in the top-right

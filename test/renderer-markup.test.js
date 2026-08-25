@@ -384,9 +384,22 @@ test('settings omit promotional and explanatory introduction cards', () => {
 
 test('job dashboard uses salary metric without a duplicate upcoming schedule panel', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
   assert.match(indexHtml, /id="jobMaxSalary"/);
   assert.match(indexHtml, /id="jobAnnualSalaryWan"/);
   assert.doesNotMatch(indexHtml, /job-upcoming-panel|jobUpcomingCount|>近期日程</);
+  assert.match(indexHtml, /岗位推进后，已完成阶段仍保留计数/);
+  assert.match(workbenchJs, /function cumulativeJobCounts\(jobs\)/);
+  assert.match(workbenchJs, /const submitted = cumulativeCounts\.submitted/);
+});
+
+test('update center shows current and available versions with a local-data safety boundary', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  assert.match(indexHtml, /RELEASE CENTER/);
+  assert.match(indexHtml, /id="updateTargetVersion"/);
+  assert.match(indexHtml, /只替换程序文件，不移动日程、笔记、投稿或求职数据/);
+  assert.match(appJs, /updateTargetVersion\.textContent/);
 });
 
 test('settings render as a workspace page with exact horizontal tabs', () => {

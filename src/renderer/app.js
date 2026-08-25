@@ -108,6 +108,7 @@ const elements = {
   updateStatusTitle: document.getElementById('updateStatusTitle'),
   updateStatusText: document.getElementById('updateStatusText'),
   updateVersionBadge: document.getElementById('updateVersionBadge'),
+  updateTargetVersion: document.getElementById('updateTargetVersion'),
   updateActionButton: document.getElementById('updateActionButton'),
   updateProgress: document.getElementById('updateProgress'),
   updateProgressBar: document.getElementById('updateProgressBar'),
@@ -787,6 +788,7 @@ function renderUpdateStatus() {
   elements.updateActionButton.disabled = display[2];
   elements.updateVersionBadge.hidden = !latestVersion;
   elements.updateVersionBadge.textContent = latestVersion;
+  elements.updateTargetVersion.textContent = latestVersion || (status === 'up-to-date' ? `v${elements.currentVersion.textContent}` : '等待检查');
   elements.updateProgress.hidden = !['downloading', 'downloaded'].includes(status);
   elements.updateProgress.setAttribute('aria-valuenow', String(Math.round(percent)));
   elements.updateProgressBar.style.transform = `scaleX(${percent / 100})`;
