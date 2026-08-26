@@ -40,6 +40,17 @@ test('removes the connector between a relative date and its clock phrase', () =>
   assert.equal(start.getMinutes(), 0);
 });
 
+test('parses a bare day-of-month and removes the full deadline token from the title', () => {
+  const now = new Date(2026, 7, 26, 10, 0);
+  const bareDay = parseNaturalLanguageSchedule('28号', now);
+  const deadline = parseNaturalLanguageSchedule('28日前完成基恩士测评', now);
+  assert.equal(new Date(bareDay.startAt).getDate(), 28);
+  assert.equal(bareDay.meta.explicitDate, true);
+  assert.equal(new Date(deadline.startAt).getDate(), 28);
+  assert.equal(deadline.title, '完成基恩士测评');
+  assert.equal(deadline.deadline, true);
+});
+
 test('splits multiple explicitly timed clauses and inherits their date', () => {
   const parsed = parseNaturalLanguageSchedules('明天上午八点去采样，下午五点去洗澡', new Date(2026, 7, 22, 10, 0));
   assert.equal(parsed.schedules.length, 2);

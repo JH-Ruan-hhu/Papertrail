@@ -1,188 +1,417 @@
 /*
- * Liquid Glass appearance
+ * Yanji liquid glass
  *
- * Glass is reserved for chrome, navigation, dialogs and transient controls.
- * Reading surfaces use a calm, nearly opaque material so text never sits on
- * glass-on-glass. This mirrors Apple's content / functional-layer separation.
+ * The classic theme remains the structural reference. This file supplies one
+ * coherent material system for every workbench page: ambient canvas, chrome,
+ * primary glass surfaces, nested content surfaces and transient overlays.
  */
 html[data-appearance="liquid-glass"] {
   color-scheme: light;
-  --yanji-bg: #dfe3ea;
-  --yanji-surface: rgba(249, 250, 253, .94);
-  --yanji-surface-soft: rgba(238, 241, 247, .9);
-  --yanji-text: #17253a;
-  --yanji-muted: #68758a;
-  --yanji-line: rgba(78, 91, 119, .14);
-  --yanji-accent: #5874c8;
-  --yanji-accent-strong: #354f9e;
-  --glass-chrome: rgba(232, 236, 244, .66);
-  --glass-chrome-strong: rgba(247, 248, 252, .82);
-  --glass-line: rgba(255, 255, 255, .72);
-  --glass-edge: rgba(74, 88, 116, .14);
-  --glass-shadow: 0 20px 54px rgba(40, 48, 72, .11), 0 2px 8px rgba(40, 48, 72, .05);
-  --glass-blur: 28px;
+  --ink: #101a33;
+  --muted: #66738c;
+  --canvas: transparent;
+  --surface: rgba(255, 255, 255, .68);
+  --line: rgba(255, 255, 255, .7);
+  --line-strong: rgba(91, 112, 157, .2);
+  --primary: #1856ff;
+  --primary-dark: #1345d1;
+  --primary-soft: rgba(24, 86, 255, .1);
+  --focus-ring: 0 0 0 3px rgba(24, 86, 255, .18);
+  --shadow: 0 20px 54px rgba(49, 68, 112, .1);
+  --yanji-bg: #eaf0fa;
+  --yanji-surface: rgba(255, 255, 255, .66);
+  --yanji-surface-soft: rgba(246, 249, 255, .52);
+  --yanji-text: #101a33;
+  --yanji-muted: #66738c;
+  --yanji-line: rgba(91, 112, 157, .16);
+  --yanji-accent: #1856ff;
+  --yanji-accent-strong: #1345d1;
+  --yanji-radius-sm: 12px;
+  --yanji-radius-md: 16px;
+  --yanji-radius-lg: 22px;
+  --glass-chrome: rgba(239, 246, 255, .54);
+  --glass-panel: rgba(255, 255, 255, .62);
+  --glass-panel-strong: rgba(255, 255, 255, .78);
+  --glass-nested: rgba(255, 255, 255, .48);
+  --glass-line: rgba(255, 255, 255, .76);
+  --glass-edge: rgba(87, 105, 148, .15);
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, .8);
+  --glass-shadow: 0 20px 52px rgba(42, 57, 101, .1), 0 2px 8px rgba(42, 57, 101, .045);
+  --glass-shadow-hover: 0 24px 62px rgba(42, 57, 101, .14), 0 4px 12px rgba(42, 57, 101, .06);
+  --glass-blur: 26px;
   --glass-saturation: 145%;
 }
 
 html[data-appearance="liquid-glass"] body {
   color: var(--yanji-text);
   background:
-    radial-gradient(circle at 2% -8%, rgba(129, 203, 224, .46), transparent 33rem),
-    radial-gradient(circle at 100% 2%, rgba(170, 153, 220, .35), transparent 38rem),
-    radial-gradient(circle at 68% 112%, rgba(231, 173, 197, .2), transparent 31rem),
-    linear-gradient(145deg, #d7dde5 0%, #eef0f5 49%, #dddce8 100%);
+    radial-gradient(circle at -4% 2%, rgba(126, 205, 255, .55), transparent 35rem),
+    radial-gradient(circle at 98% 0%, rgba(187, 157, 255, .42), transparent 42rem),
+    radial-gradient(circle at 72% 105%, rgba(255, 176, 220, .25), transparent 34rem),
+    radial-gradient(circle at 28% 74%, rgba(125, 226, 210, .18), transparent 31rem),
+    linear-gradient(145deg, #e9f5ff 0%, #f3f5fd 48%, #f6effb 100%);
+  background-attachment: fixed;
+}
+
+html[data-appearance="liquid-glass"] body::before,
+html[data-appearance="liquid-glass"] body::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(3px);
 }
 
 html[data-appearance="liquid-glass"] body::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(115deg, rgba(255,255,255,.14), transparent 38% 67%, rgba(255,255,255,.1));
+  width: 34rem;
+  height: 34rem;
+  left: 13%;
+  top: -23rem;
+  background: rgba(255, 255, 255, .42);
+  box-shadow: 42rem 22rem 0 rgba(166, 194, 255, .12);
+}
+
+html[data-appearance="liquid-glass"] body::after {
+  width: 23rem;
+  height: 23rem;
+  right: -8rem;
+  bottom: -8rem;
+  background: rgba(221, 199, 255, .21);
 }
 
 html[data-appearance="liquid-glass"] .workspace,
-html[data-appearance="liquid-glass"] .settings-page { background: transparent; }
+html[data-appearance="liquid-glass"] .settings-page,
+html[data-appearance="liquid-glass"] :is(.app-layout, .workbench-page, .home-page, .home-command-grid, .home-top-grid, .home-content-grid) { background: transparent; }
 
-/* Functional glass layer: titlebar, sidebar and floating controls only. */
+/* App chrome */
 html[data-appearance="liquid-glass"] .window-titlebar,
 html[data-appearance="liquid-glass"] .sidebar {
   background: var(--glass-chrome);
   border-color: var(--glass-edge);
-  box-shadow: inset 0 1px 0 var(--glass-line);
+  box-shadow: var(--glass-highlight);
+  backdrop-filter: blur(32px) saturate(155%);
+  -webkit-backdrop-filter: blur(32px) saturate(155%);
+}
+
+html[data-appearance="liquid-glass"] .window-titlebar {
+  color: #586982;
+  border-bottom-color: rgba(255, 255, 255, .52);
+}
+
+html[data-appearance="liquid-glass"] .sidebar {
+  border-right-color: rgba(255, 255, 255, .56);
+  box-shadow: inset -1px 0 rgba(82, 104, 151, .09), var(--glass-highlight);
+}
+
+html[data-appearance="liquid-glass"] .sidebar::after {
+  width: 240px;
+  height: 240px;
+  left: -138px;
+  bottom: 92px;
+  border-color: rgba(255, 255, 255, .4);
+  box-shadow: 0 0 80px rgba(77, 154, 255, .1);
+}
+
+html[data-appearance="liquid-glass"] .brand { padding-bottom: 22px; }
+html[data-appearance="liquid-glass"] .brand-mark {
+  width: 39px;
+  height: 39px;
+  filter: drop-shadow(0 8px 16px rgba(24, 86, 255, .2));
+}
+html[data-appearance="liquid-glass"] .brand-mark svg { width: 100%; height: 100%; overflow: visible; }
+html[data-appearance="liquid-glass"] .brand-mark rect { fill: #3977ff; stroke: rgba(255,255,255,.8); }
+html[data-appearance="liquid-glass"] .brand-mark path { fill: none; stroke: #fff; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+html[data-appearance="liquid-glass"] .brand strong { color: #111d38; }
+html[data-appearance="liquid-glass"] .brand small,
+html[data-appearance="liquid-glass"] .nav-label { color: #74839b; }
+
+html[data-appearance="liquid-glass"] :is(.nav-item, .settings-entry, .quick-capture-tip) {
+  color: #52657e;
+  border-color: transparent;
+}
+html[data-appearance="liquid-glass"] :is(.nav-item, .settings-entry, .quick-capture-tip):hover {
+  color: #173d9c;
+  background: rgba(255, 255, 255, .42);
+  border-color: rgba(255, 255, 255, .5);
+}
+html[data-appearance="liquid-glass"] .nav-item.active,
+html[data-appearance="liquid-glass"] .settings-entry.active {
+  color: #1856dd;
+  background: linear-gradient(115deg, rgba(255, 255, 255, .76), rgba(243, 247, 255, .56));
+  border: 1px solid rgba(255, 255, 255, .78);
+  box-shadow: inset 3px 0 #3974ff, inset 0 1px rgba(255, 255, 255, .9), 0 10px 24px rgba(42, 67, 135, .1);
+}
+html[data-appearance="liquid-glass"] .nav-item b { color: #50647c; background: rgba(255, 255, 255, .5); }
+html[data-appearance="liquid-glass"] .nav-item.active b {
+  color: #1345d1;
+  background: rgba(255, 255, 255, .86);
+  border: 1px solid rgba(24, 86, 255, .15);
+}
+html[data-appearance="liquid-glass"] .quick-capture-tip {
+  background: rgba(255, 255, 255, .28);
+  border-color: rgba(255, 255, 255, .42);
+  box-shadow: inset 0 1px rgba(255, 255, 255, .54);
+}
+html[data-appearance="liquid-glass"] .sticky-create-tip { background: rgba(226, 244, 255, .34); }
+html[data-appearance="liquid-glass"] :is(.quick-capture-tip strong, .settings-entry strong) { color: #243956; }
+html[data-appearance="liquid-glass"] .settings-entry { border-top-color: rgba(94, 112, 150, .12); }
+
+/* Primary glass surfaces */
+html[data-appearance="liquid-glass"] :is(
+  .home-progress-strip, .home-next-event-card, .home-today-card, .home-attendance-card,
+  .home-top-grid > section, .home-utility-stack > section, .home-content-grid > section,
+  .focus-usage-panel, .attendance-summary article, .attendance-gantt-shell,
+  .todo-toolbar, .todo-card, .schedule-board-shell, .notes-toolbar, .note-card,
+  .job-metric-strip article, .job-board-panel, .job-toolbar, .job-stage-column,
+  .job-interview-panel, .job-glance-panel, .content-section, .stats article,
+  .paper-card, .settings-group, .settings-note, .settings-about
+) {
+  color: var(--yanji-text);
+  background: var(--glass-panel);
+  border-color: var(--glass-line);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
-html[data-appearance="liquid-glass"] .window-titlebar { color: #4d657c; }
-html[data-appearance="liquid-glass"] .sidebar { border-right-color: var(--glass-edge); }
-html[data-appearance="liquid-glass"] .brand strong,
-html[data-appearance="liquid-glass"] .page-head-row h1,
-html[data-appearance="liquid-glass"] .workspace-header h1,
-html[data-appearance="liquid-glass"] .panel-heading h2 { color: var(--yanji-text); }
 
-html[data-appearance="liquid-glass"] .nav-item,
-html[data-appearance="liquid-glass"] .settings-entry,
-html[data-appearance="liquid-glass"] .quick-capture-tip { color: #526579; }
-html[data-appearance="liquid-glass"] .nav-item:hover,
-html[data-appearance="liquid-glass"] .settings-entry:hover,
-html[data-appearance="liquid-glass"] .quick-capture-tip:hover { background: rgba(255,255,255,.32); }
-html[data-appearance="liquid-glass"] .nav-item.active {
-  color: #2f478d;
-  background: rgba(255,255,255,.64);
-  border: 1px solid rgba(255,255,255,.66);
-  box-shadow: inset 3px 0 #647ed0, inset 0 1px 0 rgba(255,255,255,.78), 0 8px 22px rgba(53,65,105,.08);
+html[data-appearance="liquid-glass"] :is(
+  .home-next-event-card, .home-today-card, .home-attendance-card, .todo-card,
+  .note-card, .paper-card, .job-card, .day-card
+) { transition: transform 180ms var(--ease-out), border-color 180ms ease, box-shadow 200ms var(--ease-out), background-color 180ms ease; }
+
+html[data-appearance="liquid-glass"] :is(.todo-card, .note-card, .paper-card, .job-card):hover {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, .78);
+  border-color: rgba(255, 255, 255, .92);
+  box-shadow: var(--glass-shadow-hover), var(--glass-highlight);
 }
 
-/* Content layer: opaque enough for reliable text contrast, with only a soft
-   edge and shadow. No backdrop filter is applied to these surfaces. */
-html[data-appearance="liquid-glass"] :is(
-  .panel, .content-section, .stats article, .home-progress-strip,
-  .home-next-event-card, .home-today-card, .home-attendance-card,
-  .home-top-grid > section, .home-utility-stack > section, .home-content-grid > section,
-  .schedule-today-panel, .schedule-board-shell, .focus-usage-panel,
-  .attendance-gantt-shell, .notes-toolbar, .note-card, .todo-toolbar,
-  .todo-card, .job-pipeline-panel, .job-signal-panel, .job-toolbar,
-  .job-metric-strip article, .job-board-panel,
-  .job-interview-panel, .job-glance-panel
-) {
-  color: var(--yanji-text);
-  background: var(--yanji-surface);
-  border-color: var(--yanji-line);
-  box-shadow: 0 10px 30px rgba(38, 62, 87, .07), inset 0 1px 0 rgba(255,255,255,.56);
+html[data-appearance="liquid-glass"] :is(.page-head-row h1, .workspace-header h1, .panel-heading h2, .section-heading h2) {
+  color: #101a33;
+  letter-spacing: -.03em;
+}
+html[data-appearance="liquid-glass"] .eyebrow { color: #4169cc; }
+html[data-appearance="liquid-glass"] :is(.page-head-row > div > p:last-child, .workspace-header > div > p:last-child, .panel-heading p) { color: #6a7890; }
+
+/* Home dashboard */
+html[data-appearance="liquid-glass"] .home-progress-strip {
+  background: linear-gradient(112deg, rgba(255,255,255,.74), rgba(249,251,255,.49));
+  border-radius: 18px;
+}
+html[data-appearance="liquid-glass"] .home-progress-copy h1 { color: #101a33; }
+html[data-appearance="liquid-glass"] .home-progress-copy > p:last-child { color: #6b7890; }
+html[data-appearance="liquid-glass"] :is(.home-progress-metrics article, .day-card, .latest-note, .home-job-row) {
+  background: var(--glass-nested);
+  border-color: rgba(255,255,255,.7);
+  box-shadow: inset 0 1px rgba(255,255,255,.7), 0 5px 16px rgba(49,67,108,.045);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-html[data-appearance="liquid-glass"] .home-progress-metrics article,
-html[data-appearance="liquid-glass"] .day-card { background: rgba(255,255,255,.72); border-color: var(--yanji-line); }
-html[data-appearance="liquid-glass"] .job-stage-column {
-  background: var(--job-stage-surface);
-  border-color: var(--job-stage-line);
+html[data-appearance="liquid-glass"] .home-progress-metrics strong { color: #182440; }
+html[data-appearance="liquid-glass"] .home-progress-metrics .rate strong { color: #0b9672; }
+html[data-appearance="liquid-glass"] .home-progress-rate-track,
+html[data-appearance="liquid-glass"] .home-todo-progress i { background: rgba(91, 112, 157, .13); }
+html[data-appearance="liquid-glass"] .home-progress-rate-track i,
+html[data-appearance="liquid-glass"] .home-todo-progress i::after { background: linear-gradient(90deg, #10b889, #2978ec 62%, #8b6ceb); }
+html[data-appearance="liquid-glass"] .day-card.today {
+  background: rgba(239, 246, 255, .7);
+  border-color: rgba(77, 121, 238, .38);
+  box-shadow: inset 0 3px #4f7cff, 0 8px 22px rgba(48, 83, 175, .1);
 }
-html[data-appearance="liquid-glass"] .job-card {
-  background: rgba(255,255,255,.76);
-  border-color: var(--job-stage-line);
+html[data-appearance="liquid-glass"] .latest-note:hover { background: rgba(255,255,255,.72); }
+html[data-appearance="liquid-glass"] .focus-ring {
+  background: conic-gradient(#3378ff 0deg var(--focus-progress), #9d77f4 var(--focus-progress), rgba(112,135,181,.14) var(--focus-progress) 360deg);
+  box-shadow: 0 12px 32px rgba(62, 93, 174, .12);
 }
-html[data-appearance="liquid-glass"] .schedule-board-column { background: rgba(246,249,253,.88); border-color: var(--yanji-line); }
-html[data-appearance="liquid-glass"] .schedule-board-heading,
-html[data-appearance="liquid-glass"] .schedule-board-add { background: rgba(226,235,244,.68); border-color: var(--yanji-line); }
-html[data-appearance="liquid-glass"] .job-stage-column > header,
-html[data-appearance="liquid-glass"] .job-stage-add {
-  background: var(--job-stage-soft);
-  border-color: var(--job-stage-line);
+html[data-appearance="liquid-glass"] .focus-ring::before { background: rgba(251, 252, 255, .9); }
+html[data-appearance="liquid-glass"] :is(.heading-icon, .modal-icon, .empty-line-icon) {
+  color: #2763dc;
+  background: linear-gradient(145deg, rgba(220,240,255,.84), rgba(235,226,255,.72));
+  border-color: rgba(255,255,255,.76);
+  box-shadow: inset 0 1px rgba(255,255,255,.8);
 }
 
-/* Selective tint communicates hierarchy; neutral actions remain clear. */
+/* Controls */
+html[data-appearance="liquid-glass"] .button { border-radius: 12px; }
 html[data-appearance="liquid-glass"] .button.primary,
 html[data-appearance="liquid-glass"] .focus-clock-button.is-clocked-in {
   color: #fff;
-  background: linear-gradient(145deg, #6e88d5, #465fae);
-  border-color: rgba(57, 78, 151, .35);
-  box-shadow: 0 9px 24px rgba(59, 78, 145, .2), inset 0 1px 0 rgba(255,255,255,.36);
+  background: linear-gradient(135deg, #2876ff 0%, #3869e8 58%, #976fe9 122%);
+  border-color: rgba(42, 77, 190, .28);
+  box-shadow: 0 9px 22px rgba(37, 83, 210, .23), inset 0 1px rgba(255,255,255,.32);
 }
-html[data-appearance="liquid-glass"] .button.secondary,
-html[data-appearance="liquid-glass"] .button.tertiary,
-html[data-appearance="liquid-glass"] .focus-duration-options button,
-html[data-appearance="liquid-glass"] .usage-range-tabs button {
-  color: #465779;
-  background: rgba(244,248,252,.7);
-  border-color: var(--glass-edge);
+html[data-appearance="liquid-glass"] .button.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #1c68f1, #315bd4 64%, #8761d7 125%);
+  box-shadow: 0 12px 28px rgba(37, 83, 210, .28), inset 0 1px rgba(255,255,255,.34);
 }
-
+html[data-appearance="liquid-glass"] :is(.button.secondary, .button.tertiary, .focus-duration-options button, .usage-range-tabs button) {
+  color: #425776;
+  background: rgba(255,255,255,.48);
+  border-color: rgba(255,255,255,.7);
+  box-shadow: inset 0 1px rgba(255,255,255,.62);
+}
+html[data-appearance="liquid-glass"] :is(.button.secondary, .button.tertiary):hover:not(:disabled) { background: rgba(255,255,255,.76); border-color: rgba(73,105,181,.28); }
+html[data-appearance="liquid-glass"] :is(.focus-duration-options button.active, .usage-range-tabs button.active) {
+  color: #fff;
+  background: linear-gradient(135deg, #3c79f2, #786fe5);
+  border-color: transparent;
+}
+html[data-appearance="liquid-glass"] .text-button { color: #2764d8; }
+html[data-appearance="liquid-glass"] :is(.search-box, .input-shell) {
+  color: #697890;
+  background: rgba(255,255,255,.48);
+  border-color: rgba(255,255,255,.7);
+  box-shadow: inset 0 1px rgba(255,255,255,.65);
+}
 html[data-appearance="liquid-glass"] :is(input, textarea, select, .note-content-input) {
   color: var(--yanji-text);
-  background: rgba(249,251,254,.82);
-  border-color: rgba(79,111,141,.22);
-  box-shadow: inset 0 1px 2px rgba(34,59,84,.035);
+  background: rgba(255,255,255,.58);
+  border-color: rgba(88, 111, 159, .2);
+  box-shadow: inset 0 1px 2px rgba(35,54,92,.035);
 }
-html[data-appearance="liquid-glass"] .search-box input {
+html[data-appearance="liquid-glass"] .search-box input { background: transparent; border: 0; box-shadow: none; }
+html[data-appearance="liquid-glass"] :is(input, textarea, select, .note-content-input):focus,
+html[data-appearance="liquid-glass"] :is(.search-box, .input-shell):focus-within { border-color: rgba(24,86,255,.56); box-shadow: var(--focus-ring); }
+html[data-appearance="liquid-glass"] :is(input, textarea)::placeholder { color: #8591a6; }
+html[data-appearance="liquid-glass"] :where(.button, .nav-item, .settings-entry, .text-button, .close-button, .mode-tab, .todo-view-tab):focus-visible {
+  outline: 2px solid rgba(24,86,255,.78);
+  outline-offset: 2px;
+}
+
+/* Schedule, todos and attendance */
+html[data-appearance="liquid-glass"] .timeline-datebar,
+html[data-appearance="liquid-glass"] .attendance-weekbar {
+  color: #4f607b;
+  background: rgba(255,255,255,.35);
+  border: 1px solid rgba(255,255,255,.56);
+  border-radius: 15px;
+  box-shadow: inset 0 1px rgba(255,255,255,.62);
+}
+html[data-appearance="liquid-glass"] :is(.schedule-weekbar button, .attendance-weekbar button) { color: #36598f; background: rgba(255,255,255,.52); border-color: rgba(255,255,255,.72); }
+html[data-appearance="liquid-glass"] .schedule-board-shell { background: rgba(235,243,255,.4); }
+html[data-appearance="liquid-glass"] .schedule-board-column {
+  background: rgba(249,251,255,.5);
+  border-color: rgba(255,255,255,.72);
+  box-shadow: inset 0 1px rgba(255,255,255,.66);
+}
+html[data-appearance="liquid-glass"] .schedule-board-column.today { background: rgba(229,242,255,.62); border-color: rgba(80,129,232,.28); }
+html[data-appearance="liquid-glass"] :is(.schedule-board-heading, .schedule-board-add) { color: #4e6684; background: rgba(224,236,251,.5); border-color: rgba(105,129,170,.12); }
+html[data-appearance="liquid-glass"] :is(.schedule-board-card, .today-schedule-item) {
+  background: rgba(255,255,255,.7);
+  border-color: rgba(255,255,255,.84);
+  border-left-color: #5794ef;
+  box-shadow: 0 5px 15px rgba(45,70,118,.06);
+}
+html[data-appearance="liquid-glass"] .todo-view-tab:hover,
+html[data-appearance="liquid-glass"] .todo-view-tab.active,
+html[data-appearance="liquid-glass"] .filter-chip.active { color: #174bc3; background: rgba(230,239,255,.76); }
+html[data-appearance="liquid-glass"] .todo-check { background: rgba(255,255,255,.42); border-color: rgba(54,83,137,.3); }
+html[data-appearance="liquid-glass"] .todo-check:checked { background: #10a97e; border-color: #0d9871; }
+html[data-appearance="liquid-glass"] .attendance-summary strong { color: #172440; }
+html[data-appearance="liquid-glass"] .attendance-bar { color: #214f70; background: linear-gradient(90deg, #a8ddf4, #b6cdf8); }
+html[data-appearance="liquid-glass"] .attendance-bar.open { color: #fff; background: linear-gradient(90deg, #2484d8, #4770de); }
+html[data-appearance="liquid-glass"] .focus-usage-row > span { background: rgba(91,112,157,.12); }
+
+/* Notes, submissions and careers */
+html[data-appearance="liquid-glass"] .notes-toolbar > span { color: #718099; }
+html[data-appearance="liquid-glass"] .note-card { color: #263955; }
+html[data-appearance="liquid-glass"] .note-card header button,
+html[data-appearance="liquid-glass"] .note-card footer span { color: #315f9b; background: rgba(225,239,255,.65); }
+html[data-appearance="liquid-glass"] .filter-chip { color: #53657f; background: rgba(255,255,255,.38); }
+html[data-appearance="liquid-glass"] .paper-card.unread-card { border-color: rgba(77,121,238,.4); box-shadow: 0 18px 44px rgba(50,82,169,.12), var(--glass-highlight); }
+html[data-appearance="liquid-glass"] :is(.paper-accent, .production-card .paper-accent) { background: linear-gradient(#2b75f2, #8b70e8); }
+html[data-appearance="liquid-glass"] :is(.source-icon, .production-card .source-icon) { background: linear-gradient(145deg, #2977ee, #716fe5); }
+html[data-appearance="liquid-glass"] :is(.unread-badge, .tone-blue, .tone-violet) { color: #2958ba; background: rgba(226,237,255,.76); border-color: rgba(83,119,200,.18); }
+html[data-appearance="liquid-glass"] .job-metric-strip article { background: linear-gradient(145deg, rgba(255,255,255,.72), rgba(247,249,255,.48)); }
+html[data-appearance="liquid-glass"] .job-page .job-stage-column { background: var(--job-stage-surface, rgba(255,255,255,.5)); border-color: rgba(255,255,255,.72); }
+html[data-appearance="liquid-glass"] .job-stage-column > header,
+html[data-appearance="liquid-glass"] .job-stage-add { background: var(--job-stage-soft, rgba(226,239,255,.54)); border-color: rgba(98,119,160,.12); }
+html[data-appearance="liquid-glass"] .job-card {
+  background: rgba(255,255,255,.68);
+  border-color: rgba(255,255,255,.82);
+  box-shadow: 0 5px 15px rgba(45,70,118,.06), inset 0 1px rgba(255,255,255,.7);
+}
+
+/* Settings and overlays */
+html[data-appearance="liquid-glass"] .settings-page {
+  background:
+    radial-gradient(circle at 0 0, rgba(126,205,255,.25), transparent 31rem),
+    radial-gradient(circle at 100% 10%, rgba(187,157,255,.2), transparent 34rem);
+}
+html[data-appearance="liquid-glass"] .settings-page .settings-sidebar { background: rgba(235,243,255,.3); border-right: 1px solid rgba(255,255,255,.5); }
+html[data-appearance="liquid-glass"] .settings-nav { background: rgba(255,255,255,.34); border: 1px solid rgba(255,255,255,.56); border-radius: 15px; }
+html[data-appearance="liquid-glass"] .settings-nav-item.active { color: #174bc3; background: rgba(255,255,255,.72); box-shadow: 0 7px 20px rgba(43,70,133,.08); }
+html[data-appearance="liquid-glass"] .settings-nav-item.active::after { background: #3474f2; }
+html[data-appearance="liquid-glass"] .settings-actions { background: rgba(242,247,255,.7); border-color: rgba(255,255,255,.62); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+html[data-appearance="liquid-glass"] .settings-page :is(.settings-sidebar, .settings-group, .setting-row) {
   background: transparent;
-  border: 0;
+  border-right: 0;
   box-shadow: none;
-}
-html[data-appearance="liquid-glass"] :is(input, textarea, select, .note-content-input):focus {
-  border-color: rgba(88,116,200,.72);
-  box-shadow: 0 0 0 3px rgba(88,116,200,.13);
-}
-
-/* Dialogs are the second functional glass layer. They float above content and
-   therefore receive deeper shadow and a stronger material. */
-html[data-appearance="liquid-glass"] :is(.modal, dialog) {
-  color: var(--yanji-text);
-  background: var(--glass-chrome-strong);
-  border-color: var(--glass-edge);
-  box-shadow: 0 28px 80px rgba(25,45,69,.22), inset 0 1px 0 rgba(255,255,255,.72);
-  backdrop-filter: blur(30px) saturate(138%);
-  -webkit-backdrop-filter: blur(30px) saturate(138%);
-}
-html[data-appearance="liquid-glass"] dialog::backdrop { background: rgba(29,43,61,.22); }
-
-html[data-appearance="classic"] body { background: #edf7fc; }
-html[data-appearance="classic"] .sidebar { background: #e4f1f6; }
-html[data-appearance="classic"] :is(.home-next-event-card, .home-today-card, .home-attendance-card, .todo-toolbar, .todo-card, .job-stage-column) {
-  box-shadow: 0 10px 28px rgba(26,63,79,.08);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+html[data-appearance="liquid-glass"] .settings-page .setting-row { border-top-color: rgba(87,105,148,.13); }
+html[data-appearance="liquid-glass"] .settings-page .settings-actions {
+  background: rgba(242,247,255,.48);
+  border-color: rgba(255,255,255,.6);
+  box-shadow: inset 0 1px rgba(255,255,255,.68), 0 -10px 28px rgba(48,67,108,.045);
+}
+html[data-appearance="liquid-glass"] .appearance-choice { background: rgba(255,255,255,.38); border-color: rgba(255,255,255,.65); }
+html[data-appearance="liquid-glass"] .appearance-choice:has(input:checked) { border-color: rgba(24,86,255,.56); box-shadow: var(--focus-ring); }
 
+html[data-appearance="liquid-glass"] :is(.modal, dialog) {
+  color: var(--yanji-text);
+  background: rgba(248,251,255,.82);
+  border-color: rgba(255,255,255,.78);
+  box-shadow: 0 32px 90px rgba(28,43,82,.25), inset 0 1px rgba(255,255,255,.86);
+  backdrop-filter: blur(34px) saturate(150%);
+  -webkit-backdrop-filter: blur(34px) saturate(150%);
+}
+html[data-appearance="liquid-glass"] dialog::backdrop { background: rgba(33,46,76,.24); backdrop-filter: blur(5px); }
+html[data-appearance="liquid-glass"] .modal-head { border-color: rgba(87,106,149,.13); }
+html[data-appearance="liquid-glass"] .close-button { color: #586b87; background: rgba(255,255,255,.4); border-color: rgba(255,255,255,.62); }
+html[data-appearance="liquid-glass"] .mode-tab { color: #52647e; background: rgba(255,255,255,.42); border-color: rgba(255,255,255,.65); }
+html[data-appearance="liquid-glass"] .mode-tab.active,
+html[data-appearance="liquid-glass"] .mode-tab:focus-visible { color: #173f9e; background: rgba(255,255,255,.74); border-color: rgba(24,86,255,.46); box-shadow: var(--focus-ring); }
+html[data-appearance="liquid-glass"] :is(.mode-icon.link, .mode-icon.author, .mode-tab > i, .mode-callout > span, .mode-callout.amber > span) { color: #fff; background: linear-gradient(145deg, #2977ee, #786fe5); }
+html[data-appearance="liquid-glass"] :is(.mode-callout, .mode-callout.amber) { color: #40597a; background: rgba(228,239,255,.6); border-color: rgba(255,255,255,.7); }
+html[data-appearance="liquid-glass"] .toast { background: rgba(17,30,55,.9); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+
+/* Fallbacks and accessibility */
 @supports not ((backdrop-filter: blur(1px))) {
-  html[data-appearance="liquid-glass"] :is(.window-titlebar, .sidebar, .modal, dialog) { background: #eef3f8; }
+  html[data-appearance="liquid-glass"] :is(.window-titlebar, .sidebar, .modal, dialog) { background: #eef3fb; }
+  html[data-appearance="liquid-glass"] :is(
+    .home-progress-strip, .home-next-event-card, .home-today-card, .home-attendance-card,
+    .home-top-grid > section, .home-utility-stack > section, .home-content-grid > section,
+    .focus-usage-panel, .attendance-summary article, .attendance-gantt-shell,
+    .todo-toolbar, .todo-card, .schedule-board-shell, .notes-toolbar, .note-card,
+    .job-metric-strip article, .job-board-panel, .job-toolbar, .job-stage-column,
+    .job-interview-panel, .job-glance-panel, .content-section, .stats article, .paper-card
+  ) { background: #f7f9fd; }
 }
 
 @media (prefers-reduced-transparency: reduce) {
-  html[data-appearance="liquid-glass"] :is(.window-titlebar, .sidebar, .modal, dialog) {
-    background: #f3f6fa;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
-  }
+  html[data-appearance="liquid-glass"] :is(.window-titlebar, .sidebar, .modal, dialog) { background: #f1f5fb; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  html[data-appearance="liquid-glass"] :is(
+    .home-progress-strip, .home-next-event-card, .home-today-card, .home-attendance-card,
+    .home-top-grid > section, .home-utility-stack > section, .home-content-grid > section,
+    .focus-usage-panel, .attendance-summary article, .attendance-gantt-shell,
+    .todo-toolbar, .todo-card, .schedule-board-shell, .notes-toolbar, .note-card,
+    .job-metric-strip article, .job-board-panel, .job-toolbar, .job-stage-column,
+    .job-interview-panel, .job-glance-panel, .content-section, .stats article, .paper-card
+  ) { background: #f8f9fd; backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
 @media (prefers-contrast: more) {
-  html[data-appearance="liquid-glass"] { --yanji-text: #071a31; --yanji-muted: #44566a; --yanji-line: rgba(37,61,86,.42); }
+  html[data-appearance="liquid-glass"] { --yanji-text: #071329; --yanji-muted: #44526a; --yanji-line: rgba(34,57,101,.42); --glass-line: rgba(42,63,105,.38); }
   html[data-appearance="liquid-glass"] :is(.nav-item.active, input, textarea, select, .note-content-input) { border-width: 2px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html[data-appearance="liquid-glass"] *, html[data-appearance="liquid-glass"] *::before, html[data-appearance="liquid-glass"] *::after {
+  html[data-appearance="liquid-glass"] *,
+  html[data-appearance="liquid-glass"] *::before,
+  html[data-appearance="liquid-glass"] *::after {
     scroll-behavior: auto !important;
     transition-duration: .01ms !important;
     animation-duration: .01ms !important;
@@ -191,11 +420,19 @@ html[data-appearance="classic"] :is(.home-next-event-card, .home-today-card, .ho
 }
 
 @media (forced-colors: active) {
-  html[data-appearance="liquid-glass"] body, html[data-appearance="classic"] body { color: CanvasText; background: Canvas; }
-  html[data-appearance="liquid-glass"] :is(.window-titlebar, .sidebar, .modal, dialog, .home-progress-strip, .home-next-event-card, .home-today-card, .home-attendance-card, .todo-toolbar, .todo-card, .job-stage-column) {
-    color: CanvasText;
-    background: Canvas;
-    border: 1px solid CanvasText;
-    box-shadow: none;
-  }
+  html[data-appearance="liquid-glass"] body { color: CanvasText; background: Canvas; }
+  html[data-appearance="liquid-glass"] :is(
+    .window-titlebar, .sidebar, .modal, dialog, .home-progress-strip,
+    .home-next-event-card, .home-today-card, .home-attendance-card,
+    .todo-toolbar, .todo-card, .schedule-board-shell, .note-card,
+    .job-stage-column, .content-section, .paper-card
+  ) { color: CanvasText; background: Canvas; border: 1px solid CanvasText; box-shadow: none; }
+}
+
+html[data-appearance="classic"] body { background: #edf7fc; }
+html[data-appearance="classic"] .sidebar { background: #e4f1f6; }
+html[data-appearance="classic"] :is(.home-next-event-card, .home-today-card, .home-attendance-card, .todo-toolbar, .todo-card, .job-stage-column) {
+  box-shadow: 0 10px 28px rgba(26,63,79,.08);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }

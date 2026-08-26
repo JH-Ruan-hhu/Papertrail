@@ -12,18 +12,17 @@ Version 1.3.0 introduces Yanji-owned install and update experiences: a compact
 single-page NSIS installer with an editable destination and desktop-shortcut
 choice, and an in-app release center that compares installed and available
 versions before guiding users through checking, safe download, and restart.
-Career summaries now use cumulative funnel counts, so reaching an interview or
-Offer never removes that opportunity from the submitted total; the horizontal
-board still shows each opportunity only once at its current stage. The release
+Career summaries now show current-state counts without assuming that written
+tests must precede interviews (or the reverse); the horizontal board shows each
+opportunity once and allows any status to be selected in the editor. The release
 also includes pointer-only page-rise motion, storage-path compatibility
 recovery, packaged taskbar icon correction, note editor improvements, and the
 v1.2 performance work.
 
-Version 1.2.4 turns the job pipeline into a single six-column horizontal board.
-Job cards open the editor directly, keep their advance action in the top-right
-corner, and use larger Company, Role, City, and Notes typography. The only
-board-level create action now sits in the Pending column header; redundant
-Edit labels, page-header creation, and per-column footer actions are removed.
+Version 1.3.0 unifies the research workbench under a classic information architecture and an optional liquid-glass appearance. The job dashboard now treats written tests and interviews as flexible current states instead of a forced linear funnel.
+Job cards open the editor directly, keep a status-update action in the top-right
+corner, and use larger Company, Role, City, and Notes typography. New records
+start at Submitted, and the page-header action is the single creation entry.
 
 Version 1.2.3 is a storage-path compatibility hotfix. It restores discovery of
 the legacy `papertrail-desktop` user-data directory after the v1.2.2 Windows
@@ -154,8 +153,8 @@ saved schedule title.
   temporarily pause application toast notifications, restore the previous
   Windows policy afterward, and retain the focus session locally.
 - Review today and the following three days beside compact focus controls and
-  note excerpts. Home also shows the full six-stage application pipeline with
-  proportional progress bars.
+  note excerpts. Home also shows the five current job states with proportional
+  distribution bars, without implying a fixed test/interview sequence.
 - Show high-priority deadlines on every connected display with a low-stimulus
   star-field treatment; reduced-motion preferences disable decorative motion.
 - Add multiple reusable options to note select metadata through a tag editor.

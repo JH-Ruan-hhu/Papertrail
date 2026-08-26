@@ -40,9 +40,14 @@ body { color: var(--yanji-text); }
 .home-today-row strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-today-row small { display: block; color: var(--yanji-muted); margin-top: 2px; }
 .home-todo-row { grid-template-columns: 18px minmax(0, 1fr); }
-.home-todo-row i { width: 8px; height: 8px; border-radius: 50%; background: #8da7b2; }
-.home-todo-row.tone-high i { background: #d47766; }
-.home-todo-row.tone-medium i { background: #ce9d48; }
+.home-todo-check { width: 18px; height: 18px; display: grid; place-items: center; padding: 0; color: white; background: transparent; border: 1px solid rgba(51,95,109,.3); border-radius: 6px; cursor: pointer; }
+.home-todo-check svg { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2.2; }
+.home-todo-row.tone-high .home-todo-check { border-color: #d47766; }
+.home-todo-row.tone-medium .home-todo-check { border-color: #ce9d48; }
+.home-todo-row.is-completed .home-todo-check { background: #7f8b9e; border-color: #7f8b9e; }
+.home-todo-title { min-width: 0; padding: 0; color: inherit; background: transparent; border: 0; text-align: left; cursor: pointer; }
+.home-todo-title strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-todo-row.is-completed .home-todo-title strong { color: var(--yanji-muted); opacity: .6; text-decoration: line-through; text-decoration-color: #7e8797; text-decoration-thickness: 1px; }
 .home-todo-progress { display: flex; gap: 10px; align-items: center; margin-top: 16px; color: var(--yanji-muted); font-size: 12px; }
 .home-todo-progress i { display: block; height: 6px; flex: 1; overflow: hidden; border-radius: 999px; background: rgba(87, 122, 137, .16); }
 .home-todo-progress i::after { content: ''; display: block; width: var(--todo-progress, 0%); height: 100%; border-radius: inherit; background: linear-gradient(90deg, #4bb68c, #197d9f); transition: width .35s cubic-bezier(.23, 1, .32, 1); }
@@ -211,12 +216,17 @@ body { color: var(--yanji-text); }
   background: var(--yanji-surface);
   box-shadow: var(--yanji-shadow-soft);
 }
+.home-command-grid > article { display: flex; flex-direction: column; }
+.home-next-event-card .next-event-content,
+.home-today-card .home-today-list,
+.home-attendance-card .home-attendance-content { flex: 1; }
+.home-today-todo-card .home-todo-progress { margin-top: auto; padding-top: 12px; }
 .home-today-todo-card { border-color: var(--yanji-line); background: var(--yanji-surface); }
 .home-today-card .panel-heading, .home-next-event-card .panel-heading, .home-attendance-card .panel-heading { margin-bottom: 18px; }
 .home-today-list { max-height: 142px; overflow-y: auto; scrollbar-width: thin; }
 .home-today-row { width: 100%; min-height: 28px; padding: 5px 2px; border: 0; border-radius: 8px; color: var(--yanji-text); background: transparent; text-align: left; }
 .home-today-row:hover, .home-today-row:focus-visible { background: rgba(31, 120, 152, .08); }
-.home-attendance-content { display: grid; align-content: center; gap: 7px; min-height: 118px; }
+.home-attendance-content { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; align-content: stretch; gap: 7px; min-height: 118px; }
 .home-attendance-content strong { font-size: 18px; letter-spacing: -.02em; }
 .home-attendance-content > span { min-height: 34px; color: var(--yanji-muted); font-size: 12px; line-height: 1.45; }
 .home-attendance-content .focus-clock-button { justify-self: start; margin-top: 4px; }
@@ -727,7 +737,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-interview-panel > .panel-heading,
 .job-glance-panel > .panel-heading { margin-bottom: 12px; }
 .job-board-panel .job-toolbar { margin: 0 0 12px; padding: 7px; background: rgba(238,241,247,.7); border: 0; box-shadow: none; }
-.job-board-panel .job-board { grid-template-columns: repeat(6, minmax(198px, 1fr)); gap: 9px; overflow-x: auto; padding-bottom: 5px; }
+.job-board-panel .job-board { grid-template-columns: repeat(5, minmax(198px, 1fr)); gap: 9px; overflow-x: auto; padding-bottom: 5px; }
 .job-stage-column { --job-stage-accent: #7390d7; --job-stage-soft: rgba(221,231,253,.74); --job-stage-surface: rgba(241,245,253,.76); --job-stage-line: rgba(104,132,196,.25); --job-stage-text: #4865a8; height: 420px; min-height: 420px; grid-template-rows: 62px minmax(0, 1fr); background: var(--job-stage-surface); border-color: var(--job-stage-line); border-radius: 11px; box-shadow: none; }
 .job-stage-column.stage-submitted { --job-stage-accent: #5ca8b4; --job-stage-soft: rgba(214,240,242,.76); --job-stage-surface: rgba(239,249,249,.78); --job-stage-line: rgba(73,151,162,.24); --job-stage-text: #357782; }
 .job-stage-column.stage-written-1 { --job-stage-accent: #dc9a55; --job-stage-soft: rgba(252,232,208,.8); --job-stage-surface: rgba(253,247,238,.8); --job-stage-line: rgba(195,128,57,.24); --job-stage-text: #a16328; }
@@ -839,7 +849,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   .home-command-grid > article { grid-column: 1 / -1 !important; }
   .home-schedule-panel .day-overview,
   .job-metric-strip { grid-template-columns: 1fr; }
-  .job-board-panel .job-board { grid-template-columns: repeat(6, minmax(198px, 1fr)); }
+  .job-board-panel .job-board { grid-template-columns: repeat(5, minmax(198px, 1fr)); }
   .home-focus-timer .focus-timer-body { grid-template-columns: 96px minmax(0, 1fr); }
   .job-interview-row { grid-template-columns: 32px minmax(0, 1fr) auto; }
   .job-interview-row > b { display: none; }
@@ -989,9 +999,16 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   .settings-nav-item, .filter-chip, .mode-tab, .close-button
 ) { border-radius: var(--yanji-radius-unified); }
 
-.note-editor-modal { overflow: hidden; }
+.note-editor-modal {
+  width: min(900px, calc(100vw - 48px));
+  height: min(760px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: hidden;
+  transform-origin: top left;
+}
 .note-editor-modal > form {
   min-width: 0;
+  height: 100%;
   max-height: calc(100vh - 54px);
   display: flex;
   flex-direction: column;
@@ -1140,9 +1157,9 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .workbench-page > .page-head-row h1 { line-height: 1.15; }
 .notes-toolbar { margin-top: 0; }
 /* Pointer sidebar navigation gets fast spatial feedback; keyboard navigation remains immediate. */
-.workbench-page.page-entering { animation: workbench-page-rise 160ms var(--ease-out); }
+.workbench-page.page-entering { animation: workbench-page-rise 230ms var(--ease-out); }
 @keyframes workbench-page-rise {
-  from { opacity: .72; transform: translateY(6px); }
+  from { opacity: .76; transform: translateY(4px); }
   to { opacity: 1; transform: translateY(0); }
 }
 @keyframes workbench-page-fade {
@@ -1150,7 +1167,38 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   to { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .workbench-page.page-entering { animation: workbench-page-fade 120ms var(--ease-out); }
+  .workbench-page.page-entering { animation: workbench-page-fade 140ms var(--ease-out); }
+}
+
+/* The settings page uses one continuous canvas. Rows are separated by quiet
+   rules, not stacked white rectangles, and the top/bottom rails share width. */
+.settings-page .settings-sidebar,
+.settings-page .settings-pane { width: min(1060px, 100%); margin-inline: auto; }
+.settings-page .settings-nav { width: 100%; padding: 0 12px; }
+.settings-page .settings-group { padding: 0 12px; }
+.settings-page .setting-row {
+  min-height: 62px;
+  padding: 12px 0;
+  background: transparent;
+  border-top-color: rgba(88, 107, 146, .13);
+}
+.settings-page .settings-actions {
+  width: min(1060px, 100%);
+  min-height: 58px;
+  margin-inline: auto;
+  padding: 9px 12px;
+  border: 1px solid rgba(88, 107, 146, .12);
+  border-bottom: 0;
+  border-radius: 14px 14px 0 0;
+}
+
+/* Content-led home rows: ambient canvas may remain below the dashboard, but
+   cards no longer stretch merely to consume every remaining pixel. */
+@media (min-width: 1041px) and (min-height: 901px) {
+  .home-page { grid-template-rows: 90px 150px minmax(290px, 1fr) 230px; gap: 14px; align-content: stretch; overflow: hidden; }
+}
+@media (min-width: 1041px) and (max-height: 900px) {
+  .home-page { grid-template-rows: 74px 146px minmax(250px, 1fr) 205px; gap: 10px; align-content: stretch; overflow: hidden; }
 }
 
 /* Yanji release center: a compact command surface with explicit version context. */
@@ -1235,3 +1283,17 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   .update-version-arrow { transform: rotate(90deg); justify-self: center; }
   .update-journey b { display: none; }
 }
+
+/* Daily planning prompt: one calm decision, then hand off to the full editor. */
+.daily-plan-dialog { width: min(520px, calc(100vw - 40px)); overflow: hidden; }
+.daily-plan-shell { padding: 34px 36px 30px; text-align: center; }
+.daily-plan-mark { width: 58px; height: 58px; display: grid; place-items: center; margin: 0 auto 18px; color: var(--yanji-accent-strong); background: rgba(226,239,255,.78); border: 1px solid rgba(255,255,255,.72); border-radius: 19px; box-shadow: 0 12px 28px rgba(49,83,168,.12), inset 0 1px rgba(255,255,255,.82); }
+.daily-plan-mark svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.daily-plan-shell .eyebrow { margin-bottom: 8px; }
+.daily-plan-shell h2 { margin: 0; color: var(--yanji-text); font-size: 25px; letter-spacing: -.035em; }
+.daily-plan-shell > p:not(.eyebrow) { max-width: 390px; margin: 11px auto 0; color: var(--yanji-muted); font-size: 13px; line-height: 1.65; }
+.daily-plan-example { display: grid; gap: 6px; margin: 24px 0; padding: 14px 16px; color: var(--yanji-text); background: rgba(255,255,255,.48); border: 1px solid rgba(255,255,255,.68); border-radius: 14px; text-align: left; }
+.daily-plan-example span { color: var(--yanji-muted); font-size: 10px; font-weight: 720; letter-spacing: .08em; }
+.daily-plan-example strong { font-size: 13px; font-weight: 650; }
+.daily-plan-actions { display: flex; justify-content: center; gap: 9px; }
+@media (max-width: 560px) { .daily-plan-shell { padding: 28px 22px 24px; }.daily-plan-actions { align-items: stretch; flex-direction: column-reverse; } }

@@ -41,9 +41,10 @@ window.visualViewport?.addEventListener('resize', syncViewportDensity, { passive
 
 const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', jobs: '求职', submissions: '投稿', settings: '设置' });
 const SCHEDULE_DRAFT_KEY = 'yanji.scheduleDraft.v1';
+const DAILY_PLAN_KEY = 'yanji.dailyPlanShown.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
-const JOB_STATUSES = Object.freeze(['pending', 'submitted', 'written-1', 'written-2', 'interview', 'offer']);
-const JOB_STATUS_LABELS = Object.freeze({ pending: '待投递', submitted: '已投递', 'written-1': '一轮笔试', 'written-2': '二轮笔试', interview: '面试', offer: 'Offer' });
+const JOB_STATUSES = Object.freeze(['submitted', 'written-1', 'written-2', 'interview', 'offer']);
+const JOB_STATUS_LABELS = Object.freeze({ submitted: '已投递', 'written-1': '一轮笔试', 'written-2': '二轮笔试', interview: '面试', offer: 'Offer' });
 const UI_ICON_PATHS = Object.freeze({
   check: '<path d="m6 12 4 4 8-9"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
@@ -136,7 +137,7 @@ function closeWorkbenchDialog(dialog) {
 function switchWorkbenchPage(page, { animate = false } = {}) {
   if (!pageTitles[page]) return;
   const previousPage = wb.page;
-  if (wb.page === 'notes' && document.getElementById('noteDialog')?.open) flushNoteEditor({ silent: true }).catch(() => {});
+  if (wb.page === 'notes' && document.getElementById('noteDialog')?.open) persistNoteDraftLocally();
   if (document.getElementById('scheduleDialog')?.open) flushScheduleDraft();
   window.YanjiTodoView?.flushDraft?.();
   wb.page = page;
@@ -223,13 +224,8 @@ function jobDateLabel(value, options = { month: 'numeric', day: 'numeric' }) {
   return new Intl.DateTimeFormat('zh-CN', options).format(new Date(value));
 }
 
-function cumulativeJobCounts(jobs) {
-  return Object.fromEntries(JOB_STATUSES.map((status, index) => [
-    status,
-    status === 'pending'
-      ? jobs.filter((item) => item.status === status).length
-      : jobs.filter((item) => JOB_STATUSES.indexOf(item.status) >= index).length
-  ]));
+function currentJobCounts(jobs) {
+  return Object.fromEntries(JOB_STATUSES.map((status) => [status, jobs.filter((item) => item.status === status).length]));
 }
 
 function renderHomeJobs() {
@@ -237,19 +233,18 @@ function renderHomeJobs() {
   if (!container) return;
   const jobs = wb.workspace.jobApplications || [];
   if (!jobs.length) {
-    container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="pending" type="button">添加第一个岗位</button></div>';
+    container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="submitted" type="button">添加第一个岗位</button></div>';
     return;
   }
   const groups = [
-    ['pending', '待投递'],
     ['submitted', '已投递'],
     ['written-1', '一轮笔试'],
     ['written-2', '二轮笔试'],
     ['interview', '面试'],
     ['offer', 'Offer']
   ];
-  const cumulativeCounts = cumulativeJobCounts(jobs);
-  const counts = groups.map(([status]) => cumulativeCounts[status]);
+  const currentCounts = currentJobCounts(jobs);
+  const counts = groups.map(([status]) => currentCounts[status]);
   const maximum = Math.max(1, ...counts);
   container.innerHTML = groups.map(([status, label], index) => `<button class="home-job-row" data-go-page="jobs" data-job-home-filter="${status}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[index], maximum)}"></b></i><strong>${counts[index]}</strong></button>`).join('');
 }
@@ -258,20 +253,17 @@ function renderJobs() {
   const jobs = wb.workspace.jobApplications || [];
   const query = document.getElementById('jobSearch').value.trim().toLowerCase();
   const statusFilter = document.getElementById('jobStatusFilter').value;
-  const counts = Object.fromEntries(JOB_STATUSES.map((status) => [status, jobs.filter((item) => item.status === status).length]));
-  const cumulativeCounts = cumulativeJobCounts(jobs);
-  const maximum = Math.max(1, ...Object.values(cumulativeCounts));
-  document.getElementById('jobPipelineSummary').innerHTML = JOB_STATUSES.map((status, index) => `<div class="job-pipeline-row"><span><b>${String(index + 1).padStart(2, '0')}</b>${JOB_STATUS_LABELS[status]}</span><i><b class="${jobMeterClass(cumulativeCounts[status], maximum)}"></b></i><strong>${cumulativeCounts[status]}</strong></div>`).join('');
+  const counts = currentJobCounts(jobs);
+  const maximum = Math.max(1, ...Object.values(counts));
+  document.getElementById('jobPipelineSummary').innerHTML = JOB_STATUSES.map((status, index) => `<div class="job-pipeline-row"><span><b>${String(index + 1).padStart(2, '0')}</b>${JOB_STATUS_LABELS[status]}</span><i><b class="${jobMeterClass(counts[status], maximum)}"></b></i><strong>${counts[status]}</strong></div>`).join('');
   const active = jobs.filter((item) => item.status !== 'offer').length;
-  document.getElementById('jobInterviewCount').textContent = String(cumulativeCounts.interview);
+  document.getElementById('jobInterviewCount').textContent = String(counts.interview);
   document.getElementById('jobOfferCount').textContent = String(counts.offer);
-  const submitted = cumulativeCounts.submitted;
-  const advanced = jobs.filter((item) => JOB_STATUSES.indexOf(item.status) > JOB_STATUSES.indexOf('submitted')).length;
   const salaries = jobs.map((item) => Number(item.annualSalaryWan)).filter((value) => Number.isFinite(value) && value > 0);
   const maxSalary = salaries.length ? Math.max(...salaries) : null;
   document.getElementById('jobMaxSalary').textContent = maxSalary == null ? '—' : `${Number.isInteger(maxSalary) ? maxSalary : maxSalary.toFixed(1)}万`;
-  document.getElementById('jobSubmittedCount').textContent = String(submitted);
-  document.getElementById('jobAdvanceRate').textContent = `${submitted ? Math.round(advanced / submitted * 100) : 0}%`;
+  document.getElementById('jobSubmittedCount').textContent = String(jobs.length);
+  document.getElementById('jobAdvanceRate').textContent = String(active);
   const interviews = jobs.filter((item) => item.status === 'interview').sort((a, b) => Date.parse(a.nextActionAt || a.updatedAt) - Date.parse(b.nextActionAt || b.updatedAt));
   document.getElementById('jobInterviewList').innerHTML = interviews.length ? interviews.slice(0, 4).map((item) => `<button class="job-interview-row" data-edit-job="${wbEscape(item.id)}" type="button"><span class="job-company-monogram">${wbEscape(item.company.slice(0, 1))}</span><span><strong>${wbEscape(item.role)}</strong><small>${wbEscape(item.company)}${item.location ? ` · ${wbEscape(item.location)}` : ''}</small></span><time>${item.nextActionAt ? jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '待安排'}</time><b>面试中</b></button>`).join('') : '<div class="job-panel-empty">还没有进入面试的岗位</div>';
 
@@ -284,26 +276,24 @@ function renderJobs() {
   document.getElementById('jobBoard').innerHTML = statuses.map((status) => {
     const stageJobs = visible.filter((item) => item.status === status).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
     const cards = stageJobs.map((item) => {
-      const nextStatus = JOB_STATUSES[JOB_STATUSES.indexOf(item.status) + 1];
       const facts = [item.annualSalaryWan ? `预估 ${item.annualSalaryWan} 万/年` : null, item.appliedAt ? `投递 ${jobDateLabel(item.appliedAt)}` : null].filter(Boolean);
       const nextAction = item.nextActionAt ? `<span class="job-next-action ${Date.parse(item.nextActionAt) < Date.now() ? 'is-overdue' : ''}">下一步 ${jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>` : '';
       const sourceButton = item.sourceUrl ? `<button class="job-source-button" data-open-job-source="${wbEscape(item.sourceUrl)}" type="button" aria-label="打开 ${wbEscape(item.company)} 的招聘链接">${uiIcon('external')}</button>` : '';
-      const advanceButton = nextStatus ? `<button class="button compact secondary job-advance-button" data-advance-job="${wbEscape(item.id)}" type="button">推进至${JOB_STATUS_LABELS[nextStatus]}</button>` : '<span class="job-offer-badge">已获 Offer</span>';
-      return `<article class="job-card" data-edit-job="${wbEscape(item.id)}" role="button" tabindex="0" aria-label="编辑 ${wbEscape(item.company)} ${wbEscape(item.role)}"><div class="job-card-head"><div><strong class="job-card-company">${wbEscape(item.company)}</strong><h3 class="job-card-role">${wbEscape(item.role)}</h3></div><div class="job-card-top-actions">${sourceButton}${advanceButton}</div></div><p class="job-card-location">${wbEscape(item.location || '地点待确认')}</p><p class="job-card-notes${item.notes ? '' : ' is-empty'}">${wbEscape(item.notes || '暂无备注')}</p>${facts.length ? `<div class="job-card-facts">${facts.map((fact) => `<span>${wbEscape(fact)}</span>`).join('')}</div>` : ''}${nextAction}</article>`;
+      const statusButton = item.status === 'offer' ? '<span class="job-offer-badge">已获 Offer</span>' : `<button class="button compact secondary job-status-button" data-edit-job="${wbEscape(item.id)}" type="button">更新状态</button>`;
+      return `<article class="job-card" data-edit-job="${wbEscape(item.id)}" role="button" tabindex="0" aria-label="编辑 ${wbEscape(item.company)} ${wbEscape(item.role)}"><div class="job-card-head"><div><strong class="job-card-company">${wbEscape(item.company)}</strong><h3 class="job-card-role">${wbEscape(item.role)}</h3></div><div class="job-card-top-actions">${sourceButton}${statusButton}</div></div><p class="job-card-location">${wbEscape(item.location || '地点待确认')}</p><p class="job-card-notes${item.notes ? '' : ' is-empty'}">${wbEscape(item.notes || '暂无备注')}</p>${facts.length ? `<div class="job-card-facts">${facts.map((fact) => `<span>${wbEscape(fact)}</span>`).join('')}</div>` : ''}${nextAction}</article>`;
     }).join('');
-    const createButton = status === 'pending' ? '<button class="job-stage-create" data-add-job="pending" type="button">＋ 新增岗位</button>' : '';
-    return `<section class="job-stage-column stage-${status}"><header><div><span>${JOB_STATUS_LABELS[status]}</span><small>${counts[status]} 个岗位</small></div><div class="job-stage-header-actions"><b>${counts[status]}</b>${createButton}</div></header><div class="job-stage-cards">${cards || '<div class="job-stage-empty">这个阶段还没有岗位</div>'}</div></section>`;
+    return `<section class="job-stage-column stage-${status}"><header><div><span>${JOB_STATUS_LABELS[status]}</span><small>${counts[status]} 个岗位</small></div><div class="job-stage-header-actions"><b>${counts[status]}</b></div></header><div class="job-stage-cards">${cards || '<div class="job-stage-empty">这个状态还没有岗位</div>'}</div></section>`;
   }).join('');
 }
 
-function openJobEditor(job = null, initialStatus = 'pending') {
+function openJobEditor(job = null, initialStatus = 'submitted') {
   const dialog = document.getElementById('jobDialog');
   document.getElementById('jobForm').reset();
   document.getElementById('jobId').value = job?.id || '';
   document.getElementById('jobDialogTitle').textContent = job ? '编辑求职岗位' : '添加求职岗位';
   document.getElementById('jobCompany').value = job?.company || '';
   document.getElementById('jobRole').value = job?.role || '';
-  document.getElementById('jobStatus').value = job?.status || (JOB_STATUSES.includes(initialStatus) ? initialStatus : 'pending');
+  document.getElementById('jobStatus').value = job?.status || (JOB_STATUSES.includes(initialStatus) ? initialStatus : 'submitted');
   document.getElementById('jobLocation').value = job?.location || '';
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobAppliedAt').value = job?.appliedAt?.slice(0, 10) || '';
@@ -347,22 +337,6 @@ async function saveJobFromEditor() {
   }
 }
 
-async function advanceJob(id) {
-  const job = wb.workspace.jobApplications.find((item) => item.id === id);
-  if (!job) return;
-  const nextStatus = JOB_STATUSES[JOB_STATUSES.indexOf(job.status) + 1];
-  if (!nextStatus) return;
-  try {
-    const saved = await workbenchApi.saveJobApplication({ ...job, status: nextStatus });
-    wb.workspace.jobApplications = wb.workspace.jobApplications.map((item) => item.id === saved.id ? saved : item);
-    renderHome();
-    renderJobs();
-    showWorkbenchToast(`已推进至${JOB_STATUS_LABELS[nextStatus]}`);
-  } catch (exception) {
-    showWorkbenchToast(exception.message || '阶段更新失败。', 'error');
-  }
-}
-
 function fitHomeDayCards() {
   document.querySelectorAll('#homeDayOverview .day-card').forEach((card) => {
     const body = card.querySelector(':scope > div');
@@ -401,11 +375,12 @@ function renderHomeCommandCards(today = new Date()) {
   const todos = wb.workspace.todos || [];
   const openTodos = todos.filter((todo) => todo.status === 'open' && todo.dueAt && (sameDay(todo.dueAt, today) || Date.parse(todo.dueAt) < Date.now()));
   const completedTodos = todos.filter((todo) => todo.status === 'completed' && sameDay(todo.completedAt, today));
+  const visibleTodos = [...openTodos, ...completedTodos].slice(0, 4);
   const next = events.find((item) => Date.parse(item.endAt || item.startAt) >= Date.now()) || events[0];
   document.getElementById('homeNextEventTitle').textContent = next ? next.title : (openTodos[0]?.title || '今天还没有安排');
   document.getElementById('homeNextEventMeta').textContent = next ? `${next.allDay ? '全天' : formatTime(next.startAt)} · ${priorityLabels[next.priority]}优先级` : openTodos[0] ? '来自今日待办 · 现在开始也来得及' : '添加一条日程，让今天有下一步';
   document.getElementById('homeTodayScheduleList').innerHTML = events.slice(0, 4).map((item) => `<button class="home-today-row" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${item.allDay ? '全天' : formatTime(item.startAt)}</time><strong>${wbEscape(item.title)}</strong></button>`).join('') || '<p class="empty-mini">今天还没有日程</p>';
-  document.getElementById('homeTodayTodoList').innerHTML = openTodos.slice(0, 4).map((todo) => `<button class="home-today-row home-todo-row tone-${todo.priority}" data-edit-todo="${wbEscape(todo.id)}" type="button"><i></i><strong>${wbEscape(todo.title)}</strong></button>`).join('') || '<p class="empty-mini">今天还没有待办</p>';
+  document.getElementById('homeTodayTodoList').innerHTML = visibleTodos.map((todo) => `<div class="home-today-row home-todo-row tone-${todo.priority} ${todo.status === 'completed' ? 'is-completed' : ''}"><button class="home-todo-check" data-home-todo-action="${todo.status === 'completed' ? 'reopen' : 'complete'}" data-home-todo-id="${wbEscape(todo.id)}" type="button" aria-label="${todo.status === 'completed' ? '重新打开' : '完成'}${wbEscape(todo.title)}">${todo.status === 'completed' ? uiIcon('check') : ''}</button><button class="home-todo-title" data-edit-todo="${wbEscape(todo.id)}" type="button"><strong>${wbEscape(todo.title)}</strong></button></div>`).join('') || '<p class="empty-mini">今天还没有待办</p>';
   const total = openTodos.length + completedTodos.length;
   const rate = total ? Math.round(completedTodos.length / total * 100) : 0;
   const progress = document.getElementById('homeTodoProgress');
@@ -455,6 +430,27 @@ function renderHomeProgress() {
   document.getElementById('homeProgressRate').textContent = `${rate}%`;
   document.getElementById('homeProgressRateBar').style.width = `${rate}%`;
   document.getElementById('homeProgressFocus').textContent = String(Math.round(focusMs / 60_000));
+}
+
+function closeDailyPlanDialog() {
+  const dialog = document.getElementById('dailyPlanDialog');
+  if (dialog?.open) closeWorkbenchDialog(dialog);
+}
+
+function maybeShowDailyPlan() {
+  const promptMode = new URLSearchParams(location.search).get('dailyPrompt');
+  if (promptMode === '0') return;
+  const todayKey = localDateKey(new Date());
+  try {
+    if (promptMode !== 'force' && localStorage.getItem(DAILY_PLAN_KEY) === todayKey) return;
+    localStorage.setItem(DAILY_PLAN_KEY, todayKey);
+  } catch { /* A failed preference write must not block the workbench. */ }
+  const todayTodos = (wb.workspace.todos || []).filter((todo) => todo.status === 'open' && todo.dueAt && (sameDay(todo.dueAt, new Date()) || Date.parse(todo.dueAt) < Date.now()));
+  document.getElementById('dailyPlanSummary').textContent = todayTodos.length
+    ? `今天已有 ${todayTodos.length} 项待办。再确认一件最重要的结果，让今天更聚焦。`
+    : '把要完成的结果写成待办，研迹会把它放进今天的进度里。';
+  document.getElementById('createDailyTodoButton').textContent = todayTodos.length ? '再添加一项' : '写下今日待办';
+  openWorkbenchDialog(document.getElementById('dailyPlanDialog'));
 }
 
 function renderTimeline() {
@@ -1104,9 +1100,10 @@ function noteEditorPayload() {
 }
 
 function persistNoteDraftLocally() {
-  if (document.getElementById('noteId').value || !noteEditorHasContent()) return;
+  if (!noteEditorHasContent()) return;
   const payload = noteEditorPayload();
   localStorage.setItem('yanji.noteDraft.v1', JSON.stringify({
+    id: payload.id || '',
     title: payload.title,
     content: payload.content,
     metadata: payload.metadata,
@@ -1211,9 +1208,8 @@ function queueNoteAutoSave() {
   wb.noteDirty = true;
   wb.noteEditGeneration += 1;
   persistNoteDraftLocally();
-  document.getElementById('noteSaveHint').textContent = '正在保存…';
+  document.getElementById('noteSaveHint').textContent = '有未保存更改';
   clearTimeout(wb.noteSaveTimer);
-  wb.noteSaveTimer = setTimeout(() => flushNoteEditor({ silent: true }).catch(() => {}), 350);
 }
 
 async function flushNoteEditor({ silent = false } = {}) {
@@ -1234,8 +1230,13 @@ async function flushNoteEditor({ silent = false } = {}) {
       if (generation === wb.noteEditGeneration) {
         wb.noteDirty = false;
         clearNoteDraftLocally();
-        document.getElementById('noteSaveHint').textContent = '已自动保存';
+        document.getElementById('noteSaveHint').textContent = '已保存';
       }
+      const noteIndex = wb.workspace.notes.findIndex((item) => item.id === note.id);
+      if (noteIndex >= 0) wb.workspace.notes.splice(noteIndex, 1, note);
+      else wb.workspace.notes.unshift(note);
+      renderNotes();
+      renderHome();
       return note;
     } catch (error) {
       document.getElementById('noteError').textContent = error.message || '笔记保存失败，草稿仍保留。';
@@ -1249,16 +1250,32 @@ async function flushNoteEditor({ silent = false } = {}) {
   return wb.noteSavePromise;
 }
 
-function openNoteEditor(note = null) {
-  const draft = note ? null : readNoteDraft();
+function animateNoteDialogFromCard(dialog, sourceCard) {
+  if (!sourceCard || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const source = sourceCard.getBoundingClientRect();
+  const target = dialog.getBoundingClientRect();
+  if (!source.width || !source.height || !target.width || !target.height) return;
+  const translateX = source.left - target.left;
+  const translateY = source.top - target.top;
+  const scaleX = Math.max(.34, Math.min(1, source.width / target.width));
+  const scaleY = Math.max(.26, Math.min(1, source.height / target.height));
+  dialog.animate([
+    { opacity: .64, transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`, borderRadius: '16px' },
+    { opacity: 1, transform: 'translate(0, 0) scale(1, 1)', borderRadius: '12px' }
+  ], { duration: 260, easing: 'cubic-bezier(.23, 1, .32, 1)' });
+}
+
+function openNoteEditor(note = null, sourceCard = null) {
+  const savedDraft = readNoteDraft();
+  const draft = savedDraft && String(savedDraft.id || '') === String(note?.id || '') ? savedDraft : (!note && !savedDraft?.id ? savedDraft : null);
   wb.editingNote = note;
   wb.noteSelection = null;
   wb.previewingNoteImage = null;
   const latestEntry = note?.kind === 'daily' ? note.entries?.at(-1) : null;
   document.getElementById('noteId').value = note?.id || '';
   document.getElementById('noteEntryId').value = latestEntry?.id || '';
-  document.getElementById('noteTitle').value = note?.title || draft?.title || '';
-  document.getElementById('noteContent').innerHTML = noteContentToEditorHtml(latestEntry?.content ?? note?.content ?? draft?.content ?? '', note?.attachments || []);
+  document.getElementById('noteTitle').value = draft?.title ?? note?.title ?? '';
+  document.getElementById('noteContent').innerHTML = noteContentToEditorHtml(draft?.content ?? latestEntry?.content ?? note?.content ?? '', note?.attachments || []);
   document.getElementById('noteTitle').readOnly = note?.kind === 'daily';
   document.getElementById('noteDialogTitle').textContent = note ? '编辑笔记' : '新建今日日记';
   document.getElementById('deleteNoteButton').hidden = !note;
@@ -1266,12 +1283,14 @@ function openNoteEditor(note = null) {
   document.getElementById('addNoteImageButton').disabled = false;
   document.getElementById('noteMetadataPanel').hidden = true;
   document.getElementById('noteError').textContent = '';
-  document.getElementById('noteSaveHint').textContent = note ? '已保存' : '输入后自动保存';
+  document.getElementById('noteSaveHint').textContent = draft ? '已恢复未保存草稿' : '保存后更新笔记卡片';
   setNoteEditorFullscreen(false);
-  renderNoteMetadata(note || { metadata: draft?.metadata || {} });
-  wb.noteDirty = false;
+  renderNoteMetadata(note ? { ...note, metadata: draft?.metadata ?? note.metadata } : { metadata: draft?.metadata || {} });
+  wb.noteDirty = Boolean(draft);
   clearTimeout(wb.noteSaveTimer);
-  openWorkbenchDialog(document.getElementById('noteDialog'));
+  const dialog = document.getElementById('noteDialog');
+  openWorkbenchDialog(dialog);
+  animateNoteDialogFromCard(dialog, sourceCard);
   setTimeout(() => {
     (note ? document.getElementById('noteContent') : document.getElementById('noteTitle')).focus();
     hydrateInlineNoteImages(note).catch(() => {});
@@ -1282,6 +1301,7 @@ function setNoteEditorFullscreen(enabled) {
   const dialog = document.getElementById('noteDialog');
   const button = document.getElementById('toggleNoteFullscreenButton');
   const active = Boolean(enabled);
+  if (active) dialog.getAnimations().forEach((animation) => animation.cancel());
   dialog.classList.toggle('is-workspace-fullscreen', active);
   button.setAttribute('aria-pressed', String(active));
   button.textContent = active ? '退出全屏' : '全屏编辑';
@@ -1309,10 +1329,10 @@ async function saveNoteFromEditor() {
   }
 }
 
-async function closeNoteEditorAfterAutoSave(dialog) {
-  const note = await flushNoteEditor({ silent: true });
-  const id = note?.id || document.getElementById('noteId').value;
-  if (id) await workbenchApi.deleteNoteIfEmpty(id);
+function discardNoteEditor(dialog) {
+  clearTimeout(wb.noteSaveTimer);
+  clearNoteDraftLocally();
+  wb.noteDirty = false;
   if (dialog.open) closeWorkbenchDialog(dialog);
 }
 
@@ -1388,6 +1408,7 @@ function bindWorkbenchEvents() {
   document.getElementById('quickScheduleButton').addEventListener('click', () => openScheduleEditor());
   document.getElementById('quickNoteButton').addEventListener('click', () => openNoteEditor());
   document.getElementById('addScheduleButton').addEventListener('click', () => openScheduleEditor());
+  document.getElementById('addJobButton').addEventListener('click', () => openJobEditor());
   document.getElementById('saveJobButton').addEventListener('click', saveJobFromEditor);
   document.getElementById('cancelJobButton').addEventListener('click', () => closeWorkbenchDialog(document.getElementById('jobDialog')));
   document.getElementById('jobSearch').addEventListener('input', renderJobs);
@@ -1409,6 +1430,14 @@ function bindWorkbenchEvents() {
   });
   document.getElementById('jobDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget); });
   document.getElementById('jobDialog').addEventListener('cancel', (event) => { event.preventDefault(); closeWorkbenchDialog(event.currentTarget); });
+  document.getElementById('dismissDailyPlanButton').addEventListener('click', closeDailyPlanDialog);
+  document.getElementById('createDailyTodoButton').addEventListener('click', () => {
+    closeDailyPlanDialog();
+    const dueAt = new Date();
+    dueAt.setHours(18, 0, 0, 0);
+    window.YanjiTodoView?.openCreateDialog({ dueAt: dueAt.toISOString(), priority: 'medium' });
+  });
+  document.getElementById('dailyPlanDialog').addEventListener('cancel', (event) => { event.preventDefault(); closeDailyPlanDialog(); });
   window.YanjiTodoView?.init();
   document.getElementById('scheduleTodayButton').addEventListener('click', () => { wb.selectedDate = new Date(); renderTimeline(); });
   document.getElementById('previousDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, -1); renderTimeline(); });
@@ -1577,9 +1606,7 @@ function bindWorkbenchEvents() {
     if (event.isComposing || event.keyCode === 229) return;
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      wb.noteDirty = true;
-      wb.noteEditGeneration += 1;
-      flushNoteEditor().catch(() => {});
+      saveNoteFromEditor();
       return;
     }
     if (window.YanjiListEditing?.applyContentEditableListEditing(noteEditor, event)) {
@@ -1610,18 +1637,9 @@ function bindWorkbenchEvents() {
   document.getElementById('addNoteImageButton').addEventListener('click', async () => {
     try {
       rememberNoteEditorSelection();
-      if (!document.getElementById('noteId').value && noteEditorHasContent()) {
-        wb.noteDirty = true;
-        wb.noteEditGeneration += 1;
-        await flushNoteEditor();
-      }
       if (!document.getElementById('noteId').value) {
-        const note = await workbenchApi.saveNote(noteEditorPayload());
-        wb.editingNote = note;
-        document.getElementById('noteId').value = note.id;
-        document.getElementById('noteEntryId').value = note.kind === 'daily' ? (note.entries?.at(-1)?.id || '') : '';
-        document.getElementById('deleteNoteButton').hidden = false;
-        document.getElementById('openStickyFromEditorButton').hidden = false;
+        document.getElementById('noteError').textContent = '请先保存笔记，再插入图片。';
+        return;
       }
       const id = document.getElementById('noteId').value;
       const attachment = await workbenchApi.addNoteAttachment(id);
@@ -1653,20 +1671,17 @@ function bindWorkbenchEvents() {
   });
   document.getElementById('openStickyFromEditorButton').addEventListener('click', async () => {
     try {
-      wb.noteDirty = true;
-      wb.noteEditGeneration += 1;
-      await flushNoteEditor();
+      if (wb.noteDirty) {
+        showWorkbenchToast('请先保存当前修改，再打开便笺。');
+        return;
+      }
       await workbenchApi.openStickyNote(document.getElementById('noteId').value);
     } catch (error) {
       document.getElementById('noteError').textContent = error.message || '无法打开悬浮便笺';
     }
   });
   document.getElementById('cancelNoteButton').addEventListener('click', async () => {
-    clearNoteDraftLocally();
-    wb.noteDirty = false;
-    const id = document.getElementById('noteId').value;
-    if (id) await workbenchApi.deleteNoteIfEmpty(id).catch(() => false);
-    closeWorkbenchDialog(document.getElementById('noteDialog'));
+    discardNoteEditor(document.getElementById('noteDialog'));
   });
   document.getElementById('manageMetadataButton').addEventListener('click', openMetadataManager);
   document.getElementById('openMetadataManagerButton').addEventListener('click', openMetadataManager);
@@ -1717,14 +1732,6 @@ function bindWorkbenchEvents() {
       if (document.getElementById('scheduleDialog').open && !document.getElementById('scheduleId').value) localStorage.setItem(SCHEDULE_DRAFT_KEY, JSON.stringify(captureScheduleDraft()));
     }, 350);
   }));
-  document.getElementById('noteDialog').addEventListener('click', (event) => {
-    if (event.target === event.currentTarget) {
-      const dialog = event.currentTarget;
-      closeNoteEditorAfterAutoSave(dialog).catch((error) => {
-        document.getElementById('noteError').textContent = error.message || '笔记保存失败，窗口仍保持打开。';
-      });
-    }
-  });
   document.getElementById('noteDialog').addEventListener('cancel', (event) => {
     event.preventDefault();
     const dialog = event.currentTarget;
@@ -1732,9 +1739,7 @@ function bindWorkbenchEvents() {
       setNoteEditorFullscreen(false);
       return;
     }
-    closeNoteEditorAfterAutoSave(dialog).catch((error) => {
-      document.getElementById('noteError').textContent = error.message || '笔记保存失败，窗口仍保持打开。';
-    });
+    discardNoteEditor(dialog);
   });
   document.getElementById('noteDialog').addEventListener('close', () => setNoteEditorFullscreen(false));
   document.getElementById('noteImagePreviewDialog').addEventListener('click', (event) => {
@@ -1749,13 +1754,13 @@ function bindWorkbenchEvents() {
     closeWorkbenchDialog(document.getElementById(button.dataset.closeDialog));
   }));
   window.addEventListener('blur', () => {
-    if (document.getElementById('noteDialog')?.open) flushNoteEditor({ silent: true }).catch(() => {});
+    if (document.getElementById('noteDialog')?.open) persistNoteDraftLocally();
     if (document.getElementById('scheduleDialog')?.open) flushScheduleDraft();
     window.YanjiTodoView?.flushDraft?.();
   });
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') {
-      if (document.getElementById('noteDialog')?.open) flushNoteEditor({ silent: true }).catch(() => {});
+      if (document.getElementById('noteDialog')?.open) persistNoteDraftLocally();
       if (document.getElementById('scheduleDialog')?.open) flushScheduleDraft();
       window.YanjiTodoView?.flushDraft?.();
     }
@@ -1771,8 +1776,6 @@ function bindWorkbenchEvents() {
     if (addJobTarget) return openJobEditor(null, addJobTarget.dataset.addJob);
     const sourceJobTarget = event.target.closest('[data-open-job-source]');
     if (sourceJobTarget) return workbenchApi.openExternal(sourceJobTarget.dataset.openJobSource);
-    const advanceJobTarget = event.target.closest('[data-advance-job]');
-    if (advanceJobTarget) return advanceJob(advanceJobTarget.dataset.advanceJob);
     const editJobTarget = event.target.closest('[data-edit-job]');
     if (editJobTarget) return openJobEditor(wb.workspace.jobApplications.find((item) => item.id === editJobTarget.dataset.editJob));
     const selectedDateTarget = event.target.closest('[data-select-schedule-date]');
@@ -1793,10 +1796,26 @@ function bindWorkbenchEvents() {
     if (scheduleTarget) return openScheduleEditor(wb.workspace.schedules.find((item) => item.id === scheduleTarget.dataset.editSchedule));
     const todoTarget = event.target.closest('[data-edit-todo]');
     if (todoTarget) return window.YanjiTodoView?.openEditDialog(wb.workspace.todos.find((item) => item.id === todoTarget.dataset.editTodo));
+    const homeTodoAction = event.target.closest('[data-home-todo-action]');
+    if (homeTodoAction) {
+      try {
+        const id = homeTodoAction.dataset.homeTodoId;
+        const updated = homeTodoAction.dataset.homeTodoAction === 'reopen'
+          ? await workbenchApi.reopenTodo(id)
+          : await workbenchApi.completeTodo(id);
+        wb.workspace.todos = wb.workspace.todos.map((todo) => todo.id === updated.id ? updated : todo);
+        renderHome();
+        window.YanjiTodoView?.setWorkspace(wb.workspace);
+        showWorkbenchToast(updated.status === 'completed' ? '今日待办已完成' : '待办已重新打开');
+      } catch (error) {
+        showWorkbenchToast(error.message || '待办状态更新失败', 'error');
+      }
+      return;
+    }
     const stickyTarget = event.target.closest('[data-sticky-note]');
     if (stickyTarget) { event.stopPropagation(); return workbenchApi.openStickyNote(stickyTarget.dataset.stickyNote); }
     const noteTarget = event.target.closest('[data-edit-note]');
-    if (noteTarget) return openNoteEditor(wb.workspace.notes.find((item) => item.id === noteTarget.dataset.editNote));
+    if (noteTarget) return openNoteEditor(wb.workspace.notes.find((item) => item.id === noteTarget.dataset.editNote), noteTarget);
   });
   document.body.addEventListener('keydown', (event) => {
     const card = event.target.closest('.job-card[data-edit-job]');
@@ -1845,6 +1864,7 @@ async function initializeWorkbench() {
     renderFocus();
   });
   switchWorkbenchPage('home');
+  maybeShowDailyPlan();
 }
 
 window.showWorkbenchToast = showWorkbenchToast;

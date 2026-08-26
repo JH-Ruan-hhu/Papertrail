@@ -1,7 +1,6 @@
 'use strict';
 
 const JOB_STATUSES = Object.freeze([
-  'pending',
   'submitted',
   'written-1',
   'written-2',
@@ -10,7 +9,6 @@ const JOB_STATUSES = Object.freeze([
 ]);
 
 const JOB_STATUS_LABELS = Object.freeze({
-  pending: '待投递',
   submitted: '已投递',
   'written-1': '一轮笔试',
   'written-2': '二轮笔试',
@@ -55,7 +53,9 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
   const input = asObject(value);
   if (!input) throw new Error(`第 ${index + 1} 条求职记录格式无效。`);
   const createdAt = isoDate(input.createdAt, fallbackAt);
-  const status = JOB_STATUSES.includes(input.status) ? input.status : 'pending';
+  // Legacy `pending` records become tracked applications. The dashboard no
+  // longer models an unsubmitted wishlist or assumes one universal sequence.
+  const status = JOB_STATUSES.includes(input.status) ? input.status : 'submitted';
   return {
     id: cleanText(input.id, 200) || `job-${index + 1}`,
     company: cleanText(input.company, 200) || '未命名单位',
@@ -85,7 +85,7 @@ function saveJobApplication(list, input, now = new Date().toISOString(), makeId 
   }
   const existing = source.id ? list.find((item) => item.id === String(source.id)) : null;
   if (source.id && !existing) throw new Error('找不到这条求职记录。');
-  const status = JOB_STATUSES.includes(source.status) ? source.status : (existing?.status || 'pending');
+  const status = JOB_STATUSES.includes(source.status) ? source.status : (existing?.status || 'submitted');
   const candidate = normalizeJobApplication({
     ...existing,
     ...source,
@@ -93,7 +93,7 @@ function saveJobApplication(list, input, now = new Date().toISOString(), makeId 
     role,
     status,
     id: existing?.id || makeId(),
-    appliedAt: source.appliedAt || existing?.appliedAt || (status === 'pending' ? null : now),
+    appliedAt: source.appliedAt || existing?.appliedAt || now,
     createdAt: existing?.createdAt || now,
     updatedAt: now,
     revision: Math.max(0, Number(existing?.revision) || 0) + 1

@@ -107,10 +107,10 @@
   function syncReminderInput() {
     document.getElementById('todoReminderAtField').hidden = document.getElementById('todoReminderMode').value !== 'custom';
   }
-  function openEditor(todo = null) {
+  function openEditor(todo = null, preset = null) {
     const storedDraft = readDraft();
     const draft = todo ? (storedDraft?.id === todo.id ? storedDraft : null) : storedDraft;
-    const source = draft || todo || {};
+    const source = draft || todo || preset || {};
     document.getElementById('todoId').value = todo?.id || '';
     document.getElementById('todoTitle').value = source.title || '';
     document.getElementById('todoNotes').value = source.notes || '';
@@ -218,7 +218,7 @@
     setWorkspace(workspace) { state.workspace = workspace || state.workspace; render(); },
     flushDraft() { if (document.getElementById('todoDialog')?.open) writeDraft(); },
     render,
-    openCreateDialog: () => openEditor(),
+    openCreateDialog: (preset = null) => openEditor(null, preset),
     openEditDialog: openEditor
   };
 }());

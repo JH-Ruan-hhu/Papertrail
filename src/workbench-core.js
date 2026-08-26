@@ -147,6 +147,18 @@ function resolveDate(text, baseDate) {
     return { date: candidate, token: slashDate[0] };
   }
 
+  // A bare day such as “28号” means the next occurrence of that calendar
+  // day. Include a following “前” in the consumed token so deadline wording
+  // like “28日前完成测评” keeps the title “完成测评”, not “前完成测评”.
+  const dayOnly = text.match(/(?<![\d月])(\d{1,2})\s*(?:日|号)(?:前)?(?=$|[^\d])/);
+  if (dayOnly) {
+    const day = Number(dayOnly[1]);
+    let candidate = new Date(baseDate.getFullYear(), baseDate.getMonth(), day, 12);
+    if (candidate.getDate() !== day) return { date: baseDate, token: '' };
+    if (candidate < addLocalDays(baseDate, -1)) candidate = new Date(baseDate.getFullYear(), baseDate.getMonth() + 1, day, 12);
+    if (candidate.getDate() === day) return { date: candidate, token: dayOnly[0].trim() };
+  }
+
   return { date: baseDate, token: '' };
 }
 
@@ -205,7 +217,7 @@ function parseNaturalLanguageSchedule(input, base = new Date()) {
   let priority = priorityTag ? ({ 1: 'high', 2: 'medium', 3: 'low' })[priorityTag[1]] : 'low';
   if (!priorityTag && /!!!|紧急|最高|红色/.test(original)) priority = 'high';
   else if (!priorityTag && /!!|重要|黄色/.test(original)) priority = 'medium';
-  const deadline = /deadline|截止|到期|ddl/i.test(original);
+  const deadline = /deadline|截止|到期|ddl/i.test(original) || /前$/.test(resolvedDate.token);
 
   const tokens = [resolvedDate.token, dayPart, timeToken].filter(Boolean);
   let title = original;

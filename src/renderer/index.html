@@ -14,7 +14,7 @@
     <div class="window-titlebar"><time id="topbarClock" aria-label="当前时间"></time></div>
     <div class="app-layout">
       <aside class="sidebar">
-        <div class="brand" aria-label="研迹科研工作台"><strong>研迹</strong><small>科研工作台</small></div>
+        <div class="brand" aria-label="研迹科研工作台"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><rect x="3" y="3" width="34" height="34" rx="12"/><path d="M13 10.5h10.5a5.5 5.5 0 0 1 0 11H18v8M13 10.5v19M18 16h5.5"/></svg></span><span><strong>研迹</strong><small>科研工作台</small></span></div>
 
         <nav class="side-nav" aria-label="主导航">
           <p class="nav-label">工作区</p>
@@ -190,21 +190,22 @@
 
         <section class="workbench-page job-page" data-page="jobs" hidden>
           <header class="page-head-row">
-            <div><p class="eyebrow">CAREER DASHBOARD</p><h1>求职驾驶舱</h1><p>从投递到 Offer，把每一次推进集中在同一张看板上</p></div>
+            <div><p class="eyebrow">CAREER DASHBOARD</p><h1>求职驾驶舱</h1><p>按当前状态管理机会，笔试与面试可随招聘流程自由切换</p></div>
+            <div class="page-actions"><button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 添加岗位</button></div>
           </header>
           <section class="job-metric-strip" aria-label="求职关键指标">
             <article class="tone-offer"><span>Offer 数</span><strong id="jobOfferCount">0</strong><small>已收获结果</small></article>
-            <article class="tone-interview"><span>面试数量</span><strong id="jobInterviewCount">0</strong><small>含已进入后续阶段</small></article>
+            <article class="tone-interview"><span>面试中</span><strong id="jobInterviewCount">0</strong><small>当前处于面试状态</small></article>
             <article class="tone-salary"><span>最高预估年薪</span><strong id="jobMaxSalary">—</strong><small>按岗位合约估算</small></article>
-            <article class="tone-submitted"><span>已投递机会</span><strong id="jobSubmittedCount">0</strong><small>含后续推进阶段</small></article>
-            <article class="tone-rate"><span>推进转化率</span><strong id="jobAdvanceRate">0%</strong><small>投递后进入下一阶段</small></article>
+            <article class="tone-submitted"><span>全部机会</span><strong id="jobSubmittedCount">0</strong><small>当前记录的岗位总数</small></article>
+            <article class="tone-rate"><span>活跃机会</span><strong id="jobAdvanceRate">0</strong><small>尚未获得 Offer</small></article>
           </section>
           <div class="job-dashboard-grid">
             <section class="job-board-panel">
-              <div class="panel-heading"><div><p class="eyebrow">PIPELINE BOARD</p><h2>投递看板</h2><p>按阶段管理岗位，直接推进下一步</p></div></div>
+              <div class="panel-heading"><div><p class="eyebrow">STATUS BOARD</p><h2>投递看板</h2><p>按当前状态归位，点击岗位即可自由更新进展</p></div></div>
               <section class="job-toolbar" aria-label="求职记录筛选">
                 <label class="search-box" for="jobSearch"><input id="jobSearch" type="search" placeholder="搜索单位、岗位、地点或备注" autocomplete="off"></label>
-                <label class="job-filter-label" for="jobStatusFilter"><span>阶段</span><select id="jobStatusFilter"><option value="all">全部阶段</option><option value="pending">待投递</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></label>
+                <label class="job-filter-label" for="jobStatusFilter"><span>状态</span><select id="jobStatusFilter"><option value="all">全部状态</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></label>
               </section>
               <div id="jobBoard" class="job-board" aria-live="polite"></div>
             </section>
@@ -215,7 +216,7 @@
               <div id="jobInterviewList" class="job-interview-list"></div>
             </section>
             <section class="job-glance-panel">
-              <div class="panel-heading"><div><p class="eyebrow">PROGRESS FUNNEL</p><h2>累计进度</h2><p>岗位推进后，已完成阶段仍保留计数</p></div></div>
+              <div class="panel-heading"><div><p class="eyebrow">STATUS MIX</p><h2>当前状态分布</h2><p>这里只表达岗位此刻所处状态，不假定固定先后顺序</p></div></div>
               <div id="jobPipelineSummary" class="job-pipeline-summary"></div>
             </section>
           </div>
@@ -258,7 +259,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.2.4</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.3.0</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -538,6 +539,17 @@
       </form>
     </dialog>
 
+    <dialog id="dailyPlanDialog" class="modal daily-plan-dialog" aria-labelledby="dailyPlanTitle">
+      <div class="daily-plan-shell">
+        <div class="daily-plan-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 4h14v16H5zM8 2v4M16 2v4M8 10h8M8 14h5"/></svg></div>
+        <p class="eyebrow">DAILY INTENTION</p>
+        <h2 id="dailyPlanTitle">先定下今天最重要的事</h2>
+        <p id="dailyPlanSummary">把要完成的结果写成待办，研迹会把它放进今天的进度里。</p>
+        <div class="daily-plan-example"><span>建议写法</span><strong>今天 18:00 前完成实验数据复核</strong></div>
+        <div class="daily-plan-actions"><button class="button secondary" id="dismissDailyPlanButton" type="button">今天稍后再写</button><button class="button primary" id="createDailyTodoButton" type="button">写下今日待办</button></div>
+      </div>
+    </dialog>
+
     <dialog id="noteDialog" class="modal workbench-editor-modal note-editor-modal">
       <form method="dialog" id="noteForm">
         <div class="modal-head"><div><p class="eyebrow">NOTE</p><h2 id="noteDialogTitle">新建笔记</h2><p>元数据默认收起，不打断正常书写</p></div><button class="button secondary compact" id="toggleNoteFullscreenButton" type="button" aria-pressed="false">全屏编辑</button></div>
@@ -549,7 +561,7 @@
         <button class="metadata-reveal" id="toggleNoteMetadataButton" type="button"><div><strong>笔记元数据</strong><small id="metadataSummary">点击展开并编辑属性</small></div></button>
         <section id="noteMetadataPanel" class="note-metadata-panel" hidden><div id="noteMetadataFields" class="note-metadata-fields"></div><button class="text-button" id="openMetadataManagerButton" type="button">＋ 添加或管理字段</button></section>
         <p id="noteError" class="form-error"></p>
-        <div class="modal-actions"><span class="save-hint" id="noteSaveHint">输入后自动保存</span><button class="button tertiary danger-quiet" id="deleteNoteButton" type="button" hidden>删除</button><button class="button tertiary" id="openStickyFromEditorButton" type="button" hidden>悬浮便笺</button><span class="modal-spacer"></span><button class="button secondary" id="cancelNoteButton" data-close-dialog="noteDialog" type="button">取消</button><button class="button primary" id="saveNoteButton" type="button">保存笔记</button></div>
+        <div class="modal-actions"><span class="save-hint" id="noteSaveHint">保存后更新笔记卡片</span><button class="button tertiary danger-quiet" id="deleteNoteButton" type="button" hidden>删除</button><button class="button tertiary" id="openStickyFromEditorButton" type="button" hidden>悬浮便笺</button><span class="modal-spacer"></span><button class="button secondary" id="cancelNoteButton" data-close-dialog="noteDialog" type="button">取消</button><button class="button primary" id="saveNoteButton" type="button">保存笔记</button></div>
       </form>
     </dialog>
 
@@ -568,7 +580,7 @@
         <div class="form-grid job-form-grid">
           <div class="field"><label for="jobCompany">单位名称</label><input id="jobCompany" maxlength="200" placeholder="例如：某某环保科技" required></div>
           <div class="field"><label for="jobRole">岗位名称</label><input id="jobRole" maxlength="300" placeholder="例如：环境研发工程师" required></div>
-          <div class="field"><label for="jobStatus">当前阶段</label><select id="jobStatus"><option value="pending">待投递</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></div>
+          <div class="field"><label for="jobStatus">当前状态</label><select id="jobStatus"><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select><small>可在任意状态之间切换，不受页面排列顺序限制</small></div>
           <div class="field"><label for="jobLocation">地点</label><input id="jobLocation" maxlength="200" placeholder="城市 / 远程"></div>
           <div class="field"><label for="jobAnnualSalaryWan">预估年薪（万元）</label><input id="jobAnnualSalaryWan" type="number" min="0.1" max="10000" step="0.1" inputmode="decimal" placeholder="例如：41.1"></div>
           <div class="field"><label for="jobAppliedAt">投递日期</label><input id="jobAppliedAt" type="date"></div>

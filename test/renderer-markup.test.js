@@ -196,9 +196,9 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
 test('pointer sidebar navigation rises subtly while keyboard navigation stays immediate', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*workbench-page-rise 160ms var\(--ease-out\)/s);
-  assert.match(css, /@keyframes workbench-page-rise\s*\{[^}]*translateY\(6px\)/s);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*workbench-page-fade 120ms/);
+  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*workbench-page-rise 230ms var\(--ease-out\)/s);
+  assert.match(css, /@keyframes workbench-page-rise\s*\{[^}]*translateY\(4px\)/s);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*workbench-page-fade 140ms/);
   assert.match(workbenchJs, /animate:\s*event\.detail\s*>\s*0/);
   assert.match(workbenchJs, /previousPage !== page/);
 });
@@ -336,7 +336,9 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(liquidCss, /backdrop-filter: blur\(var\(--glass-blur\)\)/);
   assert.match(liquidCss, /prefers-reduced-transparency/);
   assert.match(liquidCss, /prefers-contrast: more/);
-  assert.match(liquidCss, /Content layer/);
+  assert.match(liquidCss, /Primary glass surfaces/);
+  assert.match(indexHtml, /class="brand-mark"/);
+  assert.match(liquidCss, /--glass-panel:/);
   assert.match(preloadJs, /saveJobApplication/);
   assert.match(mainJs, /jobs:save/);
   assert.match(mainJs, /deleteWorkspaceNoteIfEmpty/);
@@ -382,15 +384,31 @@ test('settings omit promotional and explanatory introduction cards', () => {
   assert.doesNotMatch(indexHtml, /class="privacy-note"/);
 });
 
-test('job dashboard uses salary metric without a duplicate upcoming schedule panel', () => {
+test('job dashboard uses flexible current states without a pending lane', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
   assert.match(indexHtml, /id="jobMaxSalary"/);
   assert.match(indexHtml, /id="jobAnnualSalaryWan"/);
   assert.doesNotMatch(indexHtml, /job-upcoming-panel|jobUpcomingCount|>近期日程</);
-  assert.match(indexHtml, /岗位推进后，已完成阶段仍保留计数/);
-  assert.match(workbenchJs, /function cumulativeJobCounts\(jobs\)/);
-  assert.match(workbenchJs, /const submitted = cumulativeCounts\.submitted/);
+  assert.match(indexHtml, /笔试与面试可随招聘流程自由切换/);
+  assert.doesNotMatch(indexHtml, /value="pending">待投递/);
+  assert.match(workbenchJs, /function currentJobCounts\(jobs\)/);
+  assert.doesNotMatch(workbenchJs, /data-advance-job|function advanceJob/);
+  assert.match(indexHtml, /id="addJobButton"/);
+  assert.match(indexHtml, /id="dailyPlanDialog"/);
+  assert.match(workbenchJs, /function maybeShowDailyPlan\(\)/);
+  assert.match(workbenchJs, /localStorage\.setItem\(DAILY_PLAN_KEY, todayKey\)/);
+  assert.match(workbenchJs, /openCreateDialog\(\{ dueAt: dueAt\.toISOString\(\), priority: 'medium' \}\)/);
+});
+
+test('note editor keeps ordinary edits as a draft until save and opens from its card', () => {
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  assert.match(workbenchJs, /有未保存更改/);
+  assert.match(workbenchJs, /animateNoteDialogFromCard/);
+  assert.match(workbenchJs, /duration:\s*260/);
+  assert.doesNotMatch(workbenchJs, /noteDialog'\)\.addEventListener\('click'/);
+  assert.match(indexHtml, /保存后更新笔记卡片/);
 });
 
 test('update center shows current and available versions with a local-data safety boundary', () => {

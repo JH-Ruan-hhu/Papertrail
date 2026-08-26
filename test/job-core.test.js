@@ -27,18 +27,19 @@ test('normalizes a local job application and constrains its source URL', () => {
   assert.equal(normalizeJobApplication({ sourceUrl: 'file:///secret' }).sourceUrl, null);
 });
 
-test('creates, advances, updates and deletes job applications', () => {
+test('creates, freely changes status and deletes job applications', () => {
   const now = '2026-08-24T08:00:00.000Z';
   let jobs = saveJobApplication([], { company: '水务集团', role: '环境工程师', status: 'pending' }, now, () => 'job-1');
   assert.equal(jobs[0].id, 'job-1');
-  assert.equal(jobs[0].appliedAt, null);
-  jobs = saveJobApplication(jobs, { ...jobs[0], status: 'submitted' }, '2026-08-25T08:00:00.000Z');
   assert.equal(jobs[0].status, 'submitted');
-  assert.equal(jobs[0].appliedAt, '2026-08-25T08:00:00.000Z');
-  assert.equal(jobs[0].revision, 2);
+  assert.equal(jobs[0].appliedAt, now);
+  jobs = saveJobApplication(jobs, { ...jobs[0], status: 'interview' }, '2026-08-25T08:00:00.000Z');
+  jobs = saveJobApplication(jobs, { ...jobs[0], status: 'written-1' }, '2026-08-26T08:00:00.000Z');
+  assert.equal(jobs[0].status, 'written-1');
+  assert.equal(jobs[0].revision, 3);
   assert.equal(nextJobStatus('submitted'), 'written-1');
   assert.equal(nextJobStatus('offer'), null);
-  assert.deepEqual(JOB_STATUSES, ['pending', 'submitted', 'written-1', 'written-2', 'interview', 'offer']);
+  assert.deepEqual(JOB_STATUSES, ['submitted', 'written-1', 'written-2', 'interview', 'offer']);
   assert.deepEqual(deleteJobApplication(jobs, 'job-1'), []);
 });
 

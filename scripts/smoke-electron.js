@@ -46,7 +46,7 @@ app.whenReady().then(async () => {
   window.webContents.on('render-process-gone', (_event, details) => {
     console.error(`RENDERER_GONE ${JSON.stringify(details)}`);
   });
-  await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'));
+  await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), { query: { dailyPrompt: process.env.WORKBENCH_DAILY_OUTPUT ? 'force' : '0' } });
   await window.webContents.executeJavaScript(`document.documentElement.dataset.appearance = ${JSON.stringify(process.env.PAPERTRAIL_SMOKE_APPEARANCE || 'liquid-glass')}`);
   await new Promise((resolve) => setTimeout(resolve, 700));
   const captureStablePage = async (output) => {
@@ -63,6 +63,110 @@ app.whenReady().then(async () => {
       if (!wasVisible && !window.isDestroyed()) window.hide();
     }
   };
+  if (process.env.WORKBENCH_DAILY_OUTPUT) {
+    window.show();
+    window.focus();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const dailyResult = await window.webContents.executeJavaScript(`
+      (() => {
+        const dialog = document.getElementById('dailyPlanDialog');
+        if (!dialog.open) dialog.showModal();
+        return {
+          promptVisible: dialog.open,
+          primaryAction: document.getElementById('createDailyTodoButton').textContent.length > 0,
+          secondaryAction: document.getElementById('dismissDailyPlanButton').textContent.length > 0
+        };
+      })()
+    `);
+    if (!Object.values(dailyResult).every(Boolean)) throw new Error(`Daily planning smoke failed: ${JSON.stringify(dailyResult)}`);
+    console.log(`WORKBENCH_DAILY_OK ${JSON.stringify(dailyResult)}`);
+    await captureStablePage(process.env.WORKBENCH_DAILY_OUTPUT);
+    window.destroy();
+    app.quit();
+    return;
+  }
+  if (process.env.WORKBENCH_HOME_FAST_OUTPUT) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const ready = await window.webContents.executeJavaScript(`Boolean(document.querySelector('#homeTodayTodoList [data-home-todo-action="complete"]'))`);
+      if (ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const homeInteraction = await window.webContents.executeJavaScript(`
+      (async () => {
+        document.querySelector('[data-workbench-page="home"]').click();
+        const checkbox = document.querySelector('#homeTodayTodoList [data-home-todo-action="complete"]');
+        checkbox?.click();
+        await new Promise((resolve) => setTimeout(resolve, 90));
+        const completed = document.querySelector('#homeTodayTodoList .home-todo-row.is-completed');
+        const titleStyle = completed ? getComputedStyle(completed.querySelector('.home-todo-title strong')) : null;
+        const progressBottom = document.getElementById('homeTodoProgress').getBoundingClientRect().bottom;
+        const clockBottom = document.getElementById('homeClockButton').getBoundingClientRect().bottom;
+        const cardBottoms = [...document.querySelectorAll('.home-command-grid > article')].map((card) => Math.round(card.getBoundingClientRect().bottom));
+        return {
+          completedVisible: Boolean(completed),
+          strikeThrough: Boolean(titleStyle?.textDecorationLine.includes('line-through')),
+          textFaded: Number(titleStyle?.opacity) < 1,
+          progressBottomAligned: Math.abs(progressBottom - clockBottom) <= 12,
+          cardsBottomAligned: new Set(cardBottoms).size === 1,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!Object.entries(homeInteraction).every(([key, value]) => key === 'horizontalOverflow' ? value === false : value === true)) throw new Error(`Home interaction smoke failed: ${JSON.stringify(homeInteraction)}`);
+    console.log(`WORKBENCH_HOME_INTERACTION_OK ${JSON.stringify(homeInteraction)}`);
+    await captureStablePage(process.env.WORKBENCH_HOME_FAST_OUTPUT);
+    window.destroy();
+    app.quit();
+    return;
+  }
+  if (process.env.WORKBENCH_NOTE_MODAL_OUTPUT) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const ready = await window.webContents.executeJavaScript(`Boolean(document.querySelector('#notesGrid .note-card'))`);
+      if (ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const draftResult = await window.webContents.executeJavaScript(`
+      (async () => {
+        document.querySelector('[data-workbench-page="notes"]').click();
+        const card = document.querySelector('#notesGrid .note-card');
+        const originalCardText = card.querySelector('p').textContent;
+        card.click();
+        const editor = document.getElementById('noteContent');
+        editor.innerHTML = '<p>这是尚未保存的弹窗草稿</p>';
+        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '草稿' }));
+        const dialog = document.getElementById('noteDialog');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const rect = dialog.getBoundingClientRect();
+        return {
+          originalCardText,
+          draftDoesNotLeak: card.querySelector('p').textContent === originalCardText,
+          hintShowsUnsaved: document.getElementById('noteSaveHint').textContent.includes('未保存'),
+          widerEditor: rect.width >= 860,
+          tallerEditor: rect.height >= 700,
+          centered: Math.abs((rect.left + rect.width / 2) - innerWidth / 2) <= 2 && Math.abs((rect.top + rect.height / 2) - innerHeight / 2) <= 2,
+          rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height, innerWidth, innerHeight }
+        };
+      })()
+    `);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    await captureStablePage(process.env.WORKBENCH_NOTE_MODAL_OUTPUT);
+    const savedResult = await window.webContents.executeJavaScript(`
+      (async () => {
+        document.getElementById('saveNoteButton').click();
+        await new Promise((resolve) => setTimeout(resolve, 120));
+        return {
+          closedAfterSave: !document.getElementById('noteDialog').open,
+          cardUpdatedAfterSave: document.querySelector('#notesGrid .note-card p')?.textContent.includes('尚未保存的弹窗草稿')
+        };
+      })()
+    `);
+    const noteModalResult = { ...draftResult, ...savedResult };
+    if (!noteModalResult.draftDoesNotLeak || !noteModalResult.hintShowsUnsaved || !noteModalResult.widerEditor || !noteModalResult.tallerEditor || !noteModalResult.centered || !noteModalResult.closedAfterSave || !noteModalResult.cardUpdatedAfterSave) throw new Error(`Note modal smoke failed: ${JSON.stringify(noteModalResult)}`);
+    console.log(`WORKBENCH_NOTE_MODAL_OK ${JSON.stringify(noteModalResult)}`);
+    window.destroy();
+    app.quit();
+    return;
+  }
   if (process.env.PAPERTRAIL_EMPTY_SMOKE === '1') {
     const emptyResult = await window.webContents.executeJavaScript(`
       (() => {
@@ -201,12 +305,12 @@ app.whenReady().then(async () => {
       const updatesVisible = !document.querySelector('[data-settings-panel="updates"]').hidden;
       const updateButton = document.getElementById('updateActionButton');
       const updateIdle = updateButton.textContent === '检查更新' && !updateButton.disabled;
-      updateButton.click();
-      await new Promise((resolve) => setTimeout(resolve, 40));
+      state.updateStatus = await window.paperTrail.checkForUpdates();
+      renderUpdateStatus();
       const updateAvailable = updateButton.textContent === '下载更新'
-        && document.getElementById('updateVersionBadge').textContent === 'v1.0.1';
-      updateButton.click();
-      await new Promise((resolve) => setTimeout(resolve, 40));
+        && document.getElementById('updateVersionBadge').textContent === 'v1.3.1';
+      state.updateStatus = await window.paperTrail.downloadUpdate();
+      renderUpdateStatus();
       const updateDownloaded = updateButton.textContent === '安装并重启'
         && document.getElementById('updateProgress').getAttribute('aria-valuenow') === '100';
       document.querySelector('[data-settings-section="general"]').click();
@@ -223,13 +327,21 @@ app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 180));
       const draftPreserved = startAtLogin.checked;
       document.querySelector('[data-workbench-page="home"]').click();
-      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, trackingVisible, storageVisible, storageSelectedExactly, updatesVisible, updateIdle, updateAvailable, updateDownloaded, generalVisible, todayOverviewSwitchVisible, widgetChildrenDisabled, draftPreserved };
+      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, trackingVisible, storageVisible, storageSelectedExactly, updatesVisible, updateIdle, updateAvailable, updateDownloaded, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, todayOverviewSwitchVisible, widgetChildrenDisabled, draftPreserved };
     })()
   `);
-  if (!Object.values(settingsDraftResult).every(Boolean)) {
+  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.generalVisible || !settingsDraftResult.todayOverviewSwitchVisible || !settingsDraftResult.widgetChildrenDisabled || !settingsDraftResult.draftPreserved) {
     throw new Error(`Settings draft smoke test failed: ${JSON.stringify(settingsDraftResult)}`);
   }
   console.log(`SETTINGS_DRAFT_SMOKE_OK ${JSON.stringify(settingsDraftResult)}`);
+  if (process.env.WORKBENCH_SETTINGS_OUTPUT) {
+    await window.webContents.executeJavaScript(`
+      document.getElementById('settingsButton').click();
+      document.querySelector('[data-settings-section="general"]').click();
+    `);
+    await captureStablePage(process.env.WORKBENCH_SETTINGS_OUTPUT);
+    await window.webContents.executeJavaScript(`document.querySelector('[data-workbench-page="home"]').click()`);
+  }
   const doiCopyResult = await window.webContents.executeJavaScript(`
     (async () => {
       const button = document.querySelector('[data-action="copy-doi"]');
@@ -484,9 +596,11 @@ app.whenReady().then(async () => {
   }
   if (process.env.WORKBENCH_HOME_OUTPUT) {
     const homeResult = await window.webContents.executeJavaScript(`
-      (() => {
+      (async () => {
         document.querySelector('[data-workbench-page="home"]').click();
         window.scrollTo(0, 0);
+        document.querySelector('#homeTodayTodoList [data-home-todo-action="complete"]')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 60));
         const rect = (element) => {
           const value = element.getBoundingClientRect();
           return {
@@ -538,6 +652,16 @@ app.whenReady().then(async () => {
           clockOutsideFocus: !document.querySelector('.home-focus-timer #homeClockButton')
             && Boolean(document.querySelector('.home-attendance-card #homeClockButton')),
           attendanceStatus: Boolean(document.getElementById('homeAttendanceStatus')),
+          todoCompletionVisible: (() => {
+            const row = document.querySelector('#homeTodayTodoList .home-todo-row.is-completed');
+            const titleStyle = row ? getComputedStyle(row.querySelector('.home-todo-title strong')) : null;
+            return Boolean(row && titleStyle?.textDecorationLine.includes('line-through') && Number(titleStyle.opacity) < 1);
+          })(),
+          todoProgressBottomAligned: (() => {
+            const progressBottom = document.getElementById('homeTodoProgress').getBoundingClientRect().bottom;
+            const clockBottom = document.getElementById('homeClockButton').getBoundingClientRect().bottom;
+            return Math.abs(progressBottom - clockBottom) <= 12;
+          })(),
           todoCardLarger: (document.querySelector('.home-today-todo-card')?.getBoundingClientRect().width || 0)
             > (document.querySelector('.home-next-event-card')?.getBoundingClientRect().width || 0),
           commandCardsTopAligned: commandCards.every((card) => Math.abs(card.top - commandCards[0].top) <= 1),
@@ -548,7 +672,7 @@ app.whenReady().then(async () => {
           aligned: Math.abs(utility.top - schedule.top) <= 1,
           fullWidthPipeline: Math.abs(job.left - content.left) <= 1 && Math.abs(job.right - content.right) <= 1,
           jobSummaryVisible: Boolean(document.querySelector('.home-job-panel #homeJobSummary .home-job-row')),
-          sixStageHomePipeline: document.querySelectorAll('#homeJobSummary .home-job-row').length === 6,
+          fiveStateHomeBoard: document.querySelectorAll('#homeJobSummary .home-job-row').length === 5,
           startsToday: document.querySelector('#homeDayOverview .day-card strong')?.textContent === '今天',
           comfortableBottomInset: (() => {
             const dayCards = [...document.querySelectorAll('#homeDayOverview .day-card')].map(rect);
@@ -698,7 +822,8 @@ app.whenReady().then(async () => {
         const noteOpened = document.getElementById('noteDialog').open;
         document.getElementById('noteDialog').dispatchEvent(new MouseEvent('click', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 40));
-        const noteBackdropClosed = !document.getElementById('noteDialog').open;
+        const noteBackdropKeepsEditorOpen = document.getElementById('noteDialog').open;
+        document.getElementById('cancelNoteButton').click();
         document.querySelector('#notesGrid .note-card').dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
         await new Promise((resolve) => setTimeout(resolve, 40));
         const rightClickConfirmation = document.getElementById('yanjiConfirmDialog').open;
@@ -717,14 +842,14 @@ app.whenReady().then(async () => {
           wideImageOwnRow,
           controlledImageSource,
           noteOpened,
-          noteBackdropClosed,
+          noteBackdropKeepsEditorOpen,
           rightClickConfirmation,
           rightClickDeleted: document.body.dataset.deletedNoteCount === '1',
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || !notesResult.multiOptions || !notesResult.fullscreenExcludesSidebar || !notesResult.escapeOnlyExitsFullscreen || !notesResult.automaticNumbering || !notesResult.wideImagePersists || !notesResult.wideImageFits || !notesResult.wideImageOwnRow || !notesResult.controlledImageSource || !notesResult.noteOpened || !notesResult.noteBackdropClosed || !notesResult.rightClickConfirmation || !notesResult.rightClickDeleted || notesResult.horizontalOverflow) {
+    if (!notesResult.pageVisible || notesResult.noteCards < 1 || !notesResult.metadataButton || !notesResult.multiOptions || !notesResult.fullscreenExcludesSidebar || !notesResult.escapeOnlyExitsFullscreen || !notesResult.automaticNumbering || !notesResult.wideImagePersists || !notesResult.wideImageFits || !notesResult.wideImageOwnRow || !notesResult.controlledImageSource || !notesResult.noteOpened || !notesResult.noteBackdropKeepsEditorOpen || !notesResult.rightClickConfirmation || !notesResult.rightClickDeleted || notesResult.horizontalOverflow) {
       throw new Error(`Workbench notes smoke failed: ${JSON.stringify(notesResult)}`);
     }
     console.log(`WORKBENCH_NOTES_OK ${JSON.stringify(notesResult)}`);
@@ -749,35 +874,44 @@ app.whenReady().then(async () => {
         ));
         const cardsAreEditors = [...document.querySelectorAll('#jobBoard .job-card')].every((card) => card.matches('[data-edit-job][tabindex="0"]'));
         const editButtonsRemoved = !document.querySelector('#jobBoard .job-card-actions, #jobBoard .job-card .text-button');
-        const advancesAtTop = [...document.querySelectorAll('#jobBoard [data-advance-job]')].every((button) => button.closest('.job-card-top-actions'));
-        const pendingAddOnly = document.querySelectorAll('#jobBoard [data-add-job]').length === 1 && Boolean(document.querySelector('.stage-pending > header [data-add-job="pending"]'));
+        const statusActionsAtTop = [...document.querySelectorAll('#jobBoard .job-status-button')].every((button) => button.closest('.job-card-top-actions'));
+        const pendingRemoved = !document.querySelector('.stage-pending, [data-add-job="pending"], option[value="pending"]');
+        const headerCreateOnly = Boolean(document.getElementById('addJobButton')) && !document.querySelector('#jobBoard [data-add-job]');
         const meterWidths = [...document.querySelectorAll('#jobPipelineSummary .job-pipeline-row > i > b')].map((bar) => Math.round(bar.getBoundingClientRect().width));
         document.querySelector('#jobBoard .job-card').click();
         const cardClickOpensEditor = document.getElementById('jobDialog').open;
         document.getElementById('cancelJobButton').click();
-        document.querySelector('.stage-pending > header [data-add-job="pending"]').click();
+        document.getElementById('addJobButton').click();
         document.getElementById('jobCompany').value = '新增环保公司';
         document.getElementById('jobRole').value = '研发工程师';
         document.getElementById('jobStatus').value = 'submitted';
         document.getElementById('saveJobButton').click();
         await new Promise((resolve) => setTimeout(resolve, 80));
         const added = document.querySelectorAll('#jobBoard .job-card').length === initialCards + 1;
-        const submittedBeforeAdvance = document.getElementById('jobSubmittedCount')?.textContent;
-        const advance = document.querySelector('[data-advance-job="job-submitted-1"]');
-        advance?.click();
+        const totalBeforeStatusChange = document.getElementById('jobSubmittedCount')?.textContent;
+        document.querySelector('[data-edit-job="job-submitted-1"]').click();
+        document.getElementById('jobStatus').value = 'interview';
+        document.getElementById('saveJobButton').click();
         await new Promise((resolve) => setTimeout(resolve, 80));
-        const submittedAfterAdvance = document.getElementById('jobSubmittedCount')?.textContent;
+        const interviewFirst = Boolean(document.querySelector('.stage-interview [data-edit-job="job-submitted-1"]'));
+        document.querySelector('.stage-interview [data-edit-job="job-submitted-1"]').click();
+        document.getElementById('jobStatus').value = 'written-1';
+        document.getElementById('saveJobButton').click();
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const writtenAfterInterview = Boolean(document.querySelector('.stage-written-1 [data-edit-job="job-submitted-1"]'));
+        const totalAfterStatusChange = document.getElementById('jobSubmittedCount')?.textContent;
         return {
           pageVisible: !document.querySelector('[data-page="jobs"]').hidden,
-          sixStages: document.querySelectorAll('#jobBoard .job-stage-column').length === 6,
+          fiveStates: document.querySelectorAll('#jobBoard .job-stage-column').length === 5,
           stageColors,
-          sixStageColors: new Set(stageColors).size === 6,
+          distinctStateColors: new Set(stageColors).size === 5,
           singleStageRow: new Set(stageTops).size === 1,
           cardAnatomy,
           cardsAreEditors,
           editButtonsRemoved,
-          advancesAtTop,
-          pendingAddOnly,
+          statusActionsAtTop,
+          pendingRemoved,
+          headerCreateOnly,
           cardClickOpensEditor,
           readableStageWidths: stageWidths.every((width) => width >= 198),
           fixedStageHeights: new Set(stageHeights).size === 1 && stageHeights[0] === 420,
@@ -786,14 +920,15 @@ app.whenReady().then(async () => {
           initialCards,
           proportionalMeters: new Set(meterWidths).size >= 2,
           added,
-          submittedRetained: submittedBeforeAdvance === submittedAfterAdvance && Number(submittedAfterAdvance) >= 4,
-          advanced: Boolean(document.querySelector('.stage-written-1 [data-edit-job="job-submitted-1"]')),
-          homeSummary: document.querySelectorAll('#homeJobSummary .home-job-row').length === 6,
+          totalRetained: totalBeforeStatusChange === totalAfterStatusChange && Number(totalAfterStatusChange) >= 7,
+          interviewFirst,
+          writtenAfterInterview,
+          homeSummary: document.querySelectorAll('#homeJobSummary .home-job-row').length === 5,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!jobsResult.pageVisible || !jobsResult.sixStages || !jobsResult.sixStageColors || !jobsResult.singleStageRow || !jobsResult.cardAnatomy || !jobsResult.cardsAreEditors || !jobsResult.editButtonsRemoved || !jobsResult.advancesAtTop || !jobsResult.pendingAddOnly || !jobsResult.cardClickOpensEditor || !jobsResult.readableStageWidths || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.submittedRetained || !jobsResult.advanced || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || !jobsResult.fiveStates || !jobsResult.distinctStateColors || !jobsResult.singleStageRow || !jobsResult.cardAnatomy || !jobsResult.cardsAreEditors || !jobsResult.editButtonsRemoved || !jobsResult.statusActionsAtTop || !jobsResult.pendingRemoved || !jobsResult.headerCreateOnly || !jobsResult.cardClickOpensEditor || !jobsResult.readableStageWidths || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.totalRetained || !jobsResult.interviewFirst || !jobsResult.writtenAfterInterview || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);
