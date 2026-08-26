@@ -36,6 +36,7 @@ const {
   resolveStorageState,
   samePath
 } = require('./storage-core');
+const { clearSystemRecovery, readSystemRecovery, writeSystemRecovery } = require('./system-recovery-core');
 const { createPlanningService } = require('./planning-service');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
@@ -117,6 +118,7 @@ const DATA_FILE_NAME = 'papertrail-data.json';
 const STORAGE_POINTER_NAME = 'papertrail-storage.json';
 const ATTACHMENTS_DIRECTORY_NAME = 'attachments';
 const BACKUP_DIRECTORY_NAME = 'backups';
+const SYSTEM_RECOVERY_NAME = 'system-recovery.json';
 const MAX_NOTE_ATTACHMENT_SIZE = 12 * 1024 * 1024;
 const MAX_NOTE_ATTACHMENTS_TOTAL = 50 * 1024 * 1024;
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
@@ -150,6 +152,7 @@ let focusLastPersistAt = 0;
 let attendanceUsageLive = {};
 let attendanceLastPersistAt = 0;
 let lastBackupCleanupAt = 0;
+let systemRecoveryWarning = null;
 const stickyWindows = new Map();
 const deadlineWindows = new Map();
 const refreshingIds = new Set();
@@ -260,6 +263,10 @@ function defaultDataFilePath() {
 
 function managedBackupDirectory() {
   return path.join(app.getPath('userData'), BACKUP_DIRECTORY_NAME);
+}
+
+function systemRecoveryPath() {
+  return path.join(app.getPath('userData'), SYSTEM_RECOVERY_NAME);
 }
 
 function noteAttachmentsDirectory() {
@@ -481,7 +488,8 @@ function settingsForRenderer() {
       file,
       expiresAt: new Date(Date.parse(isoBackupDate(pointer.backupCreatedAt?.[file]) || new Date().toISOString()) + BACKUP_RETENTION_MS).toISOString()
     })),
-    isDefaultDataDirectory: path.resolve(dataDirectory) === path.resolve(path.dirname(defaultDataFilePath()))
+    isDefaultDataDirectory: path.resolve(dataDirectory) === path.resolve(path.dirname(defaultDataFilePath())),
+    systemRecoveryWarning
   };
 }
 
@@ -1139,19 +1147,80 @@ function parseToastPolicyOutput(output) {
   return match ? { existed: true, value: Number.parseInt(match[1], 16) } : { existed: false, value: null };
 }
 
-async function readToastPolicy() {
-  const result = await runWindowsCommand('reg.exe', ['query', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE]);
-  return result.code === 0 ? parseToastPolicyOutput(result.stdout) : { existed: false, value: null };
+function isMissingRegistryValue(result) {
+  return result?.code === 1 && /unable to find|cannot find|not found|找不到|指定的注册表项或值/i.test(`${result.stdout || ''} ${result.stderr || ''}`);
 }
 
-async function suppressWindowsToasts() {
+async function readToastPolicy() {
+  const result = await runWindowsCommand('reg.exe', ['query', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE]);
+  if (result.code === 0) return parseToastPolicyOutput(result.stdout);
+  if (isMissingRegistryValue(result)) return { existed: false, value: null };
+  throw new Error(`无法读取 Windows 通知策略：${result.error?.message || result.stderr || `reg.exe code ${result.code}`}`);
+}
+
+function toastRestoreArguments(restore) {
+  return restore.existed
+    ? ['add', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/t', 'REG_DWORD', '/d', String(restore.value ?? 0), '/f']
+    : ['delete', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/f'];
+}
+
+async function recoverSystemStateOnStartup() {
+  const recovery = readSystemRecovery(systemRecoveryPath());
+  if (recovery.state === 'missing') return true;
+  if (recovery.state === 'corrupt') {
+    systemRecoveryWarning = `${recovery.error} 请在 Windows 通知设置中确认通知策略。`;
+    console.error('[focus-recovery]', systemRecoveryWarning);
+    return false;
+  }
+  if (process.platform !== 'win32') {
+    systemRecoveryWarning = '检测到未完成的 Windows 通知恢复记录，但当前系统无法执行恢复。';
+    console.warn('[focus-recovery]', systemRecoveryWarning);
+    return false;
+  }
+  const saved = recovery.value.toastPolicy;
+  try {
+    const current = await readToastPolicy();
+    if (current.existed && current.value === saved.expectedValue) {
+      const result = await runWindowsCommand('reg.exe', toastRestoreArguments({
+        existed: saved.previousExisted,
+        value: saved.previousValue
+      }));
+      if (result.code !== 0) throw new Error(result.stderr || 'reg.exe 返回失败状态。');
+    }
+    clearSystemRecovery(systemRecoveryPath());
+    console.info('[focus-recovery] Windows notification policy recovery completed.');
+    return true;
+  } catch (error) {
+    systemRecoveryWarning = `研迹未能恢复上次 Focus 修改的 Windows 通知策略：${error.message || error}`;
+    console.error('[focus-recovery]', systemRecoveryWarning);
+    return false;
+  }
+}
+
+async function suppressWindowsToasts(sessionId) {
   if (process.platform !== 'win32') return { supported: false, restore: null };
   const previous = await readToastPolicy();
   if (previous.existed && previous.value === 1) {
     return { supported: true, restore: { ...previous, changed: false } };
   }
+  const recovery = readSystemRecovery(systemRecoveryPath());
+  if (recovery.state === 'valid') throw new Error('仍有未完成的 Windows 通知恢复，请重启研迹或手工检查系统通知设置。');
+  if (recovery.state === 'corrupt') throw new Error(recovery.error);
+  writeSystemRecovery(systemRecoveryPath(), {
+    changed: true,
+    previousExisted: previous.existed,
+    previousValue: previous.value,
+    sessionId,
+    recordedAt: new Date().toISOString()
+  });
   const result = await runWindowsCommand('reg.exe', ['add', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/t', 'REG_DWORD', '/d', '1', '/f']);
-  if (result.code !== 0) throw new Error('Windows 勿扰设置未能启用，请检查当前账户策略权限。');
+  if (result.code !== 0) {
+    try {
+      const current = await readToastPolicy();
+      if (!current.existed || current.value !== 1) clearSystemRecovery(systemRecoveryPath());
+    } catch { /* Keep the recovery intent when the registry result is ambiguous. */ }
+    throw new Error('Windows 勿扰设置未能启用，请检查当前账户策略权限。');
+  }
   return { supported: true, restore: { ...previous, changed: true } };
 }
 
@@ -1159,24 +1228,23 @@ async function restoreWindowsToasts(session) {
   const restore = session?.notificationRestore;
   if (process.platform !== 'win32' || !restore?.changed || session.notificationRestoredAt) return;
   const current = await readToastPolicy();
-  if (!current.existed || current.value !== 1) return;
-  const args = restore.existed
-    ? ['add', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/t', 'REG_DWORD', '/d', String(restore.value ?? 0), '/f']
-    : ['delete', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/f'];
-  const result = await runWindowsCommand('reg.exe', args);
-  if (result.code !== 0) throw new Error('Windows 通知设置未能自动恢复，请在“系统 > 通知”中检查。');
+  if (current.existed && current.value === 1) {
+    const result = await runWindowsCommand('reg.exe', toastRestoreArguments(restore));
+    if (result.code !== 0) throw new Error('Windows 通知设置未能自动恢复，请在“系统 > 通知”中检查。');
+  }
+  clearSystemRecovery(systemRecoveryPath());
 }
 
 function restoreWindowsToastsSync(session) {
   const restore = session?.notificationRestore;
   if (process.platform !== 'win32' || !restore?.changed || session.notificationRestoredAt) return true;
   const query = spawnSync('reg.exe', ['query', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE], { windowsHide: true, encoding: 'utf8' });
+  const queryResult = { code: query.status, stdout: query.stdout, stderr: query.stderr };
+  if (query.status !== 0 && !isMissingRegistryValue(queryResult)) return false;
   const current = query.status === 0 ? parseToastPolicyOutput(query.stdout) : { existed: false, value: null };
-  if (!current.existed || current.value !== 1) return true;
-  const args = restore.existed
-    ? ['add', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/t', 'REG_DWORD', '/d', String(restore.value ?? 0), '/f']
-    : ['delete', TOAST_POLICY_KEY, '/v', TOAST_POLICY_VALUE, '/f'];
-  return spawnSync('reg.exe', args, { windowsHide: true }).status === 0;
+  if (current.existed && current.value === 1 && spawnSync('reg.exe', toastRestoreArguments(restore), { windowsHide: true }).status !== 0) return false;
+  try { clearSystemRecovery(systemRecoveryPath()); } catch { return false; }
+  return true;
 }
 
 function startFocusRecovery(session) {
@@ -1293,7 +1361,7 @@ async function startFocusSession(input) {
   let session = sessions[0];
   if (session.suppressNotifications) {
     try {
-      const suppression = await suppressWindowsToasts();
+      const suppression = await suppressWindowsToasts(session.id);
       session = { ...session, notificationsSuppressed: suppression.supported, notificationRestore: suppression.restore, notificationError: suppression.supported ? null : '当前系统不支持自动勿扰。' };
     } catch (error) {
       session = { ...session, notificationsSuppressed: false, notificationError: error.message || 'Windows 勿扰设置未能启用。' };
@@ -1333,6 +1401,29 @@ async function finishFocusSession(status = 'stopped') {
   stopUsageSamplerIfIdle();
   broadcastWorkspace();
   return focusSessionsForRenderer();
+}
+
+async function recoverInterruptedFocusSessionOnStartup() {
+  const active = activeFocusSession();
+  if (!active) return true;
+  let notificationRestoredAt = active.notificationRestoredAt;
+  let notificationError = active.notificationError;
+  try {
+    await restoreWindowsToasts(active);
+    notificationRestoredAt = new Date().toISOString();
+  } catch (error) {
+    notificationError = error.message || '启动时未能恢复 Windows 通知设置。';
+    systemRecoveryWarning = notificationError;
+    console.error('[focus-recovery]', notificationError);
+  }
+  store.setFocusSessions(saveFocusSession(store.listFocusSessions(), {
+    ...active,
+    status: 'stopped',
+    endedAt: new Date().toISOString(),
+    notificationRestoredAt,
+    notificationError
+  }, new Date().toISOString()));
+  return !systemRecoveryWarning;
 }
 
 function resumeFocusRuntime() {
@@ -2747,6 +2838,7 @@ if (!gotLock) {
   app.on('second-instance', showMainWindow);
   app.whenReady().then(async () => {
     try {
+      await recoverSystemStateOnStartup();
       const resolvedStorage = await recoverStorageLocation(configuredStorageState());
       if (!resolvedStorage) {
         isQuitting = true;
@@ -2755,6 +2847,7 @@ if (!gotLock) {
       }
       store = new JsonStore(resolvedStorage.filePath);
       store.load();
+      await recoverInterruptedFocusSessionOnStartup();
       planningService = createPlanningService({
         store,
         makeId: () => crypto.randomUUID(),

@@ -1243,6 +1243,9 @@ async function initialize() {
     ]);
     populateSettingsMetadata();
     render();
+    if (state.settings?.systemRecoveryWarning) {
+      showToast(state.settings.systemRecoveryWarning, 'error', 10000);
+    }
     api.onPapersChanged((papers) => { state.papers = papers; render(); });
     api.onRefreshState(({ ids }) => { state.refreshingIds = new Set(ids); render(); });
     api.onUpdateState((updateStatus) => {
