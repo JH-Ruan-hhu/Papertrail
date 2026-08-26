@@ -213,6 +213,10 @@ test('installer and updater use Yanji-owned simplified interfaces', () => {
   assert.match(installer, /Page custom YanjiInstallPageCreate YanjiInstallPageLeave/);
   assert.match(installer, /立即安装/);
   assert.match(installer, /安装不会移动或清除你的科研数据/);
+  assert.match(installer, /Function YanjiEnsureDedicatedInstallFolder/);
+  assert.match(installer, /DeleteRegKey HKCU "\$\{UNINSTALL_REGISTRY_KEY\}"/);
+  assert.match(installer, /StrCpy \$INSTDIR "\$YanjiLegacyInstallRoot\\研迹"/);
+  assert.match(installer, /Normalize the default or migrated path/);
   assert.match(indexHtml, /class="update-journey"/);
   assert.match(indexHtml, /检查版本[\s\S]*安全下载[\s\S]*重启升级/);
   assert.match(appJs, /updateGroup\.dataset\.updateStatus = status/);

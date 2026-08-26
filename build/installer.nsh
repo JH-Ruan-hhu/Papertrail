@@ -1,6 +1,7 @@
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
 !include "WinMessages.nsh"
+!include "FileFunc.nsh"
 
 !ifndef MUI_BGCOLOR
   !define MUI_BGCOLOR "F5FAFC"
@@ -20,6 +21,16 @@ Var YanjiDesktopCheckbox
 Var YanjiInstallButton
 Var YanjiDesktopWanted
 Var YanjiIconHandle
+Var YanjiLegacyInstallRoot
+
+Function YanjiEnsureDedicatedInstallFolder
+  ${GetFileName} "$0" $1
+  ${If} $1 != "研迹"
+  ${AndIf} $1 != "Yanji"
+  ${AndIf} $1 != "PaperTrail"
+    StrCpy $0 "$0\研迹"
+  ${EndIf}
+FunctionEnd
 
 !macro customHeader
   BrandingText "研迹 · 本地优先科研工作台"
@@ -31,6 +42,29 @@ Var YanjiIconHandle
 
 !macro customInit
   StrCpy $YanjiDesktopWanted "1"
+  StrCpy $YanjiLegacyInstallRoot ""
+
+  # v1.3.0 previously allowed users to select a shared software directory
+  # directly. Its generated uninstaller then treated that whole directory as
+  # application-owned. Ignore only those unsafe legacy registrations and move
+  # the replacement installation into a dedicated child folder.
+  ReadRegStr $0 HKCU "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
+  ${If} $0 != ""
+    ${GetFileName} "$INSTDIR" $3
+    ${If} $3 != "研迹"
+    ${AndIf} $3 != "Yanji"
+    ${AndIf} $3 != "PaperTrail"
+      StrCpy $YanjiLegacyInstallRoot "$INSTDIR"
+      DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"
+      StrCpy $INSTDIR "$YanjiLegacyInstallRoot\研迹"
+    ${EndIf}
+  ${EndIf}
+
+  # Normalize the default or migrated path before the install page is shown.
+  StrCpy $0 "$INSTDIR"
+  Call YanjiEnsureDedicatedInstallFolder
+  StrCpy $INSTDIR "$0"
+
   InitPluginsDir
   File /oname=$PLUGINSDIR\yanji-installer.ico "${BUILD_RESOURCES_DIR}\icon.ico"
 !macroend
@@ -108,7 +142,9 @@ Function YanjiBrowseForFolder
   nsDialogs::SelectFolderDialog "选择研迹的安装位置" "$0"
   Pop $1
   ${If} $1 != error
-    ${NSD_SetText} $YanjiPathField "$1"
+    StrCpy $0 "$1"
+    Call YanjiEnsureDedicatedInstallFolder
+    ${NSD_SetText} $YanjiPathField "$0"
   ${EndIf}
 FunctionEnd
 
@@ -118,12 +154,17 @@ Function YanjiBeginInstall
     MessageBox MB_OK|MB_ICONEXCLAMATION "请选择安装位置。"
     Return
   ${EndIf}
+  GetFullPathName $0 "$0"
+  Call YanjiEnsureDedicatedInstallFolder
+  ${NSD_SetText} $YanjiPathField "$0"
   SendMessage $HWNDPARENT ${WM_COMMAND} 1 0
 FunctionEnd
 
 Function YanjiInstallPageLeave
   ${NSD_GetText} $YanjiPathField $0
-  GetFullPathName $INSTDIR "$0"
+  GetFullPathName $0 "$0"
+  Call YanjiEnsureDedicatedInstallFolder
+  StrCpy $INSTDIR "$0"
   ${NSD_GetState} $YanjiDesktopCheckbox $YanjiDesktopWanted
   ${NSD_FreeIcon} $YanjiIconHandle
 FunctionEnd
