@@ -30,7 +30,12 @@ try {
   console.error('[updater] Failed to load electron-updater:', error);
 }
 const { JsonStore, DEFAULT_SETTINGS } = require('./store');
-const { readStoragePointer: readStoragePointerState, resolveStorageState } = require('./storage-core');
+const {
+  isManagedBackupPath,
+  readStoragePointer: readStoragePointerState,
+  resolveStorageState,
+  samePath
+} = require('./storage-core');
 const { createPlanningService } = require('./planning-service');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
@@ -111,6 +116,7 @@ const FETCH_TIMEOUT_MS = 20_000;
 const DATA_FILE_NAME = 'papertrail-data.json';
 const STORAGE_POINTER_NAME = 'papertrail-storage.json';
 const ATTACHMENTS_DIRECTORY_NAME = 'attachments';
+const BACKUP_DIRECTORY_NAME = 'backups';
 const MAX_NOTE_ATTACHMENT_SIZE = 12 * 1024 * 1024;
 const MAX_NOTE_ATTACHMENTS_TOTAL = 50 * 1024 * 1024;
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
@@ -252,6 +258,10 @@ function defaultDataFilePath() {
   return path.join(app.getPath('userData'), DATA_FILE_NAME);
 }
 
+function managedBackupDirectory() {
+  return path.join(app.getPath('userData'), BACKUP_DIRECTORY_NAME);
+}
+
 function noteAttachmentsDirectory() {
   return store?.attachmentsDirectory || path.join(path.dirname(store.filePath), ATTACHMENTS_DIRECTORY_NAME);
 }
@@ -374,26 +384,34 @@ async function recoverStorageLocation(initialState) {
 }
 
 function normalizeBackupFiles(candidates, currentFile = store?.filePath) {
-  const currentPath = currentFile ? path.resolve(currentFile) : '';
   return [...new Set((candidates || []).map((candidate) => {
     try { return path.resolve(String(candidate)); } catch { return ''; }
-  }))].filter((candidate) => {
-    try {
-      return candidate &&
-        path.isAbsolute(candidate) &&
-        path.basename(candidate).toLowerCase() === DATA_FILE_NAME &&
-        candidate !== currentPath &&
-        fs.existsSync(candidate) &&
-        fs.statSync(candidate).isFile();
-    } catch {
-      return false;
-    }
-  });
+  }))].filter((candidate) => isManagedBackupPath(candidate, {
+    backupDirectory: managedBackupDirectory(),
+    currentFile
+  }));
 }
 
 function knownBackupFiles() {
   const pointer = storagePointerValue();
-  return normalizeBackupFiles([...pointer.backupFiles, defaultDataFilePath()]);
+  return normalizeBackupFiles(pointer.backupFiles);
+}
+
+function managedBackupName(now = new Date(), suffix = 0) {
+  const stamp = now.toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+  return `papertrail-backup-${stamp}${suffix ? `-${suffix}` : ''}.json`;
+}
+
+function createManagedDataBackup(sourceFile, now = new Date()) {
+  const source = path.resolve(sourceFile);
+  if (!fs.existsSync(source) || !fs.statSync(source).isFile()) return null;
+  const backupDirectory = managedBackupDirectory();
+  fs.mkdirSync(backupDirectory, { recursive: true });
+  let suffix = 0;
+  let backupFile = path.join(backupDirectory, managedBackupName(now, suffix));
+  while (fs.existsSync(backupFile)) backupFile = path.join(backupDirectory, managedBackupName(now, ++suffix));
+  fs.copyFileSync(source, backupFile, fs.constants.COPYFILE_EXCL);
+  return backupFile;
 }
 
 function writeStoragePointer(
@@ -437,8 +455,7 @@ function cleanupExpiredBackups(now = new Date()) {
       continue;
     }
     try {
-      if (path.resolve(backupFile) === path.resolve(store.filePath)) continue;
-      if (path.basename(backupFile).toLowerCase() !== DATA_FILE_NAME) continue;
+      if (!isManagedBackupPath(backupFile, { backupDirectory: managedBackupDirectory(), currentFile: store.filePath })) continue;
       fs.unlinkSync(backupFile);
       deletedCount += 1;
     } catch {
@@ -602,7 +619,7 @@ async function chooseDataDirectory(request = {}) {
     selectedDirectory = path.resolve(result.filePaths[0]);
   }
   const targetFile = path.join(selectedDirectory, DATA_FILE_NAME);
-  if (path.resolve(targetFile) === path.resolve(store.filePath)) {
+  if (samePath(targetFile, store.filePath)) {
     return { canceled: false, settings: settingsForRenderer() };
   }
 
@@ -626,7 +643,8 @@ async function chooseDataDirectory(request = {}) {
   }
   fs.mkdirSync(nextStore.attachmentsDirectory, { recursive: true });
 
-  const nextBackups = normalizeBackupFiles([...knownBackupFiles(), previousDataFile], targetFile);
+  const createdBackup = createManagedDataBackup(previousDataFile);
+  const nextBackups = normalizeBackupFiles([...knownBackupFiles(), createdBackup], targetFile);
   writeStoragePointer(selectedDirectory, nextBackups, targetFile);
   store = nextStore;
   planningService = createPlanningService({
@@ -658,7 +676,7 @@ async function deleteDataBackups(confirmed = false) {
   let deletedCount = 0;
   for (const backupFile of backupFiles) {
     try {
-      if (path.resolve(backupFile) === path.resolve(store.filePath)) continue;
+      if (!isManagedBackupPath(backupFile, { backupDirectory: managedBackupDirectory(), currentFile: store.filePath })) continue;
       fs.unlinkSync(backupFile);
       deletedCount += 1;
     } catch {

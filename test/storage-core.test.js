@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { readStoragePointer, resolveStorageState } = require('../src/storage-core');
+const { isManagedBackupPath, readStoragePointer, resolveStorageState } = require('../src/storage-core');
 
 function fixture() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'yanji-storage-state-'));
@@ -60,4 +60,23 @@ test('accepts valid custom data and treats an explicit default pointer as defaul
   assert.equal(resolve(current).state, 'custom-valid');
   fs.writeFileSync(current.pointerPath, JSON.stringify({ dataDirectory: path.dirname(current.defaultFilePath) }), 'utf8');
   assert.equal(resolve(current).state, 'default');
+});
+
+test('automatic cleanup accepts only software-named files inside the managed backup directory', () => {
+  const current = fixture();
+  const backups = path.join(current.root, 'backups');
+  const elsewhere = path.join(current.root, 'user-data');
+  fs.mkdirSync(backups);
+  fs.mkdirSync(elsewhere);
+  const managed = path.join(backups, 'papertrail-backup-20260826-184500.json');
+  const userDatabase = path.join(backups, 'papertrail-data.json');
+  const outsideManaged = path.join(elsewhere, 'papertrail-backup-20260826-184500.json');
+  fs.writeFileSync(managed, '{}');
+  fs.writeFileSync(userDatabase, '{}');
+  fs.writeFileSync(outsideManaged, '{}');
+  const options = { backupDirectory: backups, currentFile: current.defaultFilePath };
+  assert.equal(isManagedBackupPath(managed, options), true);
+  assert.equal(isManagedBackupPath(userDatabase, options), false);
+  assert.equal(isManagedBackupPath(outsideManaged, options), false);
+  assert.equal(isManagedBackupPath(managed, { ...options, currentFile: managed }), false);
 });

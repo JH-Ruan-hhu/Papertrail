@@ -80,9 +80,12 @@ test('production DOI supports full-link hover and copy', () => {
 
 test('settings expose backup deletion, current version and cold-start refresh', () => {
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const storageCoreJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage-core.js'), 'utf8');
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   assert.match(mainJs, /settings:delete-data-backups/);
-  assert.match(mainJs, /path\.resolve\(backupFile\) === path\.resolve\(store\.filePath\)/);
+  assert.match(mainJs, /isManagedBackupPath\(backupFile/);
+  assert.match(storageCoreJs, /papertrail-backup-/);
+  assert.match(storageCoreJs, /samePath\(path\.dirname\(target\), root\)/);
   assert.match(mainJs, /refreshOnStartup/);
   assert.match(preloadJs, /deleteDataBackups/);
 });

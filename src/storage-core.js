@@ -3,6 +3,28 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const SOFTWARE_BACKUP_PATTERN = /^papertrail-backup-\d{8}-\d{6}(?:-\d+)?\.json$/i;
+
+function samePath(left, right) {
+  const a = path.resolve(left);
+  const b = path.resolve(right);
+  return process.platform === 'win32' ? a.toLowerCase() === b.toLowerCase() : a === b;
+}
+
+function isManagedBackupPath(candidate, { backupDirectory, currentFile = '', mustExist = true }) {
+  try {
+    const target = path.resolve(String(candidate));
+    const root = path.resolve(String(backupDirectory));
+    if (!SOFTWARE_BACKUP_PATTERN.test(path.basename(target))) return false;
+    if (!samePath(path.dirname(target), root)) return false;
+    if (currentFile && samePath(target, currentFile)) return false;
+    if (mustExist && (!fs.existsSync(target) || !fs.statSync(target).isFile())) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function emptyPointerValue() {
   return { dataDirectory: '', backupFiles: [], backupCreatedAt: {} };
 }
@@ -80,4 +102,12 @@ function resolveStorageState({ pointerPath, defaultFilePath, dataFileName }) {
   return { state: 'custom-valid', configuredDirectory, filePath: path.resolve(filePath), pointer };
 }
 
-module.exports = { emptyPointerValue, normalizePointerValue, readStoragePointer, resolveStorageState };
+module.exports = {
+  SOFTWARE_BACKUP_PATTERN,
+  emptyPointerValue,
+  isManagedBackupPath,
+  normalizePointerValue,
+  readStoragePointer,
+  resolveStorageState,
+  samePath
+};
