@@ -18,6 +18,19 @@ test('normalizes release versions and disables unsupported builds', () => {
   assert.equal(portable.portable, true);
 });
 
+test('degrades to a manual release link when the updater component cannot load', () => {
+  const state = createInitialUpdateState({
+    currentVersion: '1.3.1',
+    packaged: true,
+    portable: false,
+    updaterAvailable: false
+  });
+  assert.equal(state.status, 'unavailable');
+  assert.equal(state.componentUnavailable, true);
+  assert.equal(state.manualUpdate, true);
+  assert.match(state.message, /自动更新组件不可用/);
+});
+
 test('models check, download progress and install-ready states', () => {
   let state = createInitialUpdateState({ currentVersion: '0.5.2', packaged: true, portable: false });
   state = nextUpdateState(state, 'checking');

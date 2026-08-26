@@ -93,6 +93,9 @@ test('settings expose a main-process GitHub Release update workflow', () => {
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   assert.match(html, /id="updateActionButton"/);
   assert.match(html, /id="updateProgress"[\s\S]*role="progressbar"/);
+  assert.match(mainJs, /let autoUpdater = null/);
+  assert.match(mainJs, /Failed to load electron-updater/);
+  assert.match(mainJs, /YANJI_DISABLE_UPDATER/);
   assert.match(mainJs, /autoUpdater\.autoDownload = false/);
   assert.match(mainJs, /autoUpdater\.autoInstallOnAppQuit = false/);
   assert.match(mainJs, /updates:check/);

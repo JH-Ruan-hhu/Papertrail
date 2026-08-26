@@ -45,7 +45,7 @@ function isNotPublishedError(error) {
   return /404|latest(?:-|\.)ya?ml|no published versions|cannot find|release.*not found|empty feed/i.test(String(error?.message || error || ''));
 }
 
-function createInitialUpdateState({ currentVersion, packaged, portable }) {
+function createInitialUpdateState({ currentVersion, packaged, portable, updaterAvailable = true }) {
   const version = cleanVersion(currentVersion) || '0.0.0';
   if (!packaged) {
     return {
@@ -75,6 +75,22 @@ function createInitialUpdateState({ currentVersion, packaged, portable }) {
       message: '便携版请前往发布页下载新版；安装版支持应用内更新。'
     };
   }
+  if (!updaterAvailable) {
+    return {
+      status: 'unavailable',
+      currentVersion: version,
+      latestVersion: null,
+      releaseDate: null,
+      percent: null,
+      transferred: null,
+      total: null,
+      bytesPerSecond: null,
+      portable: false,
+      manualUpdate: true,
+      componentUnavailable: true,
+      message: '自动更新组件不可用，请前往 GitHub Releases 手动更新。'
+    };
+  }
   return {
     status: 'idle',
     currentVersion: version,
@@ -85,6 +101,8 @@ function createInitialUpdateState({ currentVersion, packaged, portable }) {
     total: null,
     bytesPerSecond: null,
     portable: false,
+    manualUpdate: false,
+    componentUnavailable: false,
     message: '仅在你点击检查时连接 GitHub Releases。'
   };
 }

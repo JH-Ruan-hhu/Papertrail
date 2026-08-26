@@ -779,7 +779,7 @@ function renderUpdateStatus() {
     error: ['更新检查失败', '重试', false],
     'not-published': ['暂未发布可下载版本', '重新检查', false],
     'empty-feed': ['暂未发布可下载版本', '重新检查', false],
-    unavailable: [update.portable ? '便携版更新' : '当前无法检查更新', update.portable ? '打开发布页' : '当前不可用', !update.portable]
+    unavailable: [update.componentUnavailable ? '自动更新组件不可用' : (update.portable ? '便携版更新' : '当前无法检查更新'), (update.portable || update.manualUpdate) ? '打开发布页' : '当前不可用', !(update.portable || update.manualUpdate)]
   }[status] || ['检查研迹更新', '检查更新', false];
 
   elements.updateStatusTitle.textContent = display[0];
@@ -806,7 +806,7 @@ async function handleUpdateAction() {
     let result;
     if (status === 'available') result = await api.downloadUpdate();
     else if (status === 'downloaded') result = await api.installUpdate();
-    else if (status === 'unavailable' && state.updateStatus?.portable) result = await api.openUpdateReleasePage();
+    else if (status === 'unavailable' && (state.updateStatus?.portable || state.updateStatus?.manualUpdate)) result = await api.openUpdateReleasePage();
     else result = await api.checkForUpdates();
     if (result && typeof result === 'object') {
       state.updateStatus = result;

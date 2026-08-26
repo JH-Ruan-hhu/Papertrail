@@ -20,7 +20,15 @@ const {
   shell,
   Tray
 } = require('electron');
-const { autoUpdater } = require('electron-updater');
+let autoUpdater = null;
+let updaterLoadError = null;
+try {
+  if (process.env.YANJI_DISABLE_UPDATER === '1') throw new Error('Updater disabled for startup recovery verification.');
+  ({ autoUpdater } = require('electron-updater'));
+} catch (error) {
+  updaterLoadError = error;
+  console.error('[updater] Failed to load electron-updater:', error);
+}
 const { JsonStore } = require('./store');
 const { createPlanningService } = require('./planning-service');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
@@ -409,7 +417,8 @@ function updateStateForRenderer() {
     updateState = createInitialUpdateState({
       currentVersion: app.getVersion(),
       packaged: app.isPackaged,
-      portable: isPortableBuild()
+      portable: isPortableBuild(),
+      updaterAvailable: Boolean(autoUpdater)
     });
   }
   return { ...updateState };
@@ -427,15 +436,20 @@ function setUpdateState(event, payload) {
   return updateStateForRenderer();
 }
 
-function setupAutoUpdater() {
+function initializeUpdater() {
   if (updaterInitialized) return;
   updaterInitialized = true;
   updateState = createInitialUpdateState({
     currentVersion: app.getVersion(),
     packaged: app.isPackaged,
-    portable: isPortableBuild()
+    portable: isPortableBuild(),
+    updaterAvailable: Boolean(autoUpdater)
   });
   if (updateState.status === 'unavailable') return;
+  if (!autoUpdater) {
+    console.error('[updater] Automatic updates are unavailable:', updaterLoadError);
+    return;
+  }
 
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
@@ -452,6 +466,7 @@ function setupAutoUpdater() {
 
 async function checkForAppUpdate() {
   const current = updateStateForRenderer();
+  if (!autoUpdater) return current;
   if (current.status === 'unavailable') return current;
   if (current.status === 'checking' || current.status === 'downloading') return current;
   try {
@@ -471,6 +486,7 @@ async function checkForAppUpdate() {
 }
 
 async function downloadAppUpdate() {
+  if (!autoUpdater) throw new Error('自动更新组件不可用，请前往 GitHub Releases 手动更新。');
   const current = updateStateForRenderer();
   if (current.status !== 'available') throw new Error('请先检查并确认存在新版本。');
   try {
@@ -484,6 +500,7 @@ async function downloadAppUpdate() {
 }
 
 function installDownloadedUpdate() {
+  if (!autoUpdater) throw new Error('自动更新组件不可用，请前往 GitHub Releases 手动更新。');
   if (updateStateForRenderer().status !== 'downloaded') {
     throw new Error('更新尚未下载完成。');
   }
@@ -2650,7 +2667,7 @@ if (!gotLock) {
       });
       reconcileStaleAttendance();
       cleanupExpiredBackups();
-      setupAutoUpdater();
+      initializeUpdater();
       registerIpc();
       createWindow();
       createTray();
