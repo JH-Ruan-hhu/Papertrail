@@ -269,6 +269,19 @@ function systemRecoveryPath() {
   return path.join(app.getPath('userData'), SYSTEM_RECOVERY_NAME);
 }
 
+function isPackagedSmokeTest() {
+  return process.argv.includes('--smoke-test');
+}
+
+function writeSmokeResult(filePath, payload) {
+  if (!filePath) return;
+  const target = path.resolve(filePath);
+  const temporaryPath = `${target}.tmp`;
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(temporaryPath, JSON.stringify(payload, null, 2), 'utf8');
+  fs.renameSync(temporaryPath, target);
+}
+
 function noteAttachmentsDirectory() {
   return store?.attachmentsDirectory || path.join(path.dirname(store.filePath), ATTACHMENTS_DIRECTORY_NAME);
 }
@@ -367,6 +380,12 @@ async function restoreBackupForRecovery() {
 
 async function recoverStorageLocation(initialState) {
   let state = initialState;
+  if (!['default', 'custom-valid'].includes(state.state) && process.env.YANJI_STORAGE_RECOVERY_SMOKE_RESULT) {
+    const result = { marker: 'YANJI_STORAGE_RECOVERY_REQUIRED', state: state.state, createdDefaultDatabase: fs.existsSync(defaultDataFilePath()) };
+    writeSmokeResult(process.env.YANJI_STORAGE_RECOVERY_SMOKE_RESULT, result);
+    console.log(`YANJI_STORAGE_RECOVERY_REQUIRED ${JSON.stringify(result)}`);
+    return null;
+  }
   while (!['default', 'custom-valid'].includes(state.state)) {
     const response = await dialog.showMessageBox({
       type: 'warning',
@@ -2358,7 +2377,7 @@ function createWindow() {
     height: 780,
     minWidth: 800,
     minHeight: 600,
-    show: !process.argv.includes('--hidden'),
+    show: !process.argv.includes('--hidden') && !isPackagedSmokeTest(),
     backgroundColor: '#edf7fc',
     title: APP_NAME,
     icon: createAppWindowIcon(),
@@ -2376,10 +2395,10 @@ function createWindow() {
   });
 
   mainWindow.setIcon(createAppWindowIcon());
-  mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+  mainWindow.yanjiLoadPromise = mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { appearance: store.getSettings().appearanceTheme } });
   mainWindow.webContents.once('did-finish-load', () => {
     const startsHidden = process.argv.includes('--hidden');
-    if (!startsHidden) {
+    if (!startsHidden && !isPackagedSmokeTest()) {
       if (!mainWindow.isMaximized()) mainWindow.maximize();
       mainWindow.show();
     } else {
@@ -2390,7 +2409,7 @@ function createWindow() {
     setTimeout(() => refreshAll({ notify: true }).catch(() => {}), 900);
   });
   mainWindow.once('ready-to-show', () => {
-    if (!process.argv.includes('--hidden')) {
+    if (!process.argv.includes('--hidden') && !isPackagedSmokeTest()) {
       if (!mainWindow.isMaximized()) mainWindow.maximize();
       mainWindow.show();
     }
@@ -2411,6 +2430,40 @@ function createWindow() {
     mainWindowReleaseTimer = null;
     mainWindow = null;
   });
+  return mainWindow;
+}
+
+async function runPackagedSmokeTest() {
+  if (!app.isPackaged) throw new Error('--smoke-test 必须运行 electron-builder 生成的应用。');
+  const preloadPath = path.join(__dirname, 'preload.js');
+  if (!fs.existsSync(preloadPath)) throw new Error('packaged preload.js 缺失。');
+  const window = createWindow();
+  let smokeLoadTimeout;
+  try {
+    await Promise.race([
+      window.yanjiLoadPromise,
+      new Promise((_resolve, reject) => {
+        smokeLoadTimeout = setTimeout(() => reject(new Error('BrowserWindow 在 20 秒内未加载完成。')), 20_000);
+      })
+    ]);
+  } finally {
+    clearTimeout(smokeLoadTimeout);
+  }
+  const result = {
+    marker: 'YANJI_SMOKE_OK',
+    packaged: app.isPackaged,
+    version: app.getVersion(),
+    dataFileExists: fs.existsSync(store.filePath),
+    preloadExists: fs.existsSync(preloadPath),
+    browserWindowCreated: Boolean(window && !window.isDestroyed()),
+    updaterAvailable: Boolean(autoUpdater)
+  };
+  if (!result.dataFileExists || !result.preloadExists || !result.browserWindowCreated) throw new Error('packaged smoke 初始化结果不完整。');
+  writeSmokeResult(process.env.YANJI_SMOKE_RESULT, result);
+  console.log(`YANJI_SMOKE_OK ${JSON.stringify(result)}`);
+  isQuitting = true;
+  app.quit();
+  return result;
 }
 
 function scheduleHiddenMainWindowRelease() {
@@ -2825,13 +2878,20 @@ if (process.env.YANJI_QA_USER_DATA) {
   app.setPath('userData', resolveStableUserDataPath(app.getPath('appData')));
 }
 
+if (isPackagedSmokeTest()) {
+  app.disableHardwareAcceleration();
+  app.commandLine.appendSwitch('disable-gpu');
+  app.commandLine.appendSwitch('disable-gpu-compositing');
+  app.commandLine.appendSwitch('in-process-gpu');
+}
+
 // Set the Windows identity before the single-instance lock and before any
 // BrowserWindow exists, so taskbar grouping resolves the packaged Yanji icon
 // instead of inheriting Electron's executable identity.
 app.setName('研迹');
 app.setAppUserModelId(APP_ID);
 
-const gotLock = app.requestSingleInstanceLock();
+const gotLock = isPackagedSmokeTest() || app.requestSingleInstanceLock();
 if (!gotLock) {
   app.quit();
 } else {
@@ -2857,6 +2917,10 @@ if (!gotLock) {
       cleanupExpiredBackups();
       initializeUpdater();
       registerIpc();
+      if (isPackagedSmokeTest()) {
+        await runPackagedSmokeTest();
+        return;
+      }
       createWindow();
       createTray();
       updateLoginItemSetting(store.getSettings().startAtLogin);

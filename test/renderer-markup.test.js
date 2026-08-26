@@ -493,3 +493,17 @@ test('packaged BrowserWindows load the unpacked Yanji taskbar icon', () => {
   assert.match(mainJs, /app\.isPackaged[\s\S]*app\.asar\.unpacked[\s\S]*build/);
   assert.match(mainJs, /mainWindow\.setIcon\(createAppWindowIcon\(\)\)/);
 });
+
+test('release verification executes the packaged executable and inspects app.asar', () => {
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const smokeJs = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'packaged-smoke.js'), 'utf8');
+  const verifyJs = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'verify-package.js'), 'utf8');
+  assert.match(mainJs, /--smoke-test/);
+  assert.match(mainJs, /YANJI_SMOKE_OK/);
+  assert.match(smokeJs, /win-unpacked/);
+  assert.match(smokeJs, /updaterAvailable/);
+  assert.match(smokeJs, /createdDefaultDatabase/);
+  assert.match(verifyJs, /node_modules\/electron-updater\/package\.json/);
+  assert.match(verifyJs, /node_modules\/fs-extra\/package\.json/);
+  assert.match(verifyJs, /src\/preload\.js/);
+});

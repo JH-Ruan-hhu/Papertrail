@@ -1,5 +1,7 @@
 # 研迹 · Research Workbench
 
+Version 1.3.1 is a stability release that keeps the updater optional at startup, blocks unsafe data-directory fallback, protects user-owned databases from backup cleanup, restores interrupted Focus notification policy changes, and adds packaged application verification.
+
 研迹 is a local-first Windows research workbench that brings daily planning,
 quick capture, attendance, structured notes, and a complete manuscript tracker
 into one desktop app. The manuscript connectors cover Elsevier Author Hub and

@@ -214,7 +214,7 @@ let smokeWorkspace = {
 };
 let smokeUpdateState = {
   status: 'idle',
-  currentVersion: '1.3.0',
+  currentVersion: '1.3.1',
   latestVersion: null,
   releaseDate: null,
   percent: null,
