@@ -29,7 +29,8 @@ try {
   updaterLoadError = error;
   console.error('[updater] Failed to load electron-updater:', error);
 }
-const { JsonStore } = require('./store');
+const { JsonStore, DEFAULT_SETTINGS } = require('./store');
+const { readStoragePointer: readStoragePointerState, resolveStorageState } = require('./storage-core');
 const { createPlanningService } = require('./planning-service');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
@@ -76,6 +77,7 @@ const {
   lastChangedAt,
   sortPapers,
   buildPaperExport,
+  migrateData,
   paperTaskSummary,
   updatePaperDetails,
   saveTask,
@@ -281,25 +283,94 @@ function noteAttachmentBytes(note) {
 }
 
 function readStoragePointer() {
-  try {
-    const pointer = JSON.parse(fs.readFileSync(storagePointerPath(), 'utf8'));
-    return {
-      dataDirectory: String(pointer?.dataDirectory || ''),
-      backupFiles: Array.isArray(pointer?.backupFiles) ? pointer.backupFiles.map(String) : [],
-      backupCreatedAt: pointer?.backupCreatedAt && typeof pointer.backupCreatedAt === 'object'
-        ? pointer.backupCreatedAt
-        : {}
-    };
-  } catch {
-    return { dataDirectory: '', backupFiles: [], backupCreatedAt: {} };
-  }
+  return readStoragePointerState(storagePointerPath());
 }
 
-function configuredDataFilePath() {
+function storagePointerValue() {
   const pointer = readStoragePointer();
-  const candidate = path.join(pointer.dataDirectory, DATA_FILE_NAME);
-  if (path.isAbsolute(pointer.dataDirectory) && fs.existsSync(candidate)) return candidate;
-  return defaultDataFilePath();
+  if (pointer.state === 'corrupt') throw new Error(pointer.error);
+  return pointer.value;
+}
+
+function configuredStorageState() {
+  return resolveStorageState({
+    pointerPath: storagePointerPath(),
+    defaultFilePath: defaultDataFilePath(),
+    dataFileName: DATA_FILE_NAME
+  });
+}
+
+function storageRecoveryMessage(state) {
+  if (state.state === 'pointer-corrupt') {
+    return `存储位置记录无法解析。为避免误建空数据库，研迹没有回退到默认目录。\n\n${state.error || storagePointerPath()}`;
+  }
+  if (state.state === 'custom-missing-data') {
+    return `已配置的数据目录存在，但其中没有 ${DATA_FILE_NAME}。为避免产生第二套空数据，研迹已暂停初始化。\n\n${state.configuredDirectory}`;
+  }
+  return `已配置的数据目录当前不可访问。请重新连接磁盘后重试，或明确选择其他数据。研迹没有创建新的空数据库。\n\n${state.configuredDirectory || state.error || ''}`;
+}
+
+function validateRecoveryDataFile(filePath) {
+  const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+  migrateData(parsed, DEFAULT_SETTINGS);
+  return path.resolve(filePath);
+}
+
+async function selectExistingRecoveryDirectory() {
+  const result = await dialog.showOpenDialog({
+    title: '选择包含研迹数据的文件夹',
+    buttonLabel: '使用此数据目录',
+    properties: ['openDirectory']
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const selectedDirectory = path.resolve(result.filePaths[0]);
+  const selectedFile = path.join(selectedDirectory, DATA_FILE_NAME);
+  validateRecoveryDataFile(selectedFile);
+  writeStoragePointer(selectedDirectory, [], selectedFile, {});
+  return configuredStorageState();
+}
+
+async function restoreBackupForRecovery() {
+  const result = await dialog.showOpenDialog({
+    title: '打开研迹 JSON 备份',
+    buttonLabel: '从此备份恢复',
+    filters: [{ name: '研迹 JSON 数据', extensions: ['json'] }],
+    properties: ['openFile']
+  });
+  if (result.canceled || !result.filePaths[0]) return null;
+  const sourceFile = validateRecoveryDataFile(result.filePaths[0]);
+  const stamp = new Date().toISOString().replace(/[-:TZ.]/g, '').slice(0, 14);
+  const recoveredDirectory = path.join(app.getPath('userData'), 'recovered-data', stamp);
+  const recoveredFile = path.join(recoveredDirectory, DATA_FILE_NAME);
+  fs.mkdirSync(recoveredDirectory, { recursive: true });
+  fs.copyFileSync(sourceFile, recoveredFile, fs.constants.COPYFILE_EXCL);
+  writeStoragePointer(recoveredDirectory, [], recoveredFile, {});
+  return configuredStorageState();
+}
+
+async function recoverStorageLocation(initialState) {
+  let state = initialState;
+  while (!['default', 'custom-valid'].includes(state.state)) {
+    const response = await dialog.showMessageBox({
+      type: 'warning',
+      title: '研迹需要恢复数据位置',
+      message: '为保护原数据，研迹已暂停数据初始化',
+      detail: storageRecoveryMessage(state),
+      buttons: ['重试', '选择新的数据目录', '打开备份', '退出'],
+      defaultId: 0,
+      cancelId: 3,
+      noLink: true
+    });
+    if (response.response === 3) return null;
+    try {
+      if (response.response === 0) state = configuredStorageState();
+      if (response.response === 1) state = await selectExistingRecoveryDirectory() || state;
+      if (response.response === 2) state = await restoreBackupForRecovery() || state;
+    } catch (error) {
+      dialog.showErrorBox('所选数据无法安全打开', error?.message || '请选择包含有效研迹数据的目录或备份。');
+    }
+  }
+  return state;
 }
 
 function normalizeBackupFiles(candidates, currentFile = store?.filePath) {
@@ -321,7 +392,7 @@ function normalizeBackupFiles(candidates, currentFile = store?.filePath) {
 }
 
 function knownBackupFiles() {
-  const pointer = readStoragePointer();
+  const pointer = storagePointerValue();
   return normalizeBackupFiles([...pointer.backupFiles, defaultDataFilePath()]);
 }
 
@@ -329,7 +400,7 @@ function writeStoragePointer(
   directory,
   backupFiles = knownBackupFiles(),
   currentFile = path.join(directory, DATA_FILE_NAME),
-  backupCreatedAt = readStoragePointer().backupCreatedAt
+  backupCreatedAt = storagePointerValue().backupCreatedAt
 ) {
   const pointerPath = storagePointerPath();
   const temporaryPath = `${pointerPath}.tmp`;
@@ -353,7 +424,7 @@ function isoBackupDate(value) {
 
 function cleanupExpiredBackups(now = new Date()) {
   lastBackupCleanupAt = now.getTime();
-  const pointer = readStoragePointer();
+  const pointer = storagePointerValue();
   const backups = knownBackupFiles();
   const retained = [];
   const dates = {};
@@ -382,7 +453,7 @@ function cleanupExpiredBackups(now = new Date()) {
 function settingsForRenderer() {
   const dataDirectory = path.dirname(store.filePath);
   const backupFiles = knownBackupFiles();
-  const pointer = readStoragePointer();
+  const pointer = storagePointerValue();
   return {
     ...store.getSettings(),
     appVersion: app.getVersion(),
@@ -2658,7 +2729,13 @@ if (!gotLock) {
   app.on('second-instance', showMainWindow);
   app.whenReady().then(async () => {
     try {
-      store = new JsonStore(configuredDataFilePath());
+      const resolvedStorage = await recoverStorageLocation(configuredStorageState());
+      if (!resolvedStorage) {
+        isQuitting = true;
+        app.quit();
+        return;
+      }
+      store = new JsonStore(resolvedStorage.filePath);
       store.load();
       planningService = createPlanningService({
         store,
