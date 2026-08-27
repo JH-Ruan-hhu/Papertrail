@@ -22,7 +22,7 @@ test('schema 10 adds and normalizes local job applications without losing root d
   assert.equal(result.data.version, 10);
   assert.equal(result.data.jobApplications[0].company, '水务集团');
   assert.equal(result.data.jobApplications[0].status, 'active');
-  assert.equal(result.data.jobApplications[0].workflow.stages.find((stage) => stage.id === result.data.jobApplications[0].workflow.currentStageId).name, '网测');
+  assert.equal(result.data.jobApplications[0].workflow.stages.find((stage) => stage.id === result.data.jobApplications[0].workflow.currentStageId).name, '测评');
   assert.deepEqual(result.data.unknownRoot, source.unknownRoot);
 });
 

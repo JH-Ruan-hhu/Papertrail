@@ -203,30 +203,27 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
   assert.match(appJs, /setTimeout\(finishEntering, 60\)/);
 });
 
-test('pointer sidebar navigation rises subtly while keyboard navigation stays immediate', () => {
+test('pointer sidebar navigation settles gently while keyboard navigation stays immediate', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*workbench-page-rise 230ms var\(--ease-out\)/s);
-  assert.match(css, /@keyframes workbench-page-rise\s*\{[^}]*translateY\(4px\)/s);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*workbench-page-fade 140ms/);
+  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*workbench-page-settle 280ms var\(--ease-out\) both/s);
+  assert.match(css, /@keyframes workbench-page-settle\s*\{[^}]*translate3d\(0, 6px, 0\)/s);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*workbench-page-fade 170ms/);
   assert.match(workbenchJs, /animate:\s*event\.detail\s*>\s*0/);
   assert.match(workbenchJs, /previousPage !== page/);
 });
 
-test('installer and updater use Yanji-owned simplified interfaces', () => {
+test('installer uses the stock electron-builder wizard while retaining upgrade safety', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   const installer = fs.readFileSync(path.join(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
   assert.equal(packageJson.build.nsis.include, 'build/installer.nsh');
-  assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, false);
-  assert.match(installer, /Page custom YanjiInstallPageCreate YanjiInstallPageLeave/);
-  assert.match(installer, /立即安装/);
-  assert.match(installer, /安装不会移动或清除你的科研数据/);
-  assert.match(installer, /Function YanjiEnsureDedicatedInstallFolder/);
+  assert.equal(packageJson.build.nsis.oneClick, false);
+  assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, true);
+  assert.doesNotMatch(installer, /Page custom|nsDialogs|BrandingText|MUI_BGCOLOR|立即安装|YanjiInstallPageCreate/);
   assert.match(installer, /papertrail-desktop/);
-  assert.match(installer, /MUI_PAGE_CUSTOMFUNCTION_PRE YanjiBeforeInstall/);
-  assert.match(installer, /Function YanjiBeforeInstall[\s\S]*StrCpy \$INSTDIR "\$0"/);
+  assert.doesNotMatch(installer, /customPageAfterChangeDir|MUI_PAGE_CUSTOMFUNCTION_PRE|YanjiBeforeInstall/);
   assert.match(installer, /DeleteRegKey HKCU "\$\{UNINSTALL_REGISTRY_KEY\}"/);
   assert.match(installer, /DeleteRegKey HKLM "\$\{UNINSTALL_REGISTRY_KEY\}"/);
   assert.match(installer, /DeleteRegKey HKLM "\$\{INSTALL_REGISTRY_KEY\}"/);
@@ -234,12 +231,11 @@ test('installer and updater use Yanji-owned simplified interfaces', () => {
   assert.match(installer, /StrCpy \$hasPerMachineInstallation "0"/);
   assert.match(installer, /StrCpy \$hasPerUserInstallation "1"/);
   assert.match(installer, /!insertmacro GetDParameter \$R0/);
-  assert.match(installer, /StrCpy \$INSTDIR "\$YanjiLegacyInstallRoot\\研迹"/);
-  assert.match(installer, /CreateShortCut "\$newStartMenuLink" "\$INSTDIR\\\$\{APP_EXECUTABLE_FILENAME\}"/);
-  assert.match(installer, /CreateShortCut "\$newDesktopLink" "\$INSTDIR\\\$\{APP_EXECUTABLE_FILENAME\}"/);
-  assert.match(installer, /Normalize the default or migrated path/);
+  assert.match(installer, /StrCpy \$INSTDIR "\$YanjiLegacyInstallRoot\\papertrail-desktop"/);
+  assert.match(installer, /stock electron-builder NSIS wizard/);
+  assert.match(indexHtml, /RELEASE CENTER/);
+  assert.match(indexHtml, /id="autoCheckUpdates"/);
   assert.match(indexHtml, /class="update-journey"/);
-  assert.match(indexHtml, /检查版本[\s\S]*安全下载[\s\S]*重启升级/);
   assert.match(appJs, /updateGroup\.dataset\.updateStatus = status/);
 });
 
@@ -409,7 +405,7 @@ test('settings omit promotional and explanatory introduction cards', () => {
   assert.doesNotMatch(indexHtml, /class="privacy-note"/);
 });
 
-test('job dashboard uses independent lifecycle states and dynamic workflow rails', () => {
+test('job dashboard uses independent lifecycle states and selectable standard workflow rails', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
@@ -421,9 +417,12 @@ test('job dashboard uses independent lifecycle states and dynamic workflow rails
   assert.match(indexHtml, /id="jobAnnualSalaryWan"/);
   assert.doesNotMatch(indexHtml, /job-upcoming-panel|jobUpcomingCount|>近期日程</);
   assert.match(indexHtml, /岗位状态与招聘流程当前阶段相互独立/);
+  assert.match(indexHtml, /投递与 Offer 固定为起终点；测评和各轮面试可按岗位自由选择/);
   assert.doesNotMatch(indexHtml, /value="pending">待投递/);
   assert.match(workbenchJs, /function renderJobQuickFilters\(jobs/);
   assert.match(workbenchJs, /function readWorkflowEditor\(\)/);
+  assert.match(workbenchJs, /stage-assessment[\s\S]*测评[\s\S]*stage-third-interview[\s\S]*三面/);
+  assert.match(workbenchJs, /data-workflow-stage-enabled/);
   assert.doesNotMatch(workbenchJs, /JOB_STATUSES|JOB_STATUS_LABELS/);
   assert.doesNotMatch(workbenchJs, /data-advance-job|function advanceJob/);
   assert.match(indexHtml, /id="addJobButton"/);

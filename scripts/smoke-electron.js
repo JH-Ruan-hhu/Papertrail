@@ -862,11 +862,11 @@ app.whenReady().then(async () => {
         document.querySelector('[data-workbench-page="jobs"]').click();
         window.scrollTo(0, 0);
         await new Promise((resolve) => setTimeout(resolve, 80));
-        const rows = [...document.querySelectorAll('#jobBoard .job-row-card')];
+        const rows = [...document.querySelectorAll('#jobBoard .job-position')];
         const initialRows = rows.length;
         const workflowLengths = rows.map((row) => row.querySelectorAll('.job-flow-stage').length);
         const rowAnatomy = rows.every((row) => (
-          row.querySelector('.job-primary-cell')
+          row.querySelector('.job-company-cell')
           && row.querySelector('.job-type-cell')
           && row.querySelector('.job-city-cell')
           && row.querySelector('.job-deadline-cell')
@@ -897,14 +897,14 @@ app.whenReady().then(async () => {
         const noLegacyStatusOptions = !document.querySelector('#jobBoard option[value="submitted"], #jobBoard option[value="written-1"], #jobBoard option[value="interview"], #jobBoard option[value="offer"]');
         const metricIds = ['jobTotalJobs', 'jobTodayAdded', 'jobTodayApplied', 'jobAwaitingReview', 'jobDueSoon', 'jobInProgress'];
         const metricsRendered = metricIds.every((id) => document.getElementById(id)?.textContent !== '');
-        const metricsCompact = [...document.querySelectorAll('.job-metric-strip article')].every((card) => card.firstElementChild?.matches('strong') && card.querySelector('.job-metric-copy'));
-        const headerColumns = document.querySelectorAll('.job-list-header > span').length === 9;
+        const metricsCompact = [...document.querySelectorAll('.job-summary-grid article')].every((card) => card.firstElementChild?.matches('strong') && card.querySelector('span'));
+        const headerColumns = document.querySelectorAll('.job-table-head > span').length === 9;
         const quickFiltersRendered = document.querySelectorAll('#jobQuickFilters [data-job-quick-filter]').length >= 10;
         const headerCreateOnly = Boolean(document.getElementById('addJobButton')) && !document.querySelector('#jobBoard [data-add-job]');
         rows[0]?.querySelector('[data-edit-job]')?.click();
         await new Promise((resolve) => setTimeout(resolve, 40));
         const detailEditorOpens = document.getElementById('jobDialog').open;
-        const editorStageCount = document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-row]').length;
+        const editorStageCount = document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-option]').length;
         document.getElementById('cancelJobButton').click();
         document.getElementById('addJobButton').click();
         document.getElementById('jobCompany').value = '新增环保公司';
@@ -912,7 +912,7 @@ app.whenReady().then(async () => {
         document.getElementById('jobStatus').value = 'active';
         document.getElementById('saveJobButton').click();
         await new Promise((resolve) => setTimeout(resolve, 80));
-        const added = document.querySelectorAll('#jobBoard .job-row-card').length === initialRows + 1;
+        const added = document.querySelectorAll('#jobBoard .job-position').length === initialRows + 1;
         const inlineStatus = document.querySelector('[data-job-id="job-submitted-1"][data-job-field="status"]');
         inlineStatus.value = 'paused';
         inlineStatus.dispatchEvent(new Event('change', { bubbles: true }));
@@ -922,7 +922,7 @@ app.whenReady().then(async () => {
         statusFilter.value = 'paused';
         statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 35));
-        const filterWorks = document.querySelectorAll('#jobBoard .job-row-card').length === 1;
+        const filterWorks = document.querySelectorAll('#jobBoard .job-position').length === 1;
         statusFilter.value = 'all';
         statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 35));
@@ -931,7 +931,7 @@ app.whenReady().then(async () => {
         statusFilter.value = 'active';
         statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 35));
-        const combinedRows = [...document.querySelectorAll('#jobBoard .job-row-card')];
+        const combinedRows = [...document.querySelectorAll('#jobBoard .job-position')];
         const combinedFilterWorks = combinedRows.length > 0 && combinedRows.every((row) => row.querySelector('[data-job-field="status"]')?.value === 'active' && row.querySelector('[data-job-field="priority"]')?.value === 'high');
         statusFilter.value = 'all';
         statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
@@ -940,17 +940,23 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 35));
         document.querySelector('[data-job-id="job-written-1"] [data-edit-job]')?.click();
         await new Promise((resolve) => setTimeout(resolve, 40));
-        const workflowBeforeEdit = document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-row]').length;
-        const firstStageName = document.querySelector('#jobWorkflowEditor [data-workflow-stage-name]');
-        firstStageName.value = '沟通';
-        firstStageName.dispatchEvent(new Event('input', { bubbles: true }));
-        document.getElementById('addJobStageButton').click();
+        const standardStageOptions = document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-option]:not(.is-legacy)').length;
+        const assessmentOption = document.querySelector('#jobWorkflowEditor [data-stage-id="stage-assessment"]');
+        const assessmentCheckbox = assessmentOption?.querySelector('[data-workflow-stage-enabled]');
+        assessmentCheckbox.checked = true;
+        assessmentCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 35));
-        const workflowAfterAdd = document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-row]').length;
-        document.querySelector('#jobWorkflowEditor [data-workflow-stage-row]:last-child [data-workflow-stage-name]').value = '终点';
+        const thirdInterviewOption = document.querySelector('#jobWorkflowEditor [data-stage-id="stage-third-interview"]');
+        const thirdInterviewCheckbox = thirdInterviewOption?.querySelector('[data-workflow-stage-enabled]');
+        thirdInterviewCheckbox.checked = true;
+        thirdInterviewCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        const selectableStagesWork = document.querySelector('#jobWorkflowEditor [data-stage-id="stage-assessment"]')?.classList.contains('is-selected')
+          && document.querySelector('#jobWorkflowEditor [data-stage-id="stage-third-interview"]')?.classList.contains('is-selected');
         document.getElementById('saveJobButton').click();
         await new Promise((resolve) => setTimeout(resolve, 90));
-        const savedWorkflow = document.querySelector('[data-job-id="job-written-1"]')?.querySelectorAll('.job-flow-stage').length === workflowAfterAdd;
+        const savedStageNames = [...document.querySelector('[data-job-id="job-written-1"]')?.querySelectorAll('.job-flow-name') || []].map((node) => node.textContent);
+        const savedWorkflow = savedStageNames.includes('测评') && savedStageNames.includes('三面');
         document.querySelector('[data-workbench-page="home"]').click();
         await new Promise((resolve) => setTimeout(resolve, 45));
         const homeSummary = document.querySelectorAll('#homeJobSummary .home-job-row').length === 4;
@@ -979,15 +985,15 @@ app.whenReady().then(async () => {
           inlineSaved,
           filterWorks,
           combinedFilterWorks,
-          workflowBeforeEdit,
-          workflowAfterAdd: workflowAfterAdd === workflowBeforeEdit + 1,
+          standardStageOptions,
+          selectableStagesWork,
           savedWorkflow,
           homeSummary,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 3 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || !jobsResult.workflowAfterAdd || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);

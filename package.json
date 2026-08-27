@@ -1,6 +1,6 @@
 {
   "name": "papertrail-desktop",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "Yanji contributors",
@@ -61,7 +61,7 @@
       "artifactName": "Yanji-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
       "include": "build/installer.nsh",
-      "allowToChangeInstallationDirectory": false,
+      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true
     },

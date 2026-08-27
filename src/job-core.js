@@ -21,7 +21,7 @@ const JOB_PRIORITY_LABELS = Object.freeze({ high: '高', medium: '中', low: '�
 // status-shaped records. They are not the source of truth for the new UI.
 const LEGACY_STATUS_STAGE_NAMES = Object.freeze({
   submitted: '投递',
-  'written-1': '网测',
+  'written-1': '测评',
   'written-2': '二面',
   interview: '面试',
   offer: 'Offer'
@@ -29,9 +29,10 @@ const LEGACY_STATUS_STAGE_NAMES = Object.freeze({
 
 const DEFAULT_WORKFLOW_STAGES = Object.freeze([
   Object.freeze({ id: 'stage-apply', name: '投递' }),
-  Object.freeze({ id: 'stage-online-test', name: '网测' }),
+  Object.freeze({ id: 'stage-assessment', name: '测评' }),
   Object.freeze({ id: 'stage-first-interview', name: '一面' }),
   Object.freeze({ id: 'stage-second-interview', name: '二面' }),
+  Object.freeze({ id: 'stage-third-interview', name: '三面' }),
   Object.freeze({ id: 'stage-final-interview', name: '终面' }),
   Object.freeze({ id: 'stage-offer', name: 'Offer' })
 ]);
@@ -96,6 +97,7 @@ function findLegacyStage(stages, legacyStatus) {
   if (!targetName) return null;
   const exact = stages.find((stage) => stage.name === targetName);
   if (exact) return exact;
+  if (legacyStatus === 'written-1') return stages.find((stage) => /测评|网测|笔试/.test(stage.name)) || null;
   if (legacyStatus === 'interview') return stages.find((stage) => /面/.test(stage.name)) || null;
   if (legacyStatus === 'offer') return stages.find((stage) => /offer/i.test(stage.name)) || stages.at(-1) || null;
   return null;

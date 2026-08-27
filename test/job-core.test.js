@@ -51,7 +51,7 @@ test('normalizes a local job application with an independent lifecycle and workf
 test('maps legacy stage statuses without forcing a startup rewrite', () => {
   const cases = [
     ['submitted', '投递', 'active'],
-    ['written-1', '网测', 'active'],
+    ['written-1', '测评', 'active'],
     ['written-2', '二面', 'active'],
     ['interview', '面试', 'active'],
     ['offer', 'Offer', 'closed']
@@ -64,6 +64,7 @@ test('maps legacy stage statuses without forcing a startup rewrite', () => {
   }
   const empty = normalizeJobApplication({ company: '单位', role: '岗位', workflow: { stages: [], currentStageId: 'missing' } });
   assert.deepEqual(empty.workflow.stages, DEFAULT_WORKFLOW_STAGES);
+  assert.deepEqual(DEFAULT_WORKFLOW_STAGES.map((stage) => stage.name), ['投递', '测评', '一面', '二面', '三面', '终面', 'Offer']);
   assert.equal(empty.workflow.currentStageId, DEFAULT_WORKFLOW_STAGES[0].id);
 });
 
