@@ -224,6 +224,7 @@ test('installer and updater use Yanji-owned simplified interfaces', () => {
   assert.match(installer, /立即安装/);
   assert.match(installer, /安装不会移动或清除你的科研数据/);
   assert.match(installer, /Function YanjiEnsureDedicatedInstallFolder/);
+  assert.match(installer, /papertrail-desktop/);
   assert.match(installer, /MUI_PAGE_CUSTOMFUNCTION_PRE YanjiBeforeInstall/);
   assert.match(installer, /Function YanjiBeforeInstall[\s\S]*StrCpy \$INSTDIR "\$0"/);
   assert.match(installer, /DeleteRegKey HKCU "\$\{UNINSTALL_REGISTRY_KEY\}"/);
@@ -511,6 +512,7 @@ test('release verification executes the packaged executable and inspects app.asa
   assert.match(mainJs, /--smoke-test/);
   assert.match(mainJs, /YANJI_SMOKE_OK/);
   assert.match(smokeJs, /win-unpacked/);
+  assert.match(smokeJs, /YANJI_DEVELOPMENT_SMOKE_OK/);
   assert.match(smokeJs, /updaterAvailable/);
   assert.match(smokeJs, /createdDefaultDatabase/);
   assert.match(verifyJs, /node_modules\/electron-updater\/package\.json/);

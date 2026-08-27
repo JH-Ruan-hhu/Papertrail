@@ -2480,9 +2480,8 @@ function createWindow() {
 }
 
 async function runPackagedSmokeTest() {
-  if (!app.isPackaged) throw new Error('--smoke-test 必须运行 electron-builder 生成的应用。');
   const preloadPath = path.join(__dirname, 'preload.js');
-  if (!fs.existsSync(preloadPath)) throw new Error('packaged preload.js 缺失。');
+  if (!fs.existsSync(preloadPath)) throw new Error(`${app.isPackaged ? 'packaged' : 'development'} preload.js 缺失。`);
   const window = createWindow();
   let smokeLoadTimeout;
   try {

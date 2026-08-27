@@ -18,11 +18,11 @@ function findPackagedExe(outputRoot) {
   return candidate;
 }
 
-function launchSmoke(exePath, { disableUpdater = false } = {}) {
+function launchSmoke(exePath, { disableUpdater = false, appPath = null } = {}) {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), `yanji-packaged-smoke-${disableUpdater ? 'fallback-' : ''}`));
   const resultFile = path.join(userData, 'smoke-result.json');
   return new Promise((resolve, reject) => {
-    const child = spawn(exePath, ['--smoke-test'], {
+    const child = spawn(exePath, [...(appPath ? [appPath] : []), '--smoke-test'], {
       env: {
         ...process.env,
         YANJI_QA_USER_DATA: userData,
@@ -51,7 +51,7 @@ function launchSmoke(exePath, { disableUpdater = false } = {}) {
         assert.equal(fs.existsSync(resultFile), true, `未生成 smoke 标记。\n${stdout}\n${stderr}`);
         const result = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
         assert.equal(result.marker, 'YANJI_SMOKE_OK');
-        assert.equal(result.packaged, true);
+        assert.equal(result.packaged, !appPath);
         assert.equal(result.dataFileExists, true);
         assert.equal(result.preloadExists, true);
         assert.equal(result.browserWindowCreated, true);
@@ -66,7 +66,7 @@ function launchSmoke(exePath, { disableUpdater = false } = {}) {
   });
 }
 
-function launchStorageRecoverySmoke(exePath, scenario) {
+function launchStorageRecoverySmoke(exePath, scenario, { appPath = null } = {}) {
   const userData = fs.mkdtempSync(path.join(os.tmpdir(), `yanji-storage-recovery-${scenario}-`));
   const pointerFile = path.join(userData, 'papertrail-storage.json');
   const resultFile = path.join(userData, 'storage-recovery-result.json');
@@ -84,7 +84,7 @@ function launchStorageRecoverySmoke(exePath, scenario) {
     expectedState = 'custom-missing-data';
   }
   return new Promise((resolve, reject) => {
-    const child = spawn(exePath, ['--smoke-test'], {
+    const child = spawn(exePath, [...(appPath ? [appPath] : []), '--smoke-test'], {
       env: { ...process.env, YANJI_QA_USER_DATA: userData, YANJI_STORAGE_RECOVERY_SMOKE_RESULT: resultFile },
       windowsHide: true,
       stdio: ['ignore', 'pipe', 'pipe']
@@ -117,15 +117,20 @@ function launchStorageRecoverySmoke(exePath, scenario) {
 }
 
 async function main() {
+  const development = process.argv.includes('--dev');
   const outputRoot = path.resolve(process.argv[2] || 'outputs');
-  const exePath = findPackagedExe(outputRoot);
-  const normal = await launchSmoke(exePath);
-  const updaterFallback = await launchSmoke(exePath, { disableUpdater: true });
+  const appPath = development ? outputRoot : null;
+  const exePath = development
+    ? path.join(outputRoot, 'node_modules', 'electron', 'dist', 'electron.exe')
+    : findPackagedExe(outputRoot);
+  const normal = await launchSmoke(exePath, { appPath });
+  const updaterFallback = await launchSmoke(exePath, { disableUpdater: true, appPath });
   const storageRecovery = {};
   for (const scenario of ['pointer-corrupt', 'custom-unavailable', 'custom-missing-data']) {
-    storageRecovery[scenario] = await launchStorageRecoverySmoke(exePath, scenario);
+    storageRecovery[scenario] = await launchStorageRecoverySmoke(exePath, scenario, { appPath });
   }
-  console.log(`YANJI_PACKAGED_SMOKE_OK ${JSON.stringify({ exePath, normal, updaterFallback, storageRecovery })}`);
+  const marker = development ? 'YANJI_DEVELOPMENT_SMOKE_OK' : 'YANJI_PACKAGED_SMOKE_OK';
+  console.log(`${marker} ${JSON.stringify({ exePath, normal, updaterFallback, storageRecovery })}`);
 }
 
 main().catch((error) => {
