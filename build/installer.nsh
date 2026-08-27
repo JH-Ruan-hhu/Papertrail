@@ -28,6 +28,7 @@ Function YanjiEnsureDedicatedInstallFolder
   ${If} $1 != "研迹"
   ${AndIf} $1 != "Yanji"
   ${AndIf} $1 != "PaperTrail"
+  ${AndIf} $1 != "papertrail-desktop"
     StrCpy $0 "$0\研迹"
   ${EndIf}
 FunctionEnd
@@ -56,6 +57,7 @@ FunctionEnd
     ${If} $3 != "研迹"
     ${AndIf} $3 != "Yanji"
     ${AndIf} $3 != "PaperTrail"
+    ${AndIf} $3 != "papertrail-desktop"
       StrCpy $YanjiLegacyInstallRoot "$0"
       DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"
       DeleteRegKey HKCU "${INSTALL_REGISTRY_KEY}"
@@ -73,6 +75,7 @@ FunctionEnd
     ${If} $3 != "研迹"
     ${AndIf} $3 != "Yanji"
     ${AndIf} $3 != "PaperTrail"
+    ${AndIf} $3 != "papertrail-desktop"
       ${If} $YanjiLegacyInstallRoot == ""
         StrCpy $YanjiLegacyInstallRoot "$0"
       ${EndIf}

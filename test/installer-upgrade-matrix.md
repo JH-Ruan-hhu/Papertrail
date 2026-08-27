@@ -14,7 +14,7 @@ application uninstaller, and confirms a sentinel in the shared parent survives.
 
 | Scenario | Expected result |
 | --- | --- |
-| Fresh default install | `%LOCALAPPDATA%\Programs\研迹` is app-owned; launch succeeds |
+| Fresh default install | Stable legacy `%LOCALAPPDATA%\Programs\papertrail-desktop` remains app-owned; launch succeeds |
 | User selects `D:\app` | Actual location is `D:\app\研迹`; shared siblings survive |
 | User selects `D:\app\研迹` | The name is not appended twice |
 | Chinese path `D:\科研软件` | Actual location is `D:\科研软件\研迹`; launch succeeds |
