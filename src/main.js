@@ -109,8 +109,13 @@ const APP_ICON_PNG_PATH = path.join(BUILD_DIR, 'icon.png');
 const APP_ICON_PATH = process.platform === 'win32' ? path.join(BUILD_DIR, 'icon.ico') : APP_ICON_PNG_PATH;
 
 function createAppWindowIcon() {
-  const image = nativeImage.createFromPath(APP_ICON_PATH);
-  return image.isEmpty() ? APP_ICON_PATH : image;
+  try {
+    const image = nativeImage.createFromPath(APP_ICON_PATH);
+    return image.isEmpty() ? APP_ICON_PATH : image;
+  } catch (error) {
+    console.warn('[startup:window-icon] Window icon could not be loaded:', error);
+    return APP_ICON_PATH;
+  }
 }
 const MAX_HISTORY = 100;
 const FETCH_TIMEOUT_MS = 20_000;
@@ -156,6 +161,21 @@ let systemRecoveryWarning = null;
 const stickyWindows = new Map();
 const deadlineWindows = new Map();
 const refreshingIds = new Set();
+
+function recordStartupWarning(label, error) {
+  const warning = `${label}启动失败，相关功能已停用；科研数据仍可正常使用。`;
+  systemRecoveryWarning = [systemRecoveryWarning, warning].filter(Boolean).join(' ');
+  console.error(`[startup:${label}]`, error);
+}
+
+async function runNonCriticalStartup(label, callback) {
+  try {
+    return await callback();
+  } catch (error) {
+    recordStartupWarning(label, error);
+    return null;
+  }
+}
 
 function encryptSecret(value) {
   if (!safeStorage.isEncryptionAvailable()) {
@@ -1274,12 +1294,24 @@ function startFocusRecovery(session) {
     ? `Set-ItemProperty -LiteralPath '${TOAST_POLICY_KEY.replace('HKCU\\', 'HKCU:\\')}' -Name '${TOAST_POLICY_VALUE}' -Type DWord -Value ${Number(restore.value ?? 0)}`
     : `Remove-ItemProperty -LiteralPath '${TOAST_POLICY_KEY.replace('HKCU\\', 'HKCU:\\')}' -Name '${TOAST_POLICY_VALUE}' -ErrorAction SilentlyContinue`;
   const script = `Start-Sleep -Seconds ${remainingSeconds}; $current = (Get-ItemProperty -LiteralPath '${TOAST_POLICY_KEY.replace('HKCU\\', 'HKCU:\\')}' -Name '${TOAST_POLICY_VALUE}' -ErrorAction SilentlyContinue).'${TOAST_POLICY_VALUE}'; if ($current -eq 1) { ${restoreCommand} }`;
-  focusRecoveryProcess = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
-    windowsHide: true,
-    detached: true,
-    stdio: 'ignore'
-  });
-  focusRecoveryProcess.unref();
+  try {
+    const recoveryProcess = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
+      windowsHide: true,
+      detached: true,
+      stdio: 'ignore'
+    });
+    focusRecoveryProcess = recoveryProcess;
+    recoveryProcess.on('error', (error) => {
+      console.warn('[focus-recovery] PowerShell fallback could not start:', error);
+      if (focusRecoveryProcess === recoveryProcess) focusRecoveryProcess = null;
+    });
+    recoveryProcess.on('close', () => {
+      if (focusRecoveryProcess === recoveryProcess) focusRecoveryProcess = null;
+    });
+    recoveryProcess.unref();
+  } catch (error) {
+    console.warn('[focus-recovery] PowerShell fallback could not start:', error);
+  }
 }
 
 function persistFocusUsage() {
@@ -1322,17 +1354,31 @@ function startFocusSampler() {
   const script = `Add-Type @'\nusing System;\nusing System.Runtime.InteropServices;\npublic static class YanjiFocusNative {\n  [DllImport("user32.dll")] public static extern IntPtr GetForegroundWindow();\n  [DllImport("user32.dll")] public static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint processId);\n}\n'@\nwhile ($true) {\n  $handle = [YanjiFocusNative]::GetForegroundWindow()\n  [uint32]$foregroundPid = 0\n  [void][YanjiFocusNative]::GetWindowThreadProcessId($handle, [ref]$foregroundPid)\n  try { $process = Get-Process -Id $foregroundPid -ErrorAction Stop; Write-Output (\"$foregroundPid|\" + $process.ProcessName) } catch {}\n  Start-Sleep -Seconds 5\n}`;
   focusSamplerBuffer = '';
   focusLastSampleAt = 0;
-  focusSampler = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
-    windowsHide: true,
-    stdio: ['ignore', 'pipe', 'ignore']
-  });
-  focusSampler.stdout.on('data', (chunk) => {
+  let sampler;
+  try {
+    sampler = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-WindowStyle', 'Hidden', '-Command', script], {
+      windowsHide: true,
+      stdio: ['ignore', 'pipe', 'ignore']
+    });
+  } catch (error) {
+    console.warn('[focus-sampler] PowerShell sampler could not start:', error);
+    return false;
+  }
+  focusSampler = sampler;
+  sampler.stdout.on('data', (chunk) => {
     focusSamplerBuffer += chunk.toString();
     const lines = focusSamplerBuffer.split(/\r?\n/);
     focusSamplerBuffer = lines.pop() || '';
     lines.forEach(handleFocusSample);
   });
-  focusSampler.on('close', () => { focusSampler = null; });
+  sampler.on('error', (error) => {
+    console.warn('[focus-sampler] PowerShell sampler failed:', error);
+    if (focusSampler === sampler) focusSampler = null;
+  });
+  sampler.on('close', () => {
+    if (focusSampler === sampler) focusSampler = null;
+  });
+  return true;
 }
 
 function stopFocusRuntime() {
@@ -2907,34 +2953,35 @@ if (!gotLock) {
       }
       store = new JsonStore(resolvedStorage.filePath);
       store.load();
-      await recoverInterruptedFocusSessionOnStartup();
+      await runNonCriticalStartup('Windows Focus 恢复', recoverInterruptedFocusSessionOnStartup);
       planningService = createPlanningService({
         store,
         makeId: () => crypto.randomUUID(),
         onWorkspaceChanged: () => broadcastWorkspace()
       });
-      reconcileStaleAttendance();
-      cleanupExpiredBackups();
-      initializeUpdater();
       registerIpc();
       if (isPackagedSmokeTest()) {
+        await runNonCriticalStartup('自动更新', initializeUpdater);
         await runPackagedSmokeTest();
         return;
       }
       createWindow();
-      createTray();
-      updateLoginItemSetting(store.getSettings().startAtLogin);
-      const registeredShortcuts = registerWorkbenchShortcuts(store.getSettings(), { allowFallback: true });
+      await runNonCriticalStartup('考勤恢复', () => reconcileStaleAttendance());
+      await runNonCriticalStartup('备份清理', cleanupExpiredBackups);
+      await runNonCriticalStartup('系统托盘', createTray);
+      await runNonCriticalStartup('开机启动', () => updateLoginItemSetting(store.getSettings().startAtLogin));
+      const registeredShortcuts = await runNonCriticalStartup('全局快捷键', () => registerWorkbenchShortcuts(store.getSettings(), { allowFallback: true }));
       if (registeredShortcuts) {
         const current = store.getSettings();
         const changed = Object.fromEntries(Object.entries(registeredShortcuts).filter(([key, value]) => current[key] !== value));
         if (Object.keys(changed).length) store.updateSettings(changed);
       }
-      scheduler = setInterval(() => runScheduledWork().catch(() => {}), 60_000);
-      setTimeout(runDeadlineReminders, 1500);
-      setTimeout(runWorkspaceReminders, 1800);
-      resumeFocusRuntime();
-      resumeAttendanceRuntime();
+      await runNonCriticalStartup('自动更新', initializeUpdater);
+      scheduler = setInterval(() => runScheduledWork().catch((error) => console.error('[scheduler]', error)), 60_000);
+      setTimeout(() => runNonCriticalStartup('截止提醒', runDeadlineReminders), 1500);
+      setTimeout(() => runNonCriticalStartup('工作台提醒', runWorkspaceReminders), 1800);
+      await runNonCriticalStartup('Focus 运行时', resumeFocusRuntime);
+      await runNonCriticalStartup('考勤采样', resumeAttendanceRuntime);
       if (store.getSettings().autoCheckUpdates) {
         setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
       }
@@ -2972,7 +3019,7 @@ if (!gotLock) {
         app.exit(1);
         return;
       }
-      dialog.showErrorBox('研迹无法安全打开数据', error?.message || '数据文件损坏或格式不受支持。');
+      dialog.showErrorBox('研迹核心启动失败', error?.message || '核心数据或窗口初始化失败。');
       isQuitting = true;
       app.quit();
     }

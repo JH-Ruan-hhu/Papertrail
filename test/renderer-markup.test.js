@@ -517,3 +517,14 @@ test('release verification executes the packaged executable and inspects app.asa
   assert.match(verifyJs, /node_modules\/fs-extra\/package\.json/);
   assert.match(verifyJs, /src\/preload\.js/);
 });
+
+test('non-critical startup services degrade without aborting core startup', () => {
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(mainJs, /async function runNonCriticalStartup/);
+  assert.match(mainJs, /createWindow\(\);[\s\S]*runNonCriticalStartup\('系统托盘'/);
+  assert.match(mainJs, /runNonCriticalStartup\('自动更新', initializeUpdater\)/);
+  assert.match(mainJs, /runNonCriticalStartup\('Focus 运行时', resumeFocusRuntime\)/);
+  assert.match(mainJs, /sampler\.on\('error'/);
+  assert.match(mainJs, /recoveryProcess\.on\('error'/);
+  assert.match(mainJs, /研迹核心启动失败/);
+});
