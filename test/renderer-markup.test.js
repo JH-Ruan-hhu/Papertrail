@@ -224,8 +224,18 @@ test('installer and updater use Yanji-owned simplified interfaces', () => {
   assert.match(installer, /立即安装/);
   assert.match(installer, /安装不会移动或清除你的科研数据/);
   assert.match(installer, /Function YanjiEnsureDedicatedInstallFolder/);
+  assert.match(installer, /MUI_PAGE_CUSTOMFUNCTION_PRE YanjiBeforeInstall/);
+  assert.match(installer, /Function YanjiBeforeInstall[\s\S]*StrCpy \$INSTDIR "\$0"/);
   assert.match(installer, /DeleteRegKey HKCU "\$\{UNINSTALL_REGISTRY_KEY\}"/);
+  assert.match(installer, /DeleteRegKey HKLM "\$\{UNINSTALL_REGISTRY_KEY\}"/);
+  assert.match(installer, /DeleteRegKey HKLM "\$\{INSTALL_REGISTRY_KEY\}"/);
+  assert.match(installer, /!insertmacro setInstallModePerUser/);
+  assert.match(installer, /StrCpy \$hasPerMachineInstallation "0"/);
+  assert.match(installer, /StrCpy \$hasPerUserInstallation "1"/);
+  assert.match(installer, /!insertmacro GetDParameter \$R0/);
   assert.match(installer, /StrCpy \$INSTDIR "\$YanjiLegacyInstallRoot\\研迹"/);
+  assert.match(installer, /CreateShortCut "\$newStartMenuLink" "\$INSTDIR\\\$\{APP_EXECUTABLE_FILENAME\}"/);
+  assert.match(installer, /CreateShortCut "\$newDesktopLink" "\$INSTDIR\\\$\{APP_EXECUTABLE_FILENAME\}"/);
   assert.match(installer, /Normalize the default or migrated path/);
   assert.match(indexHtml, /class="update-journey"/);
   assert.match(indexHtml, /检查版本[\s\S]*安全下载[\s\S]*重启升级/);

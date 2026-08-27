@@ -7,6 +7,7 @@ const path = require('node:path');
 const { spawn } = require('node:child_process');
 
 function findPackagedExe(outputRoot) {
+  if (fs.existsSync(outputRoot) && fs.statSync(outputRoot).isFile() && outputRoot.toLowerCase().endsWith('.exe')) return path.resolve(outputRoot);
   const unpacked = path.resolve(outputRoot, 'win-unpacked');
   const preferred = path.join(unpacked, '研迹.exe');
   if (fs.existsSync(preferred)) return preferred;

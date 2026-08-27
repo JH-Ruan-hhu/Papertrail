@@ -48,16 +48,50 @@ FunctionEnd
   # directly. Its generated uninstaller then treated that whole directory as
   # application-owned. Ignore only those unsafe legacy registrations and move
   # the replacement installation into a dedicated child folder.
-  ReadRegStr $0 HKCU "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
+  ReadRegStr $0 HKCU "${INSTALL_REGISTRY_KEY}" "InstallLocation"
+  ReadRegStr $2 HKCU "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
   ${If} $0 != ""
-    ${GetFileName} "$INSTDIR" $3
+  ${AndIf} $2 != ""
+    ${GetFileName} "$0" $3
     ${If} $3 != "研迹"
     ${AndIf} $3 != "Yanji"
     ${AndIf} $3 != "PaperTrail"
-      StrCpy $YanjiLegacyInstallRoot "$INSTDIR"
+      StrCpy $YanjiLegacyInstallRoot "$0"
       DeleteRegKey HKCU "${UNINSTALL_REGISTRY_KEY}"
-      StrCpy $INSTDIR "$YanjiLegacyInstallRoot\研迹"
+      DeleteRegKey HKCU "${INSTALL_REGISTRY_KEY}"
     ${EndIf}
+  ${EndIf}
+
+  # A v1.3.0 elevated/silent installation may have written the same unsafe
+  # location under HKLM. Remove only the app's registry records; never invoke
+  # the legacy uninstaller because it may own the shared parent directory.
+  ReadRegStr $0 HKLM "${INSTALL_REGISTRY_KEY}" "InstallLocation"
+  ReadRegStr $2 HKLM "${UNINSTALL_REGISTRY_KEY}" "UninstallString"
+  ${If} $0 != ""
+  ${AndIf} $2 != ""
+    ${GetFileName} "$0" $3
+    ${If} $3 != "研迹"
+    ${AndIf} $3 != "Yanji"
+    ${AndIf} $3 != "PaperTrail"
+      ${If} $YanjiLegacyInstallRoot == ""
+        StrCpy $YanjiLegacyInstallRoot "$0"
+      ${EndIf}
+      DeleteRegKey HKLM "${UNINSTALL_REGISTRY_KEY}"
+      DeleteRegKey HKLM "${INSTALL_REGISTRY_KEY}"
+    ${EndIf}
+  ${EndIf}
+
+  # Yanji is deliberately a per-user application. Enforce that decision for
+  # silent installs too, where the install-mode page is skipped and /allusers
+  # or a stale HKLM record could otherwise select a dangerous shared root.
+  !insertmacro setInstallModePerUser
+  StrCpy $hasPerMachineInstallation "0"
+  StrCpy $hasPerUserInstallation "1"
+
+  !insertmacro GetDParameter $R0
+  ${If} $YanjiLegacyInstallRoot != ""
+  ${AndIf} $R0 == ""
+    StrCpy $INSTDIR "$YanjiLegacyInstallRoot\研迹"
   ${EndIf}
 
   # Normalize the default or migrated path before the install page is shown.
@@ -71,7 +105,17 @@ FunctionEnd
 
 !macro customPageAfterChangeDir
   Page custom YanjiInstallPageCreate YanjiInstallPageLeave
+  # NSIS applies a silent /D override after .onInit. Normalize again in the
+  # InstFiles pre callback so /S /D=D:\app can never install into the shared
+  # parent itself.
+  !define MUI_PAGE_CUSTOMFUNCTION_PRE YanjiBeforeInstall
 !macroend
+
+Function YanjiBeforeInstall
+  StrCpy $0 "$INSTDIR"
+  Call YanjiEnsureDedicatedInstallFolder
+  StrCpy $INSTDIR "$0"
+FunctionEnd
 
 Function YanjiInstallPageCreate
   nsDialogs::Create 1018
@@ -170,7 +214,13 @@ Function YanjiInstallPageLeave
 FunctionEnd
 
 !macro customInstall
-  ${If} $YanjiDesktopWanted != ${BST_CHECKED}
+  # Never retain shortcut targets from an unsafe legacy shared-root install.
+  Delete "$newStartMenuLink"
+  CreateShortCut "$newStartMenuLink" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+  ${If} $YanjiDesktopWanted == ${BST_CHECKED}
+    Delete "$newDesktopLink"
+    CreateShortCut "$newDesktopLink" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+  ${Else}
     Delete "$newDesktopLink"
   ${EndIf}
 !macroend
