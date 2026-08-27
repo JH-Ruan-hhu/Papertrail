@@ -163,8 +163,7 @@ html[data-appearance="liquid-glass"] :is(
   .home-top-grid > section, .home-utility-stack > section, .home-content-grid > section,
   .focus-usage-panel, .attendance-summary article, .attendance-gantt-shell,
   .todo-toolbar, .todo-card, .schedule-board-shell, .notes-toolbar, .note-card,
-  .job-metric-strip article, .job-board-panel, .job-toolbar, .job-stage-column,
-  .job-interview-panel, .job-glance-panel, .content-section, .stats article,
+  .job-metric-strip article, .job-list-panel, .content-section, .stats article,
   .paper-card, .settings-group, .settings-note, .settings-about
 ) {
   color: var(--yanji-text);
@@ -177,10 +176,10 @@ html[data-appearance="liquid-glass"] :is(
 
 html[data-appearance="liquid-glass"] :is(
   .home-next-event-card, .home-today-card, .home-attendance-card, .todo-card,
-  .note-card, .paper-card, .job-card, .day-card
+  .note-card, .paper-card, .day-card
 ) { transition: transform 180ms var(--ease-out), border-color 180ms ease, box-shadow 200ms var(--ease-out), background-color 180ms ease; }
 
-html[data-appearance="liquid-glass"] :is(.todo-card, .note-card, .paper-card, .job-card):hover {
+html[data-appearance="liquid-glass"] :is(.todo-card, .note-card, .paper-card):hover {
   transform: translateY(-2px);
   background: rgba(255, 255, 255, .78);
   border-color: rgba(255, 255, 255, .92);
@@ -324,13 +323,21 @@ html[data-appearance="liquid-glass"] :is(.paper-accent, .production-card .paper-
 html[data-appearance="liquid-glass"] :is(.source-icon, .production-card .source-icon) { background: linear-gradient(145deg, #2977ee, #716fe5); }
 html[data-appearance="liquid-glass"] :is(.unread-badge, .tone-blue, .tone-violet) { color: #2958ba; background: rgba(226,237,255,.76); border-color: rgba(83,119,200,.18); }
 html[data-appearance="liquid-glass"] .job-metric-strip article { background: linear-gradient(145deg, rgba(255,255,255,.72), rgba(247,249,255,.48)); }
-html[data-appearance="liquid-glass"] .job-page .job-stage-column { background: var(--job-stage-surface, rgba(255,255,255,.5)); border-color: rgba(255,255,255,.72); }
-html[data-appearance="liquid-glass"] .job-stage-column > header,
-html[data-appearance="liquid-glass"] .job-stage-add { background: var(--job-stage-soft, rgba(226,239,255,.54)); border-color: rgba(98,119,160,.12); }
-html[data-appearance="liquid-glass"] .job-card {
+html[data-appearance="liquid-glass"] .job-list-panel { background: var(--glass-panel); border-color: rgba(255,255,255,.72); }
+html[data-appearance="liquid-glass"] .job-list-header { background: rgba(255,255,255,.42); border-color: rgba(98,119,160,.12); }
+html[data-appearance="liquid-glass"] .job-row-card {
   background: rgba(255,255,255,.68);
-  border-color: rgba(255,255,255,.82);
+  border-color: rgba(116,137,165,.1);
   box-shadow: 0 5px 15px rgba(45,70,118,.06), inset 0 1px rgba(255,255,255,.7);
+}
+html[data-appearance="liquid-glass"] :is(.job-page, #jobDialog) :is(
+  .job-filter-label select, .job-sort-direction,
+  .job-inline-control select, .job-inline-control input,
+  .job-workflow-stage-fields input, .job-workflow-stage-fields select,
+  .field input, .field select, .field textarea
+):not(:focus) {
+  border-color: rgba(88,111,159,.1);
+  box-shadow: inset 0 1px rgba(255,255,255,.52);
 }
 
 /* Settings and overlays */
@@ -386,8 +393,7 @@ html[data-appearance="liquid-glass"] .toast { background: rgba(17,30,55,.9); bac
     .home-top-grid > section, .home-utility-stack > section, .home-content-grid > section,
     .focus-usage-panel, .attendance-summary article, .attendance-gantt-shell,
     .todo-toolbar, .todo-card, .schedule-board-shell, .notes-toolbar, .note-card,
-    .job-metric-strip article, .job-board-panel, .job-toolbar, .job-stage-column,
-    .job-interview-panel, .job-glance-panel, .content-section, .stats article, .paper-card
+    .job-metric-strip article, .job-list-panel, .content-section, .stats article, .paper-card
   ) { background: #f7f9fd; }
 }
 
@@ -398,8 +404,7 @@ html[data-appearance="liquid-glass"] .toast { background: rgba(17,30,55,.9); bac
     .home-top-grid > section, .home-utility-stack > section, .home-content-grid > section,
     .focus-usage-panel, .attendance-summary article, .attendance-gantt-shell,
     .todo-toolbar, .todo-card, .schedule-board-shell, .notes-toolbar, .note-card,
-    .job-metric-strip article, .job-board-panel, .job-toolbar, .job-stage-column,
-    .job-interview-panel, .job-glance-panel, .content-section, .stats article, .paper-card
+    .job-metric-strip article, .job-list-panel, .content-section, .stats article, .paper-card
   ) { background: #f8f9fd; backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 
@@ -425,13 +430,13 @@ html[data-appearance="liquid-glass"] .toast { background: rgba(17,30,55,.9); bac
     .window-titlebar, .sidebar, .modal, dialog, .home-progress-strip,
     .home-next-event-card, .home-today-card, .home-attendance-card,
     .todo-toolbar, .todo-card, .schedule-board-shell, .note-card,
-    .job-stage-column, .content-section, .paper-card
+    .job-list-panel, .content-section, .paper-card
   ) { color: CanvasText; background: Canvas; border: 1px solid CanvasText; box-shadow: none; }
 }
 
 html[data-appearance="classic"] body { background: #edf7fc; }
 html[data-appearance="classic"] .sidebar { background: #e4f1f6; }
-html[data-appearance="classic"] :is(.home-next-event-card, .home-today-card, .home-attendance-card, .todo-toolbar, .todo-card, .job-stage-column) {
+html[data-appearance="classic"] :is(.home-next-event-card, .home-today-card, .home-attendance-card, .todo-toolbar, .todo-card, .job-list-panel) {
   box-shadow: 0 10px 28px rgba(26,63,79,.08);
   backdrop-filter: none;
   -webkit-backdrop-filter: none;

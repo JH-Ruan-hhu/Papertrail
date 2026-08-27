@@ -189,37 +189,38 @@
         </section>
 
         <section class="workbench-page job-page" data-page="jobs" hidden>
-          <header class="page-head-row">
-            <div><p class="eyebrow">CAREER DASHBOARD</p><h1>求职驾驶舱</h1><p>按当前状态管理机会，笔试与面试可随招聘流程自由切换</p></div>
-            <div class="page-actions"><button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 添加岗位</button></div>
+          <header class="page-head-row job-page-head">
+            <div><p class="job-date-kicker" id="jobTodayLabel">— · Offer 职来</p><h1>投递中控台</h1><p>把每个机会的招聘流程、下一步和截止时间放在同一张桌面上</p></div>
+            <label class="search-box job-page-search" for="jobSearch"><span aria-hidden="true">⌕</span><input id="jobSearch" type="search" placeholder="搜索公司、岗位、行业、城市、备注..." autocomplete="off"></label>
           </header>
           <section class="job-metric-strip" aria-label="求职关键指标">
-            <article class="tone-offer"><span>Offer 数</span><strong id="jobOfferCount">0</strong><small>已收获结果</small></article>
-            <article class="tone-interview"><span>面试中</span><strong id="jobInterviewCount">0</strong><small>当前处于面试状态</small></article>
-            <article class="tone-salary"><span>最高预估年薪</span><strong id="jobMaxSalary">—</strong><small>按岗位合约估算</small></article>
-            <article class="tone-submitted"><span>全部机会</span><strong id="jobSubmittedCount">0</strong><small>当前记录的岗位总数</small></article>
-            <article class="tone-rate"><span>活跃机会</span><strong id="jobAdvanceRate">0</strong><small>尚未获得 Offer</small></article>
+            <article class="tone-added"><strong id="jobTotalJobs">0</strong><div class="job-metric-copy"><span>全部岗位</span><small>当前记录总数</small></div></article>
+            <article class="tone-applied"><strong id="jobTodayApplied">0</strong><div class="job-metric-copy"><span>今日投递</span><small>今日新增 <b id="jobTodayAdded">0</b></small></div></article>
+            <article class="tone-review"><strong id="jobAwaitingReview">0</strong><div class="job-metric-copy"><span>待评估</span><small>还未开始推进</small></div></article>
+            <article class="tone-deadline"><strong id="jobDueSoon">0</strong><div class="job-metric-copy"><span>7 天内截止</span><small>含今天的截止日期</small></div></article>
+            <article class="tone-progress"><strong id="jobInProgress">0</strong><div class="job-metric-copy"><span>流程进行中</span><small>状态为进行中</small></div></article>
           </section>
-          <div class="job-dashboard-grid">
-            <section class="job-board-panel">
-              <div class="panel-heading"><div><p class="eyebrow">STATUS BOARD</p><h2>投递看板</h2><p>按当前状态归位，点击岗位即可自由更新进展</p></div></div>
-              <section class="job-toolbar" aria-label="求职记录筛选">
-                <label class="search-box" for="jobSearch"><input id="jobSearch" type="search" placeholder="搜索单位、岗位、地点或备注" autocomplete="off"></label>
-                <label class="job-filter-label" for="jobStatusFilter"><span>状态</span><select id="jobStatusFilter"><option value="all">全部状态</option><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select></label>
-              </section>
-              <div id="jobBoard" class="job-board" aria-live="polite"></div>
-            </section>
-          </div>
-          <div class="job-insight-grid">
-            <section class="job-interview-panel">
-              <div class="panel-heading"><div><p class="eyebrow">INTERVIEWS</p><h2>面试管理</h2><p>集中查看已进入面试的机会</p></div></div>
-              <div id="jobInterviewList" class="job-interview-list"></div>
-            </section>
-            <section class="job-glance-panel">
-              <div class="panel-heading"><div><p class="eyebrow">STATUS MIX</p><h2>当前状态分布</h2><p>这里只表达岗位此刻所处状态，不假定固定先后顺序</p></div></div>
-              <div id="jobPipelineSummary" class="job-pipeline-summary"></div>
-            </section>
-          </div>
+          <nav id="jobQuickFilters" class="job-quick-filters" aria-label="求职快捷筛选"></nav>
+          <section class="job-list-panel" aria-label="岗位列表">
+            <div class="job-list-toolbar">
+              <div class="job-filter-row">
+                <label class="job-filter-label" for="jobStatusFilter"><span>状态</span><select id="jobStatusFilter"><option value="all">（不限）</option><option value="preparing">准备中</option><option value="active">进行中</option><option value="paused">暂停</option><option value="closed">已结束</option></select></label>
+                <label class="job-filter-label" for="jobPriorityFilter"><span>优先级</span><select id="jobPriorityFilter"><option value="all">（不限）</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
+                <label class="job-filter-label" for="jobCityFilter"><span>城市</span><select id="jobCityFilter"><option value="all">（不限）</option></select></label>
+                <label class="job-filter-label" for="jobSortFilter"><span>排序</span><select id="jobSortFilter"><option value="updatedAt">最近更新</option><option value="createdAt">创建时间</option><option value="deadline">截止时间</option><option value="nextFollowUpAt">下次跟进</option><option value="company">公司名称</option></select></label>
+                <button class="job-sort-direction" id="jobSortDirectionButton" type="button">↓ 降序</button>
+                <span class="job-result-summary" id="jobResultSummary">0 / 0 个岗位</span>
+              </div>
+              <div class="job-list-actions">
+                <button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 新增岗位</button>
+                <button class="button secondary" id="importJobsButton" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4M5 14v5h14v-5"/></svg> 导入岗位</button>
+                <button class="button text-button job-export-button" id="exportJobsButton" type="button">导出 / 备份</button>
+                <button class="button icon-button" id="jobSettingsButton" type="button" aria-label="打开求职设置"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
+              </div>
+            </div>
+            <div class="job-list-header" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>截止时间</span><span>状态</span><span>优先级</span><span>下次跟进</span><span>备注</span><span>操作</span></div>
+            <div id="jobBoard" class="job-list-body" aria-live="polite"></div>
+          </section>
         </section>
 
         <section class="workbench-page submissions-page" data-page="submissions" hidden>
@@ -259,7 +260,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.3.1</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.3.2</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -392,7 +393,7 @@
                   <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button primary" id="updateActionButton" type="button">检查更新</button></div>
                 </div>
                 <div class="update-version-overview" aria-label="版本信息">
-                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.3.1</span></strong><small>正在使用</small></div>
+                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.3.2</span></strong><small>正在使用</small></div>
                   <span class="update-version-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
                   <div class="update-version-card target"><span>可用版本</span><strong id="updateTargetVersion">等待检查</strong><small>来自 GitHub Release</small></div>
                 </div>
@@ -575,19 +576,27 @@
 
     <dialog id="jobDialog" class="modal workbench-editor-modal job-editor-modal">
       <form method="dialog" id="jobForm">
-        <div class="modal-head"><div><p class="eyebrow">APPLICATION</p><h2 id="jobDialogTitle">添加求职岗位</h2><p>记录当前阶段与明确的下一步，减少重复翻找</p></div></div>
+        <div class="modal-head"><div><p class="eyebrow">APPLICATION</p><h2 id="jobDialogTitle">添加求职岗位</h2><p>每个岗位可以拥有自己的招聘流程，阶段名称与顺序都能随时调整</p></div></div>
         <input id="jobId" type="hidden">
         <div class="form-grid job-form-grid">
           <div class="field"><label for="jobCompany">单位名称</label><input id="jobCompany" maxlength="200" placeholder="例如：某某环保科技" required></div>
           <div class="field"><label for="jobRole">岗位名称</label><input id="jobRole" maxlength="300" placeholder="例如：环境研发工程师" required></div>
-          <div class="field"><label for="jobStatus">当前状态</label><select id="jobStatus"><option value="submitted">已投递</option><option value="written-1">一轮笔试</option><option value="written-2">二轮笔试</option><option value="interview">面试</option><option value="offer">Offer</option></select><small>可在任意状态之间切换，不受页面排列顺序限制</small></div>
-          <div class="field"><label for="jobLocation">地点</label><input id="jobLocation" maxlength="200" placeholder="城市 / 远程"></div>
+          <div class="field"><label for="jobCompanyType">企业类型</label><input id="jobCompanyType" maxlength="160" placeholder="例如：国企 / 科技公司"></div>
+          <div class="field"><label for="jobCity">城市</label><input id="jobCity" maxlength="200" placeholder="城市 / 远程"></div>
+          <div class="field"><label for="jobDeadline">截止时间</label><input id="jobDeadline" type="date"></div>
+          <div class="field"><label for="jobStatus">岗位状态</label><select id="jobStatus"><option value="preparing">准备中</option><option value="active">进行中</option><option value="paused">暂停</option><option value="closed">已结束</option></select><small>岗位状态与招聘流程当前阶段相互独立</small></div>
+          <div class="field"><label for="jobPriority">优先级</label><select id="jobPriority"><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></div>
           <div class="field"><label for="jobAnnualSalaryWan">预估年薪（万元）</label><input id="jobAnnualSalaryWan" type="number" min="0.1" max="10000" step="0.1" inputmode="decimal" placeholder="例如：41.1"></div>
           <div class="field"><label for="jobAppliedAt">投递日期</label><input id="jobAppliedAt" type="date"></div>
-          <div class="field"><label for="jobNextActionAt">下一步时间</label><input id="jobNextActionAt" type="datetime-local"></div>
+          <div class="field"><label for="jobNextFollowUpAt">下次跟进</label><input id="jobNextFollowUpAt" type="date"></div>
           <div class="field full"><label for="jobSourceUrl">招聘链接</label><input id="jobSourceUrl" type="url" maxlength="2048" placeholder="https://…"></div>
           <div class="field full"><label for="jobContact">联系人 / 渠道</label><input id="jobContact" maxlength="300" placeholder="招聘平台、内推人或 HR 联系方式"></div>
           <div class="field full"><label for="jobNotes">备注</label><textarea id="jobNotes" rows="4" maxlength="10000" placeholder="岗位亮点、准备重点、反馈与下一步"></textarea></div>
+          <section class="job-workflow-field full" aria-labelledby="jobWorkflowLabel">
+            <div class="job-workflow-heading"><div><label id="jobWorkflowLabel">招聘流程</label><p>阶段日期用于记录关键节点；当前阶段只表示这份岗位现在走到哪里。</p></div><button class="text-button" id="resetJobWorkflowButton" type="button">恢复默认流程</button></div>
+            <div id="jobWorkflowEditor" class="job-workflow-editor"></div>
+            <button class="button secondary job-add-stage-button" id="addJobStageButton" type="button">＋ 添加阶段</button>
+          </section>
         </div>
         <p id="jobError" class="form-error"></p>
         <div class="modal-actions"><button class="button tertiary danger-quiet" id="deleteJobButton" type="button" hidden>删除</button><span class="modal-spacer"></span><button class="button secondary" id="cancelJobButton" type="button">取消</button><button class="button primary" id="saveJobButton" type="button">保存岗位</button></div>

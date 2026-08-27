@@ -861,74 +861,133 @@ app.whenReady().then(async () => {
       (async () => {
         document.querySelector('[data-workbench-page="jobs"]').click();
         window.scrollTo(0, 0);
-        const initialCards = document.querySelectorAll('#jobBoard .job-card').length;
-        const stageHeights = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => Math.round(column.getBoundingClientRect().height));
-        const stageWidths = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => Math.round(column.getBoundingClientRect().width));
-        const stageColors = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => getComputedStyle(column).backgroundColor);
-        const stageTops = [...document.querySelectorAll('#jobBoard .job-stage-column')].map((column) => Math.round(column.getBoundingClientRect().top));
-        const cardAnatomy = [...document.querySelectorAll('#jobBoard .job-card')].every((card) => (
-          card.querySelector('.job-card-company')
-          && card.querySelector('.job-card-role')
-          && card.querySelector('.job-card-location')
-          && card.querySelector('.job-card-notes')
+        await new Promise((resolve) => setTimeout(resolve, 80));
+        const rows = [...document.querySelectorAll('#jobBoard .job-row-card')];
+        const initialRows = rows.length;
+        const workflowLengths = rows.map((row) => row.querySelectorAll('.job-flow-stage').length);
+        const rowAnatomy = rows.every((row) => (
+          row.querySelector('.job-primary-cell')
+          && row.querySelector('.job-type-cell')
+          && row.querySelector('.job-city-cell')
+          && row.querySelector('.job-deadline-cell')
+          && row.querySelector('[data-job-field="status"]')
+          && row.querySelector('[data-job-field="priority"]')
+          && row.querySelector('[data-job-field="nextFollowUpAt"]')
+          && row.querySelector('[data-job-field="notes"]')
+          && row.querySelector('[data-edit-job]')
+          && row.querySelector('[data-delete-job]')
         ));
-        const cardsAreEditors = [...document.querySelectorAll('#jobBoard .job-card')].every((card) => card.matches('[data-edit-job][tabindex="0"]'));
-        const editButtonsRemoved = !document.querySelector('#jobBoard .job-card-actions, #jobBoard .job-card .text-button');
-        const statusActionsAtTop = [...document.querySelectorAll('#jobBoard .job-status-button')].every((button) => button.closest('.job-card-top-actions'));
-        const pendingRemoved = !document.querySelector('.stage-pending, [data-add-job="pending"], option[value="pending"]');
+        const priorityDots = rows.every((row) => row.querySelector('.job-priority-dot.priority-high, .job-priority-dot.priority-medium, .job-priority-dot.priority-low'));
+        const firstRow = rows[0];
+        const compactInlineControls = Boolean(firstRow)
+          && (firstRow.querySelector('[data-job-field="status"]')?.getBoundingClientRect().width || 0) <= 81
+          && (firstRow.querySelector('[data-job-field="priority"]')?.getBoundingClientRect().width || 0) <= 49
+          && (firstRow.querySelector('[data-job-field="nextFollowUpAt"]')?.getBoundingClientRect().width || 0) <= 145
+          && (firstRow.querySelector('[data-job-field="notes"]')?.getBoundingClientRect().width || 0) <= 145;
+        const dynamicWorkflow = new Set(workflowLengths).size >= 3 && workflowLengths.includes(3) && workflowLengths.includes(8);
+        const railHasCurrent = rows.every((row) => row.querySelector('.job-flow-stage.current'));
+        const emptyWorkflowNodes = rows.every((row) => [...row.querySelectorAll('.job-flow-node')].every((node) => node.textContent.trim() === ''));
+        const endpointPairs = rows.map((row) => {
+          const nodes = [...row.querySelectorAll('.job-flow-node')];
+          const first = nodes[0]?.getBoundingClientRect();
+          const last = nodes.at(-1)?.getBoundingClientRect();
+          return [first ? Math.round(first.left + first.width / 2) : null, last ? Math.round(last.left + last.width / 2) : null];
+        });
+        const alignedEndpoints = endpointPairs.length > 0 && endpointPairs.every(([first, last]) => first === endpointPairs[0][0] && last === endpointPairs[0][1]);
+        const noLegacyStatusOptions = !document.querySelector('#jobBoard option[value="submitted"], #jobBoard option[value="written-1"], #jobBoard option[value="interview"], #jobBoard option[value="offer"]');
+        const metricIds = ['jobTotalJobs', 'jobTodayAdded', 'jobTodayApplied', 'jobAwaitingReview', 'jobDueSoon', 'jobInProgress'];
+        const metricsRendered = metricIds.every((id) => document.getElementById(id)?.textContent !== '');
+        const metricsCompact = [...document.querySelectorAll('.job-metric-strip article')].every((card) => card.firstElementChild?.matches('strong') && card.querySelector('.job-metric-copy'));
+        const headerColumns = document.querySelectorAll('.job-list-header > span').length === 9;
+        const quickFiltersRendered = document.querySelectorAll('#jobQuickFilters [data-job-quick-filter]').length >= 10;
         const headerCreateOnly = Boolean(document.getElementById('addJobButton')) && !document.querySelector('#jobBoard [data-add-job]');
-        const meterWidths = [...document.querySelectorAll('#jobPipelineSummary .job-pipeline-row > i > b')].map((bar) => Math.round(bar.getBoundingClientRect().width));
-        document.querySelector('#jobBoard .job-card').click();
-        const cardClickOpensEditor = document.getElementById('jobDialog').open;
+        rows[0]?.querySelector('[data-edit-job]')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        const detailEditorOpens = document.getElementById('jobDialog').open;
+        const editorStageCount = document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-row]').length;
         document.getElementById('cancelJobButton').click();
         document.getElementById('addJobButton').click();
         document.getElementById('jobCompany').value = '新增环保公司';
         document.getElementById('jobRole').value = '研发工程师';
-        document.getElementById('jobStatus').value = 'submitted';
+        document.getElementById('jobStatus').value = 'active';
         document.getElementById('saveJobButton').click();
         await new Promise((resolve) => setTimeout(resolve, 80));
-        const added = document.querySelectorAll('#jobBoard .job-card').length === initialCards + 1;
-        const totalBeforeStatusChange = document.getElementById('jobSubmittedCount')?.textContent;
-        document.querySelector('[data-edit-job="job-submitted-1"]').click();
-        document.getElementById('jobStatus').value = 'interview';
+        const added = document.querySelectorAll('#jobBoard .job-row-card').length === initialRows + 1;
+        const inlineStatus = document.querySelector('[data-job-id="job-submitted-1"][data-job-field="status"]');
+        inlineStatus.value = 'paused';
+        inlineStatus.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const inlineSaved = document.querySelector('[data-job-id="job-submitted-1"][data-job-field="status"]')?.value === 'paused';
+        const statusFilter = document.getElementById('jobStatusFilter');
+        statusFilter.value = 'paused';
+        statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        const filterWorks = document.querySelectorAll('#jobBoard .job-row-card').length === 1;
+        statusFilter.value = 'all';
+        statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        document.querySelector('[data-job-quick-filter="high-priority"]')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        statusFilter.value = 'active';
+        statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        const combinedRows = [...document.querySelectorAll('#jobBoard .job-row-card')];
+        const combinedFilterWorks = combinedRows.length > 0 && combinedRows.every((row) => row.querySelector('[data-job-field="status"]')?.value === 'active' && row.querySelector('[data-job-field="priority"]')?.value === 'high');
+        statusFilter.value = 'all';
+        statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        document.querySelector('[data-job-quick-filter="all"]')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        document.querySelector('[data-job-id="job-written-1"] [data-edit-job]')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 40));
+        const workflowBeforeEdit = document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-row]').length;
+        const firstStageName = document.querySelector('#jobWorkflowEditor [data-workflow-stage-name]');
+        firstStageName.value = '沟通';
+        firstStageName.dispatchEvent(new Event('input', { bubbles: true }));
+        document.getElementById('addJobStageButton').click();
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        const workflowAfterAdd = document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-row]').length;
+        document.querySelector('#jobWorkflowEditor [data-workflow-stage-row]:last-child [data-workflow-stage-name]').value = '终点';
         document.getElementById('saveJobButton').click();
-        await new Promise((resolve) => setTimeout(resolve, 80));
-        const interviewFirst = Boolean(document.querySelector('.stage-interview [data-edit-job="job-submitted-1"]'));
-        document.querySelector('.stage-interview [data-edit-job="job-submitted-1"]').click();
-        document.getElementById('jobStatus').value = 'written-1';
-        document.getElementById('saveJobButton').click();
-        await new Promise((resolve) => setTimeout(resolve, 80));
-        const writtenAfterInterview = Boolean(document.querySelector('.stage-written-1 [data-edit-job="job-submitted-1"]'));
-        const totalAfterStatusChange = document.getElementById('jobSubmittedCount')?.textContent;
+        await new Promise((resolve) => setTimeout(resolve, 90));
+        const savedWorkflow = document.querySelector('[data-job-id="job-written-1"]')?.querySelectorAll('.job-flow-stage').length === workflowAfterAdd;
+        document.querySelector('[data-workbench-page="home"]').click();
+        await new Promise((resolve) => setTimeout(resolve, 45));
+        const homeSummary = document.querySelectorAll('#homeJobSummary .home-job-row').length === 4;
+        document.querySelector('[data-workbench-page="jobs"]').click();
+        await new Promise((resolve) => setTimeout(resolve, 45));
         return {
           pageVisible: !document.querySelector('[data-page="jobs"]').hidden,
-          fiveStates: document.querySelectorAll('#jobBoard .job-stage-column').length === 5,
-          stageColors,
-          distinctStateColors: new Set(stageColors).size === 5,
-          singleStageRow: new Set(stageTops).size === 1,
-          cardAnatomy,
-          cardsAreEditors,
-          editButtonsRemoved,
-          statusActionsAtTop,
-          pendingRemoved,
+          initialRows,
+          workflowLengths,
+          dynamicWorkflow,
+          railHasCurrent,
+          emptyWorkflowNodes,
+          alignedEndpoints,
+          rowAnatomy,
+          priorityDots,
+          compactInlineControls,
+          noLegacyStatusOptions,
+          metricsRendered,
+          metricsCompact,
+          headerColumns,
+          quickFiltersRendered,
           headerCreateOnly,
-          cardClickOpensEditor,
-          readableStageWidths: stageWidths.every((width) => width >= 198),
-          fixedStageHeights: new Set(stageHeights).size === 1 && stageHeights[0] === 420,
-          upcomingPanelRemoved: !document.querySelector('.job-upcoming-panel') && !document.getElementById('jobUpcomingCount'),
-          salaryMetric: document.getElementById('jobMaxSalary')?.textContent === '41.1万',
-          initialCards,
-          proportionalMeters: new Set(meterWidths).size >= 2,
+          detailEditorOpens,
+          editorStageCount,
           added,
-          totalRetained: totalBeforeStatusChange === totalAfterStatusChange && Number(totalAfterStatusChange) >= 7,
-          interviewFirst,
-          writtenAfterInterview,
-          homeSummary: document.querySelectorAll('#homeJobSummary .home-job-row').length === 5,
+          inlineSaved,
+          filterWorks,
+          combinedFilterWorks,
+          workflowBeforeEdit,
+          workflowAfterAdd: workflowAfterAdd === workflowBeforeEdit + 1,
+          savedWorkflow,
+          homeSummary,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!jobsResult.pageVisible || !jobsResult.fiveStates || !jobsResult.distinctStateColors || !jobsResult.singleStageRow || !jobsResult.cardAnatomy || !jobsResult.cardsAreEditors || !jobsResult.editButtonsRemoved || !jobsResult.statusActionsAtTop || !jobsResult.pendingRemoved || !jobsResult.headerCreateOnly || !jobsResult.cardClickOpensEditor || !jobsResult.readableStageWidths || !jobsResult.fixedStageHeights || !jobsResult.upcomingPanelRemoved || !jobsResult.salaryMetric || jobsResult.initialCards < 6 || !jobsResult.proportionalMeters || !jobsResult.added || !jobsResult.totalRetained || !jobsResult.interviewFirst || !jobsResult.writtenAfterInterview || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 3 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || !jobsResult.workflowAfterAdd || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);

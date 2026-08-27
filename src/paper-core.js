@@ -209,7 +209,23 @@ function migrateData(parsed, defaultSettings) {
   const v9 = Number(v8.data.version || 8) <= 9
     ? migrateSchema8To9(v8.data)
     : { data: v8.data, changed: false };
-  const migrated = migrateSchema9To10(v9.data);
+  const v9Version = Number(v9.data.version || 9);
+  let migrated;
+  let shouldNormalizeJobRecords = false;
+  if (v9Version <= 9) {
+    migrated = migrateSchema9To10(v9.data);
+    shouldNormalizeJobRecords = true;
+  } else {
+    if (v9Version > DATA_VERSION) throw new Error(`数据文件来自更高版本（v${v9Version}），当前研迹无法安全打开。`);
+    if (v9.data.jobApplications != null && !Array.isArray(v9.data.jobApplications)) throw new Error('求职记录列表格式无效。');
+    for (const [index, item] of (v9.data.jobApplications || []).entries()) {
+      if (!asObject(item)) throw new Error(`第 ${index + 1} 条求职记录格式无效。`);
+    }
+    // v1.3.1 already stores schema 10. Keep those records in place and let
+    // the renderer normalize them lazily; saving one record upgrades only
+    // that record instead of rewriting the entire job collection on startup.
+    migrated = { data: v9.data, changed: false };
+  }
   const source = migrated.data;
   const settings = source.settings;
   const papers = (source.papers || []).map(migratePaper).map((paper) => (
@@ -221,7 +237,9 @@ function migrateData(parsed, defaultSettings) {
   const metadataFields = (source.metadataFields || []).map(normalizeMetadataField);
   const attendance = (source.attendance || []).map((record, index) => normalizeAttendance(record, index));
   const focusSessions = (source.focusSessions || []).map((session, index) => normalizeFocusSession(session, index));
-  const jobApplications = (source.jobApplications || []).map((item, index) => normalizeJobApplication(item, index));
+  const jobApplications = shouldNormalizeJobRecords
+    ? (source.jobApplications || []).map((item, index) => normalizeJobApplication(item, index))
+    : (source.jobApplications || []);
   const data = {
     ...source,
     version: DATA_VERSION,

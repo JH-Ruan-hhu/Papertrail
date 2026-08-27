@@ -3,43 +3,92 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  JOB_STATUSES,
+  DEFAULT_WORKFLOW_STAGES,
+  JOB_LIFECYCLE_STATUSES,
   deleteJobApplication,
-  nextJobStatus,
+  moveWorkflowStage,
   normalizeJobApplication,
+  removeWorkflowStage,
+  renameWorkflowStage,
   saveJobApplication
 } = require('../src/job-core');
 
-test('normalizes a local job application and constrains its source URL', () => {
+test('normalizes a local job application with an independent lifecycle and workflow', () => {
   const job = normalizeJobApplication({
     id: 'job-1',
     company: '  环境科技公司  ',
     role: '研发工程师',
-    status: 'interview',
+    companyType: '科技公司',
+    city: '南京',
+    deadline: '2026-09-30',
+    priority: 'high',
+    status: 'active',
+    nextFollowUpAt: '2026-08-28',
+    workflow: {
+      stages: [{ id: 'apply', name: '投递' }, { id: 'screen', name: '网测' }, { id: 'final', name: '终面' }],
+      currentStageId: 'screen',
+      timeline: [{ stageId: 'apply', date: '2026-08-14' }, { stageId: 'screen', date: '2026-08-28' }]
+    },
     annualSalaryWan: '41.14',
     sourceUrl: 'https://jobs.example.com/role?id=1',
     createdAt: '2026-08-24T00:00:00.000Z'
   });
   assert.equal(job.company, '环境科技公司');
-  assert.equal(job.status, 'interview');
+  assert.equal(job.status, 'active');
+  assert.deepEqual(JOB_LIFECYCLE_STATUSES, ['preparing', 'active', 'paused', 'closed']);
+  assert.equal(job.companyType, '科技公司');
+  assert.equal(job.city, '南京');
+  assert.equal(job.location, '南京');
+  assert.equal(job.priority, 'high');
+  assert.equal(job.workflow.currentStageId, 'screen');
+  assert.deepEqual(job.workflow.stages.map((stage) => stage.id), ['apply', 'screen', 'final']);
+  assert.equal(job.workflow.timeline[1].stageId, 'screen');
   assert.equal(job.annualSalaryWan, 41.1);
   assert.equal(job.sourceUrl, 'https://jobs.example.com/role?id=1');
   assert.equal(normalizeJobApplication({ sourceUrl: 'file:///secret' }).sourceUrl, null);
 });
 
-test('creates, freely changes status and deletes job applications', () => {
+test('maps legacy stage statuses without forcing a startup rewrite', () => {
+  const cases = [
+    ['submitted', '投递', 'active'],
+    ['written-1', '网测', 'active'],
+    ['written-2', '二面', 'active'],
+    ['interview', '面试', 'active'],
+    ['offer', 'Offer', 'closed']
+  ];
+  for (const [status, stageName, lifecycle] of cases) {
+    const job = normalizeJobApplication({ company: '单位', role: '岗位', status, appliedAt: '2026-08-14' });
+    const current = job.workflow.stages.find((stage) => stage.id === job.workflow.currentStageId);
+    assert.equal(current.name, stageName);
+    assert.equal(job.status, lifecycle);
+  }
+  const empty = normalizeJobApplication({ company: '单位', role: '岗位', workflow: { stages: [], currentStageId: 'missing' } });
+  assert.deepEqual(empty.workflow.stages, DEFAULT_WORKFLOW_STAGES);
+  assert.equal(empty.workflow.currentStageId, DEFAULT_WORKFLOW_STAGES[0].id);
+});
+
+test('creates, updates and deletes workflow stages while keeping the current stage valid', () => {
   const now = '2026-08-24T08:00:00.000Z';
-  let jobs = saveJobApplication([], { company: '水务集团', role: '环境工程师', status: 'pending' }, now, () => 'job-1');
+  let jobs = saveJobApplication([], { company: '水务集团', role: '环境工程师', status: 'preparing' }, now, () => 'job-1');
   assert.equal(jobs[0].id, 'job-1');
-  assert.equal(jobs[0].status, 'submitted');
+  assert.equal(jobs[0].status, 'preparing');
   assert.equal(jobs[0].appliedAt, now);
-  jobs = saveJobApplication(jobs, { ...jobs[0], status: 'interview' }, '2026-08-25T08:00:00.000Z');
-  jobs = saveJobApplication(jobs, { ...jobs[0], status: 'written-1' }, '2026-08-26T08:00:00.000Z');
-  assert.equal(jobs[0].status, 'written-1');
-  assert.equal(jobs[0].revision, 3);
-  assert.equal(nextJobStatus('submitted'), 'written-1');
-  assert.equal(nextJobStatus('offer'), null);
-  assert.deepEqual(JOB_STATUSES, ['submitted', 'written-1', 'written-2', 'interview', 'offer']);
+  const custom = {
+    stages: [{ id: 'phone', name: '电话沟通' }, { id: 'case', name: '案例题' }, { id: 'offer', name: 'Offer' }],
+    currentStageId: 'case',
+    timeline: [{ stageId: 'phone', date: '2026-08-25' }, { stageId: 'case', date: '2026-08-26' }]
+  };
+  jobs = saveJobApplication(jobs, { ...jobs[0], status: 'active', workflow: custom }, '2026-08-25T08:00:00.000Z');
+  assert.equal(jobs[0].status, 'active');
+  assert.equal(jobs[0].workflow.currentStageId, 'case');
+  assert.equal(jobs[0].revision, 2);
+  const renamed = renameWorkflowStage(jobs[0].workflow, 'case', '技术面');
+  assert.equal(renamed.stages[1].name, '技术面');
+  const moved = moveWorkflowStage(renamed, 'case', 'up');
+  assert.deepEqual(moved.stages.map((stage) => stage.id), ['case', 'phone', 'offer']);
+  const removed = removeWorkflowStage(moved, 'case');
+  assert.equal(removed.currentStageId, 'phone');
+  assert.equal(removed.timeline.some((item) => item.stageId === 'case'), false);
   assert.deepEqual(deleteJobApplication(jobs, 'job-1'), []);
 });
 

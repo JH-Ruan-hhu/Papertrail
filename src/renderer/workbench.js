@@ -20,7 +20,11 @@ const wb = {
   noteEditGeneration: 0,
   noteSelection: null,
   previewingNoteImage: null,
-  scheduleDraftTimer: null
+  scheduleDraftTimer: null,
+  jobQuickFilter: 'all',
+  jobSort: 'updatedAt',
+  jobSortDirection: 'desc',
+  editingJobWorkflow: null
 };
 
 function syncViewportDensity() {
@@ -43,13 +47,49 @@ const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '�
 const SCHEDULE_DRAFT_KEY = 'yanji.scheduleDraft.v1';
 const DAILY_PLAN_KEY = 'yanji.dailyPlanShown.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
-const JOB_STATUSES = Object.freeze(['submitted', 'written-1', 'written-2', 'interview', 'offer']);
-const JOB_STATUS_LABELS = Object.freeze({ submitted: '已投递', 'written-1': '一轮笔试', 'written-2': '二轮笔试', interview: '面试', offer: 'Offer' });
+const JOB_LIFECYCLE_OPTIONS = Object.freeze([
+  ['preparing', '准备中'],
+  ['active', '进行中'],
+  ['paused', '暂停'],
+  ['closed', '已结束']
+]);
+const JOB_PRIORITY_OPTIONS = Object.freeze([
+  ['high', '高'],
+  ['medium', '中'],
+  ['low', '低']
+]);
+const JOB_QUICK_FILTER_OPTIONS = Object.freeze([
+  ['all', '全部岗位'],
+  ['today-added', '今天新增'],
+  ['awaiting-review', '待评估'],
+  ['high-priority', '高优先级'],
+  ['due-soon', '快截止'],
+  ['submitted', '已投递'],
+  ['interviewing', '面试中'],
+  ['follow-up', '待跟进'],
+  ['incomplete', '未完成'],
+  ['imported', '历史导入'],
+  ['has-notes', '有备注'],
+  ['closed', '已结束']
+]);
+const DEFAULT_JOB_WORKFLOW_STAGES = Object.freeze([
+  Object.freeze({ id: 'stage-apply', name: '投递' }),
+  Object.freeze({ id: 'stage-online-test', name: '网测' }),
+  Object.freeze({ id: 'stage-first-interview', name: '一面' }),
+  Object.freeze({ id: 'stage-second-interview', name: '二面' }),
+  Object.freeze({ id: 'stage-final-interview', name: '终面' }),
+  Object.freeze({ id: 'stage-offer', name: 'Offer' })
+]);
 const UI_ICON_PATHS = Object.freeze({
   check: '<path d="m6 12 4 4 8-9"/>',
   chevron: '<path d="m9 6 6 6-6 6"/>',
   note: '<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h4M9 12h6M9 16h4"/>',
-  external: '<path d="M13 5h6v6M19 5l-8 8"/><path d="M17 13v6H5V7h6"/>'
+  external: '<path d="M13 5h6v6M19 5l-8 8"/><path d="M17 13v6H5V7h6"/>',
+  eye: '<path d="M3.5 12s3.1-5 8.5-5 8.5 5 8.5 5-3.1 5-8.5 5-8.5-5-8.5-5Z"/><circle cx="12" cy="12" r="2"/>',
+  trash: '<path d="M5 7h14M9 7V4h6v3M7 7l.8 13h8.4L17 7M10 11v5M14 11v5"/>',
+  upload: '<path d="M12 16V4M8 8l4-4 4 4M5 14v5h14v-5"/>',
+  download: '<path d="M12 4v12M8 12l4 4 4-4M5 19h14"/>',
+  settings: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/>'
 });
 
 function uiIcon(name, className = 'ui-icon') {
@@ -206,7 +246,7 @@ function renderHome() {
   document.getElementById('navScheduleCount').textContent = String(wb.workspace.schedules.filter((item) => Date.parse(item.startAt) >= Date.now() - 86_400_000).length);
   document.getElementById('navTodoCount').textContent = String(wb.workspace.todos.filter((item) => item.status === 'open').length);
   document.getElementById('navNoteCount').textContent = String(wb.workspace.notes.length);
-  document.getElementById('navJobCount').textContent = String(wb.workspace.jobApplications.filter((item) => item.status !== 'offer').length);
+  document.getElementById('navJobCount').textContent = String(wb.workspace.jobApplications.filter((item) => item.status !== 'closed').length);
   document.getElementById('navAttendanceCount').textContent = String(new Set(wb.workspace.attendance.filter((item) => item.date >= localDateKey(startOfWeek(new Date()))).map((item) => item.date)).size);
   renderHomeJobs();
   renderHomeCommandCards(today);
@@ -224,8 +264,124 @@ function jobDateLabel(value, options = { month: 'numeric', day: 'numeric' }) {
   return new Intl.DateTimeFormat('zh-CN', options).format(new Date(value));
 }
 
-function currentJobCounts(jobs) {
-  return Object.fromEntries(JOB_STATUSES.map((status) => [status, jobs.filter((item) => item.status === status).length]));
+function localDateInputValue(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? localDateKey(date) : '';
+}
+
+function dateInputToIso(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12, 0, 0, 0);
+  return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+}
+
+function defaultJobWorkflow() {
+  const stages = DEFAULT_JOB_WORKFLOW_STAGES.map((stage) => ({ ...stage }));
+  return { stages, currentStageId: stages[0].id, timeline: [] };
+}
+
+function clientJobWorkflow(value) {
+  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+  const rawStages = Array.isArray(source.stages) && source.stages.length ? source.stages : defaultJobWorkflow().stages;
+  const used = new Set();
+  const stages = rawStages.map((rawStage, index) => {
+    const stage = rawStage && typeof rawStage === 'object' ? rawStage : {};
+    const baseId = String(stage.id || `stage-${index + 1}`).trim().slice(0, 120) || `stage-${index + 1}`;
+    let id = baseId;
+    let suffix = 2;
+    while (used.has(id)) id = `${baseId}-${suffix++}`;
+    used.add(id);
+    return { id, name: String(stage.name || `阶段 ${index + 1}`).trim().slice(0, 120) || `阶段 ${index + 1}` };
+  });
+  const stageIds = new Set(stages.map((stage) => stage.id));
+  const timelineByStage = new Map();
+  if (Array.isArray(source.timeline)) {
+    source.timeline.forEach((item) => {
+      const stageId = String(item?.stageId || '').trim();
+      if (!stageIds.has(stageId) || !item?.date || !Number.isFinite(Date.parse(item.date))) return;
+      timelineByStage.set(stageId, { stageId, date: new Date(item.date).toISOString() });
+    });
+  }
+  const currentStageId = stageIds.has(source.currentStageId) ? source.currentStageId : stages[0].id;
+  return {
+    stages,
+    currentStageId,
+    timeline: stages.filter((stage) => timelineByStage.has(stage.id)).map((stage) => timelineByStage.get(stage.id))
+  };
+}
+
+function cloneJobWorkflow(value) {
+  return JSON.parse(JSON.stringify(clientJobWorkflow(value)));
+}
+
+function jobWorkflowStageIndex(job) {
+  const workflow = clientJobWorkflow(job?.workflow);
+  const index = workflow.stages.findIndex((stage) => stage.id === workflow.currentStageId);
+  return index >= 0 ? index : 0;
+}
+
+function jobCurrentStage(job) {
+  const workflow = clientJobWorkflow(job?.workflow);
+  return workflow.stages[jobWorkflowStageIndex({ ...job, workflow })] || workflow.stages[0];
+}
+
+function jobTimelineDate(workflow, stageId) {
+  return workflow.timeline.find((item) => item.stageId === stageId)?.date || null;
+}
+
+function jobDateWithinNextDays(value, now = new Date(), days = 7) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return false;
+  const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return timestamp >= start && timestamp <= start + days * 86_400_000;
+}
+
+function jobLifecycleCounts(jobs) {
+  return Object.fromEntries(JOB_LIFECYCLE_OPTIONS.map(([status]) => [status, jobs.filter((item) => item.status === status).length]));
+}
+
+function jobMatchesQuickFilter(job, filter, now = new Date()) {
+  const currentStage = jobCurrentStage(job);
+  switch (filter) {
+    case 'today-added': return sameDay(job.createdAt, now);
+    case 'awaiting-review': return job.status === 'preparing';
+    case 'high-priority': return job.priority === 'high';
+    case 'due-soon': return jobDateWithinNextDays(job.deadline, now, 7);
+    case 'submitted': return jobWorkflowStageIndex(job) === 0;
+    case 'interviewing': return /面/.test(currentStage?.name || '');
+    case 'follow-up': return job.status !== 'closed' && jobDateWithinNextDays(job.nextFollowUpAt, now, 7);
+    case 'incomplete': return job.status !== 'closed';
+    case 'imported': return job.imported === true;
+    case 'has-notes': return Boolean(job.notes);
+    case 'closed': return job.status === 'closed';
+    default: return true;
+  }
+}
+
+function jobQuickFilterCounts(jobs, now = new Date()) {
+  return Object.fromEntries(JOB_QUICK_FILTER_OPTIONS.map(([filter]) => [filter, jobs.filter((job) => jobMatchesQuickFilter(job, filter, now)).length]));
+}
+
+function sortJobs(jobs) {
+  const sorted = [...jobs];
+  const direction = wb.jobSortDirection === 'asc' ? 1 : -1;
+  const textValue = (job) => `${job.company || ''} ${job.role || ''}`;
+  const dateValue = (value) => {
+    const timestamp = Date.parse(value);
+    return Number.isFinite(timestamp) ? timestamp : 0;
+  };
+  sorted.sort((left, right) => {
+    let comparison = 0;
+    if (wb.jobSort === 'company') comparison = textValue(left).localeCompare(textValue(right), 'zh-CN');
+    else if (wb.jobSort === 'createdAt') comparison = dateValue(left.createdAt) - dateValue(right.createdAt);
+    else if (wb.jobSort === 'deadline') comparison = dateValue(left.deadline) - dateValue(right.deadline);
+    else if (wb.jobSort === 'nextFollowUpAt') comparison = dateValue(left.nextFollowUpAt) - dateValue(right.nextFollowUpAt);
+    else comparison = dateValue(left.updatedAt) - dateValue(right.updatedAt);
+    return comparison ? comparison * direction : textValue(left).localeCompare(textValue(right), 'zh-CN');
+  });
+  return sorted;
 }
 
 function renderHomeJobs() {
@@ -233,93 +389,196 @@ function renderHomeJobs() {
   if (!container) return;
   const jobs = wb.workspace.jobApplications || [];
   if (!jobs.length) {
-    container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="submitted" type="button">添加第一个岗位</button></div>';
+    container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="preparing" type="button">添加第一个岗位</button></div>';
     return;
   }
-  const groups = [
-    ['submitted', '已投递'],
-    ['written-1', '一轮笔试'],
-    ['written-2', '二轮笔试'],
-    ['interview', '面试'],
-    ['offer', 'Offer']
-  ];
-  const currentCounts = currentJobCounts(jobs);
-  const counts = groups.map(([status]) => currentCounts[status]);
-  const maximum = Math.max(1, ...counts);
-  container.innerHTML = groups.map(([status, label], index) => `<button class="home-job-row" data-go-page="jobs" data-job-home-filter="${status}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[index], maximum)}"></b></i><strong>${counts[index]}</strong></button>`).join('');
+  const counts = jobLifecycleCounts(jobs);
+  const maximum = Math.max(1, ...Object.values(counts));
+  container.innerHTML = JOB_LIFECYCLE_OPTIONS.map(([status, label], index) => `<button class="home-job-row" data-go-page="jobs" data-job-home-filter="${status}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[status], maximum)}"></b></i><strong>${counts[status]}</strong></button>`).join('');
+}
+
+function renderJobQuickFilters(jobs, now = new Date()) {
+  const container = document.getElementById('jobQuickFilters');
+  if (!container) return;
+  const counts = jobQuickFilterCounts(jobs, now);
+  container.innerHTML = JOB_QUICK_FILTER_OPTIONS.map(([filter, label]) => `<button class="job-quick-filter${wb.jobQuickFilter === filter ? ' active' : ''}" data-job-quick-filter="${filter}" type="button">${label}<b>${counts[filter]}</b></button>`).join('');
+}
+
+function renderJobCityFilter(jobs) {
+  const select = document.getElementById('jobCityFilter');
+  if (!select) return;
+  const current = select.value;
+  const cities = [...new Set(jobs.map((job) => job.city || job.location).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
+  select.innerHTML = `<option value="all">（不限）</option>${cities.map((city) => `<option value="${wbEscape(city)}">${wbEscape(city)}</option>`).join('')}`;
+  select.value = cities.includes(current) ? current : 'all';
+}
+
+function jobWorkflowTrackHtml(job) {
+  const workflow = clientJobWorkflow(job.workflow);
+  const currentIndex = jobWorkflowStageIndex({ ...job, workflow });
+  const currentStage = workflow.stages[currentIndex] || workflow.stages[0];
+  const stageCount = workflow.stages.length;
+  const progress = stageCount > 1 ? Math.round((currentIndex / (stageCount - 1)) * 10000) / 100 : 0;
+  const stages = workflow.stages.map((stage, index) => {
+    const state = index < currentIndex ? 'completed' : index === currentIndex ? 'current' : 'pending';
+    const date = jobTimelineDate(workflow, stage.id);
+    return `<div class="job-flow-stage ${state}" aria-current="${state === 'current' ? 'step' : 'false'}"><span class="job-flow-node" aria-hidden="true"></span><span class="job-flow-name">${wbEscape(stage.name)}</span><span class="job-flow-date">${date ? wbEscape(jobDateLabel(date, { month: '2-digit', day: '2-digit' })) : '未记录'}</span></div>`;
+  }).join('');
+  return `<div class="job-workflow-track-shell" aria-label="招聘流程，共 ${stageCount} 个阶段，当前为 ${wbEscape(currentStage?.name || '未设置')}"><div class="job-workflow-track" data-job-stage-count="${stageCount}" style="--job-progress: ${progress}%">${stages}</div></div>`;
+}
+
+function fitJobWorkflowTracks() {
+  document.querySelectorAll('#jobBoard .job-workflow-track').forEach((track) => {
+    const count = track.children.length;
+    if (!count) return;
+    track.style.gridTemplateColumns = `repeat(${count}, minmax(0, 1fr))`;
+    track.style.minWidth = `max(100%, ${count * 72}px)`;
+    const trackWidth = track.getBoundingClientRect().width;
+    const cellWidth = trackWidth / count;
+    const endpointInset = Math.min(trackWidth * 0.095, Math.max(32, cellWidth - 32));
+    track.style.setProperty('--job-end-inset', `${endpointInset}px`);
+    track.style.setProperty('--job-end-inset-right', `${Math.max(28, endpointInset - 10)}px`);
+  });
+}
+
+function jobStatusOptions(selected) {
+  return JOB_LIFECYCLE_OPTIONS.map(([status, label]) => `<option value="${status}"${selected === status ? ' selected' : ''}>${label}</option>`).join('');
+}
+
+function jobPriorityOptions(selected) {
+  return JOB_PRIORITY_OPTIONS.map(([priority, label]) => `<option value="${priority}"${selected === priority ? ' selected' : ''}>${label}</option>`).join('');
+}
+
+function jobRowHtml(job) {
+  const city = job.city || job.location || '';
+  const deadline = job.deadline ? jobDateLabel(job.deadline, { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—';
+  const deadlineClass = jobDateWithinNextDays(job.deadline, new Date(), 7) ? ' is-soon' : (Date.parse(job.deadline) < Date.now() ? ' is-overdue' : '');
+  const sourceButton = job.sourceUrl ? `<button class="job-source-button" data-open-job-source="${wbEscape(job.sourceUrl)}" type="button" aria-label="打开 ${wbEscape(job.company)} 的招聘链接">${uiIcon('external')}</button>` : '';
+  const currentStage = jobCurrentStage(job);
+  return `<article class="job-row-card job-row-status-${wbEscape(job.status)}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}"><div class="job-row-grid"><div class="job-primary-cell"><div class="job-primary-line"><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div>${sourceButton}</div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-follow-cell"><span class="sr-only">${wbEscape(job.company)}下次跟进</span><input data-job-field="nextFollowUpAt" data-job-id="${wbEscape(job.id)}" type="date" value="${wbEscape(localDateInputValue(job.nextFollowUpAt))}" aria-label="${wbEscape(job.company)}下次跟进日期"></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-row-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
 }
 
 function renderJobs() {
   const jobs = wb.workspace.jobApplications || [];
-  const query = document.getElementById('jobSearch').value.trim().toLowerCase();
-  const statusFilter = document.getElementById('jobStatusFilter').value;
-  const counts = currentJobCounts(jobs);
-  const maximum = Math.max(1, ...Object.values(counts));
-  document.getElementById('jobPipelineSummary').innerHTML = JOB_STATUSES.map((status, index) => `<div class="job-pipeline-row"><span><b>${String(index + 1).padStart(2, '0')}</b>${JOB_STATUS_LABELS[status]}</span><i><b class="${jobMeterClass(counts[status], maximum)}"></b></i><strong>${counts[status]}</strong></div>`).join('');
-  const active = jobs.filter((item) => item.status !== 'offer').length;
-  document.getElementById('jobInterviewCount').textContent = String(counts.interview);
-  document.getElementById('jobOfferCount').textContent = String(counts.offer);
-  const salaries = jobs.map((item) => Number(item.annualSalaryWan)).filter((value) => Number.isFinite(value) && value > 0);
-  const maxSalary = salaries.length ? Math.max(...salaries) : null;
-  document.getElementById('jobMaxSalary').textContent = maxSalary == null ? '—' : `${Number.isInteger(maxSalary) ? maxSalary : maxSalary.toFixed(1)}万`;
-  document.getElementById('jobSubmittedCount').textContent = String(jobs.length);
-  document.getElementById('jobAdvanceRate').textContent = String(active);
-  const interviews = jobs.filter((item) => item.status === 'interview').sort((a, b) => Date.parse(a.nextActionAt || a.updatedAt) - Date.parse(b.nextActionAt || b.updatedAt));
-  document.getElementById('jobInterviewList').innerHTML = interviews.length ? interviews.slice(0, 4).map((item) => `<button class="job-interview-row" data-edit-job="${wbEscape(item.id)}" type="button"><span class="job-company-monogram">${wbEscape(item.company.slice(0, 1))}</span><span><strong>${wbEscape(item.role)}</strong><small>${wbEscape(item.company)}${item.location ? ` · ${wbEscape(item.location)}` : ''}</small></span><time>${item.nextActionAt ? jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '待安排'}</time><b>面试中</b></button>`).join('') : '<div class="job-panel-empty">还没有进入面试的岗位</div>';
+  const now = new Date();
+  const query = document.getElementById('jobSearch')?.value.trim().toLowerCase() || '';
+  const statusFilter = document.getElementById('jobStatusFilter')?.value || 'all';
+  const priorityFilter = document.getElementById('jobPriorityFilter')?.value || 'all';
+  renderJobCityFilter(jobs);
+  const cityFilter = document.getElementById('jobCityFilter')?.value || 'all';
+  renderJobQuickFilters(jobs, now);
 
-  const visible = jobs.filter((item) => {
-    const matchesStatus = statusFilter === 'all' || item.status === statusFilter;
-    const searchable = `${item.company} ${item.role} ${item.location || ''} ${item.contact || ''} ${item.notes || ''}`.toLowerCase();
-    return matchesStatus && searchable.includes(query);
-  });
-  const statuses = statusFilter === 'all' ? JOB_STATUSES : [statusFilter];
-  document.getElementById('jobBoard').innerHTML = statuses.map((status) => {
-    const stageJobs = visible.filter((item) => item.status === status).sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
-    const cards = stageJobs.map((item) => {
-      const facts = [item.annualSalaryWan ? `预估 ${item.annualSalaryWan} 万/年` : null, item.appliedAt ? `投递 ${jobDateLabel(item.appliedAt)}` : null].filter(Boolean);
-      const nextAction = item.nextActionAt ? `<span class="job-next-action ${Date.parse(item.nextActionAt) < Date.now() ? 'is-overdue' : ''}">下一步 ${jobDateLabel(item.nextActionAt, { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })}</span>` : '';
-      const sourceButton = item.sourceUrl ? `<button class="job-source-button" data-open-job-source="${wbEscape(item.sourceUrl)}" type="button" aria-label="打开 ${wbEscape(item.company)} 的招聘链接">${uiIcon('external')}</button>` : '';
-      const statusButton = item.status === 'offer' ? '<span class="job-offer-badge">已获 Offer</span>' : `<button class="button compact secondary job-status-button" data-edit-job="${wbEscape(item.id)}" type="button">更新状态</button>`;
-      return `<article class="job-card" data-edit-job="${wbEscape(item.id)}" role="button" tabindex="0" aria-label="编辑 ${wbEscape(item.company)} ${wbEscape(item.role)}"><div class="job-card-head"><div><strong class="job-card-company">${wbEscape(item.company)}</strong><h3 class="job-card-role">${wbEscape(item.role)}</h3></div><div class="job-card-top-actions">${sourceButton}${statusButton}</div></div><p class="job-card-location">${wbEscape(item.location || '地点待确认')}</p><p class="job-card-notes${item.notes ? '' : ' is-empty'}">${wbEscape(item.notes || '暂无备注')}</p>${facts.length ? `<div class="job-card-facts">${facts.map((fact) => `<span>${wbEscape(fact)}</span>`).join('')}</div>` : ''}${nextAction}</article>`;
-    }).join('');
-    return `<section class="job-stage-column stage-${status}"><header><div><span>${JOB_STATUS_LABELS[status]}</span><small>${counts[status]} 个岗位</small></div><div class="job-stage-header-actions"><b>${counts[status]}</b></div></header><div class="job-stage-cards">${cards || '<div class="job-stage-empty">这个状态还没有岗位</div>'}</div></section>`;
+  const todayAdded = jobs.filter((job) => sameDay(job.createdAt, now)).length;
+  const todayApplied = jobs.filter((job) => sameDay(job.appliedAt, now)).length;
+  const awaitingReview = jobs.filter((job) => job.status === 'preparing').length;
+  const dueSoon = jobs.filter((job) => jobDateWithinNextDays(job.deadline, now, 7)).length;
+  const inProgress = jobs.filter((job) => job.status === 'active').length;
+  document.getElementById('jobTotalJobs').textContent = String(jobs.length);
+  document.getElementById('jobTodayAdded').textContent = String(todayAdded);
+  document.getElementById('jobTodayApplied').textContent = String(todayApplied);
+  document.getElementById('jobAwaitingReview').textContent = String(awaitingReview);
+  document.getElementById('jobDueSoon').textContent = String(dueSoon);
+  document.getElementById('jobInProgress').textContent = String(inProgress);
+  document.getElementById('jobTodayLabel').textContent = `${localDateKey(now)} · Offer 职来`;
+
+  const visible = sortJobs(jobs.filter((job) => {
+    const searchable = `${job.company} ${job.role} ${job.companyType || ''} ${job.city || job.location || ''} ${job.contact || ''} ${job.notes || ''} ${jobCurrentStage(job)?.name || ''}`.toLowerCase();
+    return (statusFilter === 'all' || job.status === statusFilter)
+      && (priorityFilter === 'all' || job.priority === priorityFilter)
+      && (cityFilter === 'all' || (job.city || job.location || '') === cityFilter)
+      && (wb.jobQuickFilter === 'all' || jobMatchesQuickFilter(job, wb.jobQuickFilter, now))
+      && searchable.includes(query);
+  }));
+  document.getElementById('jobResultSummary').textContent = `${visible.length} / ${jobs.length} 个岗位`;
+  document.getElementById('jobSortDirectionButton').textContent = wb.jobSortDirection === 'asc' ? '↑ 升序' : '↓ 降序';
+  document.getElementById('jobBoard').innerHTML = visible.length
+    ? visible.map(jobRowHtml).join('')
+    : `<div class="job-list-empty"><span>${jobs.length ? '⌕' : '＋'}</span><strong>${jobs.length ? '没有符合条件的岗位' : '还没有岗位记录'}</strong><p>${jobs.length ? '试试清空搜索或调整筛选条件。' : '添加第一条岗位，开始记录每一次机会。'}</p>${jobs.length ? '' : '<button class="button secondary" data-add-job="preparing" type="button">添加岗位</button>'}</div>`;
+  fitJobWorkflowTracks();
+}
+
+function renderWorkflowEditor(workflow = wb.editingJobWorkflow) {
+  const editor = document.getElementById('jobWorkflowEditor');
+  if (!editor) return;
+  wb.editingJobWorkflow = cloneJobWorkflow(workflow || defaultJobWorkflow());
+  const currentId = wb.editingJobWorkflow.currentStageId;
+  editor.innerHTML = wb.editingJobWorkflow.stages.map((stage, index) => {
+    const date = jobTimelineDate(wb.editingJobWorkflow, stage.id);
+    const current = stage.id === currentId;
+    return `<div class="job-workflow-stage-row" data-workflow-stage-row data-stage-index="${index}"><span class="job-workflow-grip" aria-hidden="true">⋮⋮</span><div class="job-workflow-stage-fields"><input data-workflow-stage-name maxlength="120" value="${wbEscape(stage.name)}" aria-label="阶段 ${index + 1}名称"><label><span>阶段日期</span><input data-workflow-stage-date type="date" value="${wbEscape(localDateInputValue(date))}" aria-label="${wbEscape(stage.name)}日期"></label></div><div class="job-workflow-stage-actions">${current ? '<span class="job-current-badge">当前阶段</span>' : `<button data-workflow-set-current type="button">设为当前</button>`}<button data-workflow-move="up" type="button"${index === 0 ? ' disabled' : ''} aria-label="上移阶段">↑</button><button data-workflow-move="down" type="button"${index === wb.editingJobWorkflow.stages.length - 1 ? ' disabled' : ''} aria-label="下移阶段">↓</button><button class="danger" data-workflow-delete type="button" aria-label="删除阶段">${uiIcon('trash')}</button></div></div>`;
   }).join('');
 }
 
-function openJobEditor(job = null, initialStatus = 'submitted') {
+function readWorkflowEditor() {
+  const workflow = cloneJobWorkflow(wb.editingJobWorkflow || defaultJobWorkflow());
+  const rows = [...document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-row]')];
+  rows.forEach((row, index) => {
+    const stage = workflow.stages[index];
+    if (!stage) return;
+    stage.name = row.querySelector('[data-workflow-stage-name]')?.value.trim().slice(0, 120) || `阶段 ${index + 1}`;
+    const date = dateInputToIso(row.querySelector('[data-workflow-stage-date]')?.value);
+    workflow.timeline = workflow.timeline.filter((item) => item.stageId !== stage.id);
+    if (date) workflow.timeline.push({ stageId: stage.id, date });
+  });
+  workflow.currentStageId = workflow.stages.some((stage) => stage.id === workflow.currentStageId) ? workflow.currentStageId : workflow.stages[0].id;
+  wb.editingJobWorkflow = workflow;
+  return workflow;
+}
+
+function updateEditingWorkflowDate(stageId, value) {
+  const workflow = readWorkflowEditor();
+  workflow.timeline = workflow.timeline.filter((item) => item.stageId !== stageId);
+  const date = dateInputToIso(value);
+  if (date) workflow.timeline.push({ stageId, date });
+  wb.editingJobWorkflow = workflow;
+}
+
+function openJobEditor(job = null, initialStatus = 'preparing') {
   const dialog = document.getElementById('jobDialog');
   document.getElementById('jobForm').reset();
   document.getElementById('jobId').value = job?.id || '';
   document.getElementById('jobDialogTitle').textContent = job ? '编辑求职岗位' : '添加求职岗位';
   document.getElementById('jobCompany').value = job?.company || '';
   document.getElementById('jobRole').value = job?.role || '';
-  document.getElementById('jobStatus').value = job?.status || (JOB_STATUSES.includes(initialStatus) ? initialStatus : 'submitted');
-  document.getElementById('jobLocation').value = job?.location || '';
+  document.getElementById('jobCompanyType').value = job?.companyType || '';
+  document.getElementById('jobCity').value = job?.city || job?.location || '';
+  document.getElementById('jobDeadline').value = localDateInputValue(job?.deadline);
+  document.getElementById('jobStatus').value = job?.status || (JOB_LIFECYCLE_OPTIONS.some(([status]) => status === initialStatus) ? initialStatus : 'preparing');
+  document.getElementById('jobPriority').value = job?.priority || 'medium';
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
-  document.getElementById('jobAppliedAt').value = job?.appliedAt?.slice(0, 10) || '';
-  document.getElementById('jobNextActionAt').value = localDateTimeInputValue(job?.nextActionAt);
+  document.getElementById('jobAppliedAt').value = localDateInputValue(job?.appliedAt);
+  document.getElementById('jobNextFollowUpAt').value = localDateInputValue(job?.nextFollowUpAt || job?.nextActionAt);
   document.getElementById('jobSourceUrl').value = job?.sourceUrl || '';
   document.getElementById('jobContact').value = job?.contact || '';
   document.getElementById('jobNotes').value = job?.notes || '';
   document.getElementById('jobError').textContent = '';
   document.getElementById('deleteJobButton').hidden = !job;
   dialog.dataset.revision = String(job?.revision ?? '');
+  wb.editingJobWorkflow = cloneJobWorkflow(job?.workflow || defaultJobWorkflow());
+  renderWorkflowEditor(wb.editingJobWorkflow);
   openWorkbenchDialog(dialog);
   requestAnimationFrame(() => document.getElementById('jobCompany').focus());
 }
 
 async function saveJobFromEditor() {
   const error = document.getElementById('jobError');
-  const nextActionValue = document.getElementById('jobNextActionAt').value;
+  const city = document.getElementById('jobCity').value;
+  const nextFollowUpAt = dateInputToIso(document.getElementById('jobNextFollowUpAt').value);
   const payload = {
     id: document.getElementById('jobId').value || undefined,
     company: document.getElementById('jobCompany').value,
     role: document.getElementById('jobRole').value,
+    companyType: document.getElementById('jobCompanyType').value,
+    city,
+    location: city,
+    deadline: dateInputToIso(document.getElementById('jobDeadline').value),
+    priority: document.getElementById('jobPriority').value,
     status: document.getElementById('jobStatus').value,
-    location: document.getElementById('jobLocation').value,
     annualSalaryWan: document.getElementById('jobAnnualSalaryWan').value,
-    appliedAt: document.getElementById('jobAppliedAt').value || null,
-    nextActionAt: nextActionValue ? new Date(nextActionValue).toISOString() : null,
+    appliedAt: dateInputToIso(document.getElementById('jobAppliedAt').value),
+    nextFollowUpAt,
+    nextActionAt: nextFollowUpAt,
+    workflow: readWorkflowEditor(),
     sourceUrl: document.getElementById('jobSourceUrl').value,
     contact: document.getElementById('jobContact').value,
     notes: document.getElementById('jobNotes').value,
@@ -328,12 +587,80 @@ async function saveJobFromEditor() {
   try {
     const saved = await workbenchApi.saveJobApplication(payload);
     wb.workspace.jobApplications = [saved, ...wb.workspace.jobApplications.filter((item) => item.id !== saved.id)];
+    wb.editingJobWorkflow = null;
     closeWorkbenchDialog(document.getElementById('jobDialog'));
     renderHome();
     if (wb.page === 'jobs') renderJobs();
     showWorkbenchToast('求职记录已保存');
   } catch (exception) {
     error.textContent = exception.message || '求职记录保存失败。';
+  }
+}
+
+async function saveJobInlineField(id, field, value) {
+  const current = wb.workspace.jobApplications.find((item) => item.id === id);
+  if (!current) return;
+  const patch = {};
+  if (field === 'nextFollowUpAt') {
+    patch.nextFollowUpAt = dateInputToIso(value);
+    patch.nextActionAt = patch.nextFollowUpAt;
+  } else if (field === 'notes') {
+    patch.notes = value;
+  } else {
+    patch[field] = value;
+  }
+  try {
+    const saved = await workbenchApi.saveJobApplication({ ...current, ...patch, revision: current.revision });
+    wb.workspace.jobApplications = wb.workspace.jobApplications.map((item) => item.id === saved.id ? saved : item);
+    renderHome();
+    renderJobs();
+    showWorkbenchToast('岗位信息已更新');
+  } catch (exception) {
+    showWorkbenchToast(exception.message || '岗位信息更新失败。', 'error');
+  }
+}
+
+async function deleteJobById(id) {
+  const job = wb.workspace.jobApplications.find((item) => item.id === id);
+  if (!job) return false;
+  const accepted = await window.yanjiConfirm({ title: '删除求职记录', message: `“${job.company} · ${job.role}”将被永久删除，此操作无法撤销`, confirmText: '删除记录', tone: 'danger' });
+  if (!accepted) return false;
+  try {
+    await workbenchApi.deleteJobApplication(id);
+    wb.workspace.jobApplications = wb.workspace.jobApplications.filter((item) => item.id !== id);
+    const dialog = document.getElementById('jobDialog');
+    if (dialog.open && document.getElementById('jobId').value === id) closeWorkbenchDialog(dialog);
+    renderHome();
+    if (wb.page === 'jobs') renderJobs();
+    showWorkbenchToast('求职记录已删除');
+    return true;
+  } catch (exception) {
+    const error = document.getElementById('jobError');
+    if (document.getElementById('jobDialog').open && document.getElementById('jobId').value === id) error.textContent = exception.message || '删除失败。';
+    else showWorkbenchToast(exception.message || '删除失败。', 'error');
+    return false;
+  }
+}
+
+async function importJobRecords() {
+  try {
+    const result = await workbenchApi.importJobApplications();
+    if (result?.canceled) return;
+    wb.workspace.jobApplications = result.jobApplications || wb.workspace.jobApplications;
+    renderHome();
+    renderJobs();
+    showWorkbenchToast(`已导入 ${result.count || 0} 个岗位`);
+  } catch (exception) {
+    showWorkbenchToast(exception.message || '岗位导入失败。', 'error');
+  }
+}
+
+async function exportJobRecords() {
+  try {
+    const result = await workbenchApi.exportJobApplications();
+    if (!result?.canceled) showWorkbenchToast(`已导出 ${result.count || 0} 个岗位`);
+  } catch (exception) {
+    showWorkbenchToast(exception.message || '岗位导出失败。', 'error');
   }
 }
 
@@ -1413,19 +1740,89 @@ function bindWorkbenchEvents() {
   document.getElementById('cancelJobButton').addEventListener('click', () => closeWorkbenchDialog(document.getElementById('jobDialog')));
   document.getElementById('jobSearch').addEventListener('input', renderJobs);
   document.getElementById('jobStatusFilter').addEventListener('change', renderJobs);
-  document.getElementById('deleteJobButton').addEventListener('click', async () => {
-    const id = document.getElementById('jobId').value;
-    const accepted = id && await window.yanjiConfirm({ title: '删除求职记录', message: '这条岗位记录将被永久删除，此操作无法撤销', confirmText: '删除记录', tone: 'danger' });
-    if (!accepted) return;
-    try {
-      await workbenchApi.deleteJobApplication(id);
-      wb.workspace.jobApplications = wb.workspace.jobApplications.filter((item) => item.id !== id);
-      closeWorkbenchDialog(document.getElementById('jobDialog'));
-      renderHome();
-      renderJobs();
-      showWorkbenchToast('求职记录已删除');
-    } catch (exception) {
-      document.getElementById('jobError').textContent = exception.message || '删除失败。';
+  document.getElementById('jobPriorityFilter').addEventListener('change', renderJobs);
+  document.getElementById('jobCityFilter').addEventListener('change', renderJobs);
+  document.getElementById('jobSortFilter').addEventListener('change', (event) => { wb.jobSort = event.target.value; renderJobs(); });
+  document.getElementById('jobSortDirectionButton').addEventListener('click', () => {
+    wb.jobSortDirection = wb.jobSortDirection === 'asc' ? 'desc' : 'asc';
+    renderJobs();
+  });
+  document.getElementById('jobQuickFilters').addEventListener('click', (event) => {
+    const filter = event.target.closest('[data-job-quick-filter]')?.dataset.jobQuickFilter;
+    if (!filter) return;
+    wb.jobQuickFilter = filter;
+    if (filter === 'closed') document.getElementById('jobStatusFilter').value = 'closed';
+    else if (filter === 'all') document.getElementById('jobStatusFilter').value = 'all';
+    else document.getElementById('jobStatusFilter').value = 'all';
+    renderJobs();
+  });
+  document.getElementById('jobBoard').addEventListener('change', (event) => {
+    const control = event.target.closest('[data-job-field]');
+    if (!control) return;
+    saveJobInlineField(control.dataset.jobId, control.dataset.jobField, control.value);
+  });
+  document.getElementById('deleteJobButton').addEventListener('click', () => deleteJobById(document.getElementById('jobId').value));
+  document.getElementById('importJobsButton').addEventListener('click', importJobRecords);
+  document.getElementById('exportJobsButton').addEventListener('click', exportJobRecords);
+  document.getElementById('jobSettingsButton').addEventListener('click', () => switchWorkbenchPage('settings'));
+  document.getElementById('addJobStageButton').addEventListener('click', () => {
+    const workflow = readWorkflowEditor();
+    const idBase = `stage-${Date.now()}`;
+    let id = idBase;
+    let suffix = 2;
+    const ids = new Set(workflow.stages.map((stage) => stage.id));
+    while (ids.has(id)) id = `${idBase}-${suffix++}`;
+    workflow.stages.push({ id, name: '新阶段' });
+    wb.editingJobWorkflow = workflow;
+    renderWorkflowEditor(workflow);
+    requestAnimationFrame(() => document.querySelector('#jobWorkflowEditor [data-workflow-stage-row]:last-child [data-workflow-stage-name]')?.focus());
+  });
+  document.getElementById('resetJobWorkflowButton').addEventListener('click', () => {
+    wb.editingJobWorkflow = defaultJobWorkflow();
+    document.getElementById('jobError').textContent = '';
+    renderWorkflowEditor(wb.editingJobWorkflow);
+  });
+  document.getElementById('jobWorkflowEditor').addEventListener('input', (event) => {
+    const row = event.target.closest('[data-workflow-stage-row]');
+    if (!row || !event.target.matches('[data-workflow-stage-name]')) return;
+    const index = Number(row.dataset.stageIndex);
+    if (wb.editingJobWorkflow?.stages[index]) wb.editingJobWorkflow.stages[index].name = event.target.value.slice(0, 120);
+  });
+  document.getElementById('jobWorkflowEditor').addEventListener('change', (event) => {
+    const row = event.target.closest('[data-workflow-stage-row]');
+    if (!row || !event.target.matches('[data-workflow-stage-date]')) return;
+    updateEditingWorkflowDate(wb.editingJobWorkflow.stages[Number(row.dataset.stageIndex)].id, event.target.value);
+  });
+  document.getElementById('jobWorkflowEditor').addEventListener('click', (event) => {
+    const row = event.target.closest('[data-workflow-stage-row]');
+    if (!row) return;
+    const index = Number(row.dataset.stageIndex);
+    const workflow = readWorkflowEditor();
+    if (event.target.closest('[data-workflow-set-current]')) {
+      workflow.currentStageId = workflow.stages[index].id;
+      wb.editingJobWorkflow = workflow;
+      renderWorkflowEditor(workflow);
+      return;
+    }
+    const move = event.target.closest('[data-workflow-move]')?.dataset.workflowMove;
+    if (move && ((move === 'up' && index > 0) || (move === 'down' && index < workflow.stages.length - 1))) {
+      const targetIndex = move === 'up' ? index - 1 : index + 1;
+      [workflow.stages[index], workflow.stages[targetIndex]] = [workflow.stages[targetIndex], workflow.stages[index]];
+      wb.editingJobWorkflow = workflow;
+      renderWorkflowEditor(workflow);
+      return;
+    }
+    if (event.target.closest('[data-workflow-delete]')) {
+      if (workflow.stages.length <= 1) {
+        document.getElementById('jobError').textContent = '至少保留一个招聘阶段。';
+        return;
+      }
+      const deleted = workflow.stages[index];
+      workflow.stages.splice(index, 1);
+      workflow.timeline = workflow.timeline.filter((item) => item.stageId !== deleted.id);
+      if (workflow.currentStageId === deleted.id) workflow.currentStageId = workflow.stages[Math.min(index, workflow.stages.length - 1)].id;
+      wb.editingJobWorkflow = workflow;
+      renderWorkflowEditor(workflow);
     }
   });
   document.getElementById('jobDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget); });
@@ -1769,11 +2166,14 @@ function bindWorkbenchEvents() {
     const homeJobFilter = event.target.closest('[data-job-home-filter]');
     if (homeJobFilter) {
       switchWorkbenchPage('jobs');
+      wb.jobQuickFilter = 'all';
       document.getElementById('jobStatusFilter').value = homeJobFilter.dataset.jobHomeFilter;
       return renderJobs();
     }
     const addJobTarget = event.target.closest('[data-add-job]');
     if (addJobTarget) return openJobEditor(null, addJobTarget.dataset.addJob);
+    const deleteJobTarget = event.target.closest('[data-delete-job]');
+    if (deleteJobTarget) return deleteJobById(deleteJobTarget.dataset.deleteJob);
     const sourceJobTarget = event.target.closest('[data-open-job-source]');
     if (sourceJobTarget) return workbenchApi.openExternal(sourceJobTarget.dataset.openJobSource);
     const editJobTarget = event.target.closest('[data-edit-job]');
@@ -1818,10 +2218,10 @@ function bindWorkbenchEvents() {
     if (noteTarget) return openNoteEditor(wb.workspace.notes.find((item) => item.id === noteTarget.dataset.editNote), noteTarget);
   });
   document.body.addEventListener('keydown', (event) => {
-    const card = event.target.closest('.job-card[data-edit-job]');
+    const card = event.target.closest('.job-row-card');
     if (!card || event.target !== card || !['Enter', ' '].includes(event.key)) return;
     event.preventDefault();
-    openJobEditor(wb.workspace.jobApplications.find((item) => item.id === card.dataset.editJob));
+    openJobEditor(wb.workspace.jobApplications.find((item) => item.id === card.dataset.jobId));
   });
   document.getElementById('openQuickCaptureButton').addEventListener('click', () => workbenchApi.showCapture());
   document.getElementById('createStickyNoteButton').addEventListener('click', () => workbenchApi.createStickyNote());

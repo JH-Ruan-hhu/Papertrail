@@ -34,6 +34,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
   createStickyNote: () => ipcRenderer.invoke('notes:create-sticky'),
   saveJobApplication: (input) => ipcRenderer.invoke('jobs:save', input),
   deleteJobApplication: (id) => ipcRenderer.invoke('jobs:delete', id),
+  importJobApplications: () => ipcRenderer.invoke('jobs:import'),
+  exportJobApplications: () => ipcRenderer.invoke('jobs:export'),
   saveMetadataFields: (fields) => ipcRenderer.invoke('metadata:save-fields', fields),
   clockAttendance: (action) => ipcRenderer.invoke('attendance:clock', action),
   saveAttendance: (input) => ipcRenderer.invoke('attendance:save', input),

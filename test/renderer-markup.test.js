@@ -409,17 +409,30 @@ test('settings omit promotional and explanatory introduction cards', () => {
   assert.doesNotMatch(indexHtml, /class="privacy-note"/);
 });
 
-test('job dashboard uses flexible current states without a pending lane', () => {
+test('job dashboard uses independent lifecycle states and dynamic workflow rails', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  assert.match(indexHtml, /id="jobMaxSalary"/);
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  assert.match(indexHtml, /id="jobTotalJobs"/);
+  assert.match(indexHtml, /id="jobTodayAdded"/);
+  assert.match(indexHtml, /id="jobQuickFilters"/);
+  assert.match(indexHtml, /id="jobWorkflowEditor"/);
   assert.match(indexHtml, /id="jobAnnualSalaryWan"/);
   assert.doesNotMatch(indexHtml, /job-upcoming-panel|jobUpcomingCount|>近期日程</);
-  assert.match(indexHtml, /笔试与面试可随招聘流程自由切换/);
+  assert.match(indexHtml, /岗位状态与招聘流程当前阶段相互独立/);
   assert.doesNotMatch(indexHtml, /value="pending">待投递/);
-  assert.match(workbenchJs, /function currentJobCounts\(jobs\)/);
+  assert.match(workbenchJs, /function renderJobQuickFilters\(jobs/);
+  assert.match(workbenchJs, /function readWorkflowEditor\(\)/);
+  assert.doesNotMatch(workbenchJs, /JOB_STATUSES|JOB_STATUS_LABELS/);
   assert.doesNotMatch(workbenchJs, /data-advance-job|function advanceJob/);
   assert.match(indexHtml, /id="addJobButton"/);
+  assert.match(indexHtml, /id="importJobsButton"/);
+  assert.match(indexHtml, /id="exportJobsButton"/);
+  assert.match(mainJs, /ipcMain\.handle\('jobs:import'/);
+  assert.match(mainJs, /ipcMain\.handle\('jobs:export'/);
+  assert.match(preloadJs, /importJobApplications/);
+  assert.match(preloadJs, /exportJobApplications/);
   assert.match(indexHtml, /id="dailyPlanDialog"/);
   assert.match(workbenchJs, /function maybeShowDailyPlan\(\)/);
   assert.match(workbenchJs, /localStorage\.setItem\(DAILY_PLAN_KEY, todayKey\)/);

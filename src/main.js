@@ -41,7 +41,7 @@ const { createPlanningService } = require('./planning-service');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
-const { deleteJobApplication, saveJobApplication } = require('./job-core');
+const { deleteJobApplication, normalizeJobApplication, saveJobApplication } = require('./job-core');
 const { resolveStableUserDataPath } = require('./user-data-path');
 const {
   parseTrackingInput,
@@ -787,7 +787,9 @@ function workspaceForRenderer() {
       .map((record) => record.id === activeAttendance?.id ? { ...record, appUsage: { ...attendanceUsageLive } } : record)
       .sort((a, b) => b.date.localeCompare(a.date) || Date.parse(b.clockInAt) - Date.parse(a.clockInAt)),
     focusSessions: focusSessionsForRenderer(),
-    jobApplications: [...store.listJobApplications()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
+    jobApplications: [...store.listJobApplications()]
+      .map((item, index) => normalizeJobApplication(item, index))
+      .sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt))
   };
 }
 
@@ -957,6 +959,69 @@ function deleteWorkspaceJobApplication(id) {
   store.setJobApplications(jobs);
   broadcastWorkspace();
   return true;
+}
+
+function jobImportList(parsed) {
+  if (Array.isArray(parsed)) return parsed;
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
+  if (Array.isArray(parsed.jobApplications)) return parsed.jobApplications;
+  if (Array.isArray(parsed.jobs)) return parsed.jobs;
+  return null;
+}
+
+async function importWorkspaceJobApplications() {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '导入求职岗位',
+    buttonLabel: '导入岗位',
+    filters: [{ name: '研迹岗位 JSON', extensions: ['json'] }],
+    properties: ['openFile']
+  });
+  if (result.canceled || !result.filePaths[0]) return { canceled: true };
+
+  let parsed;
+  try {
+    parsed = JSON.parse(fs.readFileSync(result.filePaths[0], 'utf8'));
+  } catch (error) {
+    throw new Error(`岗位文件无法解析：${error.message}`);
+  }
+  const sourceList = jobImportList(parsed);
+  if (!sourceList) throw new Error('岗位文件需要包含岗位数组。');
+  if (sourceList.length > 500) throw new Error('一次最多导入 500 条岗位记录。');
+
+  const now = new Date().toISOString();
+  const normalized = sourceList.map((item, index) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`第 ${index + 1} 条求职记录格式无效。`);
+    return normalizeJobApplication({ ...item, imported: true }, index, now);
+  });
+  let jobs = store.listJobApplications();
+  const backup = createManagedDataBackup(store.filePath);
+  for (const item of normalized) {
+    const existing = jobs.find((candidate) => candidate.id === item.id);
+    jobs = saveJobApplication(jobs, existing
+      ? { ...item, id: existing.id, revision: existing.revision }
+      : { ...item, id: undefined, revision: 0 }, now, () => crypto.randomUUID());
+  }
+  if (backup) writeStoragePointer(path.dirname(store.filePath), [...knownBackupFiles(), backup], store.filePath);
+  store.setJobApplications(jobs);
+  const workspace = broadcastWorkspace();
+  return { canceled: false, count: normalized.length, jobApplications: workspace.jobApplications };
+}
+
+async function exportWorkspaceJobApplications() {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '导出求职岗位',
+    defaultPath: path.join(app.getPath('documents'), `研迹求职岗位-${new Date().toISOString().slice(0, 10)}.json`),
+    filters: [{ name: '研迹岗位 JSON', extensions: ['json'] }]
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  const workspace = workspaceForRenderer();
+  fs.writeFileSync(result.filePath, JSON.stringify({
+    format: 'papertrail-job-applications',
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    jobApplications: workspace.jobApplications
+  }, null, 2), 'utf8');
+  return { canceled: false, filePath: result.filePath, count: workspace.jobApplications.length };
 }
 
 function saveMetadataFields(input) {
@@ -2759,6 +2824,8 @@ function registerIpc() {
   ipcMain.handle('notes:create-sticky', () => createNewStickyNote());
   ipcMain.handle('jobs:save', (_event, input) => saveWorkspaceJobApplication(input));
   ipcMain.handle('jobs:delete', (_event, id) => deleteWorkspaceJobApplication(String(id)));
+  ipcMain.handle('jobs:import', () => importWorkspaceJobApplications());
+  ipcMain.handle('jobs:export', () => exportWorkspaceJobApplications());
   ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
   ipcMain.handle('attendance:clock', (_event, action) => clockWorkspaceAttendance(String(action || '')));
   ipcMain.handle('attendance:save', (_event, input) => saveWorkspaceAttendance(input));
