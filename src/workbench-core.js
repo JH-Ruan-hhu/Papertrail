@@ -563,12 +563,27 @@ function saveNote(list, input, now = new Date().toISOString(), makeId = () => `n
     revision: Math.max(0, Number(existing?.revision) || 0) + 1
   };
   if (existing?.kind === 'daily' && input && Object.prototype.hasOwnProperty.call(input, 'content')) {
-    const entryId = String(input.entryId || existing.entries?.at(-1)?.id || '');
-    const entries = (existing.entries || []).map((entry) => entry.id === entryId
-      ? { ...entry, content: String(input.content || '').slice(0, 100_000), updatedAt: now, attachments: input.attachments || entry.attachments || [] }
-      : entry);
-    next.entries = entries;
-    next.content = composeNoteContent(entries, input.content);
+    if (input.appendEntry === true) {
+      const entry = normalizeNoteEntry({
+        id: input.entryId || `entry-${existing.entries?.length + 1 || 1}`,
+        createdAt: now,
+        updatedAt: now,
+        content: String(input.content || '').slice(0, 100_000),
+        attachments: input.attachments || []
+      }, existing.entries?.length || 0, now);
+      const entries = [...(existing.entries || []), entry];
+      next.entries = entries;
+      next.content = composeNoteContent(entries, input.content);
+      next.attachments = [...(existing.attachments || []), ...(entry.attachments || [])]
+        .filter((attachment, index, all) => all.findIndex((candidate) => candidate.id === attachment.id) === index);
+    } else {
+      const entryId = String(input.entryId || existing.entries?.at(-1)?.id || '');
+      const entries = (existing.entries || []).map((entry) => entry.id === entryId
+        ? { ...entry, content: String(input.content || '').slice(0, 100_000), updatedAt: now, attachments: input.attachments || entry.attachments || [] }
+        : entry);
+      next.entries = entries;
+      next.content = composeNoteContent(entries, input.content);
+    }
   }
   const candidate = normalizeNote(next, 0, now);
   return existing

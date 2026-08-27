@@ -158,6 +158,25 @@ test('notes preserve typed metadata and metadata fields support custom selects',
   assert.equal(notes[0].metadata.reviewed, true);
 });
 
+test('daily note append keeps earlier entries visible in one dated file', () => {
+  const first = saveNote([], {
+    kind: 'daily',
+    dateKey: '2026-08-27',
+    content: '<p>即写即走的第一段</p>'
+  }, '2026-08-27T01:00:00.000Z', () => 'daily-1');
+  const appended = saveNote(first, {
+    id: 'daily-1',
+    kind: 'daily',
+    appendEntry: true,
+    entryId: 'entry-2',
+    content: '<p><strong>笔记页续写</strong></p>'
+  }, '2026-08-27T02:00:00.000Z');
+  assert.equal(appended.length, 1);
+  assert.equal(appended[0].entries.length, 2);
+  assert.match(appended[0].content, /即写即走的第一段/);
+  assert.match(appended[0].content, /笔记页续写/);
+});
+
 test('detects empty rich note bodies while preserving text and image notes', () => {
   assert.equal(noteBodyHasContent({ content: '<p><br></p>&nbsp;\u200B', attachments: [] }), false);
   assert.equal(noteBodyHasContent({ title: '只有标题', content: '', attachments: [] }), false);

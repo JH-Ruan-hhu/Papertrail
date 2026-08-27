@@ -857,6 +857,9 @@ function saveWorkspaceNote(input) {
   if (existing && requested.revision != null && Number(requested.revision) !== Number(existing.revision || 0)) {
     throw new Error('这条笔记已在其他窗口更新，请重新载入后再保存。');
   }
+  if (existing?.kind === 'daily' && requested.appendEntry === true && !requested.entryId) {
+    requested.entryId = crypto.randomUUID();
+  }
 
   // New quick captures and empty sticky notes are always attached to the
   // local-day record. The single-process lookup makes dateKey de-duplication

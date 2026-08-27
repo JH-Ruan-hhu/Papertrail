@@ -24,7 +24,8 @@ const wb = {
   jobQuickFilter: 'all',
   jobSort: 'updatedAt',
   jobSortDirection: 'desc',
-  editingJobWorkflow: null
+  editingJobWorkflow: null,
+  noteAppendMode: false
 };
 
 function syncViewportDensity() {
@@ -80,6 +81,12 @@ const DEFAULT_JOB_WORKFLOW_STAGES = Object.freeze([
   Object.freeze({ id: 'stage-third-interview', name: '三面' }),
   Object.freeze({ id: 'stage-final-interview', name: '终面' }),
   Object.freeze({ id: 'stage-offer', name: 'Offer' })
+]);
+const HOME_JOB_FUNNEL_OPTIONS = Object.freeze([
+  ['submitted', '已投递'],
+  ['assessment', '测评'],
+  ['interview', '面试'],
+  ['offer', 'Offer']
 ]);
 const UI_ICON_PATHS = Object.freeze({
   check: '<path d="m6 12 4 4 8-9"/>',
@@ -348,15 +355,9 @@ function workflowForStagePicker(value) {
     }
     if (!canonical) stages.push({ ...stage, legacy: true });
   });
-  for (const required of [DEFAULT_JOB_WORKFLOW_STAGES[0], DEFAULT_JOB_WORKFLOW_STAGES.at(-1)]) {
-    if (!stages.some((stage) => stage.id === required.id)) stages.push({ ...required });
-  }
-  stages.sort((left, right) => {
-    const leftIndex = DEFAULT_JOB_WORKFLOW_STAGES.findIndex((stage) => stage.id === left.id);
-    const rightIndex = DEFAULT_JOB_WORKFLOW_STAGES.findIndex((stage) => stage.id === right.id);
-    const legacyRank = DEFAULT_JOB_WORKFLOW_STAGES.length - 1.5;
-    return (leftIndex < 0 ? legacyRank : leftIndex) - (rightIndex < 0 ? legacyRank : rightIndex);
-  });
+  const applyStage = stages.find((stage) => stage.id === 'stage-apply') || { ...DEFAULT_JOB_WORKFLOW_STAGES[0] };
+  const offerStage = stages.find((stage) => stage.id === 'stage-offer') || { ...DEFAULT_JOB_WORKFLOW_STAGES.at(-1) };
+  stages.splice(0, stages.length, applyStage, ...stages.filter((stage) => !['stage-apply', 'stage-offer'].includes(stage.id)), offerStage);
   const stageIds = new Set(stages.map((stage) => stage.id));
   const mappedCurrentId = remappedIds.get(source.currentStageId) || source.currentStageId;
   const timeline = source.timeline.map((item) => ({ ...item, stageId: remappedIds.get(item.stageId) || item.stageId }))
@@ -390,6 +391,24 @@ function jobLifecycleCounts(jobs) {
   return Object.fromEntries(JOB_LIFECYCLE_OPTIONS.map(([status]) => [status, jobs.filter((item) => item.status === status).length]));
 }
 
+function jobReachedFunnelStage(job, category) {
+  const workflow = clientJobWorkflow(job?.workflow);
+  const reached = workflow.stages.slice(0, jobWorkflowStageIndex({ ...job, workflow }) + 1);
+  if (category === 'submitted') return reached.some((stage) => /投递|申请/.test(stage.name));
+  if (category === 'assessment') return reached.some((stage) => /测评|网测|笔试/.test(stage.name));
+  if (category === 'interview') return reached.some((stage) => /面试|[一二三四五六七八九终]面/.test(stage.name));
+  if (category === 'offer') return reached.some((stage) => /offer/i.test(stage.name));
+  return true;
+}
+
+function jobFunnelCounts(jobs) {
+  const counts = Object.fromEntries(HOME_JOB_FUNNEL_OPTIONS.map(([key]) => [key, 0]));
+  jobs.forEach((job) => {
+    HOME_JOB_FUNNEL_OPTIONS.forEach(([category]) => { counts[category] += jobReachedFunnelStage(job, category) ? 1 : 0; });
+  });
+  return counts;
+}
+
 function jobMatchesQuickFilter(job, filter, now = new Date()) {
   const currentStage = jobCurrentStage(job);
   switch (filter) {
@@ -404,6 +423,10 @@ function jobMatchesQuickFilter(job, filter, now = new Date()) {
     case 'imported': return job.imported === true;
     case 'has-notes': return Boolean(job.notes);
     case 'closed': return job.status === 'closed';
+    case 'funnel-submitted': return jobReachedFunnelStage(job, 'submitted');
+    case 'funnel-assessment': return jobReachedFunnelStage(job, 'assessment');
+    case 'funnel-interview': return jobReachedFunnelStage(job, 'interview');
+    case 'funnel-offer': return jobReachedFunnelStage(job, 'offer');
     default: return true;
   }
 }
@@ -440,9 +463,9 @@ function renderHomeJobs() {
     container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="preparing" type="button">添加第一个岗位</button></div>';
     return;
   }
-  const counts = jobLifecycleCounts(jobs);
+  const counts = jobFunnelCounts(jobs);
   const maximum = Math.max(1, ...Object.values(counts));
-  container.innerHTML = JOB_LIFECYCLE_OPTIONS.map(([status, label], index) => `<button class="home-job-row" data-go-page="jobs" data-job-home-filter="${status}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[status], maximum)}"></b></i><strong>${counts[status]}</strong></button>`).join('');
+  container.innerHTML = HOME_JOB_FUNNEL_OPTIONS.map(([stage, label]) => `<button class="home-job-row" data-go-page="jobs" data-job-home-filter="${stage}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[stage], maximum)}"></b></i><strong>${counts[stage]}</strong></button>`).join('');
 }
 
 function renderJobQuickFilters(jobs, now = new Date()) {
@@ -536,16 +559,29 @@ function renderWorkflowEditor(workflow = wb.editingJobWorkflow) {
   wb.editingJobWorkflow = workflowForStagePicker(workflow || defaultJobWorkflow());
   const currentId = wb.editingJobWorkflow.currentStageId;
   const selectedById = new Map(wb.editingJobWorkflow.stages.map((stage) => [stage.id, stage]));
-  const legacyStages = wb.editingJobWorkflow.stages.filter((stage) => !DEFAULT_JOB_WORKFLOW_STAGES.some((candidate) => candidate.id === stage.id));
-  const options = [...DEFAULT_JOB_WORKFLOW_STAGES.slice(0, -1), ...legacyStages, DEFAULT_JOB_WORKFLOW_STAGES.at(-1)];
+  const selectedStages = wb.editingJobWorkflow.stages;
+  const unselectedStages = DEFAULT_JOB_WORKFLOW_STAGES.slice(1, -1).filter((stage) => !selectedById.has(stage.id));
+  const options = [selectedStages[0], ...selectedStages.slice(1, -1), ...unselectedStages, selectedStages.at(-1)].filter(Boolean);
   editor.innerHTML = options.map((stage) => {
     const selected = selectedById.has(stage.id);
     const required = ['stage-apply', 'stage-offer'].includes(stage.id);
     const current = selected && stage.id === currentId;
     const date = selected ? jobTimelineDate(wb.editingJobWorkflow, stage.id) : null;
     const legacy = !DEFAULT_JOB_WORKFLOW_STAGES.some((candidate) => candidate.id === stage.id);
-    return `<div class="job-stage-option${selected ? ' is-selected' : ''}${legacy ? ' is-legacy' : ''}" data-workflow-stage-option data-stage-id="${wbEscape(stage.id)}" data-stage-name="${wbEscape(stage.name)}"><label class="job-stage-toggle"><input data-workflow-stage-enabled type="checkbox"${selected ? ' checked' : ''}${required ? ' disabled' : ''}><span aria-hidden="true">${selected ? '✓' : ''}</span><strong>${wbEscape(stage.name)}</strong>${required ? '<small>固定</small>' : (legacy ? '<small>旧版阶段</small>' : '<small>可选</small>')}</label><label class="job-stage-date"><span>日期</span><input data-workflow-stage-date type="date" value="${wbEscape(localDateInputValue(date))}"${selected ? '' : ' disabled'}></label><label class="job-stage-current"><input data-workflow-set-current type="radio" name="jobCurrentStage"${current ? ' checked' : ''}${selected ? '' : ' disabled'}><span>${current ? '当前阶段' : '设为当前'}</span></label></div>`;
+    const selectedIndex = selectedStages.findIndex((candidate) => candidate.id === stage.id);
+    const canMoveUp = selected && selectedIndex > 1;
+    const canMoveDown = selected && selectedIndex > 0 && selectedIndex < selectedStages.length - 2;
+    return `<div class="job-stage-option${selected ? ' is-selected' : ''}${legacy ? ' is-legacy' : ''}" data-workflow-stage-option data-stage-id="${wbEscape(stage.id)}" data-stage-name="${wbEscape(stage.name)}"><label class="job-stage-toggle"><input data-workflow-stage-enabled type="checkbox"${selected ? ' checked' : ''}${required ? ' disabled' : ''}><span aria-hidden="true">${selected ? '✓' : ''}</span><strong>${wbEscape(stage.name)}</strong>${required ? '<small>固定</small>' : (legacy ? '<small>旧版阶段</small>' : '<small>可选</small>')}</label><div class="job-stage-order" aria-label="调整 ${wbEscape(stage.name)} 顺序"><button type="button" data-move-workflow-stage="up"${canMoveUp ? '' : ' disabled'} aria-label="上移 ${wbEscape(stage.name)}">↑</button><button type="button" data-move-workflow-stage="down"${canMoveDown ? '' : ' disabled'} aria-label="下移 ${wbEscape(stage.name)}">↓</button></div><label class="job-stage-date"><span>日期</span><input data-workflow-stage-date type="date" value="${wbEscape(localDateInputValue(date))}"${selected ? '' : ' disabled'}></label><label class="job-stage-current"><input data-workflow-set-current type="radio" name="jobCurrentStage"${current ? ' checked' : ''}${selected ? '' : ' disabled'}><span>${current ? '当前阶段' : '设为当前'}</span></label></div>`;
   }).join('');
+}
+
+function moveWorkflowEditorStage(stageId, direction) {
+  const workflow = readWorkflowEditor();
+  const index = workflow.stages.findIndex((stage) => stage.id === stageId);
+  const target = direction === 'up' ? index - 1 : index + 1;
+  if (index <= 0 || target <= 0 || target >= workflow.stages.length - 1) return;
+  [workflow.stages[index], workflow.stages[target]] = [workflow.stages[target], workflow.stages[index]];
+  renderWorkflowEditor(workflow);
 }
 
 function readWorkflowEditor() {
@@ -1306,11 +1342,11 @@ function metadataValueText(note) {
   return Object.values(note.metadata || {}).filter((value) => value !== false && value !== '').join(' ');
 }
 
-const NOTE_ALLOWED_TAGS = new Set(['A', 'B', 'BR', 'DIV', 'EM', 'I', 'IMG', 'LI', 'OL', 'P', 'S', 'SPAN', 'STRONG', 'U', 'UL']);
+const NOTE_ALLOWED_TAGS = new Set(['A', 'B', 'BR', 'DIV', 'EM', 'I', 'IMG', 'LI', 'OL', 'P', 'S', 'SPAN', 'STRIKE', 'STRONG', 'U', 'UL']);
 const NOTE_ATTACHMENT_ID_PATTERN = /^[A-Za-z0-9._:-]{1,200}$/;
 
 function noteContentLooksRich(value) {
-  return /<(?:a|b|br|div|em|i|img|li|ol|p|s|span|strong|u|ul)(?:\s|\/?>)/i.test(String(value || ''));
+  return /<(?:a|b|br|div|em|i|img|li|ol|p|s|span|strike|strong|u|ul)(?:\s|\/?>)/i.test(String(value || ''));
 }
 
 function noteSourceHtml(value) {
@@ -1432,6 +1468,17 @@ function renderNoteMetadata(note) {
   document.getElementById('metadataSummary').textContent = fields.length ? `${fields.length} 个字段，已填写 ${populated} 个` : '尚未设置属性字段';
 }
 
+function renderNoteDailyHistory(note, editableEntryId = '') {
+  const container = document.getElementById('noteDailyHistory');
+  const entries = note?.kind === 'daily'
+    ? (note.entries || []).filter((entry) => String(entry.id) !== String(editableEntryId || ''))
+    : [];
+  container.hidden = !entries.length;
+  container.innerHTML = entries.length
+    ? `<div class="note-daily-history-head"><strong>今天较早的记录</strong><span>${entries.length} 段内容</span></div>${entries.map((entry) => `<article><time>${wbEscape(new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(entry.createdAt)))}</time><div>${sanitizeNoteHtml(entry.content)}</div></article>`).join('')}`
+    : '';
+}
+
 function readNoteDraft() {
   try { return JSON.parse(localStorage.getItem('yanji.noteDraft.v1') || 'null'); } catch { return null; }
 }
@@ -1446,6 +1493,7 @@ function noteEditorHasContent() {
 }
 
 function noteEditorPayload() {
+  const referencedAttachmentIds = new Set([...document.querySelectorAll('#noteContent img[data-note-attachment]')].map((image) => image.dataset.noteAttachment));
   return {
     id: document.getElementById('noteId').value || undefined,
     entryId: document.getElementById('noteEntryId').value || undefined,
@@ -1453,8 +1501,9 @@ function noteEditorPayload() {
     dateKey: wb.editingNote?.dateKey || localDateKey(new Date()),
     title: document.getElementById('noteTitle').value,
     content: readNoteEditorContent(),
+    appendEntry: wb.noteAppendMode,
     metadata: readNoteMetadata(),
-    attachments: wb.editingNote?.attachments || [],
+    attachments: (wb.editingNote?.attachments || []).filter((attachment) => referencedAttachmentIds.has(String(attachment.id))),
     revision: wb.editingNote?.revision
   };
 }
@@ -1464,6 +1513,7 @@ function persistNoteDraftLocally() {
   const payload = noteEditorPayload();
   localStorage.setItem('yanji.noteDraft.v1', JSON.stringify({
     id: payload.id || '',
+    appendEntry: payload.appendEntry,
     title: payload.title,
     content: payload.content,
     metadata: payload.metadata,
@@ -1525,6 +1575,26 @@ function restoreNoteEditorSelection() {
   return range;
 }
 
+function refreshNoteFormatButtons() {
+  document.querySelectorAll('[data-note-command]').forEach((button) => {
+    let active = false;
+    try { active = document.queryCommandState(button.dataset.noteCommand); } catch { active = false; }
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+  });
+}
+
+function applyNoteFormat(command) {
+  const editor = document.getElementById('noteContent');
+  if (!editor) return;
+  editor.focus();
+  restoreNoteEditorSelection();
+  document.execCommand(command, false, null);
+  rememberNoteEditorSelection();
+  refreshNoteFormatButtons();
+  queueNoteAutoSave();
+}
+
 function insertInlineNoteAttachment(attachment, dataUrl) {
   const editor = document.getElementById('noteContent');
   if (!editor || !attachment?.id) return;
@@ -1584,6 +1654,8 @@ async function flushNoteEditor({ silent = false } = {}) {
       wb.editingNote = note;
       document.getElementById('noteId').value = note.id;
       document.getElementById('noteEntryId').value = note.kind === 'daily' ? (note.entries?.at(-1)?.id || '') : '';
+      wb.noteAppendMode = false;
+      renderNoteDailyHistory(note, document.getElementById('noteEntryId').value);
       document.getElementById('deleteNoteButton').hidden = false;
       document.getElementById('openStickyFromEditorButton').hidden = false;
       document.getElementById('addNoteImageButton').disabled = false;
@@ -1626,34 +1698,44 @@ function animateNoteDialogFromCard(dialog, sourceCard) {
 }
 
 function openNoteEditor(note = null, sourceCard = null) {
+  const todayKey = localDateKey(new Date());
+  const todayDaily = !note ? wb.workspace.notes.find((item) => item.kind === 'daily' && item.dateKey === todayKey) : null;
+  const targetNote = note || todayDaily || null;
+  wb.noteAppendMode = !note && Boolean(todayDaily);
   const savedDraft = readNoteDraft();
-  const draft = savedDraft && String(savedDraft.id || '') === String(note?.id || '') ? savedDraft : (!note && !savedDraft?.id ? savedDraft : null);
-  wb.editingNote = note;
+  const draft = savedDraft && String(savedDraft.id || '') === String(targetNote?.id || '') && Boolean(savedDraft.appendEntry) === wb.noteAppendMode
+    ? savedDraft
+    : (!targetNote && !savedDraft?.id ? savedDraft : null);
+  wb.editingNote = targetNote;
   wb.noteSelection = null;
   wb.previewingNoteImage = null;
-  const latestEntry = note?.kind === 'daily' ? note.entries?.at(-1) : null;
-  document.getElementById('noteId').value = note?.id || '';
+  const latestEntry = targetNote?.kind === 'daily' && !wb.noteAppendMode ? targetNote.entries?.at(-1) : null;
+  document.getElementById('noteId').value = targetNote?.id || '';
   document.getElementById('noteEntryId').value = latestEntry?.id || '';
-  document.getElementById('noteTitle').value = draft?.title ?? note?.title ?? '';
-  document.getElementById('noteContent').innerHTML = noteContentToEditorHtml(draft?.content ?? latestEntry?.content ?? note?.content ?? '', note?.attachments || []);
-  document.getElementById('noteTitle').readOnly = note?.kind === 'daily';
-  document.getElementById('noteDialogTitle').textContent = note ? '编辑笔记' : '新建今日日记';
-  document.getElementById('deleteNoteButton').hidden = !note;
-  document.getElementById('openStickyFromEditorButton').hidden = !note;
+  document.getElementById('noteTitle').value = draft?.title ?? targetNote?.title ?? '';
+  const editorAttachments = targetNote?.kind === 'daily' ? (latestEntry?.attachments || []) : (targetNote?.attachments || []);
+  document.getElementById('noteContent').innerHTML = noteContentToEditorHtml(draft?.content ?? (wb.noteAppendMode ? '' : latestEntry?.content ?? targetNote?.content ?? ''), editorAttachments);
+  document.getElementById('noteTitle').readOnly = targetNote?.kind === 'daily';
+  document.getElementById('noteDialogTitle').textContent = wb.noteAppendMode ? '续写今日日记' : targetNote ? '编辑笔记' : '新建今日日记';
+  document.getElementById('deleteNoteButton').hidden = !targetNote || wb.noteAppendMode;
+  document.getElementById('openStickyFromEditorButton').hidden = !targetNote || wb.noteAppendMode;
   document.getElementById('addNoteImageButton').disabled = false;
-  document.getElementById('noteMetadataPanel').hidden = true;
+  document.getElementById('noteMetadataPanel').hidden = false;
+  document.getElementById('toggleNoteMetadataButton').classList.add('is-open');
+  document.getElementById('toggleNoteMetadataButton').setAttribute('aria-expanded', 'true');
   document.getElementById('noteError').textContent = '';
   document.getElementById('noteSaveHint').textContent = draft ? '已恢复未保存草稿' : '保存后更新笔记卡片';
   setNoteEditorFullscreen(false);
-  renderNoteMetadata(note ? { ...note, metadata: draft?.metadata ?? note.metadata } : { metadata: draft?.metadata || {} });
+  renderNoteMetadata(targetNote ? { ...targetNote, metadata: draft?.metadata ?? targetNote.metadata } : { metadata: draft?.metadata || {} });
+  renderNoteDailyHistory(targetNote, latestEntry?.id || '');
   wb.noteDirty = Boolean(draft);
   clearTimeout(wb.noteSaveTimer);
   const dialog = document.getElementById('noteDialog');
   openWorkbenchDialog(dialog);
   animateNoteDialogFromCard(dialog, sourceCard);
   setTimeout(() => {
-    (note ? document.getElementById('noteContent') : document.getElementById('noteTitle')).focus();
-    hydrateInlineNoteImages(note).catch(() => {});
+    (targetNote || wb.noteAppendMode ? document.getElementById('noteContent') : document.getElementById('noteTitle')).focus();
+    hydrateInlineNoteImages(targetNote).catch(() => {});
   }, 20);
 }
 
@@ -1808,6 +1890,12 @@ function bindWorkbenchEvents() {
     if (!row) return;
     const workflow = readWorkflowEditor();
     if (event.target.matches('[data-workflow-stage-enabled], [data-workflow-set-current]')) renderWorkflowEditor(workflow);
+  });
+  document.getElementById('jobWorkflowEditor').addEventListener('click', (event) => {
+    const button = event.target.closest('[data-move-workflow-stage]');
+    const row = button?.closest('[data-workflow-stage-option]');
+    if (!button || !row) return;
+    moveWorkflowEditorStage(row.dataset.stageId, button.dataset.moveWorkflowStage);
   });
   document.getElementById('jobDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget); });
   document.getElementById('jobDialog').addEventListener('cancel', (event) => { event.preventDefault(); closeWorkbenchDialog(event.currentTarget); });
@@ -1970,9 +2058,11 @@ function bindWorkbenchEvents() {
       showWorkbenchToast('笔记已删除');
     }
   });
-  document.getElementById('toggleNoteMetadataButton').addEventListener('click', () => {
+  document.getElementById('toggleNoteMetadataButton').addEventListener('click', (event) => {
     const panel = document.getElementById('noteMetadataPanel');
     panel.hidden = !panel.hidden;
+    event.currentTarget.classList.toggle('is-open', !panel.hidden);
+    event.currentTarget.setAttribute('aria-expanded', String(!panel.hidden));
   });
   document.getElementById('noteTitle').addEventListener('input', queueNoteAutoSave);
   document.getElementById('toggleNoteFullscreenButton').addEventListener('click', () => {
@@ -1983,6 +2073,20 @@ function bindWorkbenchEvents() {
   noteEditor.addEventListener('input', queueNoteAutoSave);
   noteEditor.addEventListener('mouseup', rememberNoteEditorSelection);
   noteEditor.addEventListener('keyup', rememberNoteEditorSelection);
+  document.querySelector('.note-format-tools')?.addEventListener('mousedown', (event) => {
+    if (event.target.closest('[data-note-command]')) event.preventDefault();
+  });
+  document.querySelector('.note-format-tools')?.addEventListener('click', (event) => {
+    const button = event.target.closest('[data-note-command]');
+    if (button) applyNoteFormat(button.dataset.noteCommand);
+  });
+  document.addEventListener('selectionchange', () => {
+    const selection = window.getSelection();
+    if (selection?.rangeCount && noteEditor.contains(selection.anchorNode)) {
+      rememberNoteEditorSelection();
+      refreshNoteFormatButtons();
+    }
+  });
   noteEditor.addEventListener('keydown', (event) => {
     if (event.isComposing || event.keyCode === 229) return;
     if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
@@ -2150,8 +2254,8 @@ function bindWorkbenchEvents() {
     const homeJobFilter = event.target.closest('[data-job-home-filter]');
     if (homeJobFilter) {
       switchWorkbenchPage('jobs');
-      wb.jobQuickFilter = 'all';
-      document.getElementById('jobStatusFilter').value = homeJobFilter.dataset.jobHomeFilter;
+      wb.jobQuickFilter = `funnel-${homeJobFilter.dataset.jobHomeFilter}`;
+      document.getElementById('jobStatusFilter').value = 'all';
       return renderJobs();
     }
     const addJobTarget = event.target.closest('[data-add-job]');

@@ -2,7 +2,7 @@
   color-scheme: light;
   font-family: "Segoe UI Variable", "Microsoft YaHei UI", sans-serif;
   color: #253850;
-  background: #edf6fb;
+  background: transparent;
   --sticky-line: rgba(72, 103, 130, .16);
   --sticky-muted: #6f8295;
   --sticky-accent: #3978df;
@@ -12,11 +12,11 @@ html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; }
 body {
   display: grid;
   grid-template-rows: 44px minmax(0, 1fr) 34px;
-  border: 1px solid var(--sticky-line);
+  border: 1px solid rgba(255,255,255,.7);
   background:
     radial-gradient(circle at 0 0, rgba(130, 207, 244, .3), transparent 16rem),
     radial-gradient(circle at 100% 100%, rgba(191, 164, 244, .2), transparent 18rem),
-    linear-gradient(145deg, #eff8fd, #f5f3fb);
+    linear-gradient(145deg, #e8f6ff, #f5f2ff 56%, #fff4fa);
 }
 header, footer {
   display: flex;
@@ -30,7 +30,9 @@ header, footer {
   -webkit-backdrop-filter: blur(22px) saturate(145%);
 }
 header { border-bottom: 1px solid var(--sticky-line); -webkit-app-region: drag; }
-header > span { color: #28415d; font-size: 12px; font-weight: 720; letter-spacing: .04em; }
+.sticky-brand { display: flex; align-items: center; gap: 7px; color: #28415d; }
+.sticky-brand > span { width: 22px; height: 22px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #397af0, #8b6be8); border-radius: 8px; box-shadow: 0 5px 13px rgba(67,92,186,.2); }
+.sticky-brand strong { font-size: 12px; font-weight: 760; letter-spacing: .04em; }
 header > div { display: flex; align-items: center; gap: 5px; }
 header button {
   min-height: 28px;
@@ -54,7 +56,7 @@ main {
   margin: 10px;
   padding: 14px 15px;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
   background: rgba(255,255,255,.58);
   border: 1px solid rgba(255,255,255,.72);
   border-radius: 15px;
@@ -62,12 +64,19 @@ main {
   backdrop-filter: blur(24px) saturate(145%);
   -webkit-backdrop-filter: blur(24px) saturate(145%);
 }
-input, textarea { width: 100%; min-width: 0; border: 0; outline: 0; color: inherit; background: transparent; font: inherit; }
+input { width: 100%; min-width: 0; border: 0; outline: 0; color: inherit; background: transparent; font: inherit; }
 input { padding: 0 0 11px; border-bottom: 1px solid var(--sticky-line); font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
-textarea { min-height: 0; padding-top: 12px; resize: none; font-size: 14px; line-height: 1.75; }
-input::placeholder, textarea::placeholder { color: #8797a9; }
-input:focus, textarea:focus { caret-color: var(--sticky-accent); }
+.sticky-toolbar { display: flex; align-items: center; gap: 4px; padding: 8px 0 6px; border-bottom: 1px solid rgba(72,103,130,.1); }
+.sticky-toolbar button { width: 28px; height: 27px; display: grid; place-items: center; padding: 0; color: #536a83; background: rgba(255,255,255,.42); border: 1px solid rgba(255,255,255,.65); border-radius: 8px; font: inherit; font-size: 11px; cursor: pointer; }
+.sticky-toolbar button:hover, .sticky-toolbar button:focus-visible { color: #2356b7; background: rgba(255,255,255,.8); outline: 0; box-shadow: 0 0 0 2px rgba(57,120,223,.14); }
+.sticky-editor { min-height: 0; padding-top: 11px; overflow: auto; outline: 0; font-size: 14px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; caret-color: var(--sticky-accent); }
+.sticky-editor:empty::before { content: attr(data-placeholder); color: #8797a9; pointer-events: none; }
+.sticky-editor :is(p,div) { margin: 0 0 .5em; }
+.sticky-editor :is(ol,ul) { margin: 0 0 .5em; padding-left: 1.55em; }
+input::placeholder { color: #8797a9; }
+input:focus { caret-color: var(--sticky-accent); }
 footer { border-top: 1px solid var(--sticky-line); font-size: 10px; }
+footer small { color: #8493a5; }
 #saveState::before { content: ''; width: 6px; height: 6px; display: inline-block; margin-right: 6px; border-radius: 50%; background: #38a982; vertical-align: 1px; }
 html[data-appearance="classic"] body { background: #edf7fc; }
 html[data-appearance="classic"] header,

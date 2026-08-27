@@ -441,3 +441,34 @@ html[data-appearance="classic"] :is(.home-next-event-card, .home-today-card, .ho
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
+
+/* Keep the ambient liquid canvas visible between every matrix and support the
+   current job-console and note-editor surfaces introduced after the base theme. */
+html[data-appearance="liquid-glass"] :is(.app-layout, .workspace, .workbench-page, .home-page, .home-command-grid, .home-top-grid, .home-content-grid, .job-page) {
+  background: transparent !important;
+}
+html[data-appearance="liquid-glass"] :is(
+  .job-console-search, .job-summary-grid article, .job-table-shell,
+  .note-editor-modal, .note-editor-toolbar, .note-metadata-panel, .note-daily-history
+) {
+  background: var(--glass-panel);
+  border-color: var(--glass-line);
+  box-shadow: var(--glass-shadow), var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+html[data-appearance="liquid-glass"] :is(
+  .job-table-toolbar, .job-table-head, .job-position, .job-stage-option,
+  .job-compact-filters select, .job-sort-direction, .job-inline-control select,
+  .job-inline-control input, .job-filter-chips .job-quick-filter,
+  .note-format-tools > button, .metadata-reveal
+) {
+  background: var(--glass-nested);
+  border-color: rgba(255,255,255,.72);
+}
+html[data-appearance="liquid-glass"] .job-position:hover,
+html[data-appearance="liquid-glass"] .job-stage-option.is-selected { background: rgba(255,255,255,.7); }
+html[data-appearance="liquid-glass"] .job-table-toolbar,
+html[data-appearance="liquid-glass"] .job-table-head { border-bottom-color: rgba(91,112,157,.12); }
+html[data-appearance="liquid-glass"] .job-position { border-bottom-color: rgba(91,112,157,.1); }
+html[data-appearance="liquid-glass"] .home-job-row { background: transparent; box-shadow: none; }

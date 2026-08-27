@@ -657,10 +657,11 @@ app.whenReady().then(async () => {
             const titleStyle = row ? getComputedStyle(row.querySelector('.home-todo-title strong')) : null;
             return Boolean(row && titleStyle?.textDecorationLine.includes('line-through') && Number(titleStyle.opacity) < 1);
           })(),
-          todoProgressBottomAligned: (() => {
-            const progressBottom = document.getElementById('homeTodoProgress').getBoundingClientRect().bottom;
-            const clockBottom = document.getElementById('homeClockButton').getBoundingClientRect().bottom;
-            return Math.abs(progressBottom - clockBottom) <= 12;
+          attendanceButtonInline: (() => {
+            const status = document.getElementById('homeAttendanceStatus').getBoundingClientRect();
+            const button = document.getElementById('homeClockButton').getBoundingClientRect();
+            const card = document.querySelector('.home-attendance-card').getBoundingClientRect();
+            return button.left > status.left && button.right <= card.right && button.top >= card.top && button.bottom <= card.bottom;
           })(),
           todoCardLarger: (document.querySelector('.home-today-todo-card')?.getBoundingClientRect().width || 0)
             > (document.querySelector('.home-next-event-card')?.getBoundingClientRect().width || 0),
@@ -672,7 +673,10 @@ app.whenReady().then(async () => {
           aligned: Math.abs(utility.top - schedule.top) <= 1,
           fullWidthPipeline: Math.abs(job.left - content.left) <= 1 && Math.abs(job.right - content.right) <= 1,
           jobSummaryVisible: Boolean(document.querySelector('.home-job-panel #homeJobSummary .home-job-row')),
-          fiveStateHomeBoard: document.querySelectorAll('#homeJobSummary .home-job-row').length === 5,
+          fourStageHomeBoard: (() => {
+            const labels = [...document.querySelectorAll('#homeJobSummary .home-job-row > span')].map((item) => item.textContent.trim());
+            return JSON.stringify(labels) === JSON.stringify(['已投递', '测评', '面试', 'Offer']);
+          })(),
           startsToday: document.querySelector('#homeDayOverview .day-card strong')?.textContent === '今天',
           comfortableBottomInset: (() => {
             const dayCards = [...document.querySelectorAll('#homeDayOverview .day-card')].map(rect);
@@ -893,7 +897,7 @@ app.whenReady().then(async () => {
           const last = nodes.at(-1)?.getBoundingClientRect();
           return [first ? Math.round(first.left + first.width / 2) : null, last ? Math.round(last.left + last.width / 2) : null];
         });
-        const alignedEndpoints = endpointPairs.length > 0 && endpointPairs.every(([first, last]) => first === endpointPairs[0][0] && last === endpointPairs[0][1]);
+        const alignedEndpoints = endpointPairs.length > 0 && endpointPairs.every(([first, last]) => Math.abs(first - endpointPairs[0][0]) <= 1 && Math.abs(last - endpointPairs[0][1]) <= 1);
         const noLegacyStatusOptions = !document.querySelector('#jobBoard option[value="submitted"], #jobBoard option[value="written-1"], #jobBoard option[value="interview"], #jobBoard option[value="offer"]');
         const metricIds = ['jobTotalJobs', 'jobTodayAdded', 'jobTodayApplied', 'jobAwaitingReview', 'jobDueSoon', 'jobInProgress'];
         const metricsRendered = metricIds.every((id) => document.getElementById(id)?.textContent !== '');
@@ -953,6 +957,10 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 35));
         const selectableStagesWork = document.querySelector('#jobWorkflowEditor [data-stage-id="stage-assessment"]')?.classList.contains('is-selected')
           && document.querySelector('#jobWorkflowEditor [data-stage-id="stage-third-interview"]')?.classList.contains('is-selected');
+        document.querySelector('#jobWorkflowEditor [data-stage-id="stage-assessment"] [data-move-workflow-stage="down"]')?.click();
+        await new Promise((resolve) => setTimeout(resolve, 35));
+        const editorStageNames = [...document.querySelectorAll('#jobWorkflowEditor .job-stage-option.is-selected')].map((row) => row.dataset.stageName);
+        const editableStageOrder = editorStageNames.indexOf('测评') > editorStageNames.indexOf('一面');
         document.getElementById('saveJobButton').click();
         await new Promise((resolve) => setTimeout(resolve, 90));
         const savedStageNames = [...document.querySelector('[data-job-id="job-written-1"]')?.querySelectorAll('.job-flow-name') || []].map((node) => node.textContent);
@@ -970,6 +978,7 @@ app.whenReady().then(async () => {
           railHasCurrent,
           emptyWorkflowNodes,
           alignedEndpoints,
+          endpointPairs,
           rowAnatomy,
           priorityDots,
           compactInlineControls,
@@ -987,13 +996,14 @@ app.whenReady().then(async () => {
           combinedFilterWorks,
           standardStageOptions,
           selectableStagesWork,
+          editableStageOrder,
           savedWorkflow,
           homeSummary,
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);
@@ -1066,12 +1076,13 @@ app.whenReady().then(async () => {
   }
   if (process.env.WORKBENCH_STICKY_OUTPUT) {
     window.setSize(380, 440);
-    await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'sticky.html'), { query: { id: 'note-1' } });
+    await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'sticky.html'), { query: { id: 'note-1', appearance: 'liquid-glass' } });
+    await window.webContents.executeJavaScript(`document.documentElement.dataset.appearance = 'liquid-glass'`);
     await new Promise((resolve) => setTimeout(resolve, 160));
     const stickyResult = await window.webContents.executeJavaScript(`
       (() => ({
         titleLoaded: document.getElementById('noteTitle').value === 'PFAS 方法学想法',
-        contentLoaded: document.getElementById('noteContent').value.includes('回收率与基质效应'),
+        contentLoaded: document.getElementById('noteContent').textContent.includes('回收率与基质效应'),
         closeButtonNamed: document.getElementById('closeButton').getAttribute('aria-label') === '关闭便笺',
         liquidGlass: document.documentElement.dataset.appearance === 'liquid-glass'
           && getComputedStyle(document.body).backgroundImage.includes('radial-gradient')

@@ -9,11 +9,42 @@ let note;
 let timer;
 let pinned = true;
 let dirty = false;
+const ALLOWED_TAGS = new Set(['B', 'BR', 'DIV', 'EM', 'I', 'LI', 'OL', 'P', 'S', 'SPAN', 'STRIKE', 'STRONG', 'U', 'UL']);
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+
+function sanitizeHtml(value) {
+  const root = document.createElement('div');
+  const source = String(value || '');
+  root.innerHTML = /<\/?[a-z][\s\S]*>/i.test(source) ? source : escapeHtml(source).replace(/\r\n?|\n/g, '<br>');
+  const clean = (parent) => [...parent.childNodes].forEach((child) => {
+    if (child.nodeType === Node.TEXT_NODE) return;
+    if (child.nodeType !== Node.ELEMENT_NODE) return child.remove();
+    if (!ALLOWED_TAGS.has(child.tagName)) {
+      const fragment = document.createDocumentFragment();
+      while (child.firstChild) fragment.appendChild(child.firstChild);
+      child.replaceWith(fragment);
+      clean(parent);
+      return;
+    }
+    [...child.attributes].forEach((attribute) => child.removeAttribute(attribute.name));
+    clean(child);
+  });
+  clean(root);
+  return root.innerHTML.slice(0, 100_000);
+}
 
 function focusContent() {
   requestAnimationFrame(() => {
     content.focus();
-    content.setSelectionRange(content.value.length, content.value.length);
+    const range = document.createRange();
+    range.selectNodeContents(content);
+    range.collapse(false);
+    const selection = window.getSelection();
+    selection.removeAllRanges();
+    selection.addRange(range);
   });
 }
 
@@ -21,7 +52,7 @@ async function load() {
   note = await api.getStickyNote(id);
   if (!note) return api.closeSticky();
   title.value = note.title;
-  content.value = note.content;
+  content.innerHTML = sanitizeHtml(note.content);
   title.readOnly = note.kind === 'daily';
   dirty = false;
   focusContent();
@@ -31,7 +62,7 @@ async function flushSave() {
   if (!note || !dirty) return note;
   clearTimeout(timer);
   try {
-    note = await api.saveNote({ ...note, title: title.value, content: content.value, entryId: note.entryId });
+    note = await api.saveNote({ ...note, title: title.value, content: sanitizeHtml(content.innerHTML), entryId: note.entryId });
     dirty = false;
     saveState.textContent = '已保存';
     return note;
@@ -57,7 +88,17 @@ content.addEventListener('keydown', (event) => {
     flushSave().catch(() => {});
     return;
   }
-  if (window.YanjiListEditing?.applyListEditing(content, event)) event.preventDefault();
+  if (window.YanjiListEditing?.applyContentEditableListEditing(content, event)) event.preventDefault();
+});
+document.querySelector('.sticky-toolbar').addEventListener('mousedown', (event) => {
+  if (event.target.closest('[data-command]')) event.preventDefault();
+});
+document.querySelector('.sticky-toolbar').addEventListener('click', (event) => {
+  const button = event.target.closest('[data-command]');
+  if (!button) return;
+  content.focus();
+  document.execCommand(button.dataset.command, false, null);
+  queueSave();
 });
 pinButton.addEventListener('click', async () => {
   pinned = !pinned;
