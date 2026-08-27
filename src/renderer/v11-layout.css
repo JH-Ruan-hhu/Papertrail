@@ -1344,8 +1344,8 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-workflow-track { --job-start-inset: clamp(112px, 14.5%, 185px); --job-end-inset: clamp(34px, 3%, 42px); position: relative; min-width: max(100%, 520px); display: grid; grid-template-columns: repeat(var(--stage-count, 1), minmax(0, 1fr)); align-items: start; padding: 0 var(--job-end-inset) 0 var(--job-start-inset); }
 .job-workflow-track::before { content: ''; position: absolute; z-index: 0; top: 4px; left: calc(var(--job-start-inset) + 4px); right: calc(var(--job-end-inset) + 4px); height: 2px; background: linear-gradient(90deg, #3865d6 0 var(--job-progress, 0%), #e1e6ee var(--job-progress, 0%) 100%); }
 .job-flow-stage { position: relative; z-index: 1; width: auto; max-width: none; min-width: 0; justify-self: stretch; display: grid; justify-items: center; gap: 2px; color: #9aa5b4; font-size: 8px; line-height: 1.05; text-align: center; }
-.job-flow-stage:first-child { justify-items: start; margin: 0; text-align: left; }
-.job-flow-stage:last-child { justify-items: end; margin: 0; text-align: right; }
+.job-flow-stage:first-child { width: 62px; justify-self: start; justify-items: center; margin: 0; transform: translateX(-26.5px); text-align: center; }
+.job-flow-stage:last-child { width: 62px; justify-self: end; justify-items: center; margin: 0; transform: translateX(26.5px); text-align: center; }
 .job-flow-node { width: 9px; height: 9px; background: #e0e5ed; border: 1px solid #d5dce7; }
 .job-flow-stage.completed .job-flow-node, .job-flow-stage.current .job-flow-node { width: 9px; height: 9px; margin: 0; background: #3865d6; border-color: #3865d6; box-shadow: none; }
 .job-flow-stage.completed, .job-flow-stage.current { color: #3157ba; }

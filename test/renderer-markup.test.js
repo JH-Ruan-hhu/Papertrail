@@ -408,6 +408,7 @@ test('settings omit promotional and explanatory introduction cards', () => {
 test('job dashboard uses independent lifecycle states and selectable standard workflow rails', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
   assert.match(indexHtml, /id="jobTotalJobs"/);
@@ -423,6 +424,8 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(workbenchJs, /function readWorkflowEditor\(\)/);
   assert.match(workbenchJs, /stage-assessment[\s\S]*测评[\s\S]*stage-third-interview[\s\S]*三面/);
   assert.match(workbenchJs, /data-workflow-stage-enabled/);
+  assert.match(css, /\.job-flow-stage:first-child\s*\{[^}]*justify-items:\s*center[^}]*text-align:\s*center/s);
+  assert.match(css, /\.job-flow-stage:last-child\s*\{[^}]*justify-items:\s*center[^}]*text-align:\s*center/s);
   assert.doesNotMatch(workbenchJs, /JOB_STATUSES|JOB_STATUS_LABELS/);
   assert.doesNotMatch(workbenchJs, /data-advance-job|function advanceJob/);
   assert.match(indexHtml, /id="addJobButton"/);
