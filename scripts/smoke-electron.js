@@ -888,6 +888,12 @@ app.whenReady().then(async () => {
           && (firstRow.querySelector('[data-job-field="priority"]')?.getBoundingClientRect().width || 0) <= 49
           && (firstRow.querySelector('[data-job-field="nextFollowUpAt"]')?.getBoundingClientRect().width || 0) <= 145
           && (firstRow.querySelector('[data-job-field="notes"]')?.getBoundingClientRect().width || 0) <= 145;
+        const readableTypography = Boolean(firstRow)
+          && parseFloat(getComputedStyle(firstRow.querySelector('.job-company-line strong')).fontSize) >= 16
+          && parseFloat(getComputedStyle(firstRow.querySelector('.job-company-line span')).fontSize) >= 14
+          && parseFloat(getComputedStyle(document.querySelector('.job-table-head')).fontSize) >= 11
+          && parseFloat(getComputedStyle(firstRow.querySelector('[data-job-field="status"]')).fontSize) >= 12
+          && parseFloat(getComputedStyle(firstRow.querySelector('.job-flow-stage')).fontSize) >= 10;
         const dynamicWorkflow = new Set(workflowLengths).size >= 3 && workflowLengths.includes(3) && workflowLengths.includes(8);
         const railHasCurrent = rows.every((row) => row.querySelector('.job-flow-stage.current'));
         const emptyWorkflowNodes = rows.every((row) => [...row.querySelectorAll('.job-flow-node')].every((node) => node.textContent.trim() === ''));
@@ -982,6 +988,7 @@ app.whenReady().then(async () => {
           rowAnatomy,
           priorityDots,
           compactInlineControls,
+          readableTypography,
           noLegacyStatusOptions,
           metricsRendered,
           metricsCompact,
@@ -1003,7 +1010,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);
