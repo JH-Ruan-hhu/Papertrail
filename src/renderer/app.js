@@ -15,7 +15,8 @@ const state = {
   searchQuery: '',
   expandedIds: new Set(),
   settingsSection: 'general',
-  lastInputWasKeyboard: false
+  lastInputWasKeyboard: false,
+  dismissedUpdateVersion: null
 };
 
 const elements = {
@@ -112,6 +113,17 @@ const elements = {
   updateActionButton: document.getElementById('updateActionButton'),
   updateProgress: document.getElementById('updateProgress'),
   updateProgressBar: document.getElementById('updateProgressBar'),
+  updatePromptDialog: document.getElementById('updatePromptDialog'),
+  closeUpdatePromptButton: document.getElementById('closeUpdatePromptButton'),
+  dismissUpdatePromptButton: document.getElementById('dismissUpdatePromptButton'),
+  updatePromptActionButton: document.getElementById('updatePromptActionButton'),
+  updatePromptTitle: document.getElementById('updatePromptTitle'),
+  updatePromptMessage: document.getElementById('updatePromptMessage'),
+  updatePromptCurrentVersion: document.getElementById('updatePromptCurrentVersion'),
+  updatePromptLatestVersion: document.getElementById('updatePromptLatestVersion'),
+  updatePromptProgress: document.getElementById('updatePromptProgress'),
+  updatePromptProgressBar: document.getElementById('updatePromptProgressBar'),
+  updatePromptError: document.getElementById('updatePromptError'),
   settingsError: document.getElementById('settingsError'),
   saveSettingsButton: document.getElementById('saveSettingsButton'),
   removeDialog: document.getElementById('removeDialog'),
@@ -796,6 +808,77 @@ function renderUpdateStatus() {
   elements.updateGroup.classList.toggle('is-ready', ['available', 'downloaded'].includes(status));
   elements.updateGroup.classList.toggle('is-error', status === 'error');
   elements.updateGroup.classList.toggle('is-neutral', ['not-published', 'empty-feed'].includes(status));
+  renderUpdatePrompt();
+}
+
+function updatePromptVersionKey(update = state.updateStatus) {
+  return String(update?.latestVersion || update?.currentVersion || 'unknown');
+}
+
+function renderUpdatePrompt() {
+  const dialog = elements.updatePromptDialog;
+  const update = state.updateStatus;
+  if (!dialog || !update) return;
+  const status = update.status || 'idle';
+  const versionKey = updatePromptVersionKey(update);
+  if (status === 'available' && state.dismissedUpdateVersion !== versionKey && !dialog.open) openDialog(dialog);
+  if (!dialog.open) return;
+  if (!['checking', 'available', 'downloading', 'downloaded', 'error'].includes(status)) {
+    dialog.close();
+    return;
+  }
+
+  const percent = Math.min(100, Math.max(0, Number(update.percent) || 0));
+  const latestVersion = update.latestVersion ? `v${update.latestVersion}` : '新版本';
+  const display = {
+    checking: ['正在重新检查', '正在连接 GitHub Releases…', '检查中…', true, '关闭'],
+    available: ['发现新版本', `${latestVersion} 已发布。可以立即下载，下载完成前不会打断当前工作。`, '立即下载', false, '稍后提醒'],
+    downloading: ['正在下载更新', update.message || `正在下载 ${latestVersion}…`, `下载中 ${Math.round(percent)}%`, true, '后台下载'],
+    downloaded: ['更新已准备好', '安装会重启研迹，请先保存正在编辑的内容。', '安装并重启', false, '稍后安装'],
+    error: ['更新暂时失败', update.message || '无法完成更新，请检查网络后重试。', '重新检查', false, '关闭']
+  }[status];
+
+  dialog.dataset.updateStatus = status;
+  elements.updatePromptTitle.textContent = display[0];
+  elements.updatePromptMessage.textContent = display[1];
+  elements.updatePromptActionButton.textContent = display[2];
+  elements.updatePromptActionButton.disabled = display[3];
+  elements.dismissUpdatePromptButton.textContent = display[4];
+  elements.updatePromptCurrentVersion.textContent = update.currentVersion || elements.currentVersion.textContent;
+  elements.updatePromptLatestVersion.textContent = latestVersion;
+  elements.updatePromptProgress.hidden = !['downloading', 'downloaded'].includes(status);
+  elements.updatePromptProgress.setAttribute('aria-valuenow', String(Math.round(percent)));
+  elements.updatePromptProgressBar.style.transform = `scaleX(${percent / 100})`;
+  if (status !== 'error') elements.updatePromptError.textContent = '';
+}
+
+function dismissUpdatePrompt() {
+  state.dismissedUpdateVersion = updatePromptVersionKey();
+  if (elements.updatePromptDialog.open) elements.updatePromptDialog.close();
+}
+
+async function handleUpdatePromptAction() {
+  const status = state.updateStatus?.status || 'idle';
+  elements.updatePromptError.textContent = '';
+  elements.updatePromptActionButton.disabled = true;
+  try {
+    let result;
+    if (status === 'available') result = await api.downloadUpdate();
+    else if (status === 'downloaded') result = await api.installUpdate();
+    else result = await api.checkForUpdates();
+    if (result && typeof result === 'object') {
+      state.updateStatus = result;
+      renderUpdateStatus();
+    }
+  } catch (error) {
+    elements.updatePromptError.textContent = getErrorMessage(error);
+    try {
+      state.updateStatus = await api.getUpdateState();
+    } catch {
+      // Keep the prompt error visible when the updater state cannot be read.
+    }
+    renderUpdateStatus();
+  }
 }
 
 async function handleUpdateAction() {
@@ -1214,20 +1297,29 @@ function bindEvents() {
   elements.changeDataDirectoryButton.addEventListener('click', changeDataDirectory);
   elements.deleteBackupsButton.addEventListener('click', deleteDataBackups);
   elements.updateActionButton.addEventListener('click', handleUpdateAction);
+  elements.updatePromptActionButton.addEventListener('click', handleUpdatePromptAction);
+  elements.dismissUpdatePromptButton.addEventListener('click', dismissUpdatePrompt);
+  elements.closeUpdatePromptButton.addEventListener('click', dismissUpdatePrompt);
   document.getElementById('notifications').addEventListener('change', syncReminderSettings);
   document.getElementById('todayWidgetEnabled').addEventListener('change', syncTodayWidgetSettings);
   elements.addDialog.addEventListener('click', closeOnBackdrop);
   elements.journeyDialog.addEventListener('click', closeOnBackdrop);
   elements.workflowDialog.addEventListener('click', closeOnBackdrop);
+  elements.updatePromptDialog.addEventListener('click', closeOnBackdrop);
   elements.saveSettingsButton.addEventListener('click', saveSettings);
   elements.confirmRemoveButton.addEventListener('click', removeSelectedPaper);
   elements.removeDialog.addEventListener('close', () => { state.removeId = null; });
-  [elements.addDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog].forEach((dialog) => {
+  [elements.addDialog, elements.journeyDialog, elements.workflowDialog, elements.removeDialog, elements.updatePromptDialog].forEach((dialog) => {
     dialog.addEventListener('close', () => {
       dialog.classList.remove('dialog-entering');
       syncModalTitleBar();
     });
     dialog.addEventListener('cancel', () => setTimeout(syncModalTitleBar, 0));
+  });
+  elements.updatePromptDialog.addEventListener('close', () => {
+    if (['available', 'downloading', 'downloaded'].includes(state.updateStatus?.status)) {
+      state.dismissedUpdateVersion = updatePromptVersionKey();
+    }
   });
   elements.journeyDialog.addEventListener('close', () => { state.journeyLinkId = null; });
   elements.workflowDialog.addEventListener('close', () => { state.workflowPaperId = null; });

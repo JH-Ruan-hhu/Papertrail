@@ -309,10 +309,19 @@ app.whenReady().then(async () => {
       renderUpdateStatus();
       const updateAvailable = updateButton.textContent === '下载更新'
         && document.getElementById('updateVersionBadge').textContent === 'v1.3.1';
-      state.updateStatus = await window.paperTrail.downloadUpdate();
-      renderUpdateStatus();
+      const updatePrompt = document.getElementById('updatePromptDialog');
+      const updatePromptAvailable = updatePrompt.open
+        && document.getElementById('updatePromptLatestVersion').textContent === 'v1.3.1'
+        && document.getElementById('updatePromptActionButton').textContent === '立即下载';
+      document.getElementById('updatePromptActionButton').click();
+      await new Promise((resolve) => setTimeout(resolve, 40));
       const updateDownloaded = updateButton.textContent === '安装并重启'
         && document.getElementById('updateProgress').getAttribute('aria-valuenow') === '100';
+      const updatePromptDownloaded = updatePrompt.open
+        && document.getElementById('updatePromptActionButton').textContent === '安装并重启'
+        && document.getElementById('updatePromptProgress').getAttribute('aria-valuenow') === '100';
+      document.getElementById('dismissUpdatePromptButton').click();
+      const updatePromptDismissed = !updatePrompt.open;
       document.querySelector('[data-settings-section="general"]').click();
       const generalVisible = !document.querySelector('[data-settings-panel="general"]').hidden;
       const todayOverviewSwitchVisible = document.getElementById('todayWidgetEnabled').getBoundingClientRect().height > 0;
@@ -327,13 +336,40 @@ app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 180));
       const draftPreserved = startAtLogin.checked;
       document.querySelector('[data-workbench-page="home"]').click();
-      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, trackingVisible, storageVisible, storageSelectedExactly, updatesVisible, updateIdle, updateAvailable, updateDownloaded, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, todayOverviewSwitchVisible, widgetChildrenDisabled, draftPreserved };
+      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, trackingVisible, storageVisible, storageSelectedExactly, updatesVisible, updateIdle, updateAvailable, updatePromptAvailable, updateDownloaded, updatePromptDownloaded, updatePromptDismissed, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, todayOverviewSwitchVisible, widgetChildrenDisabled, draftPreserved };
     })()
   `);
-  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.generalVisible || !settingsDraftResult.todayOverviewSwitchVisible || !settingsDraftResult.widgetChildrenDisabled || !settingsDraftResult.draftPreserved) {
+  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updatePromptAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.updatePromptDownloaded || !settingsDraftResult.updatePromptDismissed || !settingsDraftResult.generalVisible || !settingsDraftResult.todayOverviewSwitchVisible || !settingsDraftResult.widgetChildrenDisabled || !settingsDraftResult.draftPreserved) {
     throw new Error(`Settings draft smoke test failed: ${JSON.stringify(settingsDraftResult)}`);
   }
   console.log(`SETTINGS_DRAFT_SMOKE_OK ${JSON.stringify(settingsDraftResult)}`);
+  if (process.env.WORKBENCH_UPDATE_PROMPT_OUTPUT) {
+    const updatePromptResult = await window.webContents.executeJavaScript(`
+      (async () => {
+        state.dismissedUpdateVersion = null;
+        state.updateStatus = await window.paperTrail.checkForUpdates();
+        renderUpdateStatus();
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const dialog = document.getElementById('updatePromptDialog');
+        const bounds = dialog.getBoundingClientRect();
+        return {
+          open: dialog.open,
+          version: document.getElementById('updatePromptLatestVersion').textContent,
+          primaryAction: document.getElementById('updatePromptActionButton').textContent,
+          secondaryAction: document.getElementById('dismissUpdatePromptButton').textContent,
+          safetyVisible: document.querySelector('.update-prompt-safety')?.getBoundingClientRect().height > 0,
+          centered: Math.abs((bounds.left + bounds.width / 2) - innerWidth / 2) <= 2,
+          horizontalOverflow: document.documentElement.scrollWidth > innerWidth
+        };
+      })()
+    `);
+    if (!updatePromptResult.open || updatePromptResult.version !== 'v1.3.1' || updatePromptResult.primaryAction !== '立即下载' || updatePromptResult.secondaryAction !== '稍后提醒' || !updatePromptResult.safetyVisible || !updatePromptResult.centered || updatePromptResult.horizontalOverflow) {
+      throw new Error(`Update prompt visual smoke failed: ${JSON.stringify(updatePromptResult)}`);
+    }
+    console.log(`UPDATE_PROMPT_VISUAL_OK ${JSON.stringify(updatePromptResult)}`);
+    await captureStablePage(process.env.WORKBENCH_UPDATE_PROMPT_OUTPUT);
+    await window.webContents.executeJavaScript(`document.getElementById('dismissUpdatePromptButton').click()`);
+  }
   if (process.env.WORKBENCH_SETTINGS_OUTPUT) {
     await window.webContents.executeJavaScript(`
       document.getElementById('settingsButton').click();

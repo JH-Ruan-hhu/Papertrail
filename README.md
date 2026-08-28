@@ -1,6 +1,6 @@
 # 研迹 · Research Workbench
 
-Version 1.3.5 enlarges the complete job dashboard typography hierarchy—including filters, table headers, controls, company and role labels, and workflow stages—without increasing position-row height.
+Version 1.3.5 enlarges the complete job dashboard typography hierarchy without increasing position-row height and adds a calm in-app update prompt with download progress, defer controls, and explicit install-and-restart consent.
 
 Version 1.3.4 improves the 1080p home dashboard, same-day note continuity, rich-text notes and sticky notes, editable job-stage ordering, cumulative application progress, and job-list readability while preserving local data compatibility.
 

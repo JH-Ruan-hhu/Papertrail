@@ -98,8 +98,11 @@ test('settings expose a main-process GitHub Release update workflow', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
   assert.match(html, /id="updateActionButton"/);
   assert.match(html, /id="updateProgress"[\s\S]*role="progressbar"/);
+  assert.match(html, /id="updatePromptDialog"/);
+  assert.match(html, /id="updatePromptActionButton"/);
   assert.match(mainJs, /let autoUpdater = null/);
   assert.match(mainJs, /Failed to load electron-updater/);
   assert.match(mainJs, /YANJI_DISABLE_UPDATER/);
@@ -110,6 +113,8 @@ test('settings expose a main-process GitHub Release update workflow', () => {
   assert.match(mainJs, /updates:install/);
   assert.match(preloadJs, /checkForUpdates/);
   assert.match(preloadJs, /onUpdateState/);
+  assert.match(appJs, /function renderUpdatePrompt/);
+  assert.match(appJs, /dismissedUpdateVersion/);
   assert.doesNotMatch(preloadJs, /electron-updater/);
 });
 

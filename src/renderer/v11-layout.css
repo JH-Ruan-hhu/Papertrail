@@ -350,6 +350,49 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   .job-stage-date, .job-stage-current { grid-column: 1 / -1; }
 }
 
+/* Update prompt: one calm decision surface driven by the existing updater state. */
+.update-prompt-modal { width: min(540px, calc(100vw - 36px)); overflow: hidden; color: #1c2940; background: linear-gradient(145deg, rgba(253,254,255,.94), rgba(242,246,255,.91)); border: 1px solid rgba(255,255,255,.82); border-radius: 24px; box-shadow: 0 30px 90px rgba(28,45,84,.28), inset 0 1px rgba(255,255,255,.9); backdrop-filter: blur(30px) saturate(155%); }
+.update-prompt-modal form { padding: 0; }
+.update-prompt-hero { position: relative; display: grid; grid-template-columns: 58px minmax(0, 1fr) auto; align-items: center; gap: 15px; padding: 25px 25px 20px; }
+.update-prompt-mark { position: relative; width: 58px; height: 58px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #6f91f1, #315ccf); border: 1px solid rgba(255,255,255,.65); border-radius: 19px; box-shadow: 0 13px 28px rgba(54,88,191,.25), inset 0 1px rgba(255,255,255,.44); }
+.update-prompt-mark svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.update-prompt-mark i { position: absolute; right: -2px; bottom: -2px; width: 13px; height: 13px; background: #4ec69c; border: 3px solid #f7f9ff; border-radius: 50%; }
+.update-prompt-heading > span { color: #5371c5; font-size: 10px; font-weight: 760; letter-spacing: .13em; }
+.update-prompt-heading h2 { margin: 4px 0 0; color: #15223a; font-size: 24px; line-height: 1.08; letter-spacing: -.035em; }
+.update-prompt-heading p { margin: 7px 0 0; color: #65738a; font-size: 12px; font-weight: 520; line-height: 1.55; }
+.update-prompt-close { align-self: start; min-width: 44px; padding: 6px 4px; color: #7b879a; background: transparent; border: 0; box-shadow: none; font-size: 11px; }
+.update-prompt-version { display: grid; grid-template-columns: 1fr 42px 1fr; align-items: center; margin: 0 25px; overflow: hidden; background: rgba(227,234,249,.58); border: 1px solid rgba(102,126,184,.12); border-radius: 15px; }
+.update-prompt-version > div { min-width: 0; padding: 13px 16px; }
+.update-prompt-version small { display: block; color: #8490a3; font-size: 10px; font-weight: 610; }
+.update-prompt-version strong { display: block; margin-top: 3px; color: #344156; font-size: 17px; line-height: 1.1; }
+.update-prompt-version .target strong { color: #2854c5; }
+.update-prompt-version > span { display: grid; place-items: center; color: #8798c5; }
+.update-prompt-version svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.update-prompt-safety { display: flex; align-items: center; gap: 10px; margin: 17px 25px 0; color: #456579; }
+.update-prompt-safety > span { width: 24px; height: 24px; flex: 0 0 24px; display: grid; place-items: center; color: #fff; background: #48aa8c; border-radius: 50%; font-size: 12px; font-weight: 800; }
+.update-prompt-safety strong, .update-prompt-safety small { display: block; }
+.update-prompt-safety strong { color: #3d5268; font-size: 12px; }
+.update-prompt-safety small { margin-top: 2px; color: #7a8798; font-size: 10px; line-height: 1.35; }
+.update-prompt-progress { height: 5px; margin: 17px 25px 0; overflow: hidden; background: rgba(99,119,158,.14); border-radius: 999px; }
+.update-prompt-progress span { width: 100%; height: 100%; display: block; background: linear-gradient(90deg, #3f70df, #8068dd); border-radius: inherit; transform: scaleX(0); transform-origin: left center; transition: transform 180ms ease-out; }
+.update-prompt-error { min-height: 0; margin: 10px 25px 0; }
+.update-prompt-error:empty { display: none; }
+.update-prompt-actions { justify-content: flex-end; gap: 9px; margin: 21px 0 0; padding: 17px 25px 21px; background: rgba(239,243,251,.58); border-top: 1px solid rgba(109,129,171,.1); }
+.update-prompt-actions .button { min-height: 39px; padding-inline: 17px; border-radius: 11px; }
+.update-prompt-modal[data-update-status="downloading"] .update-prompt-mark i { background: #e8ac4e; }
+.update-prompt-modal[data-update-status="downloaded"] .update-prompt-mark i { background: #43b985; }
+.update-prompt-modal[data-update-status="error"] .update-prompt-mark i { background: #da7078; }
+@media (max-width: 520px) {
+  .update-prompt-hero { grid-template-columns: 48px minmax(0, 1fr) auto; gap: 11px; padding: 21px 18px 17px; }
+  .update-prompt-mark { width: 48px; height: 48px; border-radius: 16px; }
+  .update-prompt-heading h2 { font-size: 21px; }
+  .update-prompt-version, .update-prompt-safety, .update-prompt-progress { margin-inline: 18px; }
+  .update-prompt-actions { padding-inline: 18px; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .update-prompt-modal { background: #f8faff; backdrop-filter: none; }
+}
+
 /* v1.1.2 feedback pass: keep the large surfaces on one spacing rhythm and
    make the controls use the space that is actually available. */
 .home-command-grid, .home-top-grid, .home-content-grid { column-gap: 16px; row-gap: 16px; }
