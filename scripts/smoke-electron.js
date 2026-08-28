@@ -925,11 +925,11 @@ app.whenReady().then(async () => {
           && (firstRow.querySelector('[data-job-field="nextFollowUpAt"]')?.getBoundingClientRect().width || 0) <= 145
           && (firstRow.querySelector('[data-job-field="notes"]')?.getBoundingClientRect().width || 0) <= 145;
         const readableTypography = Boolean(firstRow)
-          && parseFloat(getComputedStyle(firstRow.querySelector('.job-company-line strong')).fontSize) >= 16
-          && parseFloat(getComputedStyle(firstRow.querySelector('.job-company-line span')).fontSize) >= 14
+          && parseFloat(getComputedStyle(firstRow.querySelector('.job-company-line strong')).fontSize) >= 18
+          && parseFloat(getComputedStyle(firstRow.querySelector('.job-company-line span')).fontSize) >= 15.5
           && parseFloat(getComputedStyle(document.querySelector('.job-table-head')).fontSize) >= 11
           && parseFloat(getComputedStyle(firstRow.querySelector('[data-job-field="status"]')).fontSize) >= 12
-          && parseFloat(getComputedStyle(firstRow.querySelector('.job-flow-stage')).fontSize) >= 10;
+          && parseFloat(getComputedStyle(firstRow.querySelector('.job-flow-stage')).fontSize) >= 12;
         const dynamicWorkflow = new Set(workflowLengths).size >= 3 && workflowLengths.includes(3) && workflowLengths.includes(8);
         const railHasCurrent = rows.every((row) => row.querySelector('.job-flow-stage.current'));
         const emptyWorkflowNodes = rows.every((row) => [...row.querySelectorAll('.job-flow-node')].every((node) => node.textContent.trim() === ''));
