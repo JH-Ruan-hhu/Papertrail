@@ -321,6 +321,8 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /APP_ICON_PATH = process\.platform === 'win32'/);
   assert.match(mainJs, /nativeImage\.createFromPath\(APP_ICON_PATH\)/);
   assert.match(mainJs, /app\.setAppUserModelId\(APP_ID\)/);
+  assert.match(mainJs, /const TRAY_GUID = '[0-9a-f-]{36}'/);
+  assert.match(mainJs, /new Tray\(icon, process\.platform === 'win32' \? TRAY_GUID : undefined\)/);
   assert.match(mainJs, /if \(!mainWindow\.isMaximized\(\)\) mainWindow\.maximize\(\)/);
   assert.match(mainJs, /closeStaleAttendanceRecords/);
   assert.match(mainJs, /reconcileStaleAttendance/);

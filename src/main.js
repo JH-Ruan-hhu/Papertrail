@@ -102,6 +102,10 @@ const {
 
 const APP_NAME = '研迹 · 科研工作台';
 const APP_ID = 'io.papertrail.desktop';
+// Windows stores notification-area visibility against this identity. Keep it
+// stable across every release so an updater replacement does not look like a
+// brand-new tray icon and move Yanji back into the overflow menu.
+const TRAY_GUID = 'd47b4b95-2cf8-4d84-b2bc-671a0f5161fa';
 const BUILD_DIR = app.isPackaged
   ? path.join(process.resourcesPath, 'app.asar.unpacked', 'build')
   : path.join(__dirname, '..', 'build');
@@ -2598,7 +2602,7 @@ function createTrayIcon() {
 function createTray() {
   const icon = createTrayIcon();
   if (icon.isEmpty()) return;
-  tray = new Tray(icon);
+  tray = new Tray(icon, process.platform === 'win32' ? TRAY_GUID : undefined);
   tray.setToolTip(APP_NAME);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '打开研迹', click: showMainWindow },
