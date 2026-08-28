@@ -19,13 +19,14 @@ const wb = {
   noteDirty: false,
   noteEditGeneration: 0,
   noteSelection: null,
+  noteAttachmentMutation: false,
   previewingNoteImage: null,
   scheduleDraftTimer: null,
   jobQuickFilter: 'all',
   jobSort: 'updatedAt',
   jobSortDirection: 'desc',
   editingJobWorkflow: null,
-  noteAppendMode: false
+  noteConflict: false
 };
 
 function syncViewportDensity() {
@@ -1451,8 +1452,11 @@ function renderNotes() {
   const notes = wb.workspace.notes.filter((note) => `${note.title} ${notePlainText(note.content)} ${metadataValueText(note)}`.toLowerCase().includes(query));
   document.getElementById('notesGrid').innerHTML = notes.length ? notes.map((note) => {
     const metadata = wb.workspace.metadataFields.filter((field) => note.metadata?.[field.id] !== undefined && note.metadata[field.id] !== '' && note.metadata[field.id] !== false).slice(0, 6);
-    return `<article class="note-card" data-edit-note="${wbEscape(note.id)}"><header><span>${formatUpdated(note.updatedAt)}</span><button data-sticky-note="${wbEscape(note.id)}" type="button">置顶</button></header><h3>${wbEscape(note.title)}</h3><p>${wbEscape(notePlainText(note.content).slice(0, 220) || '空白笔记')}</p><footer class="note-metadata-tiles">${metadata.map((field, index) => `<span class="note-metadata-tile tone-${(index % 6) + 1}"><small>${wbEscape(field.name)}</small><b>${wbEscape(note.metadata[field.id] === true ? '是' : note.metadata[field.id])}</b></span>`).join('')}</footer></article>`;
+    const words = window.YanjiNoteEditor?.wordCount(note.content) || 0;
+    return `<article class="note-card note-document-card" data-edit-note="${wbEscape(note.id)}"><header><span>${formatUpdated(note.updatedAt)}</span><button data-sticky-note="${wbEscape(note.id)}" type="button">便笺</button></header><h3>${wbEscape(note.title)}</h3><p>${wbEscape(notePlainText(note.content).slice(0, 260) || '空白文档')}</p><footer><span>${words} 字</span><div class="note-metadata-tiles">${metadata.map((field, index) => `<span class="note-metadata-tile tone-${(index % 6) + 1}"><small>${wbEscape(field.name)}</small><b>${wbEscape(note.metadata[field.id] === true ? '是' : note.metadata[field.id])}</b></span>`).join('')}</div></footer></article>`;
   }).join('') : '<div class="workbench-empty notes-empty"><span>✎</span><h3>还没有笔记</h3><p>新建一条笔记，或用全局快捷键随手记录。</p></div>';
+  const today = localDateKey(new Date());
+  document.getElementById('addNoteButton').textContent = wb.workspace.notes.some((note) => note.kind === 'daily' && note.dateKey === today) ? '继续写今天' : '新建笔记';
 }
 
 function renderNoteMetadata(note) {
@@ -1466,17 +1470,6 @@ function renderNoteMetadata(note) {
   }).join('') : '<div class="metadata-empty">还没有字段。点击下方按钮添加文本、选择框或复选框。</div>';
   const populated = fields.filter((field) => note?.metadata?.[field.id] !== undefined && note.metadata[field.id] !== '' && note.metadata[field.id] !== false).length;
   document.getElementById('metadataSummary').textContent = fields.length ? `${fields.length} 个字段，已填写 ${populated} 个` : '尚未设置属性字段';
-}
-
-function renderNoteDailyHistory(note, editableEntryId = '') {
-  const container = document.getElementById('noteDailyHistory');
-  const entries = note?.kind === 'daily'
-    ? (note.entries || []).filter((entry) => String(entry.id) !== String(editableEntryId || ''))
-    : [];
-  container.hidden = !entries.length;
-  container.innerHTML = entries.length
-    ? `<div class="note-daily-history-head"><strong>今天较早的记录</strong><span>${entries.length} 段内容</span></div>${entries.map((entry) => `<article><time>${wbEscape(new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date(entry.createdAt)))}</time><div>${sanitizeNoteHtml(entry.content)}</div></article>`).join('')}`
-    : '';
 }
 
 function readNoteDraft() {
@@ -1496,12 +1489,10 @@ function noteEditorPayload() {
   const referencedAttachmentIds = new Set([...document.querySelectorAll('#noteContent img[data-note-attachment]')].map((image) => image.dataset.noteAttachment));
   return {
     id: document.getElementById('noteId').value || undefined,
-    entryId: document.getElementById('noteEntryId').value || undefined,
     kind: wb.editingNote?.kind || 'daily',
     dateKey: wb.editingNote?.dateKey || localDateKey(new Date()),
     title: document.getElementById('noteTitle').value,
     content: readNoteEditorContent(),
-    appendEntry: wb.noteAppendMode,
     metadata: readNoteMetadata(),
     attachments: (wb.editingNote?.attachments || []).filter((attachment) => referencedAttachmentIds.has(String(attachment.id))),
     revision: wb.editingNote?.revision
@@ -1513,7 +1504,6 @@ function persistNoteDraftLocally() {
   const payload = noteEditorPayload();
   localStorage.setItem('yanji.noteDraft.v1', JSON.stringify({
     id: payload.id || '',
-    appendEntry: payload.appendEntry,
     title: payload.title,
     content: payload.content,
     metadata: payload.metadata,
@@ -1639,7 +1629,9 @@ function queueNoteAutoSave() {
   wb.noteEditGeneration += 1;
   persistNoteDraftLocally();
   document.getElementById('noteSaveHint').textContent = '有未保存更改';
+  window.YanjiNoteEditor?.updateDocumentStatus(document.getElementById('noteContent'), wb.editingNote);
   clearTimeout(wb.noteSaveTimer);
+  wb.noteSaveTimer = setTimeout(() => flushNoteEditor({ silent: true }), 550);
 }
 
 async function flushNoteEditor({ silent = false } = {}) {
@@ -1653,9 +1645,7 @@ async function flushNoteEditor({ silent = false } = {}) {
       const note = await workbenchApi.saveNote(payload);
       wb.editingNote = note;
       document.getElementById('noteId').value = note.id;
-      document.getElementById('noteEntryId').value = note.kind === 'daily' ? (note.entries?.at(-1)?.id || '') : '';
-      wb.noteAppendMode = false;
-      renderNoteDailyHistory(note, document.getElementById('noteEntryId').value);
+      wb.noteConflict = false;
       document.getElementById('deleteNoteButton').hidden = false;
       document.getElementById('openStickyFromEditorButton').hidden = false;
       document.getElementById('addNoteImageButton').disabled = false;
@@ -1664,6 +1654,7 @@ async function flushNoteEditor({ silent = false } = {}) {
         clearNoteDraftLocally();
         document.getElementById('noteSaveHint').textContent = '已保存';
       }
+      window.YanjiNoteEditor?.updateDocumentStatus(document.getElementById('noteContent'), note);
       const noteIndex = wb.workspace.notes.findIndex((item) => item.id === note.id);
       if (noteIndex >= 0) wb.workspace.notes.splice(noteIndex, 1, note);
       else wb.workspace.notes.unshift(note);
@@ -1671,6 +1662,7 @@ async function flushNoteEditor({ silent = false } = {}) {
       renderHome();
       return note;
     } catch (error) {
+      if (/其他窗口更新|重新载入/.test(error.message || '')) wb.noteConflict = true;
       document.getElementById('noteError').textContent = error.message || '笔记保存失败，草稿仍保留。';
       document.getElementById('noteSaveHint').textContent = '保存失败，草稿仍保留';
       if (!silent) throw error;
@@ -1697,44 +1689,46 @@ function animateNoteDialogFromCard(dialog, sourceCard) {
   ], { duration: 260, easing: 'cubic-bezier(.23, 1, .32, 1)' });
 }
 
-function openNoteEditor(note = null, sourceCard = null) {
+async function openNoteEditor(note = null, sourceCard = null) {
   const todayKey = localDateKey(new Date());
   const todayDaily = !note ? wb.workspace.notes.find((item) => item.kind === 'daily' && item.dateKey === todayKey) : null;
-  const targetNote = note || todayDaily || null;
-  wb.noteAppendMode = !note && Boolean(todayDaily);
+  let targetNote = note || todayDaily || null;
+  if (!targetNote) {
+    targetNote = await workbenchApi.saveNote({ kind: 'daily', dateKey: todayKey, content: '' });
+    wb.workspace.notes.unshift(targetNote);
+  }
   const savedDraft = readNoteDraft();
-  const draft = savedDraft && String(savedDraft.id || '') === String(targetNote?.id || '') && Boolean(savedDraft.appendEntry) === wb.noteAppendMode
-    ? savedDraft
-    : (!targetNote && !savedDraft?.id ? savedDraft : null);
+  const draft = savedDraft && String(savedDraft.id || '') === String(targetNote.id || '') ? savedDraft : null;
   wb.editingNote = targetNote;
+  wb.noteConflict = false;
   wb.noteSelection = null;
   wb.previewingNoteImage = null;
-  const latestEntry = targetNote?.kind === 'daily' && !wb.noteAppendMode ? targetNote.entries?.at(-1) : null;
-  document.getElementById('noteId').value = targetNote?.id || '';
-  document.getElementById('noteEntryId').value = latestEntry?.id || '';
-  document.getElementById('noteTitle').value = draft?.title ?? targetNote?.title ?? '';
-  const editorAttachments = targetNote?.kind === 'daily' ? (latestEntry?.attachments || []) : (targetNote?.attachments || []);
-  document.getElementById('noteContent').innerHTML = noteContentToEditorHtml(draft?.content ?? (wb.noteAppendMode ? '' : latestEntry?.content ?? targetNote?.content ?? ''), editorAttachments);
-  document.getElementById('noteTitle').readOnly = targetNote?.kind === 'daily';
-  document.getElementById('noteDialogTitle').textContent = wb.noteAppendMode ? '续写今日日记' : targetNote ? '编辑笔记' : '新建今日日记';
-  document.getElementById('deleteNoteButton').hidden = !targetNote || wb.noteAppendMode;
-  document.getElementById('openStickyFromEditorButton').hidden = !targetNote || wb.noteAppendMode;
+  document.getElementById('noteId').value = targetNote.id || '';
+  const titleInput = document.getElementById('noteTitle');
+  titleInput.value = draft?.title ?? targetNote.title ?? '';
+  titleInput.hidden = targetNote.kind === 'daily';
+  titleInput.readOnly = targetNote.kind === 'daily';
+  const documentTitle = document.getElementById('noteDocumentTitle');
+  documentTitle.textContent = targetNote.title;
+  documentTitle.hidden = targetNote.kind !== 'daily';
+  document.getElementById('noteContent').innerHTML = noteContentToEditorHtml(draft?.content ?? targetNote.content ?? '', targetNote.attachments || []);
+  document.getElementById('noteDialogTitle').textContent = targetNote.kind === 'daily' ? '今日文档' : '编辑笔记';
+  document.getElementById('deleteNoteButton').hidden = false;
+  document.getElementById('openStickyFromEditorButton').hidden = false;
   document.getElementById('addNoteImageButton').disabled = false;
-  document.getElementById('noteMetadataPanel').hidden = false;
-  document.getElementById('toggleNoteMetadataButton').classList.add('is-open');
-  document.getElementById('toggleNoteMetadataButton').setAttribute('aria-expanded', 'true');
+  window.YanjiNoteEditor?.setInspectorOpen(true, { animate: false });
   document.getElementById('noteError').textContent = '';
-  document.getElementById('noteSaveHint').textContent = draft ? '已恢复未保存草稿' : '保存后更新笔记卡片';
+  document.getElementById('noteSaveHint').textContent = draft ? '已恢复未保存草稿' : '已保存';
   setNoteEditorFullscreen(false);
   renderNoteMetadata(targetNote ? { ...targetNote, metadata: draft?.metadata ?? targetNote.metadata } : { metadata: draft?.metadata || {} });
-  renderNoteDailyHistory(targetNote, latestEntry?.id || '');
+  window.YanjiNoteEditor?.updateDocumentStatus(document.getElementById('noteContent'), targetNote);
   wb.noteDirty = Boolean(draft);
   clearTimeout(wb.noteSaveTimer);
   const dialog = document.getElementById('noteDialog');
   openWorkbenchDialog(dialog);
   animateNoteDialogFromCard(dialog, sourceCard);
   setTimeout(() => {
-    (targetNote || wb.noteAppendMode ? document.getElementById('noteContent') : document.getElementById('noteTitle')).focus();
+    window.YanjiNoteEditor?.placeCaretAtEnd(document.getElementById('noteContent'));
     hydrateInlineNoteImages(targetNote).catch(() => {});
   }, 20);
 }
@@ -1771,11 +1765,20 @@ async function saveNoteFromEditor() {
   }
 }
 
-function discardNoteEditor(dialog) {
+async function closeNoteEditorSafely(dialog) {
   clearTimeout(wb.noteSaveTimer);
+  if (wb.noteDirty) {
+    const saved = await flushNoteEditor({ silent: true });
+    if (!saved || wb.noteDirty) {
+      persistNoteDraftLocally();
+      document.getElementById('noteError').textContent ||= '笔记尚未保存，已保留本地草稿；解决保存问题后再关闭。';
+      return false;
+    }
+  }
+  if (wb.editingNote?.id) await workbenchApi.deleteNoteIfEmpty(wb.editingNote.id).catch(() => false);
   clearNoteDraftLocally();
-  wb.noteDirty = false;
   if (dialog.open) closeWorkbenchDialog(dialog);
+  return true;
 }
 
 function renderMetadataManager() {
@@ -1828,7 +1831,35 @@ async function saveMetadataManager() {
 }
 
 async function refreshWorkspace(workspace = null) {
-  wb.workspace = workspace || await workbenchApi.getWorkspace();
+  const nextWorkspace = workspace || await workbenchApi.getWorkspace();
+  const noteDialog = document.getElementById('noteDialog');
+  if (noteDialog?.open && wb.editingNote?.id) {
+    const latest = nextWorkspace.notes?.find((note) => note.id === wb.editingNote.id);
+    if (!wb.noteSavePromise && !wb.noteAttachmentMutation && latest && Number(latest.revision || 0) > Number(wb.editingNote.revision || 0)) {
+      const editor = document.getElementById('noteContent');
+      if (!wb.noteDirty) {
+        wb.editingNote = latest;
+        editor.innerHTML = noteContentToEditorHtml(latest.content, latest.attachments);
+        hydrateInlineNoteImages(latest).catch(() => {});
+        document.getElementById('noteSaveHint').textContent = '已同步其他窗口的更新';
+      } else {
+        const suffix = window.YanjiNoteEditor?.appendedSuffix(wb.editingNote.content, latest.content);
+        if (suffix !== null) {
+          editor.insertAdjacentHTML('beforeend', sanitizeNoteHtml(suffix));
+          wb.editingNote = latest;
+          hydrateInlineNoteImages(latest).catch(() => {});
+          persistNoteDraftLocally();
+          document.getElementById('noteSaveHint').textContent = '已合并其他窗口的追加内容';
+        } else {
+          wb.noteConflict = true;
+          document.getElementById('noteError').textContent = '检测到这份文档已在其他窗口修改。当前草稿不会覆盖新版本；请复制草稿后重新载入。';
+          document.getElementById('noteSaveHint').textContent = '存在版本冲突';
+        }
+      }
+      window.YanjiNoteEditor?.updateDocumentStatus(editor, wb.editingNote);
+    }
+  }
+  wb.workspace = nextWorkspace;
   wb.workspace.todos ||= [];
   wb.workspace.attendance ||= [];
   wb.workspace.focusSessions ||= [];
@@ -2058,12 +2089,7 @@ function bindWorkbenchEvents() {
       showWorkbenchToast('笔记已删除');
     }
   });
-  document.getElementById('toggleNoteMetadataButton').addEventListener('click', (event) => {
-    const panel = document.getElementById('noteMetadataPanel');
-    panel.hidden = !panel.hidden;
-    event.currentTarget.classList.toggle('is-open', !panel.hidden);
-    event.currentTarget.setAttribute('aria-expanded', String(!panel.hidden));
-  });
+  document.getElementById('toggleNoteMetadataButton').addEventListener('click', () => window.YanjiNoteEditor?.toggleInspector());
   document.getElementById('noteTitle').addEventListener('input', queueNoteAutoSave);
   document.getElementById('toggleNoteFullscreenButton').addEventListener('click', () => {
     setNoteEditorFullscreen(!document.getElementById('noteDialog').classList.contains('is-workspace-fullscreen'));
@@ -2089,9 +2115,11 @@ function bindWorkbenchEvents() {
   });
   noteEditor.addEventListener('keydown', (event) => {
     if (event.isComposing || event.keyCode === 229) return;
-    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    if ((event.key === 'Enter' || event.key.toLowerCase() === 's') && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      saveNoteFromEditor();
+      wb.noteDirty = true;
+      wb.noteEditGeneration += 1;
+      flushNoteEditor().catch(() => {});
       return;
     }
     if (window.YanjiListEditing?.applyContentEditableListEditing(noteEditor, event)) {
@@ -2121,6 +2149,7 @@ function bindWorkbenchEvents() {
   });
   document.getElementById('addNoteImageButton').addEventListener('click', async () => {
     try {
+      wb.noteAttachmentMutation = true;
       rememberNoteEditorSelection();
       if (!document.getElementById('noteId').value) {
         document.getElementById('noteError').textContent = '请先保存笔记，再插入图片。';
@@ -2135,6 +2164,8 @@ function bindWorkbenchEvents() {
       document.getElementById('noteSaveHint').textContent = '图片已插入，正在保存…';
     } catch (error) {
       document.getElementById('noteError').textContent = error.message || '图片添加失败';
+    } finally {
+      wb.noteAttachmentMutation = false;
     }
   });
   document.getElementById('removeNoteImageButton').addEventListener('click', async () => {
@@ -2142,6 +2173,7 @@ function bindWorkbenchEvents() {
     const noteId = document.getElementById('noteId').value;
     if (!preview?.attachmentId || !noteId) return;
     try {
+      wb.noteAttachmentMutation = true;
       await workbenchApi.deleteNoteAttachment(noteId, preview.attachmentId);
       const image = [...noteEditor.querySelectorAll('img[data-note-attachment]')].find((item) => item.dataset.noteAttachment === preview.attachmentId);
       image?.remove();
@@ -2152,6 +2184,8 @@ function bindWorkbenchEvents() {
       document.getElementById('noteSaveHint').textContent = '图片已删除，正在保存…';
     } catch (error) {
       document.getElementById('noteError').textContent = error.message || '图片删除失败';
+    } finally {
+      wb.noteAttachmentMutation = false;
     }
   });
   document.getElementById('openStickyFromEditorButton').addEventListener('click', async () => {
@@ -2166,7 +2200,7 @@ function bindWorkbenchEvents() {
     }
   });
   document.getElementById('cancelNoteButton').addEventListener('click', async () => {
-    discardNoteEditor(document.getElementById('noteDialog'));
+    await closeNoteEditorSafely(document.getElementById('noteDialog'));
   });
   document.getElementById('manageMetadataButton').addEventListener('click', openMetadataManager);
   document.getElementById('openMetadataManagerButton').addEventListener('click', openMetadataManager);
@@ -2224,7 +2258,7 @@ function bindWorkbenchEvents() {
       setNoteEditorFullscreen(false);
       return;
     }
-    discardNoteEditor(dialog);
+    closeNoteEditorSafely(dialog).catch(() => {});
   });
   document.getElementById('noteDialog').addEventListener('close', () => setNoteEditorFullscreen(false));
   document.getElementById('noteImagePreviewDialog').addEventListener('click', (event) => {

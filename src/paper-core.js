@@ -7,7 +7,7 @@ const {
   normalizeNote
 } = require('./workbench-core');
 const { normalizeJobApplication } = require('./job-core');
-const { DATA_VERSION, migrateSchema7To8, migrateSchema8To9, migrateSchema9To10 } = require('./migration-core');
+const { DATA_VERSION, migrateSchema7To8, migrateSchema8To9, migrateSchema9To10, migrateSchema10To11 } = require('./migration-core');
 
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
 const TASK_REMINDER_LEAD_MS = 48 * 60 * 60_000;
@@ -210,10 +210,10 @@ function migrateData(parsed, defaultSettings) {
     ? migrateSchema8To9(v8.data)
     : { data: v8.data, changed: false };
   const v9Version = Number(v9.data.version || 9);
-  let migrated;
+  let v10;
   let shouldNormalizeJobRecords = false;
   if (v9Version <= 9) {
-    migrated = migrateSchema9To10(v9.data);
+    v10 = migrateSchema9To10(v9.data);
     shouldNormalizeJobRecords = true;
   } else {
     if (v9Version > DATA_VERSION) throw new Error(`数据文件来自更高版本（v${v9Version}），当前研迹无法安全打开。`);
@@ -224,8 +224,11 @@ function migrateData(parsed, defaultSettings) {
     // v1.3.1 already stores schema 10. Keep those records in place and let
     // the renderer normalize them lazily; saving one record upgrades only
     // that record instead of rewriting the entire job collection on startup.
-    migrated = { data: v9.data, changed: false };
+    v10 = { data: v9.data, changed: false };
   }
+  const migrated = Number(v10.data.version || 10) <= 10
+    ? migrateSchema10To11(v10.data)
+    : v10;
   const source = migrated.data;
   const settings = source.settings;
   const papers = (source.papers || []).map(migratePaper).map((paper) => (

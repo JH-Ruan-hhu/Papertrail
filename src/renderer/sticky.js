@@ -62,13 +62,14 @@ async function flushSave() {
   if (!note || !dirty) return note;
   clearTimeout(timer);
   try {
-    note = await api.saveNote({ ...note, title: title.value, content: sanitizeHtml(content.innerHTML), entryId: note.entryId });
+    note = await api.saveNote({ ...note, title: title.value, content: sanitizeHtml(content.innerHTML) });
     dirty = false;
     saveState.textContent = '已保存';
     return note;
-  } catch {
-    saveState.textContent = '保存失败，草稿仍保留';
-    throw new Error('便笺保存失败。');
+  } catch (error) {
+    const conflict = /其他窗口更新|重新载入/.test(error.message || '');
+    saveState.textContent = conflict ? '其他窗口已更新，请重新打开后再编辑' : '保存失败，草稿仍保留';
+    throw error;
   }
 }
 
@@ -107,7 +108,7 @@ pinButton.addEventListener('click', async () => {
   await api.setStickyAlwaysOnTop(pinned);
 });
 document.getElementById('closeButton').addEventListener('click', async () => {
-  try { await flushSave(); } catch { /* keep the local text visible until the window closes */ }
+  try { await flushSave(); } catch { return; }
   await api.closeSticky();
 });
 window.addEventListener('blur', () => flushSave().catch(() => {}));

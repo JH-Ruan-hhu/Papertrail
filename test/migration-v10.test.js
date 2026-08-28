@@ -35,7 +35,7 @@ test('schema 10 migration is idempotent and rejects unsafe shapes', () => {
   assert.throws(() => migrateSchema9To10({ version: 9, jobApplications: {} }), /求职记录列表格式无效/);
 });
 
-test('current schema keeps legacy job records untouched until that record is saved', () => {
+test('schema 11 note migration keeps legacy job record values untouched', () => {
   const legacyJob = {
     id: 'job-legacy',
     company: '旧单位',
@@ -61,7 +61,8 @@ test('current schema keeps legacy job records untouched until that record is sav
     unknownRoot: { retained: true }
   };
   const result = migrateData(source, source.settings);
-  assert.equal(result.changed, false);
-  assert.strictEqual(result.data.jobApplications[0], legacyJob);
+  assert.equal(result.changed, true);
+  assert.equal(result.data.version, 11);
+  assert.deepEqual(result.data.jobApplications[0], legacyJob);
   assert.deepEqual(result.data.unknownRoot, source.unknownRoot);
 });

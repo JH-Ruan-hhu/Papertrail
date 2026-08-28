@@ -3,17 +3,21 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
+  appendDailyNoteContent,
+  appendHtmlDocumentBlock,
   closeStaleAttendanceRecords,
   normalizeAttendance,
   normalizeFocusSession,
   normalizeMetadataField,
+  mergeLegacyDailyEntries,
   noteBodyHasContent,
   parseNaturalLanguageSchedule,
   parseNaturalLanguageSchedules,
   saveAttendance,
   saveFocusSession,
   saveNote,
-  saveSchedule
+  saveSchedule,
+  wordCountFromNoteHtml
 } = require('../src/workbench-core');
 
 test('parses Chinese relative date, day part and a multi-hour range', () => {
@@ -154,27 +158,84 @@ test('notes preserve typed metadata and metadata fields support custom selects',
   assert.deepEqual(field.options, ['LC-MS/MS', 'GC-MS']);
   const notes = saveNote([], { kind: 'daily', dateKey: '2026-08-22', content: '今天完成质控', metadata: { method: 'LC-MS/MS', reviewed: true } }, '2026-08-22T02:00:00.000Z', () => 'note-1');
   assert.equal(notes[0].title, '2026年8月22日');
-  assert.equal(notes[0].entries[0].title, '10:00');
+  assert.deepEqual(notes[0].entries, []);
   assert.equal(notes[0].metadata.reviewed, true);
 });
 
-test('daily note append keeps earlier entries visible in one dated file', () => {
-  const first = saveNote([], {
-    kind: 'daily',
-    dateKey: '2026-08-27',
-    content: '<p>即写即走的第一段</p>'
-  }, '2026-08-27T01:00:00.000Z', () => 'daily-1');
-  const appended = saveNote(first, {
+test('first and second quick captures create one daily document with one natural blank line', () => {
+  const first = appendDailyNoteContent([], {
+    dateKey: '2026-08-28',
+    content: '即写即走的第一段'
+  }, '2026-08-28T01:00:00.000Z', () => 'daily-1');
+  const second = appendDailyNoteContent(first.notes, {
+    dateKey: '2026-08-28',
+    content: '<p><strong>第二段</strong></p>'
+  }, '2026-08-28T02:00:00.000Z');
+  assert.equal(second.notes.length, 1);
+  assert.equal(second.note.id, 'daily-1');
+  assert.equal(second.note.revision, 2);
+  assert.equal(second.note.content, '<p>即写即走的第一段</p><p><br></p><p><strong>第二段</strong></p>');
+  assert.deepEqual(second.note.entries, []);
+});
+
+test('document append normalizes boundary whitespace and preserves rich blocks', () => {
+  const combined = appendHtmlDocumentBlock(
+    '<p><b>第一段</b></p><p><br></p><p><br></p>',
+    '<p><br></p><ol><li><u>第二段</u></li></ol>'
+  );
+  assert.equal(combined, '<p><b>第一段</b></p><p><br></p><ol><li><u>第二段</u></li></ol>');
+  assert.equal(appendHtmlDocumentBlock(combined, '<p><br></p>'), combined);
+});
+
+test('replacing a full daily document can edit early text without losing later text', () => {
+  const original = appendDailyNoteContent([], { dateKey: '2026-08-28', content: '<p>第一段</p><p><br></p><p>第二段</p>' }, '2026-08-28T01:00:00.000Z', () => 'daily-1');
+  const saved = saveNote(original.notes, {
     id: 'daily-1',
-    kind: 'daily',
-    appendEntry: true,
-    entryId: 'entry-2',
-    content: '<p><strong>笔记页续写</strong></p>'
-  }, '2026-08-27T02:00:00.000Z');
-  assert.equal(appended.length, 1);
-  assert.equal(appended[0].entries.length, 2);
-  assert.match(appended[0].content, /即写即走的第一段/);
-  assert.match(appended[0].content, /笔记页续写/);
+    content: '<p>修改后的第一段</p><p><br></p><p>第二段</p>',
+    revision: 1
+  }, '2026-08-28T02:00:00.000Z');
+  assert.match(saved[0].content, /修改后的第一段/);
+  assert.match(saved[0].content, /第二段/);
+  assert.deepEqual(saved[0].entries, []);
+});
+
+test('legacy entries merge chronologically and flatten attachments by id', () => {
+  const imageA = { id: 'image-a', storedName: 'a.png', originalName: 'a.png', mimeType: 'image/png', size: 10, createdAt: '2026-08-28T01:00:00.000Z' };
+  const imageB = { id: 'image-b', storedName: 'b.png', originalName: 'b.png', mimeType: 'image/png', size: 20, createdAt: '2026-08-28T02:00:00.000Z' };
+  const merged = mergeLegacyDailyEntries([
+    { id: 'late', createdAt: '2026-08-28T03:00:00.000Z', content: '<ul><li>第三段</li></ul>', attachments: [imageA] },
+    { id: 'early', createdAt: '2026-08-28T01:00:00.000Z', content: '<p><b>第一段</b></p>', attachments: [imageA] },
+    { id: 'middle', createdAt: '2026-08-28T02:00:00.000Z', content: '<p><img data-note-attachment="image-b"></p>', attachments: [imageB] }
+  ]);
+  assert.ok(merged.content.indexOf('第一段') < merged.content.indexOf('image-b'));
+  assert.ok(merged.content.indexOf('image-b') < merged.content.indexOf('第三段'));
+  assert.deepEqual(merged.attachments.map((item) => item.id), ['image-a', 'image-b']);
+});
+
+test('stale document revision is rejected without replacing newer content', () => {
+  const current = [saveNote([], { kind: 'daily', dateKey: '2026-08-28', content: '<p>数据库新版</p>' }, '2026-08-28T01:00:00.000Z', () => 'daily-1')[0]];
+  assert.equal(current[0].revision, 1);
+  assert.throws(() => saveNote(current, { id: 'daily-1', revision: 0, content: '<p>旧客户端覆盖</p>' }), (error) => error.code === 'NOTE_REVISION_CONFLICT');
+  assert.equal(current[0].content, '<p>数据库新版</p>');
+});
+
+test('atomic append always uses the newest stored document', () => {
+  const stored = [saveNote([], { kind: 'daily', dateKey: '2026-08-28', content: '<p>revision 11 正文</p>', revision: 10 }, '2026-08-28T01:00:00.000Z', () => 'daily-1')[0]];
+  stored[0].revision = 11;
+  const result = appendDailyNoteContent(stored, { dateKey: '2026-08-28', content: '后台追加' }, '2026-08-28T02:00:00.000Z');
+  assert.equal(result.note.revision, 12);
+  assert.match(result.note.content, /revision 11 正文/);
+  assert.match(result.note.content, /后台追加/);
+});
+
+test('rich note markup and attachment placeholders survive full-document save', () => {
+  const content = '<p><strong>粗体</strong><em>斜体</em><u>下划线</u><s>删除线</s></p><ol><li>编号</li></ol><ul><li>项目</li></ul><p><img data-note-attachment="image-a"></p>';
+  const image = { id: 'image-a', storedName: 'a.png', originalName: 'a.png', mimeType: 'image/png', size: 10, createdAt: '2026-08-28T01:00:00.000Z' };
+  const note = saveNote([], { kind: 'daily', dateKey: '2026-08-28', content, attachments: [image] }, '2026-08-28T01:00:00.000Z', () => 'daily-1')[0];
+  assert.equal(note.content, content);
+  assert.equal(note.attachments[0].id, 'image-a');
+  assert.equal(noteBodyHasContent({ content: '<p><img data-note-attachment="image-a"></p>', attachments: [] }), true);
+  assert.ok(wordCountFromNoteHtml(content) >= 13);
 });
 
 test('detects empty rich note bodies while preserving text and image notes', () => {

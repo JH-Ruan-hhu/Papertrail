@@ -134,16 +134,33 @@ app.whenReady().then(async () => {
         const editor = document.getElementById('noteContent');
         editor.innerHTML = '<p>这是尚未保存的弹窗草稿</p>';
         editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '草稿' }));
+        const hintShowsUnsaved = document.getElementById('noteSaveHint').textContent.includes('未保存');
         const dialog = document.getElementById('noteDialog');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 600));
         const rect = dialog.getBoundingClientRect();
+        const inspector = document.getElementById('noteMetadataPanel');
+        const propertyPanelOpen = inspector.getAttribute('aria-hidden') !== 'true';
+        document.getElementById('toggleNoteMetadataButton').click();
+        const propertyPanelClosed = inspector.getAttribute('aria-hidden') === 'true';
+        await new Promise((resolve) => setTimeout(resolve, 320));
+        document.querySelector('.note-paper').getAnimations().forEach((animation) => animation.finish());
+        const workspaceRect = document.querySelector('.note-workspace-body').getBoundingClientRect();
+        const paperRect = document.querySelector('.note-paper').getBoundingClientRect();
+        const paperCenteredAfterClose = Math.abs((paperRect.left + paperRect.width / 2) - (workspaceRect.left + workspaceRect.width / 2)) <= 2;
         return {
           originalCardText,
           draftDoesNotLeak: card.querySelector('p').textContent === originalCardText,
-          hintShowsUnsaved: document.getElementById('noteSaveHint').textContent.includes('未保存'),
+          hintShowsUnsaved,
           widerEditor: rect.width >= 860,
           tallerEditor: rect.height >= 700,
           centered: Math.abs((rect.left + rect.width / 2) - innerWidth / 2) <= 2 && Math.abs((rect.top + rect.height / 2) - innerHeight / 2) <= 2,
+          propertyPanelOpen,
+          propertyPanelClosed,
+          paperCenteredAfterClose,
+          paperCenterAfterClose: paperRect.left + paperRect.width / 2,
+          workspaceCenterAfterClose: workspaceRect.left + workspaceRect.width / 2,
+          workspaceClassAfterClose: document.querySelector('.note-workspace-body').className,
+          workspacePaddingAfterClose: getComputedStyle(document.querySelector('.note-workspace-body')).paddingRight,
           rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height, innerWidth, innerHeight }
         };
       })()
@@ -161,7 +178,7 @@ app.whenReady().then(async () => {
       })()
     `);
     const noteModalResult = { ...draftResult, ...savedResult };
-    if (!noteModalResult.draftDoesNotLeak || !noteModalResult.hintShowsUnsaved || !noteModalResult.widerEditor || !noteModalResult.tallerEditor || !noteModalResult.centered || !noteModalResult.closedAfterSave || !noteModalResult.cardUpdatedAfterSave) throw new Error(`Note modal smoke failed: ${JSON.stringify(noteModalResult)}`);
+    if (!noteModalResult.draftDoesNotLeak || !noteModalResult.hintShowsUnsaved || !noteModalResult.widerEditor || !noteModalResult.tallerEditor || !noteModalResult.centered || !noteModalResult.propertyPanelOpen || !noteModalResult.propertyPanelClosed || !noteModalResult.paperCenteredAfterClose || !noteModalResult.closedAfterSave || !noteModalResult.cardUpdatedAfterSave) throw new Error(`Note modal smoke failed: ${JSON.stringify(noteModalResult)}`);
     console.log(`WORKBENCH_NOTE_MODAL_OK ${JSON.stringify(noteModalResult)}`);
     window.destroy();
     app.quit();

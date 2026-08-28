@@ -449,7 +449,7 @@ html[data-appearance="liquid-glass"] :is(.app-layout, .workspace, .workbench-pag
 }
 html[data-appearance="liquid-glass"] :is(
   .job-console-search, .job-summary-grid article,
-  .note-editor-modal, .note-editor-toolbar, .note-metadata-panel, .note-daily-history
+  .note-editor-modal, .note-editor-toolbar, .note-inspector
 ) {
   background: var(--glass-panel);
   border-color: var(--glass-line);
@@ -468,7 +468,7 @@ html[data-appearance="liquid-glass"] :is(
   .job-table-toolbar, .job-table-head, .job-position, .job-stage-option,
   .job-compact-filters select, .job-sort-direction, .job-inline-control select,
   .job-inline-control input, .job-filter-chips .job-quick-filter,
-  .note-format-tools > button, .metadata-reveal
+  .note-format-tools > button
 ) {
   background: var(--glass-nested);
   border-color: rgba(255,255,255,.72);

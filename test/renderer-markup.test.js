@@ -450,14 +450,35 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(workbenchJs, /openCreateDialog\(\{ dueAt: dueAt\.toISOString\(\), priority: 'medium' \}\)/);
 });
 
-test('note editor keeps ordinary edits as a draft until save and opens from its card', () => {
+test('note editor autosaves a full daily document and opens from its card', () => {
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const noteEditorJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'note-editor.js'), 'utf8');
   assert.match(workbenchJs, /有未保存更改/);
+  assert.match(workbenchJs, /setTimeout\(\(\) => flushNoteEditor\(\{ silent: true \}\), 550\)/);
   assert.match(workbenchJs, /animateNoteDialogFromCard/);
   assert.match(workbenchJs, /duration:\s*260/);
   assert.doesNotMatch(workbenchJs, /noteDialog'\)\.addEventListener\('click'/);
-  assert.match(indexHtml, /保存后更新笔记卡片/);
+  assert.match(indexHtml, /class="note-paper"/);
+  assert.match(indexHtml, /id="noteDocumentTitle"/);
+  assert.match(indexHtml, /id="noteWordCount"/);
+  assert.match(indexHtml, /id="noteMetadataPanel" class="note-inspector"/);
+  assert.match(noteEditorJs, /function appendedSuffix/);
+});
+
+test('daily document renderer no longer exposes the legacy entry editor', () => {
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  for (const source of [workbenchJs, indexHtml]) {
+    assert.doesNotMatch(source, /noteAppendMode|noteEntryId|noteDailyHistory|renderNoteDailyHistory|appendEntry/);
+  }
+  assert.match(workbenchJs, /noteContentToEditorHtml\(draft\?\.content \?\? targetNote\.content/);
+  assert.match(mainJs, /appendWorkspaceDailyNote/);
+  assert.match(mainJs, /appendDailyNoteContent\(store\.listNotes\(\)/);
+  assert.match(indexHtml, /data-note-command="undo"/);
+  assert.match(indexHtml, /data-note-command="redo"/);
+  assert.match(indexHtml, /data-note-command="insertUnorderedList"/);
 });
 
 test('update center shows current and available versions with a local-data safety boundary', () => {

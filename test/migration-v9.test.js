@@ -35,8 +35,8 @@ test('migrates schema 8 daily notes by local date without changing standalone no
   assert.equal(result.data.version, 9);
   assert.equal(result.data.notes.filter((note) => note.kind === 'daily').length, 1);
   const daily = result.data.notes.find((note) => note.kind === 'daily');
-  assert.deepEqual(daily.entries.map((entry) => entry.id), ['entry-a', 'entry-b']);
-  assert.equal(daily.content, '先写内容\n\n后写内容');
+  assert.deepEqual(daily.entries, []);
+  assert.equal(daily.content, '<p>先写内容</p><p><br></p><p>后写内容</p>');
   assert.deepEqual(daily.attachments, []);
   const standalone = result.data.notes.find((note) => note.id === 'standalone-1');
   assert.equal(standalone.title, '自定义研究标题');

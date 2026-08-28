@@ -31,6 +31,7 @@ try {
 }
 const { JsonStore, DEFAULT_SETTINGS } = require('./store');
 const {
+  appendDailyNoteContent,
   isManagedBackupPath,
   readStoragePointer: readStoragePointerState,
   resolveStorageState,
@@ -865,54 +866,36 @@ function saveWorkspaceNote(input) {
   const notes = store.listNotes();
   const existing = requested.id ? notes.find((item) => item.id === String(requested.id)) : null;
   if (requested.id && !existing) throw new Error('找不到这条笔记。');
-  if (existing && requested.revision != null && Number(requested.revision) !== Number(existing.revision || 0)) {
-    throw new Error('这条笔记已在其他窗口更新，请重新载入后再保存。');
-  }
-  if (existing?.kind === 'daily' && requested.appendEntry === true && !requested.entryId) {
-    requested.entryId = crypto.randomUUID();
-  }
-
-  // New quick captures and empty sticky notes are always attached to the
-  // local-day record. The single-process lookup makes dateKey de-duplication
-  // atomic across the main editor, sticky note and quick capture windows.
+  // A new editor or sticky window reuses today's one daily document. Content
+  // capture uses appendWorkspaceDailyNote below so it never replaces a stale
+  // renderer snapshot.
   if (!existing && requested.kind !== 'standalone') {
     const dateKey = requested.dateKey || localDateKey(new Date(now));
     const daily = notes.find((item) => item.kind === 'daily' && item.dateKey === dateKey);
-    if (daily) {
-      if (String(requested.content || '').length || (requested.attachments || []).length) {
-        const entry = {
-          id: crypto.randomUUID(),
-          createdAt: now,
-          updatedAt: now,
-          content: String(requested.content || '').slice(0, 100_000),
-          attachments: Array.isArray(requested.attachments) ? requested.attachments : []
-        };
-        const updated = normalizeNote({
-          ...daily,
-          entries: [...(daily.entries || []), entry],
-          content: [...(daily.entries || []).map((item) => item.content), entry.content].filter(Boolean).join('\n\n'),
-          updatedAt: now,
-          revision: Number(daily.revision || 0) + 1
-        }, 0, now);
-        store.setNotes(notes.map((item) => item.id === daily.id ? updated : item));
-        broadcastWorkspace();
-        return updated;
-      }
-      return daily;
-    }
+    if (daily) return daily;
     requested.kind = 'daily';
     requested.dateKey = dateKey;
     requested.title = requested.title || `${dateKey.slice(0, 4)}年${Number(dateKey.slice(5, 7))}月${Number(dateKey.slice(8, 10))}日`;
   }
 
-  const savedNotes = saveNote(notes, {
-    ...requested,
-    revision: Number(existing?.revision || 0)
-  }, now, () => crypto.randomUUID());
+  const savedNotes = saveNote(notes, requested, now, () => crypto.randomUUID());
   const saved = savedNotes.find((item) => item.id === String(requested.id || savedNotes[0].id)) || savedNotes[0];
   store.setNotes(savedNotes);
   broadcastWorkspace();
   return saved;
+}
+
+function appendWorkspaceDailyNote(input) {
+  const now = new Date().toISOString();
+  const result = appendDailyNoteContent(store.listNotes(), {
+    dateKey: input?.dateKey || localDateKey(new Date(now)),
+    content: String(input?.content || ''),
+    attachments: Array.isArray(input?.attachments) ? input.attachments : []
+  }, now, () => crypto.randomUUID());
+  if (!result.note) throw new Error('请输入笔记内容。');
+  store.setNotes(result.notes);
+  broadcastWorkspace();
+  return result.note;
 }
 
 function deleteWorkspaceNote(id) {
@@ -1141,7 +1124,7 @@ function deleteNoteAttachment(noteId, attachmentId) {
     const updated = normalizeNote({
       ...note,
       attachments: (note.attachments || []).filter((item) => item.id !== attachment.id),
-      entries: (note.entries || []).map((entry) => ({ ...entry, attachments: (entry.attachments || []).filter((item) => item.id !== attachment.id) })),
+      entries: [],
       updatedAt,
       revision: Number(note.revision || 0) + 1
     }, 0, updatedAt);
@@ -2131,12 +2114,10 @@ function stickyNoteForRenderer(noteId) {
   const id = String(noteId || '');
   const note = store.listNotes().find((item) => item.id === id);
   if (!note) return null;
-  const latestEntry = note.kind === 'daily' ? note.entries?.at(-1) : null;
   return {
     id: note.id,
     title: note.title,
-    content: latestEntry?.content ?? note.content,
-    entryId: latestEntry?.id || null,
+    content: note.content,
     revision: note.revision || 0,
     kind: note.kind
   };
@@ -2828,6 +2809,7 @@ function registerIpc() {
     return true;
   });
   ipcMain.handle('notes:save', (_event, input) => saveWorkspaceNote(input));
+  ipcMain.handle('notes:append-daily', (_event, input) => appendWorkspaceDailyNote(input));
   ipcMain.handle('notes:delete', (_event, id) => deleteWorkspaceNote(String(id)));
   ipcMain.handle('notes:delete-if-empty', (_event, id) => deleteWorkspaceNoteIfEmpty(String(id)));
   ipcMain.handle('notes:add-attachment', (_event, id) => addNoteAttachment(String(id)));
@@ -2861,7 +2843,7 @@ function registerIpc() {
   });
   ipcMain.handle('capture:submit', (_event, input) => {
     if (input?.mode === 'note') {
-      return { mode: 'note', item: saveWorkspaceNote({ content: String(input.content || '') }) };
+      return { mode: 'note', item: appendWorkspaceDailyNote({ content: String(input.content || '') }) };
     }
     if (input?.mode === 'todo') {
       const parsed = parseNaturalLanguageTodo(input?.content, new Date());

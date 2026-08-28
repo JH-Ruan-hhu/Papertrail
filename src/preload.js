@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   closeScheduleWidget: () => ipcRenderer.invoke('schedule-widget:close'),
   openScheduleWidgetMain: () => ipcRenderer.invoke('schedule-widget:open-main'),
   saveNote: (input) => ipcRenderer.invoke('notes:save', input),
+  appendDailyNote: (input) => ipcRenderer.invoke('notes:append-daily', input),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
   deleteNoteIfEmpty: (id) => ipcRenderer.invoke('notes:delete-if-empty', id),
   addNoteAttachment: (id) => ipcRenderer.invoke('notes:add-attachment', id),

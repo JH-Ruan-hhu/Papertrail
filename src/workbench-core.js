@@ -89,8 +89,75 @@ function normalizeNoteEntry(value, index = 0, fallbackAt = new Date(0).toISOStri
 }
 
 function composeNoteContent(entries = [], fallback = '') {
-  const values = entries.map((entry) => String(entry?.content || '')).filter((value) => value.length > 0);
-  return values.length ? values.join('\n\n') : String(fallback || '').slice(0, 100_000);
+  const values = entries.map((entry) => String(entry?.content || '')).filter((value) => noteHtmlHasContent(value));
+  return values.length ? values.reduce((content, value) => appendHtmlDocumentBlock(content, value), '') : String(fallback || '').slice(0, 100_000);
+}
+
+function escapeNoteHtml(value) {
+  return String(value || '').replace(/[&<>]/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[character]);
+}
+
+function noteHtmlHasContent(value) {
+  const source = String(value || '');
+  if (/<img\b[^>]*data-note-attachment\s*=/i.test(source)) return true;
+  return Boolean(source
+    .replace(/<br\s*\/?\s*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&(?:nbsp|#160|#xA0);/gi, ' ')
+    .replace(/&[A-Za-z0-9#]+;/g, 'x')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim());
+}
+
+function noteHtmlFragment(value) {
+  const source = String(value || '').trim();
+  if (!source) return '';
+  if (/<\/?[a-z][\s\S]*>/i.test(source)) return source;
+  return source.split(/\r\n?|\n/).map((line) => `<p>${line ? escapeNoteHtml(line) : '<br>'}</p>`).join('');
+}
+
+function trimDocumentBoundaryBlanks(value, side) {
+  let source = String(value || '').trim();
+  const blankBlock = '(?:<p(?:\\s[^>]*)?>\\s*(?:<br\\s*\\/?\\s*>|&nbsp;|&#160;|&#xA0;|\\s)*<\\/p>|<div(?:\\s[^>]*)?>\\s*(?:<br\\s*\\/?\\s*>|&nbsp;|&#160;|&#xA0;|\\s)*<\\/div>|<br\\s*\\/?\\s*>)';
+  const pattern = side === 'start' ? new RegExp(`^(?:${blankBlock}\\s*)+`, 'i') : new RegExp(`(?:\\s*${blankBlock})+$`, 'i');
+  while (pattern.test(source)) source = source.replace(pattern, '').trim();
+  return source;
+}
+
+function appendHtmlDocumentBlock(currentHtml, incomingHtml) {
+  if (!noteHtmlHasContent(incomingHtml)) return noteHtmlFragment(currentHtml).slice(0, 100_000);
+  if (!noteHtmlHasContent(currentHtml)) return noteHtmlFragment(incomingHtml).slice(0, 100_000);
+  const current = trimDocumentBoundaryBlanks(noteHtmlFragment(currentHtml), 'end');
+  const incoming = trimDocumentBoundaryBlanks(noteHtmlFragment(incomingHtml), 'start');
+  return `${current}<p><br></p>${incoming}`.slice(0, 100_000);
+}
+
+function uniqueNoteAttachments(values, fallbackAt = new Date(0).toISOString()) {
+  const result = [];
+  const ids = new Set();
+  for (const value of values || []) {
+    const attachment = normalizeNoteAttachment(value, result.length, fallbackAt);
+    if (ids.has(attachment.id)) continue;
+    ids.add(attachment.id);
+    result.push(attachment);
+    if (result.length >= 40) break;
+  }
+  return result;
+}
+
+function mergeLegacyDailyEntries(entries = [], fallbackContent = '', fallbackAttachments = [], fallbackAt = new Date(0).toISOString()) {
+  const normalizedEntries = (Array.isArray(entries) ? entries : [])
+    .slice(0, 200)
+    .map((entry, index) => normalizeNoteEntry(entry, index, fallbackAt))
+    .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt) || String(left.id).localeCompare(String(right.id)));
+  const content = normalizedEntries.length
+    ? normalizedEntries.reduce((documentHtml, entry) => appendHtmlDocumentBlock(documentHtml, entry.content), '')
+    : noteHtmlFragment(fallbackContent).slice(0, 100_000);
+  const attachments = uniqueNoteAttachments([
+    ...(fallbackAttachments || []),
+    ...normalizedEntries.flatMap((entry) => entry.attachments || [])
+  ], fallbackAt);
+  return { content, attachments };
 }
 
 function chineseNumber(value) {
@@ -398,30 +465,17 @@ function normalizeNote(value, index = 0, fallbackAt = new Date(0).toISOString())
   const dateKey = kind === 'daily' && NOTE_DATE_PATTERN.test(String(value.dateKey || ''))
     ? String(value.dateKey)
     : kind === 'daily' ? localDateKey(createdAt) : null;
-  const sourceEntries = Array.isArray(value.entries)
-    ? value.entries.slice(0, 200).map((entry, entryIndex) => normalizeNoteEntry(entry, entryIndex, createdAt))
-    : [];
   const content = String(value.content || '').slice(0, 100_000);
-  const entries = sourceEntries.length
-    ? sourceEntries
-    : (kind === 'daily' && content ? [normalizeNoteEntry({
-        id: value.entryId,
-        createdAt,
-        updatedAt: value.updatedAt || createdAt,
-        content,
-        attachments: value.attachments
-      }, 0, createdAt)] : []);
   const attachments = Array.isArray(value.attachments)
-    ? value.attachments.slice(0, 40).map((item, attachmentIndex) => normalizeNoteAttachment(item, attachmentIndex, createdAt))
-    : entries.flatMap((entry) => entry.attachments || []).slice(0, 40);
-  const composedContent = kind === 'daily' ? composeNoteContent(entries, content) : content;
+    ? uniqueNoteAttachments(value.attachments, createdAt)
+    : [];
   return {
     id: cleanText(value.id, 200) || `note-${index + 1}`,
     kind,
     dateKey,
     title: cleanText(value.title, 300) || (kind === 'daily' ? noteDateLabel(dateKey) : '未命名笔记'),
-    content: composedContent,
-    entries,
+    content,
+    entries: [],
     attachments,
     metadata,
     pinned: Boolean(value.pinned),
@@ -554,6 +608,12 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
 
 function saveNote(list, input, now = new Date().toISOString(), makeId = () => `note-${Date.now()}`) {
   const existing = input?.id ? list.find((item) => item.id === String(input.id)) : null;
+  if (input?.id && !existing) throw new Error('找不到这条笔记。');
+  if (existing && input?.revision != null && Number(input.revision) !== Number(existing.revision || 0)) {
+    const error = new Error('这条笔记已经在其他窗口更新，请重新载入后再保存。');
+    error.code = 'NOTE_REVISION_CONFLICT';
+    throw error;
+  }
   const next = {
     ...existing,
     ...input,
@@ -562,46 +622,58 @@ function saveNote(list, input, now = new Date().toISOString(), makeId = () => `n
     updatedAt: now,
     revision: Math.max(0, Number(existing?.revision) || 0) + 1
   };
-  if (existing?.kind === 'daily' && input && Object.prototype.hasOwnProperty.call(input, 'content')) {
-    if (input.appendEntry === true) {
-      const entry = normalizeNoteEntry({
-        id: input.entryId || `entry-${existing.entries?.length + 1 || 1}`,
-        createdAt: now,
-        updatedAt: now,
-        content: String(input.content || '').slice(0, 100_000),
-        attachments: input.attachments || []
-      }, existing.entries?.length || 0, now);
-      const entries = [...(existing.entries || []), entry];
-      next.entries = entries;
-      next.content = composeNoteContent(entries, input.content);
-      next.attachments = [...(existing.attachments || []), ...(entry.attachments || [])]
-        .filter((attachment, index, all) => all.findIndex((candidate) => candidate.id === attachment.id) === index);
-    } else {
-      const entryId = String(input.entryId || existing.entries?.at(-1)?.id || '');
-      const entries = (existing.entries || []).map((entry) => entry.id === entryId
-        ? { ...entry, content: String(input.content || '').slice(0, 100_000), updatedAt: now, attachments: input.attachments || entry.attachments || [] }
-        : entry);
-      next.entries = entries;
-      next.content = composeNoteContent(entries, input.content);
-    }
-  }
+  if ((existing?.kind === 'daily' || next.kind === 'daily')) next.entries = [];
   const candidate = normalizeNote(next, 0, now);
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
     : [candidate, ...list];
 }
 
+function appendDailyNoteContent(list, input, now = new Date().toISOString(), makeId = () => `note-${Date.now()}`) {
+  const dateKey = NOTE_DATE_PATTERN.test(String(input?.dateKey || '')) ? String(input.dateKey) : localDateKey(now);
+  const existing = list.find((note) => note.kind === 'daily' && note.dateKey === dateKey);
+  const incoming = noteHtmlFragment(input?.content);
+  const incomingAttachments = Array.isArray(input?.attachments) ? input.attachments : [];
+  if (!noteHtmlHasContent(incoming) && !incomingAttachments.length) return { notes: list, note: existing || null };
+  const candidate = normalizeNote({
+    ...(existing || {}),
+    id: existing?.id || makeId(),
+    kind: 'daily',
+    dateKey,
+    title: noteDateLabel(dateKey),
+    content: appendHtmlDocumentBlock(existing?.content || '', incoming),
+    entries: [],
+    attachments: uniqueNoteAttachments([...(existing?.attachments || []), ...incomingAttachments], now),
+    metadata: existing?.metadata || {},
+    createdAt: existing?.createdAt || now,
+    updatedAt: now,
+    revision: Number(existing?.revision || 0) + 1
+  }, 0, now);
+  return {
+    notes: existing ? list.map((note) => note.id === existing.id ? candidate : note) : [candidate, ...list],
+    note: candidate
+  };
+}
+
+function wordCountFromNoteHtml(value) {
+  const text = String(value || '')
+    .replace(/<img\b[^>]*data-note-attachment\s*=[^>]*>/gi, ' 图 ')
+    .replace(/<br\s*\/?\s*>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&(?:nbsp|#160|#xA0);/gi, ' ')
+    .replace(/&[A-Za-z0-9#]+;/g, ' ')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+    .trim();
+  if (!text) return 0;
+  const han = text.match(/[\u3400-\u9FFF]/g)?.length || 0;
+  const tokens = text.replace(/[\u3400-\u9FFF]/g, ' ').match(/[\p{L}\p{N}]+(?:['’-][\p{L}\p{N}]+)*/gu)?.length || 0;
+  return han + tokens;
+}
+
 function noteBodyHasContent(note) {
   if (!note) return false;
   if ((note.attachments || []).length) return true;
-  const visible = String(note.content || '')
-    .replace(/<br\s*\/?\s*>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&(?:nbsp|#160|#xA0);/gi, ' ')
-    .replace(/&[A-Za-z0-9#]+;/g, 'x')
-    .replace(/[\u200B-\u200D\uFEFF]/g, '')
-    .trim();
-  return Boolean(visible);
+  return noteHtmlHasContent(note.content);
 }
 
 function saveAttendance(list, input, now = new Date().toISOString(), makeId = () => `attendance-${Date.now()}`) {
@@ -646,7 +718,12 @@ module.exports = {
   normalizeNoteEntry,
   normalizeNote,
   noteBodyHasContent,
+  noteHtmlHasContent,
+  appendHtmlDocumentBlock,
+  appendDailyNoteContent,
   composeNoteContent,
+  mergeLegacyDailyEntries,
+  wordCountFromNoteHtml,
   localDateKey,
   noteDateLabel,
   normalizeSchedule,
