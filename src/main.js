@@ -590,6 +590,13 @@ function initializeUpdater() {
     return;
   }
 
+  // A legacy installation can leave more than one Yanji executable on the
+  // machine. Force NSIS to replace the copy that initiated the update instead
+  // of following a stale installer registration to a different directory.
+  if (process.platform === 'win32' && app.isPackaged) {
+    autoUpdater.installDirectory = path.dirname(process.execPath);
+  }
+
   autoUpdater.autoDownload = false;
   autoUpdater.autoInstallOnAppQuit = false;
   autoUpdater.allowPrerelease = false;

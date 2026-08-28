@@ -221,11 +221,13 @@ test('pointer sidebar navigation settles gently while keyboard navigation stays 
 test('installer uses the stock electron-builder wizard while retaining upgrade safety', () => {
   const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
   const installer = fs.readFileSync(path.join(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
   const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
   assert.equal(packageJson.build.nsis.include, 'build/installer.nsh');
   assert.equal(packageJson.build.nsis.oneClick, false);
   assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, true);
+  assert.match(mainJs, /autoUpdater\.installDirectory = path\.dirname\(process\.execPath\)/);
   assert.doesNotMatch(installer, /Page custom|nsDialogs|BrandingText|MUI_BGCOLOR|立即安装|YanjiInstallPageCreate/);
   assert.match(installer, /papertrail-desktop/);
   assert.doesNotMatch(installer, /customPageAfterChangeDir|MUI_PAGE_CUSTOMFUNCTION_PRE|YanjiBeforeInstall/);
