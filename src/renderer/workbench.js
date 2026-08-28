@@ -23,7 +23,7 @@ const wb = {
   previewingNoteImage: null,
   scheduleDraftTimer: null,
   jobQuickFilter: 'all',
-  jobSort: 'updatedAt',
+  jobSort: 'priorityProgress',
   jobSortDirection: 'desc',
   editingJobWorkflow: null,
   noteConflict: false
@@ -49,6 +49,7 @@ const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '�
 const SCHEDULE_DRAFT_KEY = 'yanji.scheduleDraft.v1';
 const DAILY_PLAN_KEY = 'yanji.dailyPlanShown.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
+const jobPriorityRanks = Object.freeze({ high: 0, medium: 1, low: 2 });
 const JOB_LIFECYCLE_OPTIONS = Object.freeze([
   ['preparing', '准备中'],
   ['active', '进行中'],
@@ -440,11 +441,25 @@ function sortJobs(jobs) {
   const sorted = [...jobs];
   const direction = wb.jobSortDirection === 'asc' ? 1 : -1;
   const textValue = (job) => `${job.company || ''} ${job.role || ''}`;
+  const roleValue = (job) => String(job.role || '');
+  const progressValue = (job) => {
+    const workflow = clientJobWorkflow(job.workflow);
+    const maximum = Math.max(1, workflow.stages.length - 1);
+    return jobWorkflowStageIndex({ ...job, workflow }) / maximum;
+  };
   const dateValue = (value) => {
     const timestamp = Date.parse(value);
     return Number.isFinite(timestamp) ? timestamp : 0;
   };
   sorted.sort((left, right) => {
+    if (wb.jobSort === 'priorityProgress') {
+      const priority = (jobPriorityRanks[left.priority] ?? 1) - (jobPriorityRanks[right.priority] ?? 1);
+      if (priority) return wb.jobSortDirection === 'desc' ? priority : -priority;
+      const progress = progressValue(left) - progressValue(right);
+      if (progress) return wb.jobSortDirection === 'desc' ? -progress : progress;
+      const role = roleValue(left).localeCompare(roleValue(right), 'zh-CN', { sensitivity: 'base', numeric: true });
+      return role || String(left.company || '').localeCompare(String(right.company || ''), 'zh-CN', { sensitivity: 'base', numeric: true });
+    }
     let comparison = 0;
     if (wb.jobSort === 'company') comparison = textValue(left).localeCompare(textValue(right), 'zh-CN');
     else if (wb.jobSort === 'createdAt') comparison = dateValue(left.createdAt) - dateValue(right.createdAt);
@@ -511,9 +526,8 @@ function jobRowHtml(job) {
   const city = job.city || job.location || '';
   const deadline = job.deadline ? jobDateLabel(job.deadline, { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—';
   const deadlineClass = jobDateWithinNextDays(job.deadline, new Date(), 7) ? ' is-soon' : (Date.parse(job.deadline) < Date.now() ? ' is-overdue' : '');
-  const sourceButton = job.sourceUrl ? `<button class="job-source-button" data-open-job-source="${wbEscape(job.sourceUrl)}" type="button" aria-label="打开 ${wbEscape(job.company)} 的招聘链接">${uiIcon('external')}</button>` : '';
   const currentStage = jobCurrentStage(job);
-  return `<article class="job-position job-row-status-${wbEscape(job.status)}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div>${sourceButton}</div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-follow-cell"><span class="sr-only">${wbEscape(job.company)}下次跟进</span><input data-job-field="nextFollowUpAt" data-job-id="${wbEscape(job.id)}" type="date" value="${wbEscape(localDateInputValue(job.nextFollowUpAt))}" aria-label="${wbEscape(job.company)}下次跟进日期"></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
+  return `<article class="job-position job-row-status-${wbEscape(job.status)}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div></div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-follow-cell"><span class="sr-only">${wbEscape(job.company)}下次跟进</span><input data-job-field="nextFollowUpAt" data-job-id="${wbEscape(job.id)}" type="date" value="${wbEscape(localDateInputValue(job.nextFollowUpAt))}" aria-label="${wbEscape(job.company)}下次跟进日期"></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
 }
 
 function renderJobs() {
@@ -618,7 +632,6 @@ function openJobEditor(job = null, initialStatus = 'preparing') {
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobAppliedAt').value = localDateInputValue(job?.appliedAt);
   document.getElementById('jobNextFollowUpAt').value = localDateInputValue(job?.nextFollowUpAt || job?.nextActionAt);
-  document.getElementById('jobSourceUrl').value = job?.sourceUrl || '';
   document.getElementById('jobContact').value = job?.contact || '';
   document.getElementById('jobNotes').value = job?.notes || '';
   document.getElementById('jobError').textContent = '';
@@ -649,7 +662,6 @@ async function saveJobFromEditor() {
     nextFollowUpAt,
     nextActionAt: nextFollowUpAt,
     workflow: readWorkflowEditor(),
-    sourceUrl: document.getElementById('jobSourceUrl').value,
     contact: document.getElementById('jobContact').value,
     notes: document.getElementById('jobNotes').value,
     revision: document.getElementById('jobDialog').dataset.revision || undefined

@@ -1701,3 +1701,42 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   .note-editor-modal.note-editor-modal { width: calc(100vw - 20px); height: calc(100vh - 20px); max-height: calc(100vh - 20px); }
   .note-editor-modal.note-editor-modal .note-content-input { min-height: 540px; }
 }
+
+/* v1.4.0 compact job editor: details and workflow stay visible together. */
+.job-editor-modal.job-editor-modal {
+  width: min(1160px, calc(100vw - 28px));
+  max-width: none;
+  max-height: calc(100vh - 28px);
+  overflow: hidden;
+}
+.job-editor-modal.job-editor-modal > form { padding: 17px 20px 15px; }
+.job-editor-modal .modal-head { margin-bottom: 12px; }
+.job-editor-modal .modal-head h2 { font-size: 20px; }
+.job-editor-modal .modal-head > div > p:last-child { margin-top: 3px; font-size: 11px; }
+.job-editor-layout { display: grid; grid-template-columns: minmax(0, .92fr) minmax(500px, 1.08fr); align-items: start; gap: 16px; }
+.job-details-panel { min-width: 0; padding: 13px; background: #f8f9fb; border: 1px solid #e7eaf0; border-radius: 13px; }
+.job-editor-modal .job-form-grid { gap: 8px 10px; }
+.job-editor-modal .field label { margin-bottom: 4px; font-size: 10.5px; }
+.job-editor-modal .field input,
+.job-editor-modal .field select { height: 34px; min-height: 34px; padding: 0 9px; border-radius: 7px; font-size: 11.5px; }
+.job-editor-modal .field textarea { min-height: 68px; max-height: 68px; padding: 8px 9px; border-radius: 7px; font-size: 11.5px; line-height: 1.45; resize: none; }
+.job-editor-modal .job-workflow-field { min-width: 0; margin: 0; padding: 12px; }
+.job-editor-modal .job-workflow-heading { align-items: center; margin-bottom: 8px; }
+.job-editor-modal .job-workflow-heading p { margin-top: 2px; font-size: 9.5px; line-height: 1.3; }
+.job-editor-modal .job-stage-option { min-height: 39px; grid-template-columns: minmax(126px, 1fr) 52px 142px 82px; gap: 6px; padding: 4px 6px; }
+.job-editor-modal .job-stage-toggle > span { width: 16px; height: 16px; flex-basis: 16px; }
+.job-editor-modal .job-stage-toggle strong { font-size: 11.5px; }
+.job-editor-modal .job-stage-toggle small { font-size: 9px; }
+.job-editor-modal .job-stage-order { gap: 3px; }
+.job-editor-modal .job-stage-order button { width: 22px; height: 22px; border-radius: 6px; }
+.job-editor-modal .job-stage-date { gap: 4px; }
+.job-editor-modal .job-stage-date span { font-size: 9px; }
+.job-editor-modal .job-stage-date input { width: 112px; height: 28px; padding: 0 6px; font-size: 10px; }
+.job-editor-modal .job-stage-current { font-size: 10px; }
+.job-editor-modal .form-error { min-height: 16px; margin: 4px 0 0; }
+.job-editor-modal .modal-actions { margin-top: 5px; }
+.job-editor-modal .modal-actions .button { min-height: 34px; padding: 0 13px; }
+@media (max-width: 980px) {
+  .job-editor-modal.job-editor-modal { overflow-y: auto; }
+  .job-editor-layout { grid-template-columns: 1fr; }
+}

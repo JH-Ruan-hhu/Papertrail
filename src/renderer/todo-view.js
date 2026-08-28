@@ -75,7 +75,7 @@
     const todos = sorted(filteredTodos());
     const groups = new Map();
     todos.forEach((todo) => { const label = state.view === 'completed' ? '已完成' : state.view === 'cancelled' ? '已取消' : groupLabel(todo); if (!groups.has(label)) groups.set(label, []); groups.get(label).push(todo); });
-    list.innerHTML = todos.length ? [...groups.entries()].map(([label, items]) => `<section class="todo-group"><div class="todo-group-heading"><strong>${label}</strong><span>${items.length} 项</span></div>${items.map(card).join('')}</section>`).join('') : '<div class="todo-empty"><strong>这一组还没有待办</strong><span>按 Ctrl + J 快速记录，或点击右上角新建待办</span></div>';
+    list.innerHTML = todos.length ? [...groups.entries()].map(([label, items]) => `<section class="todo-group"><div class="todo-group-heading"><strong>${label}</strong><span>${items.length} 项</span></div>${items.map(card).join('')}</section>`).join('') : '<div class="todo-empty"><strong>这一组还没有待办</strong><span>点击右上角新建待办</span></div>';
   }
   function readDraft() { try { return JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch { return null; } }
   function writeDraft() {
