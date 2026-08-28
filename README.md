@@ -1,6 +1,6 @@
 # 研迹 · Research Workbench
 
-Version 1.3.3 rebuilds the job dashboard around a clean white console, selectable application stages, balanced timeline endpoints, gentler page transitions, and the standard Electron installer wizard while preserving local data compatibility.
+Version 1.3.4 improves the 1080p home dashboard, same-day note continuity, rich-text notes and sticky notes, editable job-stage ordering, cumulative application progress, and job-list readability while preserving local data compatibility.
 
 Version 1.3.1 is a stability release that keeps the updater optional at startup, blocks unsafe data-directory fallback, protects user-owned databases from backup cleanup, restores interrupted Focus notification policy changes, and adds packaged application verification.
 
