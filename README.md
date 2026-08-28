@@ -1,6 +1,6 @@
 # 研迹 · Research Workbench
 
-Version 1.3.6 gives the Windows tray icon a permanent identity so its notification-area visibility and position survive application updates. Version 1.3.5 enlarged the complete job dashboard typography hierarchy without increasing position-row height and added a calm in-app update prompt with download progress, defer controls, and explicit install-and-restart consent.
+Version 1.3.7 increases company, position, workflow-stage, and workflow-date typography on the job dashboard while preserving the compact position-row rhythm. Version 1.3.6 gives the Windows tray icon a permanent identity so its notification-area visibility and position survive application updates. Version 1.3.5 enlarged the complete job dashboard typography hierarchy without increasing position-row height and added a calm in-app update prompt with download progress, defer controls, and explicit install-and-restart consent.
 
 Version 1.3.4 improves the 1080p home dashboard, same-day note continuity, rich-text notes and sticky notes, editable job-stage ordering, cumulative application progress, and job-list readability while preserving local data compatibility.
 
