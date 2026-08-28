@@ -1400,7 +1400,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-filter-chips .job-quick-filter:hover { color: #2853c7; background: #f7f9ff; border-color: #cdd7f5; transform: none; }
 .job-filter-chips .job-quick-filter.active { color: #274fc0; background: #edf2ff; border-color: #d7e0fb; box-shadow: none; }
 .job-filter-chips .job-quick-filter.active b { color: #526fc3; }
-.job-table-shell { overflow: hidden; background: #fff; border: 1px solid #e3e7ed; border-radius: 14px; box-shadow: 0 7px 20px rgba(36,51,78,.045); }
+.job-table-shell { overflow: hidden; background: #fff; border: 1px solid #e3e7ed; border-radius: 14px; box-shadow: none; }
 .job-table-toolbar { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 10px 13px; background: #fff; border-bottom: 1px solid #edf0f4; }
 .job-compact-filters, .job-table-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; }
 .job-compact-filters select, .job-sort-direction { width: 82px; height: 33px; padding: 0 9px; color: #46546a; background: #f2f3f5; border: 1px solid #e5e7ea; border-radius: 7px; box-shadow: none; font-size: 12px; font-weight: 590; }

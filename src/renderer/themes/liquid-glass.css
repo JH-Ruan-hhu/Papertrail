@@ -448,12 +448,19 @@ html[data-appearance="liquid-glass"] :is(.app-layout, .workspace, .workbench-pag
   background: transparent !important;
 }
 html[data-appearance="liquid-glass"] :is(
-  .job-console-search, .job-summary-grid article, .job-table-shell,
+  .job-console-search, .job-summary-grid article,
   .note-editor-modal, .note-editor-toolbar, .note-metadata-panel, .note-daily-history
 ) {
   background: var(--glass-panel);
   border-color: var(--glass-line);
   box-shadow: var(--glass-shadow), var(--glass-highlight);
+  backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
+}
+html[data-appearance="liquid-glass"] .job-table-shell {
+  background: var(--glass-panel);
+  border-color: rgba(255,255,255,.78);
+  box-shadow: none;
   backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
   -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(var(--glass-saturation));
 }
