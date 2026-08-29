@@ -275,6 +275,8 @@ original file.
 
 ## Privacy and security
 
+The complete privacy statement is available in [PRIVACY.md](PRIVACY.md).
+
 Tracking URLs contain a UUID that should be treated like a private access link.
 Yanji never exposes that UUID to the renderer. The full link is encrypted
 in Electron's user-data directory and only decrypted in the main process when a
@@ -306,6 +308,14 @@ The build produces the x64 NSIS installer only. Portable builds are no longer
 generated.
 For application updates, publish the NSIS installer, its blockmap, and the
 generated `latest.yml` together in the same public GitHub Release.
+
+## Code signing policy
+
+Yanji is applying for free open-source code signing provided by
+[SignPath.io](https://signpath.io/), certificate by
+[SignPath Foundation](https://signpath.org/). The build, approval, and release
+rules are documented in [SIGNING_POLICY.md](SIGNING_POLICY.md). Releases made
+before onboarding is complete remain unsigned.
 
 ## Limitations
 
