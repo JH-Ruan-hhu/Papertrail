@@ -11,7 +11,7 @@
     "start": "electron .",
     "test": "node --test",
     "pack": "electron-builder --dir",
-    "dist": "electron-builder --win nsis --x64",
+    "dist": "electron-builder --win nsis --x64 --publish never",
     "metadata:update": "node scripts/generate-update-metadata.js",
     "smoke:packaged": "node scripts/packaged-smoke.js",
     "verify:package": "node scripts/verify-package.js"

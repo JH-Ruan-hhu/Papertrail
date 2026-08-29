@@ -13,6 +13,7 @@ test('SignPath policy and workflow keep signed releases scoped and auditable', (
   const signingPolicy = fs.readFileSync(path.join(root, 'SIGNING_POLICY.md'), 'utf8');
   const privacyPolicy = fs.readFileSync(path.join(root, 'PRIVACY.md'), 'utf8');
   const workflow = fs.readFileSync(path.join(root, '.github', 'workflows', 'windows-release.yml'), 'utf8');
+  const manifest = require('../package.json');
 
   assert.match(signingPolicy, /Free code signing provided by \[SignPath\.io\]/);
   assert.match(signingPolicy, /certificate\s+by \[SignPath Foundation\]/);
@@ -24,6 +25,7 @@ test('SignPath policy and workflow keep signed releases scoped and auditable', (
   assert.match(workflow, /Get-AuthenticodeSignature/);
   assert.match(workflow, /Portable artifacts are not allowed/);
   assert.doesNotMatch(workflow, /electron-builder.*portable/i);
+  assert.match(manifest.scripts.dist, /--publish never$/);
 });
 
 test('update metadata is regenerated from the exact signed installer bytes', () => {
