@@ -1015,7 +1015,7 @@ function renderAttendance() {
   const weekStart = wb.attendanceWeekStart;
   const weekEnd = addDays(weekStart, 6);
   document.getElementById('attendanceWeekTitle').textContent = `${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(weekStart)} — ${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(weekEnd)}`;
-  document.getElementById('attendanceGanttHours').innerHTML = '<span></span>' + Array.from({ length: 9 }, (_, index) => `<time>${String(index * 3).padStart(2, '0')}:00</time>`).join('');
+  document.getElementById('attendanceGanttHours').innerHTML = `<span></span><div class="attendance-hour-scale">${Array.from({ length: 9 }, (_, index) => `<time>${String(index * 3).padStart(2, '0')}:00</time>`).join('')}</div>`;
   const weekRecords = wb.workspace.attendance.filter((record) => record.date >= localDateKey(weekStart) && record.date <= localDateKey(weekEnd));
   const totalMs = weekRecords.reduce((sum, record) => sum + (record.clockOutAt ? Date.parse(record.clockOutAt) - Date.parse(record.clockInAt) : (record.date === localDateKey(new Date()) ? Date.now() - Date.parse(record.clockInAt) : 0)), 0);
   document.getElementById('attendanceDays').textContent = `${new Set(weekRecords.map((record) => record.date)).size} 天`;
