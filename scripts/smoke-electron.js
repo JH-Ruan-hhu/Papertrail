@@ -132,11 +132,18 @@ app.whenReady().then(async () => {
         const card = document.querySelector('#notesGrid .note-card');
         card.click();
         const dialog = document.getElementById('noteDialog');
+        const openingMorph = dialog.getAnimations().find((animation) => animation.effect?.getTiming().duration === 260);
+        const openingKeyframes = openingMorph?.effect?.getKeyframes() || [];
+        const morphsFromCard = Boolean(openingMorph)
+          && /translate3d\\([^)]*\\) scale\\(0[.]/.test(openingKeyframes[0]?.transform || '')
+          && /translate3d\\(0px, 0px, 0px\\) scale\\(1, 1\\)/.test(openingKeyframes.at(-1)?.transform || '');
         const editor = document.getElementById('noteContent');
         const toggle = document.getElementById('toggleNoteMetadataButton');
         if (toggle.getAttribute('aria-expanded') === 'true') toggle.click();
         const closedBeforeReopen = toggle.getAttribute('aria-expanded') === 'false';
         document.getElementById('saveNoteButton').click();
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const morphsBackToCard = dialog.getAnimations().some((animation) => animation.effect?.getTiming().duration === 220);
         for (let attempt = 0; attempt < 20 && dialog.open; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 50));
         document.querySelector('#notesGrid .note-card').click();
         const closedAfterReopen = toggle.getAttribute('aria-expanded') === 'false';
@@ -171,10 +178,10 @@ app.whenReady().then(async () => {
         scroll.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true }));
         const zoomLabel = document.getElementById('noteZoomLabel').textContent;
         const pageDuration = getComputedStyle(document.documentElement).getPropertyValue('--motion-duration-page').trim();
-        return { closedBeforeReopen, closedAfterReopen, infiniteDocumentScrolls, continued, indented, outdented, smallHeaderClear, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, zoomLabel, pageDuration };
+        return { morphsFromCard, morphsBackToCard, openingDuration: openingMorph?.effect?.getTiming().duration || null, openingTransforms: openingKeyframes.map((frame) => frame.transform), closedBeforeReopen, closedAfterReopen, infiniteDocumentScrolls, continued, indented, outdented, smallHeaderClear, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, zoomLabel, pageDuration };
       })()
     `);
-    if (!behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.infiniteDocumentScrolls || !behavior.continued || !behavior.indented || !behavior.outdented || !behavior.smallHeaderClear || behavior.paperRadius !== '0px' || behavior.zoomLabel !== '110%' || behavior.pageDuration !== '360ms') {
+    if (!behavior.morphsFromCard || !behavior.morphsBackToCard || !behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.infiniteDocumentScrolls || !behavior.continued || !behavior.indented || !behavior.outdented || !behavior.smallHeaderClear || behavior.paperRadius !== '0px' || behavior.zoomLabel !== '110%' || behavior.pageDuration !== '360ms') {
       throw new Error(`Note behavior smoke failed: ${JSON.stringify(behavior)}`);
     }
     console.log(`WORKBENCH_NOTE_BEHAVIOR_OK ${JSON.stringify(behavior)}`);
@@ -1071,6 +1078,9 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 80));
         const rows = [...document.querySelectorAll('#jobBoard .job-position')];
         const initialRows = rows.length;
+        const stableFirstRow = rows[0];
+        await refreshWorkspace(JSON.parse(JSON.stringify(wb.workspace)));
+        const identicalBroadcastKeepsRows = stableFirstRow === document.querySelector('#jobBoard .job-position');
         const deferredRow = rows.find((row) => {
           const rect = row.getBoundingClientRect();
           return rect.top >= innerHeight || rect.bottom <= 0;
@@ -1193,6 +1203,7 @@ app.whenReady().then(async () => {
         return {
           pageVisible: !document.querySelector('[data-page="jobs"]').hidden,
           initialRows,
+          identicalBroadcastKeepsRows,
           deferredPending,
           deferredRevealed,
           workflowLengths,
@@ -1227,7 +1238,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.identicalBroadcastKeepsRows || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);

@@ -87,6 +87,8 @@
 .note-editor-modal { transition-duration: 280ms; }
 .note-editor-modal.dialog-entering { transform: translate3d(0, 8px, 0) scale(.985); }
 .note-editor-modal.dialog-entering .note-paper { opacity: 0; transform: translate3d(0, 4px, 0); }
+.note-editor-modal.note-dialog-morph-closing { pointer-events: none; }
+.note-editor-modal.note-dialog-morph-closing::backdrop { animation: motion-dialog-backdrop-exit 220ms var(--motion-ease-move) both; }
 .modal.dialog-closing { animation: motion-dialog-exit 160ms var(--motion-ease-enter) both; pointer-events: none; will-change: opacity, transform; }
 .modal[open]::backdrop { animation: motion-dialog-backdrop-enter var(--motion-duration-fast) var(--motion-ease-enter) both; }
 .modal.dialog-closing::backdrop { animation: motion-dialog-backdrop-exit 160ms var(--motion-ease-enter) both; }

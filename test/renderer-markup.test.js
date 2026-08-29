@@ -468,8 +468,9 @@ test('note editor autosaves a full daily document and opens from its card', () =
   const noteEditorJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'note-editor.js'), 'utf8');
   assert.match(workbenchJs, /有未保存更改/);
   assert.match(workbenchJs, /setTimeout\(\(\) => flushNoteEditor\(\{ silent: true \}\), 550\)/);
-  assert.doesNotMatch(workbenchJs, /animateNoteDialogFromCard/);
-  assert.match(workbenchJs, /function openNoteEditor[\s\S]*openWorkbenchDialog\(dialog\)/);
+  assert.match(workbenchJs, /function animateNoteDialogFromCard[\s\S]*duration:\s*260[\s\S]*cubic-bezier\(0\.77, 0, 0\.175, 1\)/);
+  assert.match(workbenchJs, /function openNoteEditor[\s\S]*openWorkbenchDialog\(dialog, \{ animate: !sourceCard \}\)[\s\S]*animateNoteDialogFromCard\(dialog, sourceCard\)/);
+  assert.match(workbenchJs, /function closeNoteDialogToCard[\s\S]*duration:\s*220/);
   assert.match(noteEditorJs, /duration:\s*260/);
   assert.doesNotMatch(workbenchJs, /noteDialog'\)\.addEventListener\('click'/);
   assert.match(indexHtml, /class="note-paper"/);
@@ -477,6 +478,12 @@ test('note editor autosaves a full daily document and opens from its card', () =
   assert.match(indexHtml, /id="noteWordCount"/);
   assert.match(indexHtml, /id="noteMetadataPanel" class="note-inspector"/);
   assert.match(noteEditorJs, /function appendedSuffix/);
+});
+
+test('unchanged workspace broadcasts do not rebuild the visible job table', () => {
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  assert.match(workbenchJs, /const jobsChanged = JSON\.stringify\(wb\.workspace\.jobApplications \|\| \[\]\) !== JSON\.stringify\(nextWorkspace\.jobApplications \|\| \[\]\)/);
+  assert.match(workbenchJs, /if \(wb\.page === 'jobs' && jobsChanged\) renderJobs\(\)/);
 });
 
 test('daily document renderer no longer exposes the legacy entry editor', () => {

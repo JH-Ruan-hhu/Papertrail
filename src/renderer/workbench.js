@@ -27,7 +27,8 @@ const wb = {
   jobSort: 'priorityProgress',
   jobSortDirection: 'desc',
   editingJobWorkflow: null,
-  noteConflict: false
+  noteConflict: false,
+  noteMotionSourceId: null
 };
 
 function syncViewportDensity() {
@@ -174,9 +175,9 @@ function showWorkbenchToast(message, tone = '') {
   showWorkbenchToast.timer = setTimeout(() => { toast.className = 'toast'; }, 2500);
 }
 
-function openWorkbenchDialog(dialog) {
+function openWorkbenchDialog(dialog, { animate = true } = {}) {
   if (dialog?.open) return;
-  window.YanjiMotion?.animateDialog(dialog);
+  if (animate) window.YanjiMotion?.animateDialog(dialog);
   dialog.showModal();
   workbenchApi.setModalWindowState(true).catch(() => {});
 }
@@ -190,6 +191,73 @@ function closeWorkbenchDialog(dialog) {
   if (dialog?.open) dialog.close();
   finish();
   return Promise.resolve(true);
+}
+
+function noteMotionSourceCard() {
+  if (!wb.noteMotionSourceId) return null;
+  return [...document.querySelectorAll('#notesGrid [data-edit-note]')]
+    .find((card) => card.dataset.editNote === wb.noteMotionSourceId) || null;
+}
+
+function noteDialogMorphGeometry(dialog, sourceCard) {
+  if (!dialog?.open || !sourceCard?.isConnected || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return null;
+  const source = sourceCard.getBoundingClientRect();
+  const target = dialog.getBoundingClientRect();
+  if (![source.width, source.height, target.width, target.height].every((value) => Number.isFinite(value) && value > 0)) return null;
+  return {
+    translateX: source.left + source.width / 2 - (target.left + target.width / 2),
+    translateY: source.top + source.height / 2 - (target.top + target.height / 2),
+    scaleX: source.width / target.width,
+    scaleY: source.height / target.height
+  };
+}
+
+function animateNoteDialogFromCard(dialog, sourceCard) {
+  const geometry = noteDialogMorphGeometry(dialog, sourceCard);
+  if (!geometry || typeof dialog.animate !== 'function') return null;
+  dialog.getAnimations().forEach((animation) => animation.cancel());
+  const animation = dialog.animate([
+    {
+      opacity: .76,
+      transform: `translate3d(${geometry.translateX}px, ${geometry.translateY}px, 0) scale(${geometry.scaleX}, ${geometry.scaleY})`,
+      transformOrigin: 'center'
+    },
+    { opacity: 1, transform: 'translate3d(0, 0, 0) scale(1, 1)', transformOrigin: 'center' }
+  ], { duration: 260, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' });
+  dialog._yanjiNoteMorphAnimation = animation;
+  animation.finished.catch(() => {}).finally(() => {
+    if (dialog._yanjiNoteMorphAnimation === animation) dialog._yanjiNoteMorphAnimation = null;
+  });
+  return animation;
+}
+
+async function closeNoteDialogToCard(dialog, { morph = true } = {}) {
+  const sourceCard = morph ? noteMotionSourceCard() : null;
+  const geometry = sourceCard && !dialog.classList.contains('is-workspace-fullscreen')
+    ? noteDialogMorphGeometry(dialog, sourceCard)
+    : null;
+  if (!geometry || typeof dialog.animate !== 'function') {
+    wb.noteMotionSourceId = null;
+    return closeWorkbenchDialog(dialog);
+  }
+  dialog.getAnimations().forEach((animation) => animation.cancel());
+  dialog.classList.add('note-dialog-morph-closing');
+  const animation = dialog.animate([
+    { opacity: 1, transform: 'translate3d(0, 0, 0) scale(1, 1)', transformOrigin: 'center' },
+    {
+      opacity: .4,
+      transform: `translate3d(${geometry.translateX}px, ${geometry.translateY}px, 0) scale(${geometry.scaleX}, ${geometry.scaleY})`,
+      transformOrigin: 'center'
+    }
+  ], { duration: 220, easing: 'cubic-bezier(0.77, 0, 0.175, 1)', fill: 'forwards' });
+  await animation.finished.catch(() => {});
+  animation.cancel();
+  dialog.classList.remove('note-dialog-morph-closing');
+  if (dialog.open) dialog.close();
+  wb.noteMotionSourceId = null;
+  const anyOpen = [...document.querySelectorAll('dialog')].some((item) => item.open);
+  workbenchApi.setModalWindowState(anyOpen).catch(() => {});
+  return true;
 }
 
 function switchWorkbenchPage(page, { animate = false } = {}) {
@@ -1742,7 +1810,7 @@ async function flushNoteEditor({ silent = false } = {}) {
   return wb.noteSavePromise;
 }
 
-async function openNoteEditor(note = null) {
+async function openNoteEditor(note = null, sourceCard = null) {
   const todayKey = localDateKey(new Date());
   const todayDaily = !note ? wb.workspace.notes.find((item) => item.kind === 'daily' && item.dateKey === todayKey) : null;
   let targetNote = note || todayDaily || null;
@@ -1778,7 +1846,9 @@ async function openNoteEditor(note = null) {
   wb.noteDirty = Boolean(draft);
   clearTimeout(wb.noteSaveTimer);
   const dialog = document.getElementById('noteDialog');
-  openWorkbenchDialog(dialog);
+  wb.noteMotionSourceId = sourceCard?.dataset.editNote || null;
+  openWorkbenchDialog(dialog, { animate: !sourceCard });
+  if (sourceCard) animateNoteDialogFromCard(dialog, sourceCard);
   setTimeout(() => {
     window.YanjiNoteEditor?.placeCaretAtEnd(document.getElementById('noteContent'));
     hydrateInlineNoteImages(targetNote).catch(() => {});
@@ -1820,14 +1890,14 @@ async function saveNoteFromEditor() {
     const note = await flushNoteEditor();
     wb.editingNote = note;
     const deleted = note?.id ? await workbenchApi.deleteNoteIfEmpty(note.id) : false;
-    closeWorkbenchDialog(document.getElementById('noteDialog'));
+    await closeNoteDialogToCard(document.getElementById('noteDialog'));
     showWorkbenchToast(deleted ? '空白笔记已自动删除' : '笔记已保存。');
   } catch (exception) {
     document.getElementById('noteError').textContent = exception.message || '笔记保存失败。';
   }
 }
 
-async function closeNoteEditorSafely(dialog) {
+async function closeNoteEditorSafely(dialog, { morph = true } = {}) {
   clearTimeout(wb.noteSaveTimer);
   if (wb.noteDirty) {
     const saved = await flushNoteEditor({ silent: true });
@@ -1839,7 +1909,7 @@ async function closeNoteEditorSafely(dialog) {
   }
   if (wb.editingNote?.id) await workbenchApi.deleteNoteIfEmpty(wb.editingNote.id).catch(() => false);
   clearNoteDraftLocally();
-  if (dialog.open) closeWorkbenchDialog(dialog);
+  if (dialog.open) await closeNoteDialogToCard(dialog, { morph });
   return true;
 }
 
@@ -1894,6 +1964,7 @@ async function saveMetadataManager() {
 
 async function refreshWorkspace(workspace = null) {
   const nextWorkspace = workspace || await workbenchApi.getWorkspace();
+  const jobsChanged = JSON.stringify(wb.workspace.jobApplications || []) !== JSON.stringify(nextWorkspace.jobApplications || []);
   const noteDialog = document.getElementById('noteDialog');
   if (noteDialog?.open && wb.editingNote?.id) {
     const latest = nextWorkspace.notes?.find((note) => note.id === wb.editingNote.id);
@@ -1932,7 +2003,7 @@ async function refreshWorkspace(workspace = null) {
   if (wb.page === 'todos') window.YanjiTodoView?.render();
   if (wb.page === 'attendance') renderAttendance();
   if (wb.page === 'notes') renderNotes();
-  if (wb.page === 'jobs') renderJobs();
+  if (wb.page === 'jobs' && jobsChanged) renderJobs();
 }
 
 function bindWorkbenchEvents() {
@@ -2323,7 +2394,7 @@ function bindWorkbenchEvents() {
       setNoteEditorFullscreen(false);
       return;
     }
-    closeNoteEditorSafely(dialog).catch(() => {});
+    closeNoteEditorSafely(dialog, { morph: false }).catch(() => {});
   });
   document.getElementById('noteDialog').addEventListener('close', () => setNoteEditorFullscreen(false));
   document.getElementById('noteImagePreviewDialog').addEventListener('click', (event) => {
