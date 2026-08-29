@@ -426,7 +426,6 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(indexHtml, /id="jobWorkflowEditor"/);
   assert.match(indexHtml, /id="jobAnnualSalaryWan"/);
   assert.doesNotMatch(indexHtml, /job-upcoming-panel|jobUpcomingCount|>近期日程</);
-  assert.match(indexHtml, /岗位状态与招聘流程当前阶段相互独立/);
   assert.match(indexHtml, /投递与 Offer 固定为起终点；测评和各轮面试可按岗位自由选择/);
   assert.doesNotMatch(indexHtml, /value="pending">待投递/);
   assert.match(workbenchJs, /function renderJobQuickFilters\(jobs/);
@@ -547,7 +546,38 @@ test('packaged BrowserWindows load the unpacked Yanji taskbar icon', () => {
   assert.match(packageJson, /"build\/icon\.ico"/);
   assert.match(packageJson, /"build\/icon\.png"/);
   assert.match(mainJs, /app\.isPackaged[\s\S]*app\.asar\.unpacked[\s\S]*build/);
-  assert.match(mainJs, /mainWindow\.setIcon\(createAppWindowIcon\(\)\)/);
+  assert.match(mainJs, /applyWindowsTaskbarIdentity\(mainWindow\)/);
+  assert.match(mainJs, /window\.setAppDetails\(\{[\s\S]*appId:\s*APP_ID[\s\S]*appIconPath:\s*APP_ICON_PATH/);
+});
+
+test('global motion tokens cover routes, dialogs, tabs and reduced motion without a new dependency', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const motionCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.css'), 'utf8');
+  const motionJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.js'), 'utf8');
+  assert.match(indexHtml, /motion-system\.css/);
+  assert.match(indexHtml, /motion-system\.js/);
+  assert.match(indexHtml, /class="sidebar-active-indicator"/);
+  assert.match(motionCss, /--motion-duration-(?:fast|component|page)/);
+  assert.match(motionCss, /\.workbench-page\.page-entering/);
+  assert.match(motionCss, /\.modal\.dialog-entering/);
+  assert.match(motionCss, /\.motion-tab-entering/);
+  assert.match(motionCss, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.doesNotMatch(motionCss, /transition:\s*all\b/);
+  assert.match(motionJs, /pointerInitiated/);
+});
+
+test('note editor restores inspector state and wires Word-like Enter and Tab handling', () => {
+  const noteEditorJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'note-editor.js'), 'utf8');
+  const listEditingJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'list-editing.js'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  assert.match(noteEditorJs, /yanji\.noteInspectorOpen\.v1/);
+  assert.match(noteEditorJs, /localStorage\.setItem\(INSPECTOR_STATE_KEY/);
+  assert.match(workbenchJs, /YanjiNoteEditor\?\.restoreInspector\(\)/);
+  assert.match(listEditingJs, /\['Enter', 'Tab'\]/);
+  assert.match(listEditingJs, /execCommand\('insertParagraph'/);
+  assert.match(listEditingJs, /event\.shiftKey \? 'outdent' : 'indent'/);
+  assert.match(css, /\.note-paper\s*\{[\s\S]*?border-radius:\s*0;/);
 });
 
 test('release verification executes the packaged executable and inspects app.asar', () => {

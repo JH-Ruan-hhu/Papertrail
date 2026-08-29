@@ -124,6 +124,7 @@
     document.getElementById('todoRecognition').hidden = true;
     document.getElementById('todoRecognition').textContent = '';
     document.getElementById('todoError').textContent = '';
+    window.YanjiMotion?.animateDialog(document.getElementById('todoDialog'));
     document.getElementById('todoDialog').showModal();
     api.setModalWindowState(true).catch(() => {});
     setTimeout(() => document.getElementById('todoTitle').focus(), 20);
@@ -180,7 +181,12 @@
   function bind() {
     if (state.bound) return;
     state.bound = true;
-    document.querySelectorAll('[data-todo-view]').forEach((button) => button.addEventListener('click', () => { state.view = button.dataset.todoView; render(); }));
+    document.querySelectorAll('[data-todo-view]').forEach((button) => button.addEventListener('click', () => {
+      if (state.view === button.dataset.todoView) return;
+      state.view = button.dataset.todoView;
+      render();
+      window.YanjiMotion?.animateTab(document.getElementById('todoList'));
+    }));
     document.getElementById('todoSearch').addEventListener('input', (event) => { state.query = event.target.value; render(); });
     document.getElementById('todoList').addEventListener('click', (event) => {
       const actionButton = event.target.closest('[data-todo-action]');

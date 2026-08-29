@@ -174,6 +174,7 @@ function showWorkbenchToast(message, tone = '') {
 }
 
 function openWorkbenchDialog(dialog) {
+  window.YanjiMotion?.animateDialog(dialog);
   dialog.showModal();
   workbenchApi.setModalWindowState(true).catch(() => {});
 }
@@ -198,10 +199,7 @@ function switchWorkbenchPage(page, { animate = false } = {}) {
     section.hidden = section.dataset.page !== page;
   });
   const activeSection = sections.find((section) => section.dataset.page === page);
-  if (animate && previousPage !== page && activeSection) {
-    activeSection.classList.add('page-entering');
-    activeSection.addEventListener('animationend', () => activeSection.classList.remove('page-entering'), { once: true });
-  }
+  if (animate && previousPage !== page && activeSection) window.YanjiMotion?.enterPage(activeSection);
   if (page === 'schedule') renderTimeline();
   if (page === 'todos') window.YanjiTodoView?.render();
   if (page === 'attendance') renderAttendance();
@@ -1728,7 +1726,7 @@ async function openNoteEditor(note = null, sourceCard = null) {
   document.getElementById('deleteNoteButton').hidden = false;
   document.getElementById('openStickyFromEditorButton').hidden = false;
   document.getElementById('addNoteImageButton').disabled = false;
-  window.YanjiNoteEditor?.setInspectorOpen(true, { animate: false });
+  window.YanjiNoteEditor?.restoreInspector();
   document.getElementById('noteError').textContent = '';
   document.getElementById('noteSaveHint').textContent = draft ? '已恢复未保存草稿' : '已保存';
   setNoteEditorFullscreen(false);
@@ -2042,8 +2040,10 @@ function bindWorkbenchEvents() {
     renderFocus();
   }));
   document.querySelectorAll('[data-usage-range]').forEach((button) => button.addEventListener('click', () => {
+    if (wb.usageRange === button.dataset.usageRange) return;
     wb.usageRange = button.dataset.usageRange;
     renderAttendanceUsage();
+    window.YanjiMotion?.animateTab(document.getElementById('focusUsageList'));
   }));
   document.getElementById('startFocusButton').addEventListener('click', async () => {
     const suppressNotifications = document.getElementById('focusSuppressNotifications').checked;

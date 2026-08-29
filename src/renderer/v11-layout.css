@@ -403,7 +403,7 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   color: #26364c;
   background: #fff;
   border: 1px solid rgba(77, 95, 126, .11);
-  border-radius: 10px;
+  border-radius: 0;
   box-shadow: 0 8px 26px rgba(48, 66, 96, .07);
 }
 .note-paper > h1 {

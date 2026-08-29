@@ -490,6 +490,7 @@ function render() {
 }
 
 function setAddMode(mode) {
+  const changed = state.addMode !== mode;
   state.addMode = mode;
   const linkMode = mode === 'link';
   elements.addModeLink.classList.toggle('active', linkMode);
@@ -498,6 +499,7 @@ function setAddMode(mode) {
   elements.addModeAuthor.setAttribute('aria-selected', String(!linkMode));
   elements.linkModePanel.hidden = !linkMode;
   elements.authorModePanel.hidden = linkMode;
+  if (changed) window.YanjiMotion?.animateTab(linkMode ? elements.linkModePanel : elements.authorModePanel);
   elements.addError.textContent = '';
   setTimeout(() => (linkMode ? elements.trackingUrl : elements.productionReference).focus(), 40);
 }
@@ -960,6 +962,7 @@ const SETTINGS_SECTION_COPY = Object.freeze({
 
 function setSettingsSection(section) {
   if (!SETTINGS_SECTION_COPY[section]) return;
+  const changed = state.settingsSection !== section;
   state.settingsSection = section;
   elements.settingsNavButtons.forEach((button) => {
     const active = button.dataset.settingsSection === section;
@@ -974,6 +977,8 @@ function setSettingsSection(section) {
   elements.settingsPanels.forEach((panel) => {
     panel.hidden = panel.dataset.settingsPanel !== section;
   });
+  if (changed) window.YanjiMotion?.animateTab(elements.settingsPanels.find((panel) => panel.dataset.settingsPanel === section));
+  window.YanjiMotion?.syncIndicators();
   if (scroller) scroller.scrollTop = 0;
 }
 

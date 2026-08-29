@@ -1,12 +1,12 @@
 'use strict';
 
-const LIST_PREFIX = /^(?<indent>[ \t]*)(?<marker>(?:\d+[\.、)]|[a-zA-Z][.)]|[-*]))(?<gap>[ \t]+|$)/;
+const LIST_PREFIX = /^(?<indent>[ \t\u00a0]*)(?<marker>(?:\d+[\.、)]|[a-zA-Z][.)]|[-*]))(?<gap>[ \t\u00a0]+|$)/;
 
 function parseListPrefix(line) {
   const match = String(line || '').match(LIST_PREFIX);
   if (!match) return null;
   const marker = match.groups.marker;
-  const indent = match.groups.indent.replace(/\t/g, '  ');
+  const indent = match.groups.indent.replace(/\t|\u00a0/g, '  ');
   const number = /^\d/.test(marker) ? Number.parseInt(marker, 10) : null;
   const letter = /^[a-zA-Z]/.test(marker) ? marker.charCodeAt(0) : null;
   return {
@@ -79,45 +79,107 @@ function insertContentEditableText(editor, text) {
   return true;
 }
 
-function currentContentEditableLine(editor) {
+function contentEditableContext(editor) {
   const selection = editor?.ownerDocument?.defaultView?.getSelection?.();
   if (!selection?.rangeCount || !selection.isCollapsed) return null;
-  const caret = selection.getRangeAt(0);
+  const caret = selection.getRangeAt(0).cloneRange();
   if (!editor.contains(caret.commonAncestorContainer)) return null;
+  if (caret.endContainer.nodeType === 1 && caret.endOffset > 0) {
+    let node = caret.endContainer.childNodes[caret.endOffset - 1];
+    while (node?.lastChild) node = node.lastChild;
+    if (node?.nodeType === 3) {
+      caret.setStart(node, node.nodeValue.length);
+      caret.collapse(true);
+    }
+  }
   const anchorElement = caret.endContainer.nodeType === 1 ? caret.endContainer : caret.endContainer.parentElement;
+  const listItem = anchorElement?.closest?.('li');
   const block = anchorElement?.closest?.('p, div, li');
+  let line = '';
   if (block && block !== editor && editor.contains(block)) {
     const beforeBlockCaret = caret.cloneRange();
     beforeBlockCaret.selectNodeContents(block);
     beforeBlockCaret.setEnd(caret.endContainer, caret.endOffset);
-    return beforeBlockCaret.toString().split('\n').at(-1) || '';
+    line = beforeBlockCaret.toString().split('\n').at(-1) || '';
+  } else {
+    const before = caret.cloneRange();
+    before.selectNodeContents(editor);
+    before.setEnd(caret.endContainer, caret.endOffset);
+    const fragment = before.cloneContents();
+    const read = (node) => {
+      if (node.nodeType === 3) return node.nodeValue || '';
+      if (node.nodeType !== 1 && node.nodeType !== 11) return '';
+      if (node.nodeName === 'BR') return '\n';
+      const text = [...node.childNodes].map(read).join('');
+      return ['DIV', 'P', 'LI'].includes(node.nodeName) ? `${text}\n` : text;
+    };
+    line = read(fragment).replace(/\n$/, '').split('\n').at(-1) || '';
   }
-  const before = caret.cloneRange();
-  before.selectNodeContents(editor);
-  before.setEnd(caret.endContainer, caret.endOffset);
-  return before.toString().split('\n').at(-1) || '';
+  return { block, caret, line, listItem, selection };
 }
 
-function exitContentEditableList(editor, indentation = '') {
-  const selection = editor?.ownerDocument?.defaultView?.getSelection?.();
-  if (!selection?.rangeCount || !selection.isCollapsed) return false;
-  const caret = selection.getRangeAt(0);
-  const node = caret.endContainer;
-  if (node.nodeType !== 3 || !editor.contains(node)) return false;
-  const lineStart = node.nodeValue.lastIndexOf('\n', Math.max(0, caret.endOffset - 1)) + 1;
-  const replacement = caret.cloneRange();
-  replacement.setStart(node, lineStart);
-  replacement.deleteContents();
-  return insertContentEditableText(editor, indentation);
+function replaceContentEditablePrefix(editor, context, prefix, replacement) {
+  const node = context?.caret?.endContainer;
+  if (node?.nodeType !== 3 || !editor.contains(node)) return false;
+  const offset = context.caret.endOffset;
+  const lineStart = node.nodeValue.lastIndexOf('\n', Math.max(0, offset - 1)) + 1;
+  const beforeCaret = node.nodeValue.slice(lineStart, offset);
+  if (!beforeCaret.startsWith(context.line.slice(0, prefix.contentStart))) return false;
+  node.replaceData(lineStart, prefix.contentStart, replacement);
+  const nextOffset = Math.max(lineStart + replacement.length, offset + replacement.length - prefix.contentStart);
+  const range = editor.ownerDocument.createRange();
+  range.setStart(node, Math.min(nextOffset, node.nodeValue.length));
+  range.collapse(true);
+  context.selection.removeAllRanges();
+  context.selection.addRange(range);
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
+}
+
+function continueContentEditableList(editor, insertion) {
+  const document = editor.ownerDocument;
+  if (typeof document.execCommand !== 'function') return false;
+  const openedParagraph = document.execCommand('insertParagraph', false, null);
+  if (!openedParagraph) return false;
+  document.execCommand('insertText', false, insertion);
+  editor.dispatchEvent(new Event('input', { bubbles: true }));
+  return true;
 }
 
 function applyContentEditableListEditing(editor, event) {
-  if (!editor || event?.isComposing || event?.keyCode === 229 || event?.key !== 'Enter') return false;
-  const line = currentContentEditableLine(editor);
-  const continuation = continuationForLine(line);
-  if (!continuation) return false;
-  if (continuation.exitList) return exitContentEditableList(editor, continuation.insertion);
-  return insertContentEditableText(editor, continuation.insertion);
+  if (!editor || event?.isComposing || event?.keyCode === 229 || !['Enter', 'Tab'].includes(event?.key)) return false;
+  const context = contentEditableContext(editor);
+  if (!context) return false;
+
+  // Native rich lists already know how to continue. Tab needs an explicit
+  // indent command because Chromium otherwise moves focus out of the editor.
+  if (context.listItem) {
+    if (event.key === 'Enter') return false;
+    const command = event.shiftKey ? 'outdent' : 'indent';
+    const changed = editor.ownerDocument.execCommand?.(command, false, null) === true;
+    if (changed) editor.dispatchEvent(new Event('input', { bubbles: true }));
+    return changed;
+  }
+
+  const prefix = parseListPrefix(context.line);
+  if (!prefix) {
+    if (event.key !== 'Tab' || event.shiftKey) return false;
+    return insertContentEditableText(editor, '  ');
+  }
+
+  if (event.key === 'Enter') {
+    const body = context.line.slice(prefix.contentStart).trim();
+    if (!body) return replaceContentEditablePrefix(editor, context, prefix, prefix.indent);
+    return continueContentEditableList(editor, `${prefix.indent}${nextMarker(prefix)} `);
+  }
+
+  const level = Math.max(0, prefix.level + (event.shiftKey ? -1 : 1));
+  const sequence = prefix.number != null
+    ? prefix.number
+    : prefix.letter != null
+      ? prefix.letter - (prefix.letter >= 65 && prefix.letter <= 90 ? 64 : 96)
+      : 1;
+  return replaceContentEditablePrefix(editor, context, prefix, `${'  '.repeat(level)}${markerForLevel(level, prefix, sequence)} `);
 }
 
 function lineBounds(value, start, end = start) {
@@ -165,7 +227,7 @@ function transformListLines(text, increase) {
       : prefix.letter != null
         ? prefix.letter - (prefix.letter >= 65 && prefix.letter <= 90 ? 64 : 96)
         : 1;
-    return `${'  '.repeat(level)}${markerForLevel(level, prefix, sequence)}${content.startsWith(' ') || content.startsWith('\t') ? '' : ' '}${content.replace(/^[ \t]+/, ' ')}`;
+    return `${'  '.repeat(level)}${markerForLevel(level, prefix, sequence)}${/^[ \t\u00a0]/.test(content) ? '' : ' '}${content.replace(/^[ \t\u00a0]+/, ' ')}`;
   }).join('\n');
 }
 

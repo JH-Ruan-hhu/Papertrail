@@ -119,6 +119,58 @@ app.whenReady().then(async () => {
     app.quit();
     return;
   }
+  if (process.env.WORKBENCH_NOTE_BEHAVIOR_OUTPUT) {
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      const ready = await window.webContents.executeJavaScript(`Boolean(document.querySelector('#notesGrid .note-card'))`);
+      if (ready) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    const behavior = await window.webContents.executeJavaScript(`
+      (async () => {
+        document.querySelector('[data-workbench-page="notes"]').click();
+        const card = document.querySelector('#notesGrid .note-card');
+        card.click();
+        const dialog = document.getElementById('noteDialog');
+        const editor = document.getElementById('noteContent');
+        const toggle = document.getElementById('toggleNoteMetadataButton');
+        if (toggle.getAttribute('aria-expanded') === 'true') toggle.click();
+        const closedBeforeReopen = toggle.getAttribute('aria-expanded') === 'false';
+        document.getElementById('saveNoteButton').click();
+        for (let attempt = 0; attempt < 20 && dialog.open; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+        document.querySelector('#notesGrid .note-card').click();
+        const closedAfterReopen = toggle.getAttribute('aria-expanded') === 'false';
+
+        editor.innerHTML = '1. 第一项';
+        const range = document.createRange();
+        range.selectNodeContents(editor);
+        range.collapse(false);
+        const selection = getSelection();
+        selection.removeAllRanges();
+        selection.addRange(range);
+        editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+        const enterHtml = editor.innerHTML;
+        const continued = /2[.]/.test(editor.innerText);
+        editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }));
+        const indentHtml = editor.innerHTML;
+        const indentSelection = { node: getSelection().anchorNode?.nodeName, offset: getSelection().anchorOffset, value: getSelection().anchorNode?.nodeValue };
+        const indented = /b[)]/.test(editor.innerText);
+        editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
+        const outdentHtml = editor.innerHTML;
+        const outdented = /2[.]/.test(editor.innerText);
+        const paperRadius = getComputedStyle(document.querySelector('.note-paper')).borderRadius;
+        const pageDuration = getComputedStyle(document.documentElement).getPropertyValue('--motion-duration-page').trim();
+        return { closedBeforeReopen, closedAfterReopen, continued, indented, outdented, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, pageDuration };
+      })()
+    `);
+    if (!behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.continued || !behavior.indented || !behavior.outdented || behavior.paperRadius !== '0px' || behavior.pageDuration !== '280ms') {
+      throw new Error(`Note behavior smoke failed: ${JSON.stringify(behavior)}`);
+    }
+    console.log(`WORKBENCH_NOTE_BEHAVIOR_OK ${JSON.stringify(behavior)}`);
+    await captureStablePage(process.env.WORKBENCH_NOTE_BEHAVIOR_OUTPUT);
+    window.destroy();
+    app.quit();
+    return;
+  }
   if (process.env.WORKBENCH_NOTE_MODAL_OUTPUT) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
       const ready = await window.webContents.executeJavaScript(`Boolean(document.querySelector('#notesGrid .note-card'))`);

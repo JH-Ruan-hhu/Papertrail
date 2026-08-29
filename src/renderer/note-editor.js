@@ -1,6 +1,8 @@
 'use strict';
 
 (() => {
+  const INSPECTOR_STATE_KEY = 'yanji.noteInspectorOpen.v1';
+
   function plainTextFromHtml(value) {
     const root = document.createElement('div');
     root.innerHTML = String(value || '');
@@ -49,7 +51,16 @@
 
   let paperMotion = null;
 
-  function setInspectorOpen(open, { animate = true } = {}) {
+  function preferredInspectorOpen() {
+    try {
+      const saved = localStorage.getItem(INSPECTOR_STATE_KEY);
+      return saved == null ? true : saved === 'true';
+    } catch {
+      return true;
+    }
+  }
+
+  function setInspectorOpen(open, { animate = true, persist = true } = {}) {
     const body = document.querySelector('.note-workspace-body');
     const panel = document.getElementById('noteMetadataPanel');
     const button = document.getElementById('toggleNoteMetadataButton');
@@ -63,6 +74,9 @@
     button.setAttribute('aria-expanded', String(nextOpen));
     button.setAttribute('aria-label', nextOpen ? '收起属性侧栏' : '展开属性侧栏');
     button.title = nextOpen ? '收起属性侧栏' : '展开属性侧栏';
+    if (persist) {
+      try { localStorage.setItem(INSPECTOR_STATE_KEY, String(nextOpen)); } catch { /* storage can be unavailable in recovery mode */ }
+    }
     if (!animate || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const after = paper.getBoundingClientRect();
     const deltaX = before.left - after.left;
@@ -79,5 +93,9 @@
     setInspectorOpen(body?.classList.contains('is-inspector-closed'));
   }
 
-  window.YanjiNoteEditor = Object.freeze({ appendedSuffix, placeCaretAtEnd, setInspectorOpen, toggleInspector, updateDocumentStatus, wordCount });
+  function restoreInspector() {
+    setInspectorOpen(preferredInspectorOpen(), { animate: false, persist: false });
+  }
+
+  window.YanjiNoteEditor = Object.freeze({ appendedSuffix, placeCaretAtEnd, preferredInspectorOpen, restoreInspector, setInspectorOpen, toggleInspector, updateDocumentStatus, wordCount });
 })();

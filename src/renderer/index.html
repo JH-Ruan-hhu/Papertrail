@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="v11-layout.css">
     <link rel="stylesheet" href="themes/liquid-glass.css">
+    <link rel="stylesheet" href="motion-system.css">
   </head>
   <body>
     <div class="window-titlebar"><time id="topbarClock" aria-label="当前时间"></time></div>
@@ -17,6 +18,7 @@
         <div class="brand" aria-label="研迹科研工作台"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40"><rect x="3" y="3" width="34" height="34" rx="12"/><path d="M13 10.5h10.5a5.5 5.5 0 0 1 0 11H18v8M13 10.5v19M18 16h5.5"/></svg></span><span><strong>研迹</strong><small>科研工作台</small></span></div>
 
         <nav class="side-nav" aria-label="主导航">
+          <span class="sidebar-active-indicator" aria-hidden="true"></span>
           <p class="nav-label">工作区</p>
           <button class="nav-item active" data-workbench-page="home" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10.5 12 4l8 6.5v8a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5z"/><path d="M9 20v-6h6v6"/></svg><span>首页</span>
@@ -305,6 +307,10 @@
         <aside class="settings-sidebar" aria-label="设置分类">
           <div class="settings-sidebar-title"><div><small>研迹</small><strong>设置</strong></div></div>
           <nav class="settings-nav" role="tablist" aria-orientation="horizontal">
+            <span class="settings-liquid-indicator" aria-hidden="true"><i></i></span>
+            <svg class="settings-liquid-filters" aria-hidden="true" width="0" height="0">
+              <defs><filter id="settings-liquid-warp" x="-30%" y="-40%" width="160%" height="180%"><feTurbulence type="fractalNoise" baseFrequency=".018 .085" numOctaves="2" seed="8" result="waterNoise"/><feDisplacementMap in="SourceGraphic" in2="waterNoise" scale="8" xChannelSelector="R" yChannelSelector="B"/></filter></defs>
+            </svg>
             <button class="settings-nav-item active" type="button" role="tab" aria-selected="true" data-settings-section="general"><span>通用</span></button>
             <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="appearance"><span>外观</span></button>
             <button class="settings-nav-item" type="button" role="tab" aria-selected="false" data-settings-section="notifications"><span>提醒</span></button>
@@ -661,6 +667,7 @@
     <script src="shared-ui.js"></script>
     <script src="list-editing.js"></script>
     <script src="note-editor.js"></script>
+    <script src="motion-system.js"></script>
     <script src="app.js"></script>
     <script src="todo-view.js"></script>
     <script src="workbench.js"></script>

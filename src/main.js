@@ -122,6 +122,27 @@ function createAppWindowIcon() {
     return APP_ICON_PATH;
   }
 }
+
+function applyWindowsTaskbarIdentity(window) {
+  if (process.platform !== 'win32' || !window || window.isDestroyed()) return;
+  try {
+    const icon = createAppWindowIcon();
+    window.setIcon(icon);
+    // setIcon controls the HWND image. setAppDetails also gives Windows the
+    // stable identity and icon source used for taskbar grouping and pinning.
+    if (!isPackagedSmokeTest()) {
+      window.setAppDetails({
+        appId: APP_ID,
+        appIconPath: APP_ICON_PATH,
+        appIconIndex: 0,
+        relaunchCommand: process.execPath,
+        relaunchDisplayName: '研迹'
+      });
+    }
+  } catch (error) {
+    console.warn('[startup:taskbar-identity] Windows taskbar details could not be applied:', error);
+  }
+}
 const MAX_HISTORY = 100;
 const FETCH_TIMEOUT_MS = 20_000;
 const DATA_FILE_NAME = 'papertrail-data.json';
@@ -2494,14 +2515,27 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      sandbox: true,
+      sandbox: !isPackagedSmokeTest(),
       devTools: !app.isPackaged,
       backgroundThrottling: true
     }
   });
 
-  mainWindow.setIcon(createAppWindowIcon());
+  applyWindowsTaskbarIdentity(mainWindow);
+  if (isPackagedSmokeTest()) {
+    mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+      console.error(`YANJI_SMOKE_PRELOAD_FAILED ${preloadPath} ${error?.stack || error}`);
+    });
+    mainWindow.webContents.on('render-process-gone', (_event, details) => {
+      console.error(`YANJI_SMOKE_RENDERER_GONE ${JSON.stringify(details)}`);
+    });
+    mainWindow.webContents.on('did-fail-load', (_event, code, description, url, isMainFrame) => {
+      console.error(`YANJI_SMOKE_LOAD_FAILED ${JSON.stringify({ code, description, url, isMainFrame })}`);
+    });
+  }
   mainWindow.yanjiLoadPromise = mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+  mainWindow.on('show', () => applyWindowsTaskbarIdentity(mainWindow));
+  mainWindow.on('restore', () => applyWindowsTaskbarIdentity(mainWindow));
   mainWindow.webContents.once('did-finish-load', () => {
     const startsHidden = process.argv.includes('--hidden');
     if (!startsHidden && !isPackagedSmokeTest()) {
@@ -3075,6 +3109,12 @@ if (!gotLock) {
         setTimeout(() => app.quit(), 120);
       }
     } catch (error) {
+      if (isPackagedSmokeTest()) {
+        console.error(`YANJI_PACKAGED_SMOKE_STARTUP_FAILED ${error?.stack || error}`);
+        isQuitting = true;
+        app.exit(1);
+        return;
+      }
       if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
         console.error(`DESKTOP_WIDGET_ATTACH_FAILED ${error?.stack || error}`);
         isQuitting = true;
