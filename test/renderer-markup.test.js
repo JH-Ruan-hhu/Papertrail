@@ -200,28 +200,34 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
     path.join(__dirname, '..', 'src', 'renderer', 'app.js'),
     'utf8'
   );
+  const motionJs = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'renderer', 'motion-system.js'),
+    'utf8'
+  );
   assert.match(tokens, /--motion-ease-enter:\s*cubic-bezier\(\.23,\s*1,\s*\.32,\s*1\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /\.button:not\(:disabled\):active\s*\{\s*transform:\s*scale\(\.97\)/);
   assert.doesNotMatch(css, /transition:\s*all\b/);
   assert.doesNotMatch(css, /\.paper-card:hover[^}]*transform/);
   assert.match(appJs, /lastInputWasKeyboard/);
-  assert.match(appJs, /document\.visibilityState === 'visible'/);
-  assert.match(appJs, /document\.hasFocus\(\)/);
-  assert.match(appJs, /classList\.add\('dialog-entering'\)/);
-  assert.match(appJs, /setTimeout\(finishEntering, 60\)/);
+  assert.match(motionJs, /document\.visibilityState !== 'visible'/);
+  assert.match(motionJs, /document\.hasFocus\(\)/);
+  assert.match(motionJs, /classList\.add\('dialog-entering'\)/);
+  assert.match(motionJs, /function closeDialog\(/);
+  assert.match(motionJs, /dialog\.classList\.add\('dialog-closing'\)/);
 });
 
 test('pointer sidebar navigation settles gently while keyboard navigation stays immediate', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.css'), 'utf8');
   const tokens = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-tokens.css'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  assert.match(tokens, /--motion-duration-page:\s*340ms/);
-  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*motion-page-fade var\(--motion-duration-fast\)/s);
-  assert.match(css, /\.workbench-page\.page-entering > \.page-head-row\s*\{[^}]*motion-heading-enter var\(--motion-duration-component\)/s);
+  assert.match(tokens, /--motion-duration-page:\s*360ms/);
+  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*motion-page-fade var\(--motion-duration-page\)/s);
+  assert.match(css, /\.workbench-page\.page-entering > \.page-head-row\s*\{[^}]*motion-heading-enter var\(--motion-duration-page\)/s);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*motion-reduced-fade var\(--motion-duration-reduced\)/);
   assert.match(workbenchJs, /animate:\s*event\.detail\s*>\s*0/);
-  assert.match(workbenchJs, /previousPage !== page/);
+  assert.match(workbenchJs, /previousPage !== page \|\| page === 'home'/);
+  assert.match(workbenchJs, /force: page === 'home'/);
 });
 
 test('installer uses the stock electron-builder wizard while retaining upgrade safety', () => {
@@ -438,8 +444,9 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(workbenchJs, /function readWorkflowEditor\(\)/);
   assert.match(workbenchJs, /stage-assessment[\s\S]*测评[\s\S]*stage-third-interview[\s\S]*三面/);
   assert.match(workbenchJs, /data-workflow-stage-enabled/);
-  assert.match(css, /\.job-flow-stage:first-child\s*\{[^}]*justify-items:\s*center[^}]*text-align:\s*center/s);
-  assert.match(css, /\.job-flow-stage:last-child\s*\{[^}]*justify-items:\s*center[^}]*text-align:\s*center/s);
+  assert.match(css, /\.job-workflow-track\s*\{[^}]*display:\s*flex[^}]*justify-content:\s*space-between/s);
+  assert.match(css, /\.job-flow-stage:first-child,\s*\.job-flow-stage:last-child\s*\{[^}]*transform:\s*none/s);
+  assert.doesNotMatch(indexHtml, /id="job(?:Status|Deadline|NextFollowUpAt)"/);
   assert.doesNotMatch(workbenchJs, /JOB_STATUSES|JOB_STATUS_LABELS/);
   assert.doesNotMatch(workbenchJs, /data-advance-job|function advanceJob/);
   assert.match(indexHtml, /id="addJobButton"/);
@@ -463,7 +470,7 @@ test('note editor autosaves a full daily document and opens from its card', () =
   assert.match(workbenchJs, /setTimeout\(\(\) => flushNoteEditor\(\{ silent: true \}\), 550\)/);
   assert.doesNotMatch(workbenchJs, /animateNoteDialogFromCard/);
   assert.match(workbenchJs, /function openNoteEditor[\s\S]*openWorkbenchDialog\(dialog\)/);
-  assert.match(noteEditorJs, /duration:\s*300/);
+  assert.match(noteEditorJs, /duration:\s*260/);
   assert.doesNotMatch(workbenchJs, /noteDialog'\)\.addEventListener\('click'/);
   assert.match(indexHtml, /class="note-paper"/);
   assert.match(indexHtml, /id="noteDocumentTitle"/);
@@ -562,15 +569,20 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
   const tokens = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-tokens.css'), 'utf8');
   const motionCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.css'), 'utf8');
   const motionJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.js'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const todoViewJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'todo-view.js'), 'utf8');
   const auxiliaryPages = ['sticky.html', 'deadline.html', 'capture.html', 'schedule-widget.html']
     .map((file) => fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', file), 'utf8'));
   assert.match(indexHtml, /motion-tokens\.css/);
   assert.match(indexHtml, /motion-system\.css/);
   assert.match(indexHtml, /motion-system\.js/);
   assert.match(indexHtml, /class="sidebar-active-indicator"/);
-  assert.match(tokens, /--motion-duration-fast:\s*190ms/);
-  assert.match(tokens, /--motion-duration-component:\s*270ms/);
-  assert.match(tokens, /--motion-duration-page:\s*340ms/);
+  assert.match(tokens, /--motion-duration-micro:\s*140ms/);
+  assert.match(tokens, /--motion-duration-fast:\s*180ms/);
+  assert.match(tokens, /--motion-duration-component:\s*240ms/);
+  assert.match(tokens, /--motion-duration-page:\s*360ms/);
+  assert.match(tokens, /--motion-duration-showcase:\s*420ms/);
+  assert.match(tokens, /--motion-stagger-home:\s*115ms/);
   assert.match(tokens, /--motion-duration-progress:\s*650ms/);
   for (const html of auxiliaryPages) {
     assert.match(html, /motion-tokens\.css/);
@@ -584,6 +596,26 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
   assert.doesNotMatch(motionCss, /transition:\s*(?:width|height)\b/);
   assert.doesNotMatch(motionCss, /transition:\s*all\b/);
   assert.match(motionJs, /pointerInitiated/);
+  assert.match(motionJs, /HOME_MATRIX_SELECTOR/);
+  assert.match(motionJs, /getBoundingClientRect\(\)/);
+  assert.match(motionJs, /Math\.abs\(item\.top - row\.top\) >= 40/);
+  assert.match(motionJs, /--home-enter-index/);
+  assert.match(motionCss, /motion-home-card-enter var\(--motion-duration-showcase\)/);
+  assert.match(motionCss, /var\(--home-enter-index, 0\) \* var\(--motion-stagger-home\)/);
+  assert.doesNotMatch(motionCss, /home-page[^\n]*:nth-child/);
+  assert.match(motionJs, /animateList\(document\.getElementById\('todoList'\), '\.todo-card', \{ limit: 8, delay: 150 \}\)/);
+  assert.match(motionCss, /--motion-index[^\n]*var\(--motion-stagger-fast\)/);
+  assert.doesNotMatch(motionCss, /page-entering[^\n]*todo-card[^\n]*:nth-child/);
+  assert.match(todoViewJs, /animateStateChange\(card, 'todo-completing', 280\)/);
+  assert.match(motionCss, /motion-todo-check-complete 160ms/);
+  assert.match(motionCss, /motion-todo-card-complete 280ms/);
+  assert.match(motionJs, /function transitionSchedule\(/);
+  assert.match(motionJs, /sign \* 18/);
+  assert.match(workbenchJs, /function changeScheduleDate\(/);
+  assert.match(workbenchJs, /pendingScheduleHighlightId/);
+  assert.match(motionCss, /motion-schedule-added 840ms/);
+  assert.match(motionCss, /attendance-bar[^\n]*motion-bar-grow 540ms/);
+  assert.match(motionCss, /focus-usage-row i[^\n]*motion-bar-grow 420ms/);
 });
 
 test('note editor restores inspector state and wires Word-like Enter and Tab handling', () => {
@@ -597,7 +629,34 @@ test('note editor restores inspector state and wires Word-like Enter and Tab han
   assert.match(listEditingJs, /\['Enter', 'Tab'\]/);
   assert.match(listEditingJs, /execCommand\('insertParagraph'/);
   assert.match(listEditingJs, /event\.shiftKey \? 'outdent' : 'indent'/);
+  assert.match(listEditingJs, /insertContentEditableText\(editor, '\\t'\)/);
+  assert.match(noteEditorJs, /function handleZoomWheel\(event\)/);
+  assert.match(workbenchJs, /note-paper-scroll'[\s\S]*handleZoomWheel/);
   assert.match(css, /\.note-paper\s*\{[\s\S]*?border-radius:\s*0;/);
+});
+
+test('quick capture note submission imports and calls the daily-note append helper from workbench core', () => {
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const storageImport = mainJs.match(/const\s*\{([\s\S]*?)\}\s*=\s*require\('\.\/storage-core'\)/)?.[1] || '';
+  const workbenchImport = mainJs.match(/const\s*\{([\s\S]*?)\}\s*=\s*require\('\.\/workbench-core'\)/)?.[1] || '';
+  assert.doesNotMatch(storageImport, /appendDailyNoteContent/);
+  assert.match(workbenchImport, /appendDailyNoteContent/);
+  assert.match(mainJs, /function appendWorkspaceDailyNote\(input\)[\s\S]*appendDailyNoteContent\(store\.listNotes\(\)/);
+  assert.match(mainJs, /ipcMain\.handle\('capture:submit'[\s\S]*input\?\.mode === 'note'[\s\S]*appendWorkspaceDailyNote\(\{ content:/);
+});
+
+test('quick capture Tab cycles through schedule, todo, note and back to schedule', () => {
+  const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
+  const tabBranch = captureJs.indexOf("if (event.key === 'Tab')");
+  const noteEditingBranch = captureJs.indexOf("mode === 'note' && window.YanjiListEditing");
+  assert.ok(tabBranch >= 0 && noteEditingBranch > tabBranch);
+  assert.match(captureJs, /const modes = \['schedule', 'todo', 'note'\]/);
+});
+
+test('home page common workspace exposes the global gradient between matrices', () => {
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  assert.match(css, /\.workspace:has\(> \.home-page:not\(\[hidden\]\)\)[\s\S]*background:\s*transparent\s*!important/);
+  assert.match(css, /\.workspace\s*>\s*\.home-page:not\(\[hidden\]\)[\s\S]*box-shadow:\s*none/);
 });
 
 test('release verification executes the packaged executable and inspects app.asar', () => {

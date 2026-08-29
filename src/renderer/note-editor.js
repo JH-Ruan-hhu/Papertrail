@@ -50,6 +50,7 @@
   }
 
   let paperMotion = null;
+  let noteZoom = 1;
 
   function preferredInspectorOpen() {
     try {
@@ -84,8 +85,24 @@
     if (Math.abs(deltaX) < 1) return;
     paperMotion = paper.animate(
       [{ transform: `translateX(${deltaX}px)` }, { transform: 'translateX(0)' }],
-      { duration: 300, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' }
+      { duration: 260, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' }
     );
+  }
+
+  function setZoom(value) {
+    noteZoom = Math.min(1.8, Math.max(.7, Math.round(Number(value) * 10) / 10));
+    const paper = document.querySelector('.note-paper');
+    const label = document.getElementById('noteZoomLabel');
+    paper?.style.setProperty('--note-zoom', noteZoom);
+    if (label) label.textContent = `${Math.round(noteZoom * 100)}%`;
+    return noteZoom;
+  }
+
+  function handleZoomWheel(event) {
+    if (!(event?.ctrlKey || event?.metaKey)) return false;
+    event.preventDefault();
+    setZoom(noteZoom + (event.deltaY < 0 ? .1 : -.1));
+    return true;
   }
 
   function toggleInspector() {
@@ -97,5 +114,5 @@
     setInspectorOpen(preferredInspectorOpen(), { animate: false, persist: false });
   }
 
-  window.YanjiNoteEditor = Object.freeze({ appendedSuffix, placeCaretAtEnd, preferredInspectorOpen, restoreInspector, setInspectorOpen, toggleInspector, updateDocumentStatus, wordCount });
+  window.YanjiNoteEditor = Object.freeze({ appendedSuffix, handleZoomWheel, placeCaretAtEnd, preferredInspectorOpen, restoreInspector, setInspectorOpen, setZoom, toggleInspector, updateDocumentStatus, wordCount });
 })();

@@ -18,6 +18,12 @@ header > span, footer { color: #6b8493; font-size: 12px; }
 footer { border-top: 1px solid #dceaf1; padding-top: 10px; }
 footer > div:last-child { display: flex; gap: 14px; }
 kbd { min-width: 22px; padding: 2px 6px; border: 1px solid #c6dce7; border-bottom-width: 2px; border-radius: 5px; color: #526f81; background: #f9fcfe; font-family: inherit; font-size: 11px; }
-.parse-result { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3c7b9b; }
+.parse-result { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3c7b9b; transition: color 160ms var(--motion-ease-enter), opacity 160ms var(--motion-ease-enter); }
 .parse-result.error { color: #b52c3c; }
-@media (prefers-reduced-motion: no-preference) { .capture-card.shake { animation: shake var(--motion-duration-component) var(--motion-ease-move); } @keyframes shake { 25% { transform: translateX(-7px); } 75% { transform: translateX(7px); } } }
+@media (prefers-reduced-motion: no-preference) {
+  .capture-card { animation: capture-open 200ms var(--motion-ease-enter) both; }
+  .capture-card.shake { animation: capture-shake 190ms var(--motion-ease-move); }
+  @keyframes capture-open { from { opacity: 0; transform: translate3d(0, 5px, 0) scale(.99); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+  @keyframes capture-shake { 25% { transform: translateX(-3px); } 75% { transform: translateX(3px); } }
+}
+@media (prefers-reduced-motion: reduce) { .capture-card { animation: capture-reduced 120ms linear both; } @keyframes capture-reduced { from { opacity: .72; } to { opacity: 1; } } }

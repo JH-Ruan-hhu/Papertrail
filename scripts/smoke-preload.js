@@ -347,6 +347,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   showCapture: async () => true,
   hideCapture: async () => { document.body.dataset.hideRequested = 'true'; return true; },
   setCaptureContentState: () => {},
+  submitCapture: async (input) => { document.body.dataset.captureSubmitted = JSON.stringify(input); return input; },
   listPapers: async () => smokePapers,
   addPaper: async (payload) => payload?.mode === 'author' ? productionPaper : mockPaper,
   refreshPaper: async () => mockPaper,

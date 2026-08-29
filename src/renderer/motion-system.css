@@ -18,43 +18,82 @@
   opacity: 1;
   pointer-events: none;
   transform: translate3d(0, var(--motion-nav-y, 0), 0);
-  transition: transform var(--motion-duration-page) var(--motion-ease-move), opacity var(--motion-duration-fast) var(--motion-ease-enter);
+  transition: transform 310ms var(--motion-ease-move), opacity var(--motion-duration-fast) var(--motion-ease-enter);
 }
 .sidebar-active-indicator.is-hidden { opacity: 0; }
 .nav-item.active { background: transparent; border-color: transparent; box-shadow: none; }
 
 /* Route content: one page fade, then header/content hierarchy. */
-.workbench-page.page-entering { animation: motion-page-fade var(--motion-duration-fast) var(--motion-ease-enter) both; }
-.workbench-page.page-entering > .page-head-row { animation: motion-heading-enter var(--motion-duration-component) var(--motion-ease-enter) both; }
-.workbench-page.page-entering > :not(.page-head-row) { animation: motion-content-enter var(--motion-duration-component) var(--motion-ease-enter) 60ms both; }
-.home-page.page-entering > * { animation: motion-home-card-enter var(--motion-duration-page) var(--motion-ease-enter) both; }
-.home-page.page-entering > :nth-child(2) { animation-delay: 70ms; }
-.home-page.page-entering > :nth-child(3) { animation-delay: 135ms; }
-.home-page.page-entering > :nth-child(4) { animation-delay: 200ms; }
-.home-page.page-initial-entry > :nth-child(2) { animation-delay: 95ms; }
-.home-page.page-initial-entry > :nth-child(3) { animation-delay: 185ms; }
-.home-page.page-initial-entry > :nth-child(4) { animation-delay: 275ms; }
+.workbench-page.page-entering { animation: motion-page-fade var(--motion-duration-page) var(--motion-ease-enter) both; }
+.workbench-page.page-entering > .page-head-row { animation: motion-heading-enter var(--motion-duration-page) var(--motion-ease-enter) both; }
+.workbench-page.page-entering > :not(.page-head-row) { animation: motion-content-enter var(--motion-duration-page) var(--motion-ease-enter) 60ms both; }
+.home-page.home-entering :is(
+  .home-progress-strip,
+  .home-next-event-card,
+  .home-today-card:not(.home-today-todo-card),
+  .home-today-todo-card,
+  .home-attendance-card,
+  .home-schedule-panel,
+  .home-focus-timer,
+  .latest-notes-panel,
+  .home-job-panel
+) {
+  animation: motion-home-card-enter var(--motion-duration-showcase) var(--motion-ease-enter) both;
+  animation-delay: calc(var(--home-enter-index, 0) * var(--motion-stagger-home));
+  will-change: opacity, transform;
+}
 
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(-n + 8) { animation: motion-list-item-enter var(--motion-duration-component) var(--motion-ease-enter) both; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(2) { animation-delay: 32ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(3) { animation-delay: 64ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(4) { animation-delay: 96ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(5) { animation-delay: 128ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(6) { animation-delay: 160ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(7) { animation-delay: 192ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(8) { animation-delay: 224ms; }
+.todo-page.page-entering > .todo-toolbar { animation: motion-heading-enter var(--motion-duration-component) var(--motion-ease-enter) 60ms both; }
+.todo-page.page-entering .todo-group-heading { animation: motion-content-enter var(--motion-duration-component) var(--motion-ease-enter) 120ms both; }
+.motion-list-entering > .motion-list-item,
+.motion-list-entering .motion-list-item {
+  animation: motion-list-item-enter var(--motion-duration-component) var(--motion-ease-enter) both;
+  animation-delay: calc(var(--motion-list-delay, 0ms) + var(--motion-index, 0) * var(--motion-list-stagger, var(--motion-stagger-fast)));
+  will-change: opacity, transform;
+}
+
+.notes-grid.motion-list-entering .note-card { animation-name: motion-note-card-enter; }
+.job-list-entering .job-position.motion-list-item { animation: motion-job-row-enter var(--motion-duration-component) var(--motion-ease-enter) both; animation-delay: calc(var(--motion-index, 0) * var(--motion-list-stagger, 28ms)); will-change: opacity, transform; }
+
+.todo-card.todo-completing { animation: motion-todo-card-complete 280ms var(--motion-ease-enter) both; will-change: opacity, transform; }
+.todo-card.todo-completing .todo-check { animation: motion-todo-check-complete 160ms var(--motion-ease-enter) both; }
+.todo-card.todo-completing .todo-card-title strong { text-decoration: line-through; opacity: .66; transition: opacity 220ms var(--motion-ease-enter); }
+
+.schedule-board-card.schedule-item-added { animation: motion-schedule-added 840ms var(--motion-ease-enter) both; will-change: opacity, transform; }
+
+.attendance-page.attendance-entering .attendance-summary article {
+  animation: motion-list-item-enter var(--motion-duration-component) var(--motion-ease-enter) both;
+  animation-delay: calc(var(--motion-index, 0) * var(--motion-stagger-medium));
+}
+.attendance-page.attendance-entering .attendance-bar { animation: motion-bar-grow 540ms var(--motion-ease-enter) both; transform-origin: left center; will-change: transform; }
+.attendance-page.attendance-entering .focus-usage-row i { animation: motion-bar-grow 420ms var(--motion-ease-enter) both; transform-origin: left center; will-change: transform; }
 
 @keyframes motion-page-fade { from { opacity: .74; } to { opacity: 1; } }
 @keyframes motion-heading-enter { from { opacity: 0; transform: translate3d(0, var(--motion-distance-small), 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
 @keyframes motion-content-enter { from { opacity: .64; } to { opacity: 1; } }
-@keyframes motion-home-card-enter { from { opacity: 0; transform: translate3d(0, 10px, 0) scale(var(--motion-scale-enter)); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
-@keyframes motion-list-item-enter { from { opacity: 0; transform: translate3d(0, 5px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes motion-home-card-enter { from { opacity: 0; transform: translate3d(0, 14px, 0) scale(.985); } to { opacity: 1; transform: translate3d(0, 0, 0) scale(1); } }
+@keyframes motion-list-item-enter { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes motion-note-card-enter { from { opacity: 0; transform: translate3d(0, 5px, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes motion-job-row-enter { from { opacity: 0; transform: translate3d(-14px, 0, 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes motion-todo-check-complete { 50% { transform: scale(.86); } to { transform: scale(1); } }
+@keyframes motion-todo-card-complete { 55% { opacity: .72; transform: translate3d(0, 0, 0); } to { opacity: 0; transform: translate3d(0, -4px, 0); } }
+@keyframes motion-schedule-added { from { opacity: 0; transform: scale(.96); background-color: rgba(232, 244, 186, .9); } 28% { opacity: 1; transform: scale(1); background-color: rgba(232, 244, 186, .9); } to { opacity: 1; transform: scale(1); } }
+@keyframes motion-bar-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
 /* Dialogs, tabs, menus and state controls share the component tier. */
 .modal { transition: opacity var(--motion-duration-component) var(--motion-ease-enter), transform var(--motion-duration-component) var(--motion-ease-enter); }
-.modal.dialog-entering { opacity: 0; transform: translate3d(0, 6px, 0) scale(.97); }
+.modal.dialog-entering { opacity: 0; transform: translate3d(0, 8px, 0) scale(.975); will-change: opacity, transform; }
+.note-editor-modal { transition-duration: 280ms; }
+.note-editor-modal.dialog-entering { transform: translate3d(0, 8px, 0) scale(.985); }
+.note-editor-modal.dialog-entering .note-paper { opacity: 0; transform: translate3d(0, 4px, 0); }
+.modal.dialog-closing { animation: motion-dialog-exit 160ms var(--motion-ease-enter) both; pointer-events: none; will-change: opacity, transform; }
+.modal[open]::backdrop { animation: motion-dialog-backdrop-enter var(--motion-duration-fast) var(--motion-ease-enter) both; }
+.modal.dialog-closing::backdrop { animation: motion-dialog-backdrop-exit 160ms var(--motion-ease-enter) both; }
 .motion-tab-entering { animation: motion-tab-enter var(--motion-duration-component) var(--motion-ease-enter) both; }
 @keyframes motion-tab-enter { from { opacity: .3; transform: translate3d(0, var(--motion-distance-micro), 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
+@keyframes motion-dialog-exit { to { opacity: 0; transform: translate3d(0, 4px, 0) scale(.985); } }
+@keyframes motion-dialog-backdrop-enter { from { opacity: 0; } to { opacity: 1; } }
+@keyframes motion-dialog-backdrop-exit { to { opacity: 0; } }
 
 .button, .text-button, .close-button, .nav-item, .settings-entry, .note-inspector-toggle,
 .todo-view-tab, .usage-range-tabs button, .job-quick-filter, .mode-tab { transition-duration: var(--motion-duration-fast); }
@@ -74,7 +113,7 @@
   box-shadow: 0 8px 24px rgba(43, 70, 133, .1), inset 0 1px rgba(255,255,255,.88);
   pointer-events: none;
   transform: translate3d(var(--motion-tab-x, 0), 0, 0);
-  transition: transform var(--motion-duration-page) var(--motion-ease-move);
+  transition: transform 280ms var(--motion-ease-move);
 }
 .settings-liquid-indicator::after {
   content: '';
@@ -101,13 +140,23 @@
   .workbench-page.page-entering,
   .workbench-page.page-entering > .page-head-row,
   .workbench-page.page-entering > :not(.page-head-row),
-  .home-page.page-entering > *,
-  .page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(-n + 8),
+  .home-page.home-entering :is(.home-progress-strip, .home-next-event-card, .home-today-card, .home-attendance-card, .home-schedule-panel, .home-focus-timer, .latest-notes-panel, .home-job-panel),
+  .motion-list-entering .motion-list-item,
   .motion-tab-entering { animation: motion-reduced-fade var(--motion-duration-reduced) linear both; }
+  .home-page.home-entering :is(.home-progress-strip, .home-next-event-card, .home-today-card, .home-attendance-card, .home-schedule-panel, .home-focus-timer, .latest-notes-panel, .home-job-panel) { animation-delay: 0ms; will-change: auto; }
+  .todo-card.todo-completing, .schedule-board-card.schedule-item-added { animation: motion-reduced-fade-out var(--motion-duration-reduced) linear both; transform: none; }
+  .todo-card.todo-completing .todo-check { animation: none; }
+  .attendance-page.attendance-entering .attendance-summary article { animation: motion-reduced-fade var(--motion-duration-reduced) linear both; animation-delay: 0ms; }
+  .attendance-page.attendance-entering .attendance-bar,
+  .attendance-page.attendance-entering .focus-usage-row i { animation: none; transform: none; will-change: auto; }
   .modal { transition: opacity var(--motion-duration-reduced) linear; }
   .modal.dialog-entering { opacity: 0; transform: none; }
+  .modal.dialog-closing { animation: motion-reduced-fade-out var(--motion-duration-reduced) linear both; transform: none; }
+  .modal[open]::backdrop { animation-duration: var(--motion-duration-reduced); }
+  .modal.dialog-closing::backdrop { animation: motion-reduced-fade-out var(--motion-duration-reduced) linear both; }
   .modal[open] { opacity: 1; }
   @starting-style { .modal[open] { opacity: 0; } }
   .home-progress-rate-track i, .home-todo-progress i::after, .update-progress span { transition-duration: var(--motion-duration-reduced); }
   @keyframes motion-reduced-fade { from { opacity: .72; } to { opacity: 1; } }
+  @keyframes motion-reduced-fade-out { to { opacity: 0; } }
 }

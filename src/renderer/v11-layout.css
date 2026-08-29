@@ -391,20 +391,23 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   display: block;
   padding-right: 300px;
   overflow: hidden;
+  transition: padding-right 260ms var(--motion-ease-move);
 }
 .note-workspace-body.is-inspector-closed { padding-right: 0; }
-.note-paper-scroll { min-width: 0; overflow: auto; padding: 32px clamp(22px, 4vw, 64px) 54px; scroll-padding: 32px; }
+.note-paper-scroll { min-width: 0; overflow: auto; padding: 24px clamp(16px, 3vw, 42px) 40px; scroll-padding: 24px; }
 .note-paper {
   width: min(820px, 100%);
   min-height: min(1040px, calc(100vh - 190px));
   margin: 0 auto;
-  padding: clamp(48px, 6vw, 76px) clamp(42px, 7vw, 76px) 84px;
+  padding: clamp(34px, 4vw, 52px) clamp(30px, 5vw, 56px) 60px;
   box-sizing: border-box;
   color: #26364c;
   background: #fff;
   border: 1px solid rgba(77, 95, 126, .11);
   border-radius: 0;
   box-shadow: 0 8px 26px rgba(48, 66, 96, .07);
+  zoom: var(--note-zoom, 1);
+  transition: opacity 240ms var(--motion-ease-enter) 40ms, transform 240ms var(--motion-ease-enter) 40ms;
 }
 .note-paper > h1 {
   margin: 0 0 34px;
@@ -432,7 +435,8 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   font-size: 15px;
   line-height: 1.82;
   letter-spacing: .002em;
-  white-space: normal;
+  white-space: pre-wrap;
+  tab-size: 4;
 }
 .note-paper .note-content-input:focus { border: 0; box-shadow: none; }
 .note-paper .note-content-input :is(p, div) { min-height: 1.82em; margin: 0 0 .52em; }
@@ -453,7 +457,7 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   transform: translateX(0);
   transition: opacity var(--motion-duration-component) var(--motion-ease-enter), transform var(--motion-duration-component) var(--motion-ease-enter);
 }
-.note-workspace-body.is-inspector-closed .note-inspector { pointer-events: none; opacity: 0; transform: translateX(100%); }
+.note-workspace-body.is-inspector-closed .note-inspector { pointer-events: none; opacity: .2; transform: translateX(18px); }
 .note-inspector-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
 .note-inspector-heading strong, .note-inspector-heading small { display: block; }
 .note-inspector-heading strong { color: #2a3a51; font-size: 15px; }
@@ -1104,11 +1108,12 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
   box-sizing: border-box;
 }
 .note-editor-modal.is-workspace-fullscreen {
-  width: auto;
+  position: fixed;
+  width: 100vw;
   max-width: none;
-  height: auto;
+  height: calc(100vh - var(--titlebar-height));
   max-height: none;
-  inset: var(--titlebar-height) 0 0 var(--sidebar-width);
+  inset: var(--titlebar-height) 0 0 0;
   margin: 0;
   border-radius: 0;
 }
@@ -1588,11 +1593,10 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-position-actions .job-row-action span { white-space: nowrap; }
 .job-position-actions .job-row-action.danger { width: 29px; color: #c25559; background: #fff; border-color: #e9c8ca; }
 .job-workflow-track-shell { overflow-x: auto; padding: 2px 17px 10px 10px; }
-.job-workflow-track { --job-start-inset: clamp(112px, 14.5%, 185px); --job-end-inset: clamp(34px, 3%, 42px); position: relative; min-width: max(100%, 520px); display: grid; grid-template-columns: repeat(var(--stage-count, 1), minmax(0, 1fr)); align-items: start; padding: 0 var(--job-end-inset) 0 var(--job-start-inset); }
-.job-workflow-track::before { content: ''; position: absolute; z-index: 0; top: 4px; left: calc(var(--job-start-inset) + 4px); right: calc(var(--job-end-inset) + 4px); height: 2px; background: linear-gradient(90deg, #3865d6 0 var(--job-progress, 0%), #e1e6ee var(--job-progress, 0%) 100%); }
-.job-flow-stage { position: relative; z-index: 1; width: auto; max-width: none; min-width: 0; justify-self: stretch; display: grid; justify-items: center; gap: 2px; color: #7f8b9e; font-size: 10px; font-weight: 590; line-height: 1.08; text-align: center; }
-.job-flow-stage:first-child { width: 62px; justify-self: start; justify-items: center; margin: 0; transform: translateX(-26.5px); text-align: center; }
-.job-flow-stage:last-child { width: 62px; justify-self: end; justify-items: center; margin: 0; transform: translateX(26.5px); text-align: center; }
+.job-workflow-track { --job-track-inset: clamp(112px, 14.5%, 185px); position: relative; min-width: max(100%, 520px); display: flex; align-items: start; justify-content: space-between; padding: 0 var(--job-track-inset); }
+.job-workflow-track::before { content: ''; position: absolute; z-index: 0; top: 4px; left: calc(var(--job-track-inset) + 31px); right: calc(var(--job-track-inset) + 31px); height: 2px; background: linear-gradient(90deg, #3865d6 0 var(--job-progress, 0%), #e1e6ee var(--job-progress, 0%) 100%); }
+.job-flow-stage { position: relative; z-index: 1; width: 62px; max-width: 62px; min-width: 62px; display: grid; justify-items: center; gap: 2px; color: #7f8b9e; font-size: 10px; font-weight: 590; line-height: 1.08; text-align: center; }
+.job-flow-stage:first-child, .job-flow-stage:last-child { margin: 0; transform: none; }
 .job-flow-node { width: 9px; height: 9px; background: #e0e5ed; border: 1px solid #d5dce7; }
 .job-flow-stage.completed .job-flow-node, .job-flow-stage.current .job-flow-node { width: 9px; height: 9px; margin: 0; background: #3865d6; border-color: #3865d6; box-shadow: none; }
 .job-flow-stage.completed, .job-flow-stage.current { color: #3157ba; }
@@ -1680,6 +1684,7 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
 .note-editor-modal.note-editor-modal .note-content-input { min-height: 720px; max-height: none; padding: 0; overflow: visible; border: 0; border-radius: 0; box-shadow: none; contain: none; }
 .note-editor-modal.note-editor-modal .note-metadata-panel { max-height: none; }
 .note-editor-modal.note-editor-modal.is-workspace-fullscreen > form { padding: 0; }
+.note-editor-modal.note-editor-modal.is-workspace-fullscreen { width: 100vw; height: calc(100vh - var(--titlebar-height)); max-height: none; }
 @media (max-width: 700px) {
   .note-editor-modal.note-editor-modal { width: calc(100vw - 20px); height: calc(100vh - 20px); max-height: calc(100vh - 20px); }
   .note-editor-modal.note-editor-modal .note-content-input { min-height: 540px; }
@@ -1696,16 +1701,17 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
 .job-editor-modal .modal-head { margin-bottom: 12px; }
 .job-editor-modal .modal-head h2 { font-size: 20px; }
 .job-editor-modal .modal-head > div > p:last-child { margin-top: 3px; font-size: 11px; }
-.job-editor-layout { display: grid; grid-template-columns: minmax(0, .92fr) minmax(500px, 1.08fr); align-items: start; gap: 16px; }
-.job-details-panel { min-width: 0; padding: 13px; background: #f8f9fb; border: 1px solid #e7eaf0; border-radius: 13px; }
+.job-editor-layout { display: grid; grid-template-columns: minmax(0, .92fr) minmax(500px, 1.08fr); align-items: stretch; gap: 16px; }
+.job-details-panel { min-width: 0; height: 100%; padding: 13px; background: #f8f9fb; border: 1px solid #e7eaf0; border-radius: 13px; }
 .job-editor-modal .job-form-grid { gap: 8px 10px; }
 .job-editor-modal .field label { margin-bottom: 4px; font-size: 10.5px; }
 .job-editor-modal .field input,
 .job-editor-modal .field select { height: 34px; min-height: 34px; padding: 0 9px; border-radius: 7px; font-size: 11.5px; }
 .job-editor-modal .field textarea { min-height: 68px; max-height: 68px; padding: 8px 9px; border-radius: 7px; font-size: 11.5px; line-height: 1.45; resize: none; }
-.job-editor-modal .job-workflow-field { min-width: 0; margin: 0; padding: 12px; }
+.job-editor-modal .job-workflow-field { min-width: 0; height: 100%; display: flex; flex-direction: column; margin: 0; padding: 12px; }
 .job-editor-modal .job-workflow-heading { align-items: center; margin-bottom: 8px; }
 .job-editor-modal .job-workflow-heading p { margin-top: 2px; font-size: 9.5px; line-height: 1.3; }
+.job-editor-modal .job-workflow-editor { flex: 1; grid-auto-rows: minmax(39px, 1fr); }
 .job-editor-modal .job-stage-option { min-height: 39px; grid-template-columns: minmax(126px, 1fr) 52px 142px 82px; gap: 6px; padding: 4px 6px; }
 .job-editor-modal .job-stage-toggle > span { width: 16px; height: 16px; flex-basis: 16px; }
 .job-editor-modal .job-stage-toggle strong { font-size: 11.5px; }
@@ -1722,4 +1728,13 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
 @media (max-width: 980px) {
   .job-editor-modal.job-editor-modal { overflow-y: auto; }
   .job-editor-layout { grid-template-columns: 1fr; }
+}
+
+/* The home matrices sit directly on the app canvas; the workspace must not
+   introduce a second page-sized surface between cards and the global gradient. */
+.workspace:has(> .home-page:not([hidden])),
+.workspace > .home-page:not([hidden]) {
+  background: transparent !important;
+  background-color: transparent !important;
+  box-shadow: none;
 }

@@ -536,7 +536,7 @@ async function confirmJourneyLink() {
   elements.confirmJourneyButton.disabled = true;
   try {
     state.papers = await api.linkPaperJourney(state.journeyLinkId, elements.journeyTarget.value);
-    elements.journeyDialog.close();
+    closeDialog(elements.journeyDialog);
     render();
     showToast('投稿记录已关联，可在进展中查看跨期刊历程。');
   } catch (error) {
@@ -747,7 +747,7 @@ async function addPaper() {
   elements.confirmAddButton.textContent = '正在读取…';
   try {
     await api.addPaper(payload);
-    elements.addDialog.close();
+    closeDialog(elements.addDialog);
     showToast(state.addMode === 'author' ? '已添加文章并保存出版进展。' : '已添加稿件并保存审稿进展。');
   } catch (error) {
     elements.addError.textContent = getErrorMessage(error);
@@ -826,7 +826,7 @@ function renderUpdatePrompt() {
   if (status === 'available' && state.dismissedUpdateVersion !== versionKey && !dialog.open) openDialog(dialog);
   if (!dialog.open) return;
   if (!['checking', 'available', 'downloading', 'downloaded', 'error'].includes(status)) {
-    dialog.close();
+    closeDialog(dialog);
     return;
   }
 
@@ -856,7 +856,7 @@ function renderUpdatePrompt() {
 
 function dismissUpdatePrompt() {
   state.dismissedUpdateVersion = updatePromptVersionKey();
-  if (elements.updatePromptDialog.open) elements.updatePromptDialog.close();
+  if (elements.updatePromptDialog.open) closeDialog(elements.updatePromptDialog);
 }
 
 async function handleUpdatePromptAction() {
@@ -1058,18 +1058,16 @@ function syncModalTitleBar() {
 }
 
 function openDialog(dialog) {
-  const shouldAnimate = document.visibilityState === 'visible'
-    && document.hasFocus()
-    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    && !state.lastInputWasKeyboard;
-  if (shouldAnimate) dialog.classList.add('dialog-entering');
+  window.YanjiMotion?.animateDialog(dialog);
   dialog.showModal();
-  if (shouldAnimate) {
-    const finishEntering = () => dialog.classList.remove('dialog-entering');
-    requestAnimationFrame(() => requestAnimationFrame(finishEntering));
-    setTimeout(finishEntering, 60);
-  }
   syncModalTitleBar();
+}
+
+function closeDialog(dialog) {
+  if (window.YanjiMotion?.closeDialog) return window.YanjiMotion.closeDialog(dialog, syncModalTitleBar);
+  if (dialog?.open) dialog.close();
+  syncModalTitleBar();
+  return Promise.resolve(true);
 }
 
 function closeOnBackdrop(event) {
@@ -1078,7 +1076,7 @@ function closeOnBackdrop(event) {
   const rect = dialog.getBoundingClientRect();
   const inside = event.clientX >= rect.left && event.clientX <= rect.right
     && event.clientY >= rect.top && event.clientY <= rect.bottom;
-  if (!inside) dialog.close();
+  if (!inside) closeDialog(dialog);
 }
 
 async function saveSettings() {
@@ -1208,7 +1206,7 @@ async function removeSelectedPaper() {
   elements.confirmRemoveButton.disabled = true;
   try {
     await api.removePaper(removeId);
-    elements.removeDialog.close();
+    closeDialog(elements.removeDialog);
     state.expandedIds.delete(removeId);
     showToast('本地记录已永久删除');
   } catch (error) {
@@ -1256,12 +1254,12 @@ function bindEvents() {
   elements.saveRevisionButton.addEventListener('click', saveWorkflowRevision);
   elements.cancelRevisionEditButton.addEventListener('click', resetRevisionEditor);
   elements.workflowDialog.addEventListener('click', handleWorkflowAction);
-  elements.closeAddDialogButton.addEventListener('click', () => elements.addDialog.close());
-  elements.cancelAddButton.addEventListener('click', () => elements.addDialog.close());
-  elements.closeJourneyDialogButton.addEventListener('click', () => elements.journeyDialog.close());
-  elements.cancelJourneyButton.addEventListener('click', () => elements.journeyDialog.close());
-  elements.closeWorkflowDialogButton.addEventListener('click', () => elements.workflowDialog.close());
-  elements.closeWorkflowFooterButton.addEventListener('click', () => elements.workflowDialog.close());
+  elements.closeAddDialogButton.addEventListener('click', () => closeDialog(elements.addDialog));
+  elements.cancelAddButton.addEventListener('click', () => closeDialog(elements.addDialog));
+  elements.closeJourneyDialogButton.addEventListener('click', () => closeDialog(elements.journeyDialog));
+  elements.cancelJourneyButton.addEventListener('click', () => closeDialog(elements.journeyDialog));
+  elements.closeWorkflowDialogButton.addEventListener('click', () => closeDialog(elements.workflowDialog));
+  elements.closeWorkflowFooterButton.addEventListener('click', () => closeDialog(elements.workflowDialog));
   elements.addModeLink.addEventListener('click', () => setAddMode('link'));
   elements.addModeAuthor.addEventListener('click', () => setAddMode('author'));
   [elements.trackingUrl, elements.productionReference, elements.authorLastName, elements.authorFirstName].forEach((input) => {

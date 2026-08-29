@@ -31,7 +31,6 @@ try {
 }
 const { JsonStore, DEFAULT_SETTINGS } = require('./store');
 const {
-  appendDailyNoteContent,
   isManagedBackupPath,
   readStoragePointer: readStoragePointerState,
   resolveStorageState,
@@ -60,6 +59,7 @@ const {
 } = require('./production-core');
 const { importantChanges } = require('./notification-core');
 const {
+  appendDailyNoteContent,
   closeStaleAttendanceRecords,
   normalizeMetadataField,
   normalizeNote,

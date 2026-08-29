@@ -157,8 +157,9 @@
       const reminderAtValue = document.getElementById('todoReminderAt').value;
       await api.saveTodo({ id: document.getElementById('todoId').value || undefined, title: parsed?.title || rawTitle, notes: document.getElementById('todoNotes').value, dueAt: dueValue ? new Date(dueValue).toISOString() : null, reminderMode, reminderAt: reminderMode === 'custom' && reminderAtValue ? new Date(reminderAtValue).toISOString() : null, priority: document.querySelector('input[name="todoPriority"]:checked')?.value || 'medium' });
       clearDraft();
-      document.getElementById('todoDialog').close();
-      api.setModalWindowState(false).catch(() => {});
+      const dialog = document.getElementById('todoDialog');
+      if (window.YanjiMotion?.closeDialog) window.YanjiMotion.closeDialog(dialog, () => api.setModalWindowState(false).catch(() => {}));
+      else { dialog.close(); api.setModalWindowState(false).catch(() => {}); }
       window.showWorkbenchToast?.('待办已保存');
     } catch (exception) { error.textContent = exception.message || '待办保存失败'; }
   }
@@ -169,7 +170,13 @@
         const accepted = await window.yanjiConfirm?.({ title: '删除待办', message: `“${todo?.title || ''}”将被删除`, confirmText: '删除待办', tone: 'danger' });
         if (!accepted) return;
         await api.deleteTodo(id);
-      } else if (name === 'complete') await api.completeTodo(id);
+      } else if (name === 'complete') {
+        const card = document.querySelector(`[data-todo-card="${CSS.escape(id)}"]`);
+        const checkbox = card?.querySelector('.todo-check');
+        if (checkbox) checkbox.checked = true;
+        await window.YanjiMotion?.animateStateChange(card, 'todo-completing', 280);
+        await api.completeTodo(id);
+      }
       else if (name === 'reopen') await api.reopenTodo(id);
       else if (name === 'cancel') await api.cancelTodo(id);
       else if (name === 'schedule') window.dispatchEvent(new CustomEvent('yanji:todo-schedule', { detail: state.workspace.todos.find((item) => item.id === id) }));
@@ -198,10 +205,15 @@
     document.getElementById('todoQuickCaptureButton').addEventListener('click', () => api.showCapture());
     document.getElementById('saveTodoButton').addEventListener('click', save);
     document.getElementById('todoForm').addEventListener('submit', (event) => { event.preventDefault(); save(); });
-    document.getElementById('cancelTodoButton').addEventListener('click', () => { clearDraft(); document.getElementById('todoDialog').close(); api.setModalWindowState(false).catch(() => {}); });
-    document.getElementById('deleteTodoButton').addEventListener('click', () => action(document.getElementById('todoId').value, 'delete').then(() => { if (document.getElementById('todoDialog').open) document.getElementById('todoDialog').close(); }));
-    document.getElementById('todoDialog').addEventListener('cancel', (event) => { event.preventDefault(); writeDraft(); event.currentTarget.close(); api.setModalWindowState(false).catch(() => {}); });
-    document.getElementById('todoDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) { writeDraft(); event.currentTarget.close(); api.setModalWindowState(false).catch(() => {}); } });
+    const closeTodoDialog = (dialog) => {
+      const finish = () => api.setModalWindowState(false).catch(() => {});
+      if (window.YanjiMotion?.closeDialog) window.YanjiMotion.closeDialog(dialog, finish);
+      else { if (dialog.open) dialog.close(); finish(); }
+    };
+    document.getElementById('cancelTodoButton').addEventListener('click', () => { clearDraft(); closeTodoDialog(document.getElementById('todoDialog')); });
+    document.getElementById('deleteTodoButton').addEventListener('click', () => action(document.getElementById('todoId').value, 'delete').then(() => { const dialog = document.getElementById('todoDialog'); if (dialog.open) closeTodoDialog(dialog); }));
+    document.getElementById('todoDialog').addEventListener('cancel', (event) => { event.preventDefault(); writeDraft(); closeTodoDialog(event.currentTarget); });
+    document.getElementById('todoDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) { writeDraft(); closeTodoDialog(event.currentTarget); } });
     let timer;
     document.getElementById('todoTitle').addEventListener('input', () => { queueDraft(); clearTimeout(timer); timer = setTimeout(parseTitle, 180); });
     document.querySelectorAll('#todoDialog input, #todoDialog textarea, #todoDialog select').forEach((input) => input.addEventListener('change', queueDraft));

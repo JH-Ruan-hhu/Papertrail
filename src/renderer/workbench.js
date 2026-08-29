@@ -22,6 +22,7 @@ const wb = {
   noteAttachmentMutation: false,
   previewingNoteImage: null,
   scheduleDraftTimer: null,
+  pendingScheduleHighlightId: null,
   jobQuickFilter: 'all',
   jobSort: 'priorityProgress',
   jobSortDirection: 'desc',
@@ -174,15 +175,21 @@ function showWorkbenchToast(message, tone = '') {
 }
 
 function openWorkbenchDialog(dialog) {
+  if (dialog?.open) return;
   window.YanjiMotion?.animateDialog(dialog);
   dialog.showModal();
   workbenchApi.setModalWindowState(true).catch(() => {});
 }
 
 function closeWorkbenchDialog(dialog) {
-  dialog.close();
-  const anyOpen = [...document.querySelectorAll('dialog')].some((item) => item.open);
-  workbenchApi.setModalWindowState(anyOpen).catch(() => {});
+  const finish = () => {
+    const anyOpen = [...document.querySelectorAll('dialog')].some((item) => item.open);
+    workbenchApi.setModalWindowState(anyOpen).catch(() => {});
+  };
+  if (window.YanjiMotion?.closeDialog) return window.YanjiMotion.closeDialog(dialog, finish);
+  if (dialog?.open) dialog.close();
+  finish();
+  return Promise.resolve(true);
 }
 
 function switchWorkbenchPage(page, { animate = false } = {}) {
@@ -198,13 +205,15 @@ function switchWorkbenchPage(page, { animate = false } = {}) {
     section.classList.remove('page-entering');
     section.hidden = section.dataset.page !== page;
   });
-  const activeSection = sections.find((section) => section.dataset.page === page);
-  if (animate && previousPage !== page && activeSection) window.YanjiMotion?.enterPage(activeSection);
   if (page === 'schedule') renderTimeline();
   if (page === 'todos') window.YanjiTodoView?.render();
   if (page === 'attendance') renderAttendance();
   if (page === 'notes') renderNotes();
   if (page === 'jobs') renderJobs();
+  const activeSection = sections.find((section) => section.dataset.page === page);
+  if (animate && activeSection && (previousPage !== page || page === 'home')) {
+    window.YanjiMotion?.enterPage(activeSection, { force: page === 'home' });
+  }
 }
 
 function renderClock() {
@@ -624,12 +633,10 @@ function openJobEditor(job = null, initialStatus = 'preparing') {
   document.getElementById('jobRole').value = job?.role || '';
   document.getElementById('jobCompanyType').value = job?.companyType || '';
   document.getElementById('jobCity').value = job?.city || job?.location || '';
-  document.getElementById('jobDeadline').value = localDateInputValue(job?.deadline);
-  document.getElementById('jobStatus').value = job?.status || (JOB_LIFECYCLE_OPTIONS.some(([status]) => status === initialStatus) ? initialStatus : 'preparing');
+  dialog.dataset.initialStatus = JOB_LIFECYCLE_OPTIONS.some(([status]) => status === initialStatus) ? initialStatus : 'preparing';
   document.getElementById('jobPriority').value = job?.priority || 'medium';
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobAppliedAt').value = localDateInputValue(job?.appliedAt);
-  document.getElementById('jobNextFollowUpAt').value = localDateInputValue(job?.nextFollowUpAt || job?.nextActionAt);
   document.getElementById('jobContact').value = job?.contact || '';
   document.getElementById('jobNotes').value = job?.notes || '';
   document.getElementById('jobError').textContent = '';
@@ -644,17 +651,19 @@ function openJobEditor(job = null, initialStatus = 'preparing') {
 async function saveJobFromEditor() {
   const error = document.getElementById('jobError');
   const city = document.getElementById('jobCity').value;
-  const nextFollowUpAt = dateInputToIso(document.getElementById('jobNextFollowUpAt').value);
+  const id = document.getElementById('jobId').value || undefined;
+  const existing = wb.workspace.jobApplications.find((item) => item.id === id);
+  const nextFollowUpAt = existing?.nextFollowUpAt || existing?.nextActionAt || null;
   const payload = {
-    id: document.getElementById('jobId').value || undefined,
+    id,
     company: document.getElementById('jobCompany').value,
     role: document.getElementById('jobRole').value,
     companyType: document.getElementById('jobCompanyType').value,
     city,
     location: city,
-    deadline: dateInputToIso(document.getElementById('jobDeadline').value),
+    deadline: existing?.deadline || null,
     priority: document.getElementById('jobPriority').value,
-    status: document.getElementById('jobStatus').value,
+    status: existing?.status || document.getElementById('jobDialog').dataset.initialStatus || 'preparing',
     annualSalaryWan: document.getElementById('jobAnnualSalaryWan').value,
     appliedAt: dateInputToIso(document.getElementById('jobAppliedAt').value),
     nextFollowUpAt,
@@ -877,7 +886,7 @@ function renderTimeline() {
         ? (linkedTodo.status === 'completed' ? '关联待办已完成' : `来自待办：${linkedTodo.title}`)
         : '';
       const linkedButton = linkedTodo ? `<button class="schedule-card-linked-todo" data-open-linked-todo="${wbEscape(linkedTodo.id)}" type="button">${wbEscape(linkedLabel)}</button>` : '';
-      return `<article class="schedule-board-card tone-${item.priority}"><button class="schedule-card-main" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${item.allDay ? '全天' : timing.label}</time><strong>${wbEscape(item.title)}</strong><span>${priorityLabels[item.priority]}${timing.spansDay ? ' · 跨日' : ''}</span></button>${linkedButton}</article>`;
+      return `<article class="schedule-board-card tone-${item.priority}" data-schedule-card="${wbEscape(item.id)}"><button class="schedule-card-main" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${item.allDay ? '全天' : timing.label}</time><strong>${wbEscape(item.title)}</strong><span>${priorityLabels[item.priority]}${timing.spansDay ? ' · 跨日' : ''}</span></button>${linkedButton}</article>`;
     }).join('');
     return `<section class="schedule-board-column ${sameDay(date, new Date()) ? 'today' : ''} ${sameDay(date, selected) ? 'selected' : ''}" data-board-date="${dateKey}"><button class="schedule-board-heading" data-select-schedule-date="${dateKey}" type="button"><span>${new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date)}</span><strong>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}</strong><b>${events.length}</b></button><div class="schedule-board-cards">${cards || '<p class="schedule-board-empty">暂无安排</p>'}</div><button class="schedule-board-add" data-add-schedule-date="${dateKey}" type="button">＋ 新建日程</button></section>`;
   }).join('');
@@ -886,6 +895,22 @@ function renderTimeline() {
   if (boardShell && selectedColumn) {
     boardShell.scrollLeft = Math.max(0, selectedColumn.offsetLeft - (boardShell.clientWidth - selectedColumn.clientWidth) / 2);
   }
+  if (wb.pendingScheduleHighlightId) {
+    const added = document.querySelector(`[data-schedule-card="${CSS.escape(wb.pendingScheduleHighlightId)}"]`);
+    if (added) {
+      window.YanjiMotion?.animateStateChange(added, 'schedule-item-added', 840);
+      wb.pendingScheduleHighlightId = null;
+    }
+  }
+}
+
+function changeScheduleDate(nextDate) {
+  const next = new Date(nextDate);
+  const direction = next < wb.selectedDate ? 'previous' : 'next';
+  wb.selectedDate = next;
+  const board = document.getElementById('scheduleBoard');
+  if (window.YanjiMotion?.transitionSchedule) window.YanjiMotion.transitionSchedule(board, direction, renderTimeline);
+  else renderTimeline();
 }
 
 function averageClock(records, key) {
@@ -1187,15 +1212,16 @@ function openScheduleConvertDialog(schedule) {
   document.getElementById('convertScheduleTodoReminder').value = 'at-due';
   document.querySelector('input[name="scheduleConvertMode"][value="keep-schedule"]').checked = true;
   document.getElementById('scheduleConvertError').textContent = '';
-  document.getElementById('scheduleConvertDialog').showModal();
+  const dialog = document.getElementById('scheduleConvertDialog');
+  window.YanjiMotion?.animateDialog(dialog);
+  dialog.showModal();
   workbenchApi.setModalWindowState(true).catch(() => {});
   setTimeout(() => document.getElementById('convertScheduleTodoTitle').focus(), 20);
 }
 
 function closeScheduleConvertDialog() {
   const dialog = document.getElementById('scheduleConvertDialog');
-  if (dialog.open) dialog.close();
-  workbenchApi.setModalWindowState([...document.querySelectorAll('dialog')].some((item) => item.open)).catch(() => {});
+  if (dialog.open) closeWorkbenchDialog(dialog);
 }
 
 async function saveScheduleConversion() {
@@ -1338,8 +1364,12 @@ async function saveScheduleFromEditor() {
       return;
     }
     if (!await confirmScheduleConflict(payload)) return;
-    await workbenchApi.saveSchedule(payload);
+    const savedSchedule = await workbenchApi.saveSchedule(payload);
     wb.selectedDate = dateFromKey(date);
+    if (!scheduleId && savedSchedule?.id) {
+      wb.pendingScheduleHighlightId = savedSchedule.id;
+      renderTimeline();
+    }
     if (!scheduleId) clearScheduleDraft();
     closeWorkbenchDialog(document.getElementById('scheduleDialog'));
     showWorkbenchToast('日程已保存。');
@@ -1731,10 +1761,20 @@ function setNoteEditorFullscreen(enabled) {
   const dialog = document.getElementById('noteDialog');
   const button = document.getElementById('toggleNoteFullscreenButton');
   const active = Boolean(enabled);
-  if (active) dialog.getAnimations().forEach((animation) => animation.cancel());
+  const before = dialog.getBoundingClientRect();
+  dialog.getAnimations().forEach((animation) => animation.cancel());
+  dialog.firstElementChild?.getAnimations().forEach((animation) => animation.cancel());
   dialog.classList.toggle('is-workspace-fullscreen', active);
   button.setAttribute('aria-pressed', String(active));
   button.textContent = active ? '退出全屏' : '全屏编辑';
+  if (!dialog.open || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const after = dialog.getBoundingClientRect();
+  const scaleX = before.width && after.width ? before.width / after.width : 1;
+  const scaleY = before.height && after.height ? before.height / after.height : 1;
+  dialog.firstElementChild?.animate([
+    { transform: `translate3d(${before.left - after.left}px, ${before.top - after.top}px, 0) scale(${scaleX}, ${scaleY})` },
+    { transform: 'translate3d(0, 0, 0) scale(1)' }
+  ], { duration: 240, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' });
 }
 
 function readNoteMetadata() {
@@ -1933,9 +1973,9 @@ function bindWorkbenchEvents() {
   });
   document.getElementById('dailyPlanDialog').addEventListener('cancel', (event) => { event.preventDefault(); closeDailyPlanDialog(); });
   window.YanjiTodoView?.init();
-  document.getElementById('scheduleTodayButton').addEventListener('click', () => { wb.selectedDate = new Date(); renderTimeline(); });
-  document.getElementById('previousDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, -1); renderTimeline(); });
-  document.getElementById('nextDayButton').addEventListener('click', () => { wb.selectedDate = addDays(wb.selectedDate, 1); renderTimeline(); });
+  document.getElementById('scheduleTodayButton').addEventListener('click', () => changeScheduleDate(new Date()));
+  document.getElementById('previousDayButton').addEventListener('click', () => changeScheduleDate(addDays(wb.selectedDate, -1)));
+  document.getElementById('nextDayButton').addEventListener('click', () => changeScheduleDate(addDays(wb.selectedDate, 1)));
   document.getElementById('saveScheduleButton').addEventListener('click', saveScheduleFromEditor);
   window.addEventListener('yanji:todo-schedule', (event) => {
     wb.pendingTodoId = event.detail?.id || null;
@@ -2092,6 +2132,7 @@ function bindWorkbenchEvents() {
     document.getElementById('noteContent').focus();
   });
   const noteEditor = document.getElementById('noteContent');
+  document.querySelector('.note-paper-scroll')?.addEventListener('wheel', (event) => window.YanjiNoteEditor?.handleZoomWheel(event), { passive: false });
   noteEditor.addEventListener('input', queueNoteAutoSave);
   noteEditor.addEventListener('mouseup', rememberNoteEditorSelection);
   noteEditor.addEventListener('keyup', rememberNoteEditorSelection);
@@ -2298,8 +2339,7 @@ function bindWorkbenchEvents() {
     if (editJobTarget) return openJobEditor(wb.workspace.jobApplications.find((item) => item.id === editJobTarget.dataset.editJob));
     const selectedDateTarget = event.target.closest('[data-select-schedule-date]');
     if (selectedDateTarget) {
-      wb.selectedDate = dateFromKey(selectedDateTarget.dataset.selectScheduleDate);
-      return renderTimeline();
+      return changeScheduleDate(dateFromKey(selectedDateTarget.dataset.selectScheduleDate));
     }
     const addForDateTarget = event.target.closest('[data-add-schedule-date]');
     if (addForDateTarget) {
