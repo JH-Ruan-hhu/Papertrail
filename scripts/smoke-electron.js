@@ -204,6 +204,7 @@ app.whenReady().then(async () => {
         document.querySelector('.note-paper').getAnimations().forEach((animation) => animation.finish());
         const workspaceRect = document.querySelector('.note-workspace-body').getBoundingClientRect();
         const paperRect = document.querySelector('.note-paper').getBoundingClientRect();
+        const inspectorStyle = getComputedStyle(inspector);
         const paperCenteredAfterClose = Math.abs((paperRect.left + paperRect.width / 2) - (workspaceRect.left + workspaceRect.width / 2)) <= 2;
         return {
           originalCardText,
@@ -214,6 +215,8 @@ app.whenReady().then(async () => {
           centered: Math.abs((rect.left + rect.width / 2) - innerWidth / 2) <= 2 && Math.abs((rect.top + rect.height / 2) - innerHeight / 2) <= 2,
           propertyPanelOpen,
           propertyPanelClosed,
+          propertyPanelFullyHidden: inspectorStyle.display === 'none' && inspectorStyle.visibility === 'hidden' && inspectorStyle.opacity === '0' && inspectorStyle.pointerEvents === 'none',
+          propertyPanelComputedState: { display: inspectorStyle.display, visibility: inspectorStyle.visibility, opacity: inspectorStyle.opacity, pointerEvents: inspectorStyle.pointerEvents },
           paperCenteredAfterClose,
           paperCenterAfterClose: paperRect.left + paperRect.width / 2,
           workspaceCenterAfterClose: workspaceRect.left + workspaceRect.width / 2,
@@ -236,7 +239,7 @@ app.whenReady().then(async () => {
       })()
     `);
     const noteModalResult = { ...draftResult, ...savedResult };
-    if (!noteModalResult.draftDoesNotLeak || !noteModalResult.hintShowsUnsaved || !noteModalResult.widerEditor || !noteModalResult.tallerEditor || !noteModalResult.centered || !noteModalResult.propertyPanelOpen || !noteModalResult.propertyPanelClosed || !noteModalResult.paperCenteredAfterClose || !noteModalResult.closedAfterSave || !noteModalResult.cardUpdatedAfterSave) throw new Error(`Note modal smoke failed: ${JSON.stringify(noteModalResult)}`);
+    if (!noteModalResult.draftDoesNotLeak || !noteModalResult.hintShowsUnsaved || !noteModalResult.widerEditor || !noteModalResult.tallerEditor || !noteModalResult.centered || !noteModalResult.propertyPanelOpen || !noteModalResult.propertyPanelClosed || !noteModalResult.propertyPanelFullyHidden || !noteModalResult.paperCenteredAfterClose || !noteModalResult.closedAfterSave || !noteModalResult.cardUpdatedAfterSave) throw new Error(`Note modal smoke failed: ${JSON.stringify(noteModalResult)}`);
     console.log(`WORKBENCH_NOTE_MODAL_OK ${JSON.stringify(noteModalResult)}`);
     window.destroy();
     app.quit();
@@ -319,26 +322,23 @@ app.whenReady().then(async () => {
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const selector = '.home-progress-strip, .home-next-event-card, .home-today-card:not(.home-today-todo-card), .home-today-todo-card, .home-attendance-card, .home-schedule-panel, .home-focus-timer, .latest-notes-panel, .home-job-panel';
       const cards = [...document.querySelectorAll(selector)];
-      const firstIndices = cards.map((card) => Number(card.style.getPropertyValue('--home-enter-index')));
+      const firstWaves = cards.map((card) => Number(card.style.getPropertyValue('--home-enter-wave')));
       const firstReplay = document.querySelector('[data-page="home"]').classList.contains('home-entering');
       activate('home');
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const repeatedReplay = document.querySelector('[data-page="home"]').classList.contains('home-entering');
-      const visualOrder = [...cards].sort((a, b) => {
-        const ar = a.getBoundingClientRect();
-        const br = b.getBoundingClientRect();
-        return Math.abs(ar.top - br.top) < 40 ? ar.left - br.left : ar.top - br.top;
-      }).map((card) => Number(card.style.getPropertyValue('--home-enter-index')));
+      const waveCoordinatesMatch = cards.every((card) => Number(card.style.getPropertyValue('--home-enter-wave'))
+        === Number(card.style.getPropertyValue('--home-enter-row')) + Number(card.style.getPropertyValue('--home-enter-column')));
       return {
         cardCount: cards.length,
         firstReplay,
         repeatedReplay,
-        uniqueIndices: new Set(firstIndices).size === cards.length,
-        visualOrder: visualOrder.every((index, position) => index === position)
+        diagonalWaves: new Set(firstWaves).size < cards.length && Math.min(...firstWaves) === 0,
+        waveCoordinatesMatch
       };
     })()
   `);
-  if (homeMotionResult.cardCount !== 9 || !homeMotionResult.firstReplay || !homeMotionResult.repeatedReplay || !homeMotionResult.uniqueIndices || !homeMotionResult.visualOrder) {
+  if (homeMotionResult.cardCount !== 9 || !homeMotionResult.firstReplay || !homeMotionResult.repeatedReplay || !homeMotionResult.diagonalWaves || !homeMotionResult.waveCoordinatesMatch) {
     throw new Error(`Home motion smoke failed: ${JSON.stringify(homeMotionResult)}`);
   }
   console.log(`HOME_MOTION_SMOKE_OK ${JSON.stringify(homeMotionResult)}`);
@@ -1042,6 +1042,16 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 80));
         const rows = [...document.querySelectorAll('#jobBoard .job-position')];
         const initialRows = rows.length;
+        const deferredRow = rows.find((row) => {
+          const rect = row.getBoundingClientRect();
+          return rect.top >= innerHeight || rect.bottom <= 0;
+        });
+        const deferredPending = Boolean(deferredRow?.classList.contains('motion-job-pending'));
+        deferredRow?.scrollIntoView({ block: 'center' });
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        const deferredRevealed = Boolean(deferredRow)
+          && (deferredRow.classList.contains('motion-job-visible') || !deferredRow.classList.contains('motion-job-pending'));
+        window.scrollTo(0, 0);
         const workflowLengths = rows.map((row) => row.querySelectorAll('.job-flow-stage').length);
         const rowAnatomy = rows.every((row) => (
           row.querySelector('.job-company-cell')
@@ -1154,6 +1164,8 @@ app.whenReady().then(async () => {
         return {
           pageVisible: !document.querySelector('[data-page="jobs"]').hidden,
           initialRows,
+          deferredPending,
+          deferredRevealed,
           workflowLengths,
           dynamicWorkflow,
           railHasCurrent,
@@ -1186,7 +1198,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);

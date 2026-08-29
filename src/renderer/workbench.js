@@ -573,6 +573,7 @@ function renderJobs() {
   document.getElementById('jobBoard').innerHTML = visible.length
     ? visible.map(jobRowHtml).join('')
     : `<div class="job-list-empty"><span>${jobs.length ? '⌕' : '＋'}</span><strong>${jobs.length ? '没有符合条件的岗位' : '还没有岗位记录'}</strong><p>${jobs.length ? '试试清空搜索或调整筛选条件。' : '添加第一条岗位，开始记录每一次机会。'}</p>${jobs.length ? '' : '<button class="button secondary" data-add-job="preparing" type="button">添加岗位</button>'}</div>`;
+  window.YanjiMotion?.animateJobList(document.getElementById('jobBoard'));
 }
 
 function renderWorkflowEditor(workflow = wb.editingJobWorkflow) {

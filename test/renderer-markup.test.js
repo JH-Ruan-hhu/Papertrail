@@ -582,7 +582,7 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
   assert.match(tokens, /--motion-duration-component:\s*240ms/);
   assert.match(tokens, /--motion-duration-page:\s*360ms/);
   assert.match(tokens, /--motion-duration-showcase:\s*420ms/);
-  assert.match(tokens, /--motion-stagger-home:\s*115ms/);
+  assert.match(tokens, /--motion-stagger-home:\s*50ms/);
   assert.match(tokens, /--motion-duration-progress:\s*650ms/);
   for (const html of auxiliaryPages) {
     assert.match(html, /motion-tokens\.css/);
@@ -599,13 +599,21 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
   assert.match(motionJs, /HOME_MATRIX_SELECTOR/);
   assert.match(motionJs, /getBoundingClientRect\(\)/);
   assert.match(motionJs, /Math\.abs\(item\.top - row\.top\) >= 40/);
-  assert.match(motionJs, /--home-enter-index/);
-  assert.match(motionCss, /motion-home-card-enter var\(--motion-duration-showcase\)/);
-  assert.match(motionCss, /var\(--home-enter-index, 0\) \* var\(--motion-stagger-home\)/);
+  assert.match(motionJs, /--home-enter-wave/);
+  assert.match(motionJs, /rowIndex \+ columnIndex/);
+  assert.match(motionCss, /motion-home-card-enter var\(--motion-duration-component\)/);
+  assert.match(motionCss, /var\(--home-enter-wave, 0\) \* var\(--motion-stagger-home\)/);
   assert.doesNotMatch(motionCss, /home-page[^\n]*:nth-child/);
   assert.match(motionJs, /animateList\(document\.getElementById\('todoList'\), '\.todo-card', \{ limit: 8, delay: 150 \}\)/);
   assert.match(motionCss, /--motion-index[^\n]*var\(--motion-stagger-fast\)/);
   assert.doesNotMatch(motionCss, /page-entering[^\n]*todo-card[^\n]*:nth-child/);
+  assert.match(motionJs, /function animateJobList\(/);
+  assert.match(motionJs, /new IntersectionObserver\(/);
+  assert.match(motionJs, /observer\.unobserve\(element\)/);
+  assert.match(motionJs, /rootMargin: '0px 0px -8% 0px'/);
+  assert.match(workbenchJs, /YanjiMotion\?\.animateJobList\(document\.getElementById\('jobBoard'\)\)/);
+  assert.match(motionCss, /\.job-position\.motion-job-pending\s*\{[^}]*opacity:\s*0/);
+  assert.match(motionCss, /\.job-position\.motion-job-visible\s*\{[^}]*motion-job-row-enter/);
   assert.match(todoViewJs, /animateStateChange\(card, 'todo-completing', 280\)/);
   assert.match(motionCss, /motion-todo-check-complete 160ms/);
   assert.match(motionCss, /motion-todo-card-complete 280ms/);
@@ -633,6 +641,7 @@ test('note editor restores inspector state and wires Word-like Enter and Tab han
   assert.match(noteEditorJs, /function handleZoomWheel\(event\)/);
   assert.match(workbenchJs, /note-paper-scroll'[\s\S]*handleZoomWheel/);
   assert.match(css, /\.note-paper\s*\{[\s\S]*?border-radius:\s*0;/);
+  assert.match(css, /is-inspector-closed \.note-inspector\s*\{[^}]*display:\s*none[^}]*visibility:\s*hidden[^}]*opacity:\s*0[^}]*translateX\(100%\)/);
 });
 
 test('quick capture note submission imports and calls the daily-note append helper from workbench core', () => {

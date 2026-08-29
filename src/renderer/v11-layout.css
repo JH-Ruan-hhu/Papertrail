@@ -457,7 +457,7 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   transform: translateX(0);
   transition: opacity var(--motion-duration-component) var(--motion-ease-enter), transform var(--motion-duration-component) var(--motion-ease-enter);
 }
-.note-workspace-body.is-inspector-closed .note-inspector { pointer-events: none; opacity: .2; transform: translateX(18px); }
+.note-workspace-body.is-inspector-closed .note-inspector { display: none; visibility: hidden; pointer-events: none; opacity: 0; transform: translateX(100%); }
 .note-inspector-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 18px; }
 .note-inspector-heading strong, .note-inspector-heading small { display: block; }
 .note-inspector-heading strong { color: #2a3a51; font-size: 15px; }
@@ -513,6 +513,7 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
 }
 @media (prefers-reduced-motion: reduce) {
   .note-inspector { transition: opacity var(--motion-duration-reduced) linear; }
+  .note-workspace-body.is-inspector-closed .note-inspector { transform: none; }
   .note-inspector-toggle { transition: color var(--motion-duration-reduced) linear, background-color var(--motion-duration-reduced) linear; }
 }
 

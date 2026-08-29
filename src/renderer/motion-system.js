@@ -57,9 +57,13 @@
       if (!row || Math.abs(item.top - row.top) >= 40) rows.push({ top: item.top, items: [item] });
       else row.items.push(item);
     });
-    const ordered = rows.flatMap((row) => row.items.sort((a, b) => a.left - b.left));
-    ordered.forEach(({ element }, index) => element.style.setProperty('--home-enter-index', index));
-    replayClass(section, 'home-entering', reducedMotion.matches ? 160 : 1450);
+    const ordered = rows.flatMap((row, rowIndex) => row.items.sort((a, b) => a.left - b.left).map((item, columnIndex) => {
+      item.element.style.setProperty('--home-enter-wave', rowIndex + columnIndex);
+      item.element.style.setProperty('--home-enter-row', rowIndex);
+      item.element.style.setProperty('--home-enter-column', columnIndex);
+      return item;
+    }));
+    replayClass(section, 'home-entering', reducedMotion.matches ? 160 : 720);
     return ordered.map(({ element }) => element);
   }
 
@@ -125,6 +129,46 @@
     return items.slice(0, limit);
   }
 
+  function animateJobList(container) {
+    if (!container) return [];
+    container._yanjiJobObserver?.disconnect();
+    const items = [...container.querySelectorAll('.job-position')];
+    items.forEach((element) => {
+      element.classList.remove('motion-job-visible');
+      element.classList.add('motion-job-pending');
+      element.style.removeProperty('--motion-index');
+    });
+    if (!items.length) return items;
+
+    const reveal = (elements) => {
+      elements.sort((a, b) => items.indexOf(a) - items.indexOf(b)).forEach((element, index) => {
+        element.style.setProperty('--motion-index', reducedMotion.matches ? 0 : index);
+        element.classList.add('motion-job-visible');
+        const finish = () => {
+          element.classList.remove('motion-job-pending', 'motion-job-visible');
+          element.style.removeProperty('--motion-index');
+        };
+        element.addEventListener('animationend', finish, { once: true });
+        setTimeout(finish, reducedMotion.matches ? 180 : 420);
+      });
+    };
+
+    if (typeof IntersectionObserver !== 'function') {
+      reveal(items);
+      return items;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      const entering = entries.filter((entry) => entry.isIntersecting).map((entry) => entry.target);
+      if (!entering.length) return;
+      entering.forEach((element) => observer.unobserve(element));
+      reveal(entering);
+    }, { threshold: .08, rootMargin: '0px 0px -8% 0px' });
+    container._yanjiJobObserver = observer;
+    items.forEach((element) => observer.observe(element));
+    return items;
+  }
+
   function animateStateChange(element, className = 'motion-state-changing', timeout = 300) {
     if (!element) return Promise.resolve(false);
     const duration = reducedMotion.matches ? 120 : timeout;
@@ -165,7 +209,6 @@
     const page = section?.dataset.page;
     if (page === 'todos') animateList(document.getElementById('todoList'), '.todo-card', { limit: 8, delay: 150 });
     if (page === 'notes') animateList(document.getElementById('notesGrid'), '.note-card', { limit: 8, stagger: 35 });
-    if (page === 'jobs') animateList(document.getElementById('jobBoard'), '.job-position', { limit: 10, className: 'job-list-entering', stagger: 28 });
     if (page === 'attendance') {
       const summary = document.querySelector('.attendance-summary');
       [...summary?.querySelectorAll('article') || []].forEach((card, index) => card.style.setProperty('--motion-index', index));
@@ -231,6 +274,7 @@
     closeDialog,
     animateTab,
     animateList,
+    animateJobList,
     animateStateChange,
     transitionSchedule,
     pointerInitiated,
