@@ -1,18 +1,4 @@
 /* Yanji Motion Design System -------------------------------------------- */
-:root {
-  --motion-duration-instant: 120ms;
-  --motion-duration-fast: 160ms;
-  --motion-duration-component: 220ms;
-  --motion-duration-page: 280ms;
-  --motion-duration-progress: 550ms;
-  --motion-ease-enter: cubic-bezier(.23, 1, .32, 1);
-  --motion-ease-move: cubic-bezier(.77, 0, .175, 1);
-  --motion-distance-micro: 4px;
-  --motion-distance-small: 6px;
-  --motion-scale-press: .97;
-  --motion-scale-enter: .99;
-}
-
 /* The application shell enters once; route changes never replay it. */
 .motion-system-ready:not(.motion-shell-ready) .sidebar { opacity: 0; transform: translate3d(-6px, 0, 0); }
 .sidebar { transition: opacity var(--motion-duration-page) var(--motion-ease-enter), transform var(--motion-duration-page) var(--motion-ease-enter); }
@@ -40,23 +26,23 @@
 /* Route content: one page fade, then header/content hierarchy. */
 .workbench-page.page-entering { animation: motion-page-fade var(--motion-duration-fast) var(--motion-ease-enter) both; }
 .workbench-page.page-entering > .page-head-row { animation: motion-heading-enter var(--motion-duration-component) var(--motion-ease-enter) both; }
-.workbench-page.page-entering > :not(.page-head-row) { animation: motion-content-enter var(--motion-duration-component) var(--motion-ease-enter) 45ms both; }
+.workbench-page.page-entering > :not(.page-head-row) { animation: motion-content-enter var(--motion-duration-component) var(--motion-ease-enter) 60ms both; }
 .home-page.page-entering > * { animation: motion-home-card-enter var(--motion-duration-page) var(--motion-ease-enter) both; }
-.home-page.page-entering > :nth-child(2) { animation-delay: 55ms; }
-.home-page.page-entering > :nth-child(3) { animation-delay: 105ms; }
-.home-page.page-entering > :nth-child(4) { animation-delay: 155ms; }
-.home-page.page-initial-entry > :nth-child(2) { animation-delay: 75ms; }
-.home-page.page-initial-entry > :nth-child(3) { animation-delay: 145ms; }
-.home-page.page-initial-entry > :nth-child(4) { animation-delay: 215ms; }
+.home-page.page-entering > :nth-child(2) { animation-delay: 70ms; }
+.home-page.page-entering > :nth-child(3) { animation-delay: 135ms; }
+.home-page.page-entering > :nth-child(4) { animation-delay: 200ms; }
+.home-page.page-initial-entry > :nth-child(2) { animation-delay: 95ms; }
+.home-page.page-initial-entry > :nth-child(3) { animation-delay: 185ms; }
+.home-page.page-initial-entry > :nth-child(4) { animation-delay: 275ms; }
 
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(-n + 8) { animation: motion-list-item-enter 240ms var(--motion-ease-enter) both; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(2) { animation-delay: 25ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(3) { animation-delay: 50ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(4) { animation-delay: 75ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(5) { animation-delay: 100ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(6) { animation-delay: 125ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(7) { animation-delay: 150ms; }
-.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(8) { animation-delay: 175ms; }
+.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(-n + 8) { animation: motion-list-item-enter var(--motion-duration-component) var(--motion-ease-enter) both; }
+.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(2) { animation-delay: 32ms; }
+.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(3) { animation-delay: 64ms; }
+.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(4) { animation-delay: 96ms; }
+.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(5) { animation-delay: 128ms; }
+.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(6) { animation-delay: 160ms; }
+.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(7) { animation-delay: 192ms; }
+.page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(8) { animation-delay: 224ms; }
 
 @keyframes motion-page-fade { from { opacity: .74; } to { opacity: 1; } }
 @keyframes motion-heading-enter { from { opacity: 0; transform: translate3d(0, var(--motion-distance-small), 0); } to { opacity: 1; transform: translate3d(0, 0, 0); } }
@@ -88,7 +74,7 @@
   box-shadow: 0 8px 24px rgba(43, 70, 133, .1), inset 0 1px rgba(255,255,255,.88);
   pointer-events: none;
   transform: translate3d(var(--motion-tab-x, 0), 0, 0);
-  transition: transform 250ms var(--motion-ease-move);
+  transition: transform var(--motion-duration-page) var(--motion-ease-move);
 }
 .settings-liquid-indicator::after {
   content: '';
@@ -110,18 +96,18 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sidebar { transform: none; transition: opacity 120ms linear; }
-  .sidebar-active-indicator, .settings-liquid-indicator { transition: opacity 120ms linear; }
+  .sidebar { transform: none; transition: opacity var(--motion-duration-reduced) linear; }
+  .sidebar-active-indicator, .settings-liquid-indicator { transition: opacity var(--motion-duration-reduced) linear; }
   .workbench-page.page-entering,
   .workbench-page.page-entering > .page-head-row,
   .workbench-page.page-entering > :not(.page-head-row),
   .home-page.page-entering > *,
   .page-entering :is(.todo-card, .note-card, .job-position, .paper-card):nth-child(-n + 8),
-  .motion-tab-entering { animation: motion-reduced-fade 120ms linear both; }
-  .modal { transition: opacity 120ms linear; }
+  .motion-tab-entering { animation: motion-reduced-fade var(--motion-duration-reduced) linear both; }
+  .modal { transition: opacity var(--motion-duration-reduced) linear; }
   .modal.dialog-entering { opacity: 0; transform: none; }
   .modal[open] { opacity: 1; }
   @starting-style { .modal[open] { opacity: 0; } }
-  .home-progress-rate-track i, .home-todo-progress i::after, .update-progress span { transition-duration: 120ms; }
+  .home-progress-rate-track i, .home-todo-progress i::after, .update-progress span { transition-duration: var(--motion-duration-reduced); }
   @keyframes motion-reduced-fade { from { opacity: .72; } to { opacity: 1; } }
 }

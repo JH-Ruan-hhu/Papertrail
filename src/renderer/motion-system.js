@@ -9,7 +9,7 @@
     return Date.now() - lastPointerAt < POINTER_WINDOW_MS;
   }
 
-  function replayClass(element, className, timeout = 320) {
+  function replayClass(element, className, timeout = 420) {
     if (!element) return;
     element.classList.remove(className);
     // A page or tab can be revisited before its previous animationend fires.
@@ -23,20 +23,20 @@
   function enterPage(section, { initial = false, force = false } = {}) {
     if (!section || (!force && !initial && !pointerInitiated())) return;
     section.classList.toggle('page-initial-entry', initial);
-    replayClass(section, 'page-entering', initial ? 920 : 520);
-    if (initial) setTimeout(() => section.classList.remove('page-initial-entry'), 940);
+    replayClass(section, 'page-entering', initial ? 1120 : 700);
+    if (initial) setTimeout(() => section.classList.remove('page-initial-entry'), 1140);
   }
 
   function animateDialog(dialog) {
     if (!dialog || reducedMotion.matches || !pointerInitiated()) return;
     dialog.classList.add('dialog-entering');
     requestAnimationFrame(() => requestAnimationFrame(() => dialog.classList.remove('dialog-entering')));
-    setTimeout(() => dialog.classList.remove('dialog-entering'), 80);
+    setTimeout(() => dialog.classList.remove('dialog-entering'), 120);
   }
 
   function animateTab(panel) {
     if (!panel || !pointerInitiated()) return;
-    replayClass(panel, 'motion-tab-entering', reducedMotion.matches ? 150 : 260);
+    replayClass(panel, 'motion-tab-entering', reducedMotion.matches ? 180 : 360);
   }
 
   function syncSidebarIndicator() {

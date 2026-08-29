@@ -20,4 +20,4 @@ footer > div:last-child { display: flex; gap: 14px; }
 kbd { min-width: 22px; padding: 2px 6px; border: 1px solid #c6dce7; border-bottom-width: 2px; border-radius: 5px; color: #526f81; background: #f9fcfe; font-family: inherit; font-size: 11px; }
 .parse-result { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #3c7b9b; }
 .parse-result.error { color: #b52c3c; }
-@media (prefers-reduced-motion: no-preference) { .capture-card.shake { animation: shake .22s ease-in-out; } @keyframes shake { 25% { transform: translateX(-7px); } 75% { transform: translateX(7px); } } }
+@media (prefers-reduced-motion: no-preference) { .capture-card.shake { animation: shake var(--motion-duration-component) var(--motion-ease-move); } @keyframes shake { 25% { transform: translateX(-7px); } 75% { transform: translateX(7px); } } }

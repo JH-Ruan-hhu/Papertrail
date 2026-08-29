@@ -1,0 +1,31 @@
+/* Shared Yanji motion tokens. Every renderer window imports this file first. */
+:root {
+  --motion-duration-instant: 140ms;
+  --motion-duration-fast: 190ms;
+  --motion-duration-component: 270ms;
+  --motion-duration-page: 340ms;
+  --motion-duration-slow: 460ms;
+  --motion-duration-progress: 650ms;
+  --motion-duration-reduced: 140ms;
+  --motion-ease-enter: cubic-bezier(.23, 1, .32, 1);
+  --motion-ease-move: cubic-bezier(.77, 0, .175, 1);
+  --motion-distance-micro: 4px;
+  --motion-distance-small: 6px;
+  --motion-scale-press: .97;
+  --motion-scale-enter: .99;
+}
+
+body.motion-aux-window {
+  animation: motion-aux-window-enter var(--motion-duration-page) var(--motion-ease-enter) both;
+}
+
+@keyframes motion-aux-window-enter {
+  from { opacity: .72; }
+  to { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.motion-aux-window {
+    animation: motion-aux-window-enter var(--motion-duration-reduced) linear both;
+  }
+}

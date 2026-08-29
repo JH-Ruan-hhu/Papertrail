@@ -84,7 +84,7 @@
     if (Math.abs(deltaX) < 1) return;
     paperMotion = paper.animate(
       [{ transform: `translateX(${deltaX}px)` }, { transform: 'translateX(0)' }],
-      { duration: 240, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' }
+      { duration: 300, easing: 'cubic-bezier(0.77, 0, 0.175, 1)' }
     );
   }
 

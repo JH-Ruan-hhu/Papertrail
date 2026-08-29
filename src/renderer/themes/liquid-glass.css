@@ -177,7 +177,7 @@ html[data-appearance="liquid-glass"] :is(
 html[data-appearance="liquid-glass"] :is(
   .home-next-event-card, .home-today-card, .home-attendance-card, .todo-card,
   .note-card, .paper-card, .day-card
-) { transition: transform 180ms var(--ease-out), border-color 180ms ease, box-shadow 200ms var(--ease-out), background-color 180ms ease; }
+) { transition: transform var(--motion-duration-instant) var(--motion-ease-enter), border-color var(--motion-duration-fast) ease, box-shadow var(--motion-duration-component) var(--motion-ease-enter), background-color var(--motion-duration-fast) ease; }
 
 html[data-appearance="liquid-glass"] :is(.todo-card, .note-card, .paper-card):hover {
   transform: translateY(-2px);

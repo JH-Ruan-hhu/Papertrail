@@ -791,7 +791,7 @@ function renderHomeCommandCards(today = new Date()) {
   const total = openTodos.length + completedTodos.length;
   const rate = total ? Math.round(completedTodos.length / total * 100) : 0;
   const progress = document.getElementById('homeTodoProgress');
-  progress.style.setProperty('--todo-progress', `${rate}%`);
+  progress.style.setProperty('--todo-progress-scale', String(rate / 100));
   progress.querySelector('span').textContent = `${rate}% 完成`;
 }
 
@@ -835,7 +835,7 @@ function renderHomeProgress() {
   document.getElementById('homeProgressScheduleCount').textContent = String(total);
   document.getElementById('homeProgressCompletedCount').textContent = String(completed);
   document.getElementById('homeProgressRate').textContent = `${rate}%`;
-  document.getElementById('homeProgressRateBar').style.width = `${rate}%`;
+  document.getElementById('homeProgressRateBar').style.transform = `scaleX(${rate / 100})`;
   document.getElementById('homeProgressFocus').textContent = String(Math.round(focusMs / 60_000));
 }
 
@@ -1684,22 +1684,7 @@ async function flushNoteEditor({ silent = false } = {}) {
   return wb.noteSavePromise;
 }
 
-function animateNoteDialogFromCard(dialog, sourceCard) {
-  if (!sourceCard || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-  const source = sourceCard.getBoundingClientRect();
-  const target = dialog.getBoundingClientRect();
-  if (!source.width || !source.height || !target.width || !target.height) return;
-  const translateX = source.left - target.left;
-  const translateY = source.top - target.top;
-  const scaleX = Math.max(.34, Math.min(1, source.width / target.width));
-  const scaleY = Math.max(.26, Math.min(1, source.height / target.height));
-  dialog.animate([
-    { opacity: .64, transform: `translate(${translateX}px, ${translateY}px) scale(${scaleX}, ${scaleY})`, borderRadius: '16px' },
-    { opacity: 1, transform: 'translate(0, 0) scale(1, 1)', borderRadius: '12px' }
-  ], { duration: 260, easing: 'cubic-bezier(.23, 1, .32, 1)' });
-}
-
-async function openNoteEditor(note = null, sourceCard = null) {
+async function openNoteEditor(note = null) {
   const todayKey = localDateKey(new Date());
   const todayDaily = !note ? wb.workspace.notes.find((item) => item.kind === 'daily' && item.dateKey === todayKey) : null;
   let targetNote = note || todayDaily || null;
@@ -1736,7 +1721,6 @@ async function openNoteEditor(note = null, sourceCard = null) {
   clearTimeout(wb.noteSaveTimer);
   const dialog = document.getElementById('noteDialog');
   openWorkbenchDialog(dialog);
-  animateNoteDialogFromCard(dialog, sourceCard);
   setTimeout(() => {
     window.YanjiNoteEditor?.placeCaretAtEnd(document.getElementById('noteContent'));
     hydrateInlineNoteImages(targetNote).catch(() => {});

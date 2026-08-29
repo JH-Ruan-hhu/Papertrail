@@ -162,7 +162,7 @@ app.whenReady().then(async () => {
         return { closedBeforeReopen, closedAfterReopen, continued, indented, outdented, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, pageDuration };
       })()
     `);
-    if (!behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.continued || !behavior.indented || !behavior.outdented || behavior.paperRadius !== '0px' || behavior.pageDuration !== '280ms') {
+    if (!behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.continued || !behavior.indented || !behavior.outdented || behavior.paperRadius !== '0px' || behavior.pageDuration !== '340ms') {
       throw new Error(`Note behavior smoke failed: ${JSON.stringify(behavior)}`);
     }
     console.log(`WORKBENCH_NOTE_BEHAVIOR_OK ${JSON.stringify(behavior)}`);

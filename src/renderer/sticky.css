@@ -45,7 +45,7 @@ header button {
   font-size: 10px;
   cursor: pointer;
   -webkit-app-region: no-drag;
-  transition: transform 160ms cubic-bezier(.23,1,.32,1), background-color 180ms ease;
+  transition: transform var(--motion-duration-instant) var(--motion-ease-enter), background-color var(--motion-duration-fast) ease;
 }
 header button:hover { background: rgba(255,255,255,.72); }
 header button:active { transform: scale(.97); }

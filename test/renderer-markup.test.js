@@ -192,11 +192,15 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
     path.join(__dirname, '..', 'src', 'renderer', 'styles.css'),
     'utf8'
   );
+  const tokens = fs.readFileSync(
+    path.join(__dirname, '..', 'src', 'renderer', 'motion-tokens.css'),
+    'utf8'
+  );
   const appJs = fs.readFileSync(
     path.join(__dirname, '..', 'src', 'renderer', 'app.js'),
     'utf8'
   );
-  assert.match(css, /--ease-out:\s*cubic-bezier\(\.23,\s*1,\s*\.32,\s*1\)/);
+  assert.match(tokens, /--motion-ease-enter:\s*cubic-bezier\(\.23,\s*1,\s*\.32,\s*1\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /\.button:not\(:disabled\):active\s*\{\s*transform:\s*scale\(\.97\)/);
   assert.doesNotMatch(css, /transition:\s*all\b/);
@@ -209,11 +213,13 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
 });
 
 test('pointer sidebar navigation settles gently while keyboard navigation stays immediate', () => {
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.css'), 'utf8');
+  const tokens = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-tokens.css'), 'utf8');
   const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*workbench-page-settle 280ms var\(--ease-out\) both/s);
-  assert.match(css, /@keyframes workbench-page-settle\s*\{[^}]*translate3d\(0, 6px, 0\)/s);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*workbench-page-fade 170ms/);
+  assert.match(tokens, /--motion-duration-page:\s*340ms/);
+  assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*motion-page-fade var\(--motion-duration-fast\)/s);
+  assert.match(css, /\.workbench-page\.page-entering > \.page-head-row\s*\{[^}]*motion-heading-enter var\(--motion-duration-component\)/s);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*motion-reduced-fade var\(--motion-duration-reduced\)/);
   assert.match(workbenchJs, /animate:\s*event\.detail\s*>\s*0/);
   assert.match(workbenchJs, /previousPage !== page/);
 });
@@ -455,8 +461,9 @@ test('note editor autosaves a full daily document and opens from its card', () =
   const noteEditorJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'note-editor.js'), 'utf8');
   assert.match(workbenchJs, /有未保存更改/);
   assert.match(workbenchJs, /setTimeout\(\(\) => flushNoteEditor\(\{ silent: true \}\), 550\)/);
-  assert.match(workbenchJs, /animateNoteDialogFromCard/);
-  assert.match(workbenchJs, /duration:\s*260/);
+  assert.doesNotMatch(workbenchJs, /animateNoteDialogFromCard/);
+  assert.match(workbenchJs, /function openNoteEditor[\s\S]*openWorkbenchDialog\(dialog\)/);
+  assert.match(noteEditorJs, /duration:\s*300/);
   assert.doesNotMatch(workbenchJs, /noteDialog'\)\.addEventListener\('click'/);
   assert.match(indexHtml, /class="note-paper"/);
   assert.match(indexHtml, /id="noteDocumentTitle"/);
@@ -552,16 +559,29 @@ test('packaged BrowserWindows load the unpacked Yanji taskbar icon', () => {
 
 test('global motion tokens cover routes, dialogs, tabs and reduced motion without a new dependency', () => {
   const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const tokens = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-tokens.css'), 'utf8');
   const motionCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.css'), 'utf8');
   const motionJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.js'), 'utf8');
+  const auxiliaryPages = ['sticky.html', 'deadline.html', 'capture.html', 'schedule-widget.html']
+    .map((file) => fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', file), 'utf8'));
+  assert.match(indexHtml, /motion-tokens\.css/);
   assert.match(indexHtml, /motion-system\.css/);
   assert.match(indexHtml, /motion-system\.js/);
   assert.match(indexHtml, /class="sidebar-active-indicator"/);
-  assert.match(motionCss, /--motion-duration-(?:fast|component|page)/);
+  assert.match(tokens, /--motion-duration-fast:\s*190ms/);
+  assert.match(tokens, /--motion-duration-component:\s*270ms/);
+  assert.match(tokens, /--motion-duration-page:\s*340ms/);
+  assert.match(tokens, /--motion-duration-progress:\s*650ms/);
+  for (const html of auxiliaryPages) {
+    assert.match(html, /motion-tokens\.css/);
+    assert.match(html, /<body class="[^"]*\bmotion-aux-window\b[^"]*">/);
+  }
   assert.match(motionCss, /\.workbench-page\.page-entering/);
   assert.match(motionCss, /\.modal\.dialog-entering/);
   assert.match(motionCss, /\.motion-tab-entering/);
   assert.match(motionCss, /@media \(prefers-reduced-motion: reduce\)/);
+  assert.match(motionCss, /transition:\s*transform var\(--motion-duration-progress\)/);
+  assert.doesNotMatch(motionCss, /transition:\s*(?:width|height)\b/);
   assert.doesNotMatch(motionCss, /transition:\s*all\b/);
   assert.match(motionJs, /pointerInitiated/);
 });
