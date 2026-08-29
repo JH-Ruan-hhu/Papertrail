@@ -141,6 +141,11 @@ app.whenReady().then(async () => {
         document.querySelector('#notesGrid .note-card').click();
         const closedAfterReopen = toggle.getAttribute('aria-expanded') === 'false';
 
+        editor.innerHTML = Array.from({ length: 90 }, (_, index) => '<p>滚动段落 ' + index + '</p>').join('');
+        const paperScroll = document.querySelector('.note-paper-scroll');
+        paperScroll.scrollTop = paperScroll.scrollHeight;
+        const infiniteDocumentScrolls = paperScroll.scrollHeight > paperScroll.clientHeight && paperScroll.scrollTop > 0;
+
         editor.innerHTML = '1. 第一项';
         const range = document.createRange();
         range.selectNodeContents(editor);
@@ -158,15 +163,18 @@ app.whenReady().then(async () => {
         editor.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true }));
         const outdentHtml = editor.innerHTML;
         const outdented = /2[.]/.test(editor.innerText);
+        const noteHeaderTitle = document.querySelector('.note-workspace-header > div:first-child').getBoundingClientRect();
+        const noteHeaderActions = document.querySelector('.note-workspace-header-actions').getBoundingClientRect();
+        const smallHeaderClear = innerWidth > 850 || (noteHeaderTitle.right <= noteHeaderActions.left && getComputedStyle(document.querySelector('.window-titlebar time')).display === 'none');
         const paperRadius = getComputedStyle(document.querySelector('.note-paper')).borderRadius;
         const scroll = document.querySelector('.note-paper-scroll');
         scroll.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true }));
         const zoomLabel = document.getElementById('noteZoomLabel').textContent;
         const pageDuration = getComputedStyle(document.documentElement).getPropertyValue('--motion-duration-page').trim();
-        return { closedBeforeReopen, closedAfterReopen, continued, indented, outdented, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, zoomLabel, pageDuration };
+        return { closedBeforeReopen, closedAfterReopen, infiniteDocumentScrolls, continued, indented, outdented, smallHeaderClear, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, zoomLabel, pageDuration };
       })()
     `);
-    if (!behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.continued || !behavior.indented || !behavior.outdented || behavior.paperRadius !== '0px' || behavior.zoomLabel !== '110%' || behavior.pageDuration !== '360ms') {
+    if (!behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.infiniteDocumentScrolls || !behavior.continued || !behavior.indented || !behavior.outdented || !behavior.smallHeaderClear || behavior.paperRadius !== '0px' || behavior.zoomLabel !== '110%' || behavior.pageDuration !== '360ms') {
       throw new Error(`Note behavior smoke failed: ${JSON.stringify(behavior)}`);
     }
     console.log(`WORKBENCH_NOTE_BEHAVIOR_OK ${JSON.stringify(behavior)}`);
@@ -327,18 +335,24 @@ app.whenReady().then(async () => {
       activate('home');
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       const repeatedReplay = document.querySelector('[data-page="home"]').classList.contains('home-entering');
+      activate('schedule');
+      document.getElementById('scheduleTodayButton').click();
+      await new Promise((resolve) => setTimeout(resolve, 360));
+      const scheduleRestoresOpacity = getComputedStyle(document.getElementById('scheduleBoard')).opacity === '1';
+      activate('home');
       const waveCoordinatesMatch = cards.every((card) => Number(card.style.getPropertyValue('--home-enter-wave'))
         === Number(card.style.getPropertyValue('--home-enter-row')) + Number(card.style.getPropertyValue('--home-enter-column')));
       return {
         cardCount: cards.length,
         firstReplay,
         repeatedReplay,
+        scheduleRestoresOpacity,
         diagonalWaves: new Set(firstWaves).size < cards.length && Math.min(...firstWaves) === 0,
         waveCoordinatesMatch
       };
     })()
   `);
-  if (homeMotionResult.cardCount !== 9 || !homeMotionResult.firstReplay || !homeMotionResult.repeatedReplay || !homeMotionResult.diagonalWaves || !homeMotionResult.waveCoordinatesMatch) {
+  if (homeMotionResult.cardCount !== 9 || !homeMotionResult.firstReplay || !homeMotionResult.repeatedReplay || !homeMotionResult.scheduleRestoresOpacity || !homeMotionResult.diagonalWaves || !homeMotionResult.waveCoordinatesMatch) {
     throw new Error(`Home motion smoke failed: ${JSON.stringify(homeMotionResult)}`);
   }
   console.log(`HOME_MOTION_SMOKE_OK ${JSON.stringify(homeMotionResult)}`);
@@ -408,6 +422,10 @@ app.whenReady().then(async () => {
       const storageVisible = !document.querySelector('[data-settings-panel="storage"]').hidden;
       const storageSelectedExactly = document.querySelector('.settings-nav-item.active')?.dataset.settingsSection === 'storage'
         && [...document.querySelectorAll('[data-settings-panel]')].filter((panel) => !panel.hidden).length === 1;
+      const settingsTabWidths = [...document.querySelectorAll('.settings-nav-item')].map((item) => Math.round(item.getBoundingClientRect().width));
+      const settingsTabsEqualWidth = settingsTabWidths.length === 6 && Math.max(...settingsTabWidths) - Math.min(...settingsTabWidths) <= 1;
+      const settingsTabTops = [...document.querySelectorAll('.settings-nav-item')].map((item) => Math.round(item.getBoundingClientRect().top));
+      const settingsTabsSingleRow = settingsTabTops.length === 6 && Math.max(...settingsTabTops) - Math.min(...settingsTabTops) <= 1;
       document.querySelector('[data-settings-section="updates"]').click();
       const updatesVisible = !document.querySelector('[data-settings-panel="updates"]').hidden;
       const updateButton = document.getElementById('updateActionButton');
@@ -443,10 +461,10 @@ app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 180));
       const draftPreserved = startAtLogin.checked;
       document.querySelector('[data-workbench-page="home"]').click();
-      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, trackingVisible, storageVisible, storageSelectedExactly, updatesVisible, updateIdle, updateAvailable, updatePromptAvailable, updateDownloaded, updatePromptDownloaded, updatePromptDismissed, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, todayOverviewSwitchVisible, widgetChildrenDisabled, draftPreserved };
+      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, trackingVisible, storageVisible, storageSelectedExactly, settingsTabsEqualWidth, settingsTabsSingleRow, settingsTabWidths, settingsTabTops, updatesVisible, updateIdle, updateAvailable, updatePromptAvailable, updateDownloaded, updatePromptDownloaded, updatePromptDismissed, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, todayOverviewSwitchVisible, widgetChildrenDisabled, draftPreserved };
     })()
   `);
-  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updatePromptAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.updatePromptDownloaded || !settingsDraftResult.updatePromptDismissed || !settingsDraftResult.generalVisible || !settingsDraftResult.todayOverviewSwitchVisible || !settingsDraftResult.widgetChildrenDisabled || !settingsDraftResult.draftPreserved) {
+  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.settingsTabsEqualWidth || !settingsDraftResult.settingsTabsSingleRow || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updatePromptAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.updatePromptDownloaded || !settingsDraftResult.updatePromptDismissed || !settingsDraftResult.generalVisible || !settingsDraftResult.todayOverviewSwitchVisible || !settingsDraftResult.widgetChildrenDisabled || !settingsDraftResult.draftPreserved) {
     throw new Error(`Settings draft smoke test failed: ${JSON.stringify(settingsDraftResult)}`);
   }
   console.log(`SETTINGS_DRAFT_SMOKE_OK ${JSON.stringify(settingsDraftResult)}`);
@@ -705,6 +723,7 @@ app.whenReady().then(async () => {
         const cancelDiscarded = !scheduleDialog.open && !localStorage.getItem('yanji.scheduleDraft.v1');
         document.getElementById('addScheduleButton').click();
         const scheduleTitle = document.getElementById('scheduleTitle');
+        document.getElementById('scheduleRepeatDailyInput').checked = true;
         scheduleTitle.value = '明天上午八点去采样，下午五点去洗澡';
         scheduleTitle.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 360));
@@ -731,6 +750,7 @@ app.whenReady().then(async () => {
           cancelDiscarded,
           multiPreview,
           multiSaved: document.body.dataset.savedScheduleCount === '2',
+          dailyRepeatSaved: JSON.parse(document.body.dataset.lastSavedSchedule || '{}').repeat === 'daily',
           draftClearedAfterSave: !localStorage.getItem('yanji.scheduleDraft.v1'),
           modalScrollbarHidden,
           allDayCompact,
@@ -743,7 +763,7 @@ app.whenReady().then(async () => {
         return result;
       })()
     `);
-    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || !scheduleResult.directionalAnimationRunning || !scheduleResult.directionalDateChange || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || !scheduleResult.directionalAnimationRunning || !scheduleResult.directionalDateChange || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.dailyRepeatSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
@@ -918,7 +938,15 @@ app.whenReady().then(async () => {
         const attendanceEntering = document.querySelector('[data-page="attendance"]').classList.contains('attendance-entering');
         const ganttGrowRunning = [...document.querySelectorAll('#attendanceGanttRows .attendance-bar')].some((bar) => bar.getAnimations().length > 0);
         const usageGrowRunning = [...document.querySelectorAll('#focusUsageList .focus-usage-row i')].some((bar) => bar.getAnimations().length > 0);
-        await new Promise((resolve) => setTimeout(resolve, 480));
+        await new Promise((resolve) => setTimeout(resolve, 760));
+        const ganttScaleAccurate = [...document.querySelectorAll('#attendanceGanttRows .attendance-bar')].every((bar) => {
+          const track = bar.parentElement.getBoundingClientRect();
+          const rect = bar.getBoundingClientRect();
+          const actualLeft = (rect.left - track.left) / track.width * 100;
+          const actualWidth = rect.width / track.width * 100;
+          return Math.abs(actualLeft - Number(bar.dataset.attendanceLeft)) <= .2
+            && Math.abs(actualWidth - Number(bar.dataset.attendanceWidth)) <= .2;
+        });
         return {
           pageVisible: !document.querySelector('[data-page="attendance"]').hidden,
           attendanceEntering,
@@ -926,6 +954,7 @@ app.whenReady().then(async () => {
           usageGrowRunning,
           ganttRows: document.querySelectorAll('#attendanceGanttRows .attendance-gantt-row').length,
           ganttBars: document.querySelectorAll('#attendanceGanttRows .attendance-bar').length,
+          ganttScaleAccurate,
           appRows: document.querySelectorAll('#focusUsageList .focus-usage-row').length,
           usageWidths: [...document.querySelectorAll('#focusUsageList .focus-usage-row i')].map((item) => Math.round(item.getBoundingClientRect().width)),
           usageColors: [...document.querySelectorAll('#focusUsageList .focus-usage-row i')].map((item) => getComputedStyle(item).backgroundImage),
@@ -937,7 +966,7 @@ app.whenReady().then(async () => {
     const usageWidthsAreProportional = usagePixelWidths.length < 2
       || Math.max(...usagePixelWidths) - Math.min(...usagePixelWidths) >= 8;
     const usageColorsAreDistinct = attendanceResult.usageColors.length < 2 || new Set(attendanceResult.usageColors).size > 1;
-    if (!attendanceResult.pageVisible || !attendanceResult.attendanceEntering || !attendanceResult.ganttGrowRunning || !attendanceResult.usageGrowRunning || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 2 || attendanceResult.appRows < 1 || !usageWidthsAreProportional || !usageColorsAreDistinct || attendanceResult.horizontalOverflow) {
+    if (!attendanceResult.pageVisible || !attendanceResult.attendanceEntering || !attendanceResult.ganttGrowRunning || !attendanceResult.usageGrowRunning || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 2 || !attendanceResult.ganttScaleAccurate || attendanceResult.appRows < 1 || !usageWidthsAreProportional || !usageColorsAreDistinct || attendanceResult.horizontalOverflow) {
       throw new Error(`Workbench attendance smoke failed: ${JSON.stringify(attendanceResult)}`);
     }
     console.log(`WORKBENCH_ATTENDANCE_OK ${JSON.stringify(attendanceResult)}`);
@@ -1229,6 +1258,11 @@ app.whenReady().then(async () => {
         const switchedToNote = document.querySelector('[data-mode="note"]').classList.contains('active');
         document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Tab' }));
         const switchedBackToSchedule = document.querySelector('[data-mode="schedule"]').classList.contains('active');
+        editor.value = '1. 第一项';
+        editor.setSelectionRange(editor.value.length, editor.value.length);
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        editor.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' }));
+        const numberedEnterContinues = editor.value === '1. 第一项\\n2. ';
         editor.value = '';
         editor.dispatchEvent(new Event('input', { bubbles: true }));
         window.dispatchEvent(new Event('blur'));
@@ -1241,7 +1275,7 @@ app.whenReady().then(async () => {
         const singleSurface = card.left === 0 && card.top === 0 && card.right === innerWidth && card.bottom === innerHeight;
         const transparentRoot = getComputedStyle(document.body).backgroundColor === 'rgba(0, 0, 0, 0)'
           && getComputedStyle(document.body).backgroundImage === 'none';
-        return { compositionPreserved, priorityRendered, highlighted, switchedToTodo, switchedToNote, switchedBackToSchedule, emptyBlurClosed, singleSurface, transparentRoot };
+        return { compositionPreserved, priorityRendered, highlighted, switchedToTodo, switchedToNote, switchedBackToSchedule, numberedEnterContinues, emptyBlurClosed, singleSurface, transparentRoot };
       })()
     `);
     if (!Object.values(captureResult).every(Boolean)) throw new Error(`Workbench capture smoke failed: ${JSON.stringify(captureResult)}`);

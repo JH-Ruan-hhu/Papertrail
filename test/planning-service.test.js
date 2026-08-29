@@ -16,6 +16,23 @@ function makeStore() {
   return store;
 }
 
+test('persists the daily repeat option through the planning service whitelist', () => {
+  const store = makeStore();
+  const service = createPlanningService({
+    store,
+    makeId: () => 'schedule-daily',
+    now: () => new Date('2026-08-29T08:00:00.000Z')
+  });
+  const saved = service.saveSchedule({
+    title: '每日复盘',
+    startAt: '2026-08-29T09:00:00.000Z',
+    endAt: '2026-08-29T09:30:00.000Z',
+    repeat: 'daily'
+  });
+  assert.equal(saved.repeat, 'daily');
+  assert.equal(store.data.schedules[0].repeat, 'daily');
+});
+
 test('saves a todo, schedules linked work and deletes the todo without deleting the block', () => {
   const store = makeStore();
   let id = 0;

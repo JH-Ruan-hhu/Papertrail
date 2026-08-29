@@ -69,7 +69,8 @@ const {
   saveAttendance,
   saveFocusSession,
   saveNote,
-  saveSchedule
+  saveSchedule,
+  scheduleOccurrenceForDate
 } = require('./workbench-core');
 const {
   applyRefreshFailure,
@@ -2146,7 +2147,7 @@ function stickyNoteForRenderer(noteId) {
 
 function runWorkspaceReminders(now = new Date()) {
   const candidates = collectReminderCandidates({
-    schedules: store.listSchedules(),
+    schedules: store.listSchedules().map((schedule) => scheduleOccurrenceForDate(schedule, now)).filter(Boolean),
     todos: store.listTodos(),
     now,
     settings: store.getSettings()
@@ -2159,7 +2160,7 @@ function runWorkspaceReminders(now = new Date()) {
       else showScheduleNotification(candidate.item);
       store.updateWorkspace((workspace) => {
         workspace.schedules = workspace.schedules.map((item) => item.id === candidate.item.id
-          ? { ...item, reminderSentAt: now.toISOString(), updatedAt: now.toISOString() }
+          ? { ...item, reminderSentAt: now.toISOString(), reminderOccurrence: candidate.item.occurrenceKey || null, updatedAt: now.toISOString() }
           : item);
         return workspace;
       });

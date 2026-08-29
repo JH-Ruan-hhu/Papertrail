@@ -395,7 +395,7 @@ function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOStrin
   const legacy = asObject(value.legacy) ? { ...value.legacy } : {};
   const knownKeys = new Set([
     'id', 'title', 'startAt', 'endAt', 'allDay', 'priority', 'reminderMinutesBefore',
-    'reminderSentAt', 'sourceRef', 'createdAt', 'updatedAt', 'legacy',
+    'reminderSentAt', 'reminderOccurrence', 'repeat', 'sourceRef', 'createdAt', 'updatedAt', 'legacy',
     'deadline', 'completedAt', 'remindedAt'
   ]);
   for (const [key, item] of Object.entries(value)) {
@@ -424,6 +424,8 @@ function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOStrin
     priority: SCHEDULE_PRIORITIES.includes(value.priority) ? value.priority : 'low',
     reminderMinutesBefore,
     reminderSentAt,
+    reminderOccurrence: /^\d{4}-\d{2}-\d{2}$/.test(String(value.reminderOccurrence || '')) ? String(value.reminderOccurrence) : null,
+    repeat: value.repeat === 'daily' ? 'daily' : null,
     sourceRef,
     createdAt,
     updatedAt: isoDate(value.updatedAt, createdAt),
@@ -582,6 +584,7 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
   const nextEndAt = hasInput('endAt') ? input.endAt : existing?.endAt;
   const nextAllDay = hasInput('allDay') ? input.allDay : existing?.allDay;
   const nextPriority = hasInput('priority') ? input.priority : existing?.priority;
+  const nextRepeat = hasInput('repeat') ? input.repeat : existing?.repeat;
   const requestedReminderMinutes = hasInput('reminderMinutesBefore') ? input.reminderMinutesBefore : existing?.reminderMinutesBefore;
   const nextReminderMinutes = requestedReminderMinutes == null && ['high', 'medium'].includes(nextPriority)
     ? 0
@@ -590,12 +593,14 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
     && existing.startAt === nextStartAt
     && existing.endAt === nextEndAt
     && existing.allDay === Boolean(nextAllDay)
+    && existing.repeat === (nextRepeat === 'daily' ? 'daily' : null)
     && existing.reminderMinutesBefore === nextReminderMinutes);
   const requestedReminder = input?.reminderSentAt ?? null;
   const candidate = normalizeSchedule({
     ...existing,
     ...input,
     reminderMinutesBefore: nextReminderMinutes,
+    repeat: nextRepeat,
     id: existing?.id || makeId(),
     createdAt: existing?.createdAt || now,
     updatedAt: now,
@@ -604,6 +609,28 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
     : [candidate, ...list];
+}
+
+function scheduleOccurrenceForDate(schedule, date = new Date()) {
+  if (!schedule || schedule.repeat !== 'daily') return schedule || null;
+  const sourceStart = new Date(schedule.startAt);
+  const sourceEnd = new Date(schedule.endAt);
+  const target = date instanceof Date ? new Date(date) : new Date(date);
+  if (![sourceStart, sourceEnd, target].every((item) => Number.isFinite(item.getTime()))) return null;
+  const sourceDay = new Date(sourceStart.getFullYear(), sourceStart.getMonth(), sourceStart.getDate());
+  const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  if (targetDay < sourceDay) return null;
+  const occurrenceStart = new Date(targetDay);
+  occurrenceStart.setHours(sourceStart.getHours(), sourceStart.getMinutes(), sourceStart.getSeconds(), sourceStart.getMilliseconds());
+  const occurrenceEnd = new Date(occurrenceStart.getTime() + (sourceEnd.getTime() - sourceStart.getTime()));
+  const occurrenceKey = localDateKey(targetDay);
+  return {
+    ...schedule,
+    startAt: occurrenceStart.toISOString(),
+    endAt: occurrenceEnd.toISOString(),
+    occurrenceKey,
+    reminderSentAt: schedule.reminderOccurrence === occurrenceKey ? schedule.reminderSentAt : null
+  };
 }
 
 function saveNote(list, input, now = new Date().toISOString(), makeId = () => `note-${Date.now()}`) {
@@ -732,5 +759,6 @@ module.exports = {
   saveAttendance,
   saveFocusSession,
   saveNote,
-  saveSchedule
+  saveSchedule,
+  scheduleOccurrenceForDate
 };

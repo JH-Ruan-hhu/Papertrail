@@ -657,15 +657,39 @@ test('quick capture note submission imports and calls the daily-note append help
 test('quick capture Tab cycles through schedule, todo, note and back to schedule', () => {
   const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
   const tabBranch = captureJs.indexOf("if (event.key === 'Tab')");
-  const noteEditingBranch = captureJs.indexOf("mode === 'note' && window.YanjiListEditing");
-  assert.ok(tabBranch >= 0 && noteEditingBranch > tabBranch);
+  const listEditingBranch = captureJs.indexOf("window.YanjiListEditing?.applyListEditing(editor, event)");
+  assert.ok(tabBranch >= 0 && listEditingBranch > tabBranch);
   assert.match(captureJs, /const modes = \['schedule', 'todo', 'note'\]/);
+});
+
+test('quick capture recognizes numbered Enter continuation before normal submission', () => {
+  const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
+  const continuationBranch = captureJs.indexOf("event.key === 'Enter' && !event.shiftKey && window.YanjiListEditing?.applyListEditing(editor, event)");
+  const submitBranch = captureJs.indexOf("event.key === 'Enter' && (mode === 'schedule' || mode === 'todo') && !event.shiftKey");
+  assert.ok(continuationBranch >= 0 && continuationBranch < submitBranch);
+  assert.doesNotMatch(captureJs.slice(continuationBranch, submitBranch), /mode === 'note'/);
 });
 
 test('home page common workspace exposes the global gradient between matrices', () => {
   const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
   assert.match(css, /\.workspace:has\(> \.home-page:not\(\[hidden\]\)\)[\s\S]*background:\s*transparent\s*!important/);
   assert.match(css, /\.workspace\s*>\s*\.home-page:not\(\[hidden\]\)[\s\S]*box-shadow:\s*none/);
+});
+
+test('v1.4.3 schedule, note, settings and attendance regressions stay wired', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const motionJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.js'), 'utf8');
+  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  assert.match(indexHtml, /id="scheduleRepeatDailyInput"/);
+  assert.match(workbenchJs, /schedule\.repeat !== 'daily'/);
+  assert.match(workbenchJs, /repeat:\s*document\.getElementById\('scheduleRepeatDailyInput'\)\.checked \? 'daily' : null/);
+  assert.match(motionJs, /exitAnimation\.cancel\(\)/);
+  assert.match(css, /\.note-paper-scroll\s*\{[^}]*height:\s*100%[^}]*overflow-y:\s*auto/);
+  assert.match(css, /grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)/);
+  assert.match(css, /\.settings-page \.settings-liquid-filters\s*\{[^}]*position:\s*absolute/);
+  assert.match(workbenchJs, /bar\.style\.left = `\$\{Number\(bar\.dataset\.attendanceLeft\)\}%`/);
+  assert.doesNotMatch(workbenchJs, /class="attendance-bar[^`]*style="left:/);
 });
 
 test('release verification executes the packaged executable and inspects app.asar', () => {

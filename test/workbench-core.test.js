@@ -17,8 +17,30 @@ const {
   saveFocusSession,
   saveNote,
   saveSchedule,
+  scheduleOccurrenceForDate,
   wordCountFromNoteHtml
 } = require('../src/workbench-core');
+
+test('daily schedules keep their local time and generate one occurrence for each later date', () => {
+  const schedules = saveSchedule([], {
+    title: '每日复盘',
+    startAt: new Date(2026, 7, 29, 9, 30).toISOString(),
+    endAt: new Date(2026, 7, 29, 10, 15).toISOString(),
+    repeat: 'daily',
+    reminderMinutesBefore: 10
+  }, new Date(2026, 7, 29, 8).toISOString(), () => 'daily-schedule');
+  const occurrence = scheduleOccurrenceForDate(schedules[0], new Date(2026, 7, 31, 12));
+  assert.equal(occurrence.id, 'daily-schedule');
+  assert.equal(occurrence.repeat, 'daily');
+  assert.equal(new Date(occurrence.startAt).getDate(), 31);
+  assert.equal(new Date(occurrence.startAt).getHours(), 9);
+  assert.equal(new Date(occurrence.startAt).getMinutes(), 30);
+  assert.equal(Date.parse(occurrence.endAt) - Date.parse(occurrence.startAt), 45 * 60_000);
+  assert.equal(scheduleOccurrenceForDate(schedules[0], new Date(2026, 7, 28, 12)), null);
+  const reminded = { ...schedules[0], reminderSentAt: new Date(2026, 7, 30, 9, 20).toISOString(), reminderOccurrence: '2026-08-30' };
+  assert.ok(scheduleOccurrenceForDate(reminded, new Date(2026, 7, 30, 12)).reminderSentAt);
+  assert.equal(scheduleOccurrenceForDate(reminded, new Date(2026, 7, 31, 12)).reminderSentAt, null);
+});
 
 test('parses Chinese relative date, day part and a multi-hour range', () => {
   const parsed = parseNaturalLanguageSchedule('明天下午3点到5点组会 !!', new Date(2026, 7, 22, 10, 0));

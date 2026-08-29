@@ -257,7 +257,11 @@ contextBridge.exposeInMainWorld('paperTrail', {
     const parsed = { valid: true, title: '组会', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: /#1/.test(text) ? 'high' : 'low', deadline: false, matches };
     return { ...parsed, schedules: [parsed] };
   },
-  saveSchedule: async (input) => { document.body.dataset.savedScheduleCount = String(Number(document.body.dataset.savedScheduleCount || 0) + 1); return input; },
+  saveSchedule: async (input) => {
+    document.body.dataset.savedScheduleCount = String(Number(document.body.dataset.savedScheduleCount || 0) + 1);
+    document.body.dataset.lastSavedSchedule = JSON.stringify(input);
+    return input;
+  },
   deleteSchedule: async () => true,
   completeSchedule: async () => true,
   showScheduleWidget: async () => ({ attached: true }),

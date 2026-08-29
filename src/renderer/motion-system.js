@@ -194,11 +194,13 @@
       return;
     }
     const sign = direction === 'previous' ? 1 : -1;
-    await board.animate([
+    const exitAnimation = board.animate([
       { opacity: 1, transform: 'translate3d(0, 0, 0)' },
       { opacity: .25, transform: `translate3d(${sign * 18}px, 0, 0)` }
-    ], { duration: 110, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'forwards' }).finished.catch(() => {});
+    ], { duration: 110, easing: 'cubic-bezier(.23, 1, .32, 1)', fill: 'forwards' });
+    await exitAnimation.finished.catch(() => {});
     update?.();
+    exitAnimation.cancel();
     await board.animate([
       { opacity: .25, transform: `translate3d(${-sign * 18}px, 0, 0)` },
       { opacity: 1, transform: 'translate3d(0, 0, 0)' }

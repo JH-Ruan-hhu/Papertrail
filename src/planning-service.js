@@ -18,7 +18,7 @@ const TODO_INPUT_KEYS = Object.freeze([
 ]);
 const SCHEDULE_INPUT_KEYS = Object.freeze([
   'id', 'title', 'startAt', 'endAt', 'allDay', 'priority', 'reminderMinutesBefore',
-  'reminderSentAt', 'sourceRef', 'createdAt', 'updatedAt', 'legacy'
+  'reminderSentAt', 'repeat', 'sourceRef', 'createdAt', 'updatedAt', 'legacy'
 ]);
 
 function clone(value) {

@@ -229,7 +229,22 @@ function schedulesForDay(date) {
   dayStart.setHours(0, 0, 0, 0);
   const dayEnd = addDays(dayStart, 1);
   return wb.workspace.schedules
-    .filter((schedule) => Date.parse(schedule.startAt) < dayEnd.getTime() && Date.parse(schedule.endAt) > dayStart.getTime())
+    .map((schedule) => {
+      if (schedule.repeat !== 'daily') return schedule;
+      const sourceStart = new Date(schedule.startAt);
+      const sourceEnd = new Date(schedule.endAt);
+      const sourceDay = new Date(sourceStart.getFullYear(), sourceStart.getMonth(), sourceStart.getDate());
+      if (dayStart < sourceDay) return null;
+      const occurrenceStart = new Date(dayStart);
+      occurrenceStart.setHours(sourceStart.getHours(), sourceStart.getMinutes(), sourceStart.getSeconds(), sourceStart.getMilliseconds());
+      return {
+        ...schedule,
+        startAt: occurrenceStart.toISOString(),
+        endAt: new Date(occurrenceStart.getTime() + (sourceEnd.getTime() - sourceStart.getTime())).toISOString(),
+        occurrenceKey: localDateKey(dayStart)
+      };
+    })
+    .filter((schedule) => schedule && Date.parse(schedule.startAt) < dayEnd.getTime() && Date.parse(schedule.endAt) > dayStart.getTime())
     .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt));
 }
 
@@ -887,7 +902,7 @@ function renderTimeline() {
         ? (linkedTodo.status === 'completed' ? '关联待办已完成' : `来自待办：${linkedTodo.title}`)
         : '';
       const linkedButton = linkedTodo ? `<button class="schedule-card-linked-todo" data-open-linked-todo="${wbEscape(linkedTodo.id)}" type="button">${wbEscape(linkedLabel)}</button>` : '';
-      return `<article class="schedule-board-card tone-${item.priority}" data-schedule-card="${wbEscape(item.id)}"><button class="schedule-card-main" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${item.allDay ? '全天' : timing.label}</time><strong>${wbEscape(item.title)}</strong><span>${priorityLabels[item.priority]}${timing.spansDay ? ' · 跨日' : ''}</span></button>${linkedButton}</article>`;
+      return `<article class="schedule-board-card tone-${item.priority}" data-schedule-card="${wbEscape(item.id)}"><button class="schedule-card-main" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${item.allDay ? '全天' : timing.label}</time><strong>${wbEscape(item.title)}</strong><span>${priorityLabels[item.priority]}${item.repeat === 'daily' ? ' · 每天' : ''}${timing.spansDay ? ' · 跨日' : ''}</span></button>${linkedButton}</article>`;
     }).join('');
     return `<section class="schedule-board-column ${sameDay(date, new Date()) ? 'today' : ''} ${sameDay(date, selected) ? 'selected' : ''}" data-board-date="${dateKey}"><button class="schedule-board-heading" data-select-schedule-date="${dateKey}" type="button"><span>${new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date)}</span><strong>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}</strong><b>${events.length}</b></button><div class="schedule-board-cards">${cards || '<p class="schedule-board-empty">暂无安排</p>'}</div><button class="schedule-board-add" data-add-schedule-date="${dateKey}" type="button">＋ 新建日程</button></section>`;
   }).join('');
@@ -953,10 +968,18 @@ function renderAttendance() {
       const left = startMinutes / 1440 * 100;
       const width = Math.max(.6, (endMinutes - startMinutes) / 1440 * 100);
       const label = record.clockOutAt ? `${formatTime(record.clockInAt)}–${formatTime(record.clockOutAt)}` : `${formatTime(record.clockInAt)}–进行中`;
-      return `<button class="attendance-bar ${record.clockOutAt ? '' : 'open'}" style="left:${left}%;width:${width}%;top:${8 + recordIndex * 25}px" data-edit-attendance="${wbEscape(record.id)}" type="button"><span>${label}</span></button>`;
+      return `<button class="attendance-bar ${record.clockOutAt ? '' : 'open'}" data-attendance-left="${left}" data-attendance-width="${width}" data-attendance-top="${8 + recordIndex * 25}" data-edit-attendance="${wbEscape(record.id)}" type="button"><span>${label}</span></button>`;
     }).join('');
-    return `<div class="attendance-gantt-row ${isToday ? 'today' : ''}" style="min-height:${Math.max(56, 16 + records.length * 25)}px"><div class="attendance-day"><strong>${weekday[index]}</strong><small>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}${records.length > 1 ? ` · ${records.length} 段` : ''}</small></div><div class="attendance-row-track">${Array.from({ length: 8 }, () => '<i></i>').join('')}${bars}</div></div>`;
+    return `<div class="attendance-gantt-row ${isToday ? 'today' : ''}" data-attendance-row-height="${Math.max(56, 16 + records.length * 25)}"><div class="attendance-day"><strong>${weekday[index]}</strong><small>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}${records.length > 1 ? ` · ${records.length} 段` : ''}</small></div><div class="attendance-row-track">${Array.from({ length: 8 }, () => '<i></i>').join('')}${bars}</div></div>`;
   }).join('');
+  document.querySelectorAll('#attendanceGanttRows .attendance-gantt-row').forEach((row) => {
+    row.style.minHeight = `${Number(row.dataset.attendanceRowHeight)}px`;
+  });
+  document.querySelectorAll('#attendanceGanttRows .attendance-bar').forEach((bar) => {
+    bar.style.left = `${Number(bar.dataset.attendanceLeft)}%`;
+    bar.style.width = `${Number(bar.dataset.attendanceWidth)}%`;
+    bar.style.top = `${Number(bar.dataset.attendanceTop)}px`;
+  });
   renderAttendanceUsage();
   renderFocus();
 }
@@ -1098,6 +1121,7 @@ function openScheduleEditor(schedule = null, sourceTodo = null, options = {}) {
   document.getElementById('scheduleDate').value = localDateKey(start);
   const allDay = Boolean(schedule?.allDay || draft?.allDay);
   document.getElementById('scheduleAllDayInput').checked = allDay;
+  document.getElementById('scheduleRepeatDailyInput').checked = schedule?.repeat === 'daily' || draft?.repeat === 'daily';
   document.getElementById('scheduleStartTime').value = convertingTodo ? '' : `${String(start.getHours()).padStart(2, '0')}:${String(start.getMinutes()).padStart(2, '0')}`;
   document.getElementById('scheduleEndTime').value = convertingTodo ? '' : `${String(end.getHours()).padStart(2, '0')}:${String(end.getMinutes()).padStart(2, '0')}`;
   document.querySelectorAll('.schedule-time-field').forEach((field) => field.classList.toggle('is-hidden', allDay));
@@ -1137,6 +1161,7 @@ function captureScheduleDraft() {
     endTime: document.getElementById('scheduleEndTime').value,
     priority: document.querySelector('input[name="schedulePriority"]:checked')?.value || 'low',
     allDay: document.getElementById('scheduleAllDayInput').checked,
+    repeat: document.getElementById('scheduleRepeatDailyInput').checked ? 'daily' : null,
     reminderMinutesBefore: document.getElementById('scheduleReminderSelect').value === 'null' ? null : Number(document.getElementById('scheduleReminderSelect').value),
     recognition: wb.scheduleRecognition?.input === title.trim() ? wb.scheduleRecognition : null
   };
@@ -1328,8 +1353,9 @@ async function saveScheduleFromEditor() {
   try {
     if (!scheduleId && !wb.convertingTodoId && recognizedSchedules.length > 1) {
       for (const schedule of recognizedSchedules) {
-        if (!await confirmScheduleConflict(schedule)) return;
-        await workbenchApi.saveSchedule(schedule);
+        const repeatedSchedule = { ...schedule, repeat: document.getElementById('scheduleRepeatDailyInput').checked ? 'daily' : null };
+        if (!await confirmScheduleConflict(repeatedSchedule)) return;
+        await workbenchApi.saveSchedule(repeatedSchedule);
       }
       wb.selectedDate = new Date(recognizedSchedules[0].startAt);
       clearScheduleDraft();
@@ -1343,6 +1369,7 @@ async function saveScheduleFromEditor() {
       startAt: startAt.toISOString(),
       endAt: endAt.toISOString(),
       allDay,
+      repeat: document.getElementById('scheduleRepeatDailyInput').checked ? 'daily' : null,
       priority: document.querySelector('input[name="schedulePriority"]:checked').value,
       reminderMinutesBefore: document.getElementById('scheduleReminderSelect').value === 'null' ? null : Number(document.getElementById('scheduleReminderSelect').value),
       sourceRef: wb.editingScheduleTodoId ? { type: 'todo', id: wb.editingScheduleTodoId } : null
