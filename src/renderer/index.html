@@ -221,7 +221,7 @@
                 <button class="button icon-button" id="jobSettingsButton" type="button" aria-label="打开求职设置"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.9 4.9 7 7M17 17l2.1 2.1M2 12h3M19 12h3M4.9 19.1 7 17M17 7l2.1-2.1"/></svg></button>
               </div>
             </div>
-            <div class="job-table-head" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>截止时间</span><span>状态</span><span>优先级</span><span>下次跟进</span><span>备注</span><span>操作</span></div>
+            <div class="job-table-head" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>截止时间</span><span>状态</span><span>优先级</span><span>备注</span><span>操作</span></div>
             <div id="jobBoard" class="job-table-body" aria-live="polite"></div>
           </section>
         </section>
@@ -263,7 +263,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.4.5</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.4.6</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -400,7 +400,7 @@
                   <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button primary" id="updateActionButton" type="button">检查更新</button></div>
                 </div>
                 <div class="update-version-overview" aria-label="版本信息">
-                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.4.5</span></strong><small>正在使用</small></div>
+                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.4.6</span></strong><small>正在使用</small></div>
                   <span class="update-version-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
                   <div class="update-version-card target"><span>可用版本</span><strong id="updateTargetVersion">等待检查</strong><small>来自 GitHub Release</small></div>
                 </div>
@@ -432,7 +432,7 @@
           <button class="close-button update-prompt-close" id="closeUpdatePromptButton" type="button" aria-label="稍后处理更新">关闭</button>
         </div>
         <div class="update-prompt-version" aria-label="更新版本">
-          <div><small>当前版本</small><strong>v<span id="updatePromptCurrentVersion">1.4.5</span></strong></div>
+          <div><small>当前版本</small><strong>v<span id="updatePromptCurrentVersion">1.4.6</span></strong></div>
           <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
           <div class="target"><small>可用版本</small><strong id="updatePromptLatestVersion">等待检查</strong></div>
         </div>
@@ -594,8 +594,8 @@
     <dialog id="noteImagePreviewDialog" class="modal note-image-preview-modal" aria-labelledby="noteImagePreviewTitle">
       <div class="note-image-preview-shell">
         <div class="note-image-preview-head"><strong id="noteImagePreviewTitle">图片预览</strong><button class="close-button" data-close-dialog="noteImagePreviewDialog" type="button">关闭</button></div>
-        <img id="noteImagePreview" alt="">
-        <div class="note-image-preview-actions"><button class="button tertiary danger-quiet" id="removeNoteImageButton" type="button">删除图片</button></div>
+        <div class="note-image-preview-viewport" id="noteImagePreviewViewport"><img id="noteImagePreview" alt=""></div>
+        <div class="note-image-preview-actions"><button class="button tertiary danger-quiet" id="removeNoteImageButton" type="button">删除图片</button><div class="note-image-zoom-controls" aria-label="图片缩放"><button class="button tertiary compact" id="noteImageZoomOutButton" type="button" aria-label="缩小图片">−</button><button class="button tertiary compact note-image-zoom-label" id="noteImageZoomResetButton" type="button" title="恢复 100%">100%</button><button class="button tertiary compact" id="noteImageZoomInButton" type="button" aria-label="放大图片">＋</button></div></div>
       </div>
     </dialog>
 

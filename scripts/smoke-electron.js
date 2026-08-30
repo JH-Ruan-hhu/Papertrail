@@ -1099,7 +1099,7 @@ app.whenReady().then(async () => {
           && row.querySelector('.job-deadline-cell')
           && row.querySelector('[data-job-field="status"]')
           && row.querySelector('[data-job-field="priority"]')
-          && row.querySelector('[data-job-field="nextFollowUpAt"]')
+          && !row.querySelector('[data-job-field="nextFollowUpAt"]')
           && row.querySelector('[data-job-field="notes"]')
           && row.querySelector('[data-edit-job]')
           && row.querySelector('[data-delete-job]')
@@ -1109,7 +1109,6 @@ app.whenReady().then(async () => {
         const compactInlineControls = Boolean(firstRow)
           && (firstRow.querySelector('[data-job-field="status"]')?.getBoundingClientRect().width || 0) <= 81
           && (firstRow.querySelector('[data-job-field="priority"]')?.getBoundingClientRect().width || 0) <= 49
-          && (firstRow.querySelector('[data-job-field="nextFollowUpAt"]')?.getBoundingClientRect().width || 0) <= 145
           && (firstRow.querySelector('[data-job-field="notes"]')?.getBoundingClientRect().width || 0) <= 145;
         const readableTypography = Boolean(firstRow)
           && parseFloat(getComputedStyle(firstRow.querySelector('.job-company-line strong')).fontSize) >= 18

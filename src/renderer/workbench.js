@@ -21,6 +21,7 @@ const wb = {
   noteSelection: null,
   noteAttachmentMutation: false,
   previewingNoteImage: null,
+  noteImageZoom: 1,
   scheduleDraftTimer: null,
   pendingScheduleHighlightId: null,
   jobQuickFilter: 'all',
@@ -617,7 +618,7 @@ function jobRowHtml(job) {
   const deadline = job.deadline ? jobDateLabel(job.deadline, { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—';
   const deadlineClass = jobDateWithinNextDays(job.deadline, new Date(), 7) ? ' is-soon' : (Date.parse(job.deadline) < Date.now() ? ' is-overdue' : '');
   const currentStage = jobCurrentStage(job);
-  return `<article class="job-position job-row-status-${wbEscape(job.status)}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div></div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-follow-cell"><span class="sr-only">${wbEscape(job.company)}下次跟进</span><input data-job-field="nextFollowUpAt" data-job-id="${wbEscape(job.id)}" type="date" value="${wbEscape(localDateInputValue(job.nextFollowUpAt))}" aria-label="${wbEscape(job.company)}下次跟进日期"></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
+  return `<article class="job-position job-row-status-${wbEscape(job.status)}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div></div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
 }
 
 function renderJobs() {
@@ -1755,9 +1756,23 @@ function openNoteImagePreview(src, alt = '图片预览') {
   if (!dialog || !image || !src) return;
   image.src = src;
   image.alt = alt;
+  setNoteImagePreviewZoom(1);
   document.getElementById('noteImagePreviewTitle').textContent = alt || '图片预览';
   document.getElementById('removeNoteImageButton').hidden = !wb.previewingNoteImage?.attachmentId;
   openWorkbenchDialog(dialog);
+}
+
+function setNoteImagePreviewZoom(value) {
+  const image = document.getElementById('noteImagePreview');
+  const label = document.getElementById('noteImageZoomResetButton');
+  const nextZoom = Math.max(.5, Math.min(3, Math.round(Number(value || 1) * 4) / 4));
+  wb.noteImageZoom = nextZoom;
+  if (image) image.style.zoom = String(nextZoom);
+  if (label) label.textContent = `${Math.round(nextZoom * 100)}%`;
+  const zoomOut = document.getElementById('noteImageZoomOutButton');
+  const zoomIn = document.getElementById('noteImageZoomInButton');
+  if (zoomOut) zoomOut.disabled = nextZoom <= .5;
+  if (zoomIn) zoomIn.disabled = nextZoom >= 3;
 }
 
 function queueNoteAutoSave() {
@@ -2324,6 +2339,14 @@ function bindWorkbenchEvents() {
       wb.noteAttachmentMutation = false;
     }
   });
+  document.getElementById('noteImageZoomOutButton').addEventListener('click', () => setNoteImagePreviewZoom(wb.noteImageZoom - .25));
+  document.getElementById('noteImageZoomResetButton').addEventListener('click', () => setNoteImagePreviewZoom(1));
+  document.getElementById('noteImageZoomInButton').addEventListener('click', () => setNoteImagePreviewZoom(wb.noteImageZoom + .25));
+  document.getElementById('noteImagePreviewViewport').addEventListener('wheel', (event) => {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    setNoteImagePreviewZoom(wb.noteImageZoom + (event.deltaY < 0 ? .25 : -.25));
+  }, { passive: false });
   document.getElementById('openStickyFromEditorButton').addEventListener('click', async () => {
     try {
       if (wb.noteDirty) {
@@ -2402,7 +2425,10 @@ function bindWorkbenchEvents() {
   });
   document.getElementById('noteImagePreviewDialog').addEventListener('close', () => {
     wb.previewingNoteImage = null;
-    document.getElementById('noteImagePreview').removeAttribute('src');
+    const image = document.getElementById('noteImagePreview');
+    image.removeAttribute('src');
+    image.style.removeProperty('zoom');
+    wb.noteImageZoom = 1;
   });
   document.querySelectorAll('[data-close-dialog]').forEach((button) => button.addEventListener('click', () => {
     if (button.dataset.closeDialog === 'noteDialog') return;

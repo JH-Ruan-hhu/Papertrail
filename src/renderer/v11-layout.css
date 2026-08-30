@@ -610,11 +610,15 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
 .note-inline-image { display: block; width: auto; max-width: 100%; height: auto; max-height: 420px; margin: 14px 0; object-fit: contain; border: 1px solid rgba(71, 109, 126, .2); border-radius: 10px; box-shadow: 0 8px 24px rgba(28, 67, 84, .12); cursor: zoom-in; }
 .note-inline-image.is-missing { width: 100%; min-height: 92px; background: rgba(117, 146, 159, .12); object-fit: contain; }
 .note-image-preview-modal { width: min(1080px, calc(100vw - 48px)); max-width: calc(100vw - 48px); max-height: calc(100vh - 48px); overflow: hidden; }
-.note-image-preview-shell { display: grid; gap: 12px; min-width: 0; padding: 16px; }
+.note-image-preview-shell { max-height: calc(100vh - 48px); display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 12px; min-width: 0; padding: 16px; }
 .note-image-preview-head, .note-image-preview-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .note-image-preview-head strong { min-width: 0; overflow: hidden; color: var(--yanji-text); font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
-.note-image-preview-shell > img { display: block; width: auto; max-width: 100%; max-height: calc(100vh - 150px); margin: 0 auto; object-fit: contain; border-radius: 9px; }
-.note-image-preview-actions { justify-content: flex-end; }
+.note-image-preview-viewport { min-width: 0; min-height: 180px; overflow: auto; padding: 8px; background: rgba(224, 233, 242, .45); border-radius: 10px; }
+.note-image-preview-viewport > img { display: block; width: auto; max-width: 100%; max-height: calc(100vh - 174px); margin: auto; object-fit: contain; border-radius: 9px; transform-origin: center; }
+.note-image-preview-actions { justify-content: space-between; }
+.note-image-zoom-controls { display: flex; align-items: center; gap: 6px; }
+.note-image-zoom-controls .button { min-width: 34px; }
+.note-image-zoom-controls .note-image-zoom-label { min-width: 60px; font-variant-numeric: tabular-nums; }
 
 /* Settings is a page-level flow, not another glass card. Keep groups readable
    with separators while removing the large enclosing border/background. */
@@ -1569,7 +1573,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-table-actions .button { min-height: 35px; padding-inline: 12px; border-radius: 8px; font-size: 12px; font-weight: 620; }
 .job-table-actions .button .ui-icon { width: 13px; height: 13px; margin-right: 3px; vertical-align: -3px; }
 .job-table-actions .icon-button { width: 33px; padding: 0; }
-.job-table-head, .job-position-main { display: grid; grid-template-columns: minmax(118px, 1.18fr) minmax(70px, .74fr) minmax(64px, .72fr) minmax(82px, .8fr) 76px 62px minmax(112px, 1.12fr) minmax(100px, 1fr) 98px; align-items: center; gap: 7px; }
+.job-table-head, .job-position-main { display: grid; grid-template-columns: minmax(126px, 1.3fr) minmax(76px, .8fr) minmax(70px, .76fr) minmax(88px, .88fr) 76px 62px minmax(126px, 1.25fr) 98px; align-items: center; gap: 7px; }
 .job-table-head { min-height: 40px; padding: 0 14px; color: #4f5e74; background: #fafbfc; border-bottom: 1px solid #e9edf2; font-size: 11.5px; font-weight: 730; letter-spacing: .01em; }
 .job-position { background: #fff; border-bottom: 1px solid #edf0f4; transition: background var(--motion-duration-fast) ease, box-shadow var(--motion-duration-fast) ease; }
 .job-position:last-child { border-bottom: 0; }
@@ -1636,7 +1640,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 @media (max-width: 860px) {
   .job-table-shell { overflow-x: auto; }
   .job-table-toolbar, .job-table-head, .job-table-body { min-width: 1010px; }
-  .job-table-head, .job-position-main { grid-template-columns: 156px 76px 70px 88px 76px 62px 116px 106px 98px; }
+  .job-table-head, .job-position-main { grid-template-columns: 172px 82px 76px 96px 76px 62px minmax(140px, 1fr) 98px; }
   .job-stage-option { grid-template-columns: 1fr 168px 88px; }
 }
 @media (max-width: 560px) {

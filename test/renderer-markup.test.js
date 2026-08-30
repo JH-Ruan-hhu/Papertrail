@@ -298,6 +298,9 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /id="noteContent"[^>]*contenteditable="true"/);
   assert.match(indexHtml, /id="addNoteImageButton"[^>]*>插入图片</);
   assert.match(indexHtml, /id="noteImagePreviewDialog"/);
+  assert.match(indexHtml, /id="noteImageZoomOutButton"/);
+  assert.match(indexHtml, /id="noteImageZoomResetButton"/);
+  assert.match(indexHtml, /id="noteImageZoomInButton"/);
   assert.match(indexHtml, /id="toggleNoteFullscreenButton"[^>]*>全屏编辑</);
   assert.match(indexHtml, /id="jobBoard"/);
   assert.match(indexHtml, /id="homeJobSummary"/);
@@ -305,6 +308,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(workbenchJs, /insertInlineNoteAttachment/);
   assert.match(workbenchJs, /workbenchApi\.getNoteAttachment/);
   assert.match(layoutCss, /\.note-inline-image/);
+  assert.match(workbenchJs, /function setNoteImagePreviewZoom/);
   assert.match(layoutCss, /\.note-editor-modal\.is-workspace-fullscreen/);
   assert.match(indexHtml, /#1 · 多屏星空提醒/);
   assert.match(mainJs, /globalShortcut\.register/);
