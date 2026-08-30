@@ -988,6 +988,63 @@ function jobImportList(parsed) {
   return null;
 }
 
+function portableJobHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+
+function portableJobDate(value) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return '—';
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function portableJobPreviewHtml(jobs, pageNumber, pageCount, exportedAt) {
+  const statusLabels = { preparing: '准备中', active: '进行中', paused: '暂停', closed: '已结束' };
+  const priorityLabels = { high: '高', medium: '中', low: '低' };
+  const rows = jobs.map((job) => {
+    const stages = Array.isArray(job.workflow?.stages) ? job.workflow.stages : [];
+    const currentIndex = Math.max(0, stages.findIndex((stage) => stage.id === job.workflow?.currentStageId));
+    const currentStage = stages[currentIndex]?.name || '—';
+    const progress = stages.length ? `${currentIndex + 1}/${stages.length}` : '—';
+    return `<section class="row"><div class="primary"><strong>${portableJobHtml(job.company || '未命名单位')}</strong><span>${portableJobHtml(job.role || '未命名岗位')}</span></div><div>${portableJobHtml(job.companyType || '—')}</div><div>${portableJobHtml(job.city || job.location || '—')}</div><div>${portableJobDate(job.deadline)}</div><div>${portableJobHtml(statusLabels[job.status] || job.status || '—')}</div><div>${portableJobHtml(priorityLabels[job.priority] || job.priority || '—')}</div><div class="notes">${portableJobHtml(job.notes || '—')}</div><p>招聘流程：${portableJobHtml(currentStage)} · ${portableJobHtml(progress)}</p></section>`;
+  }).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}html,body{margin:0;width:1400px;background:#f3f6fb;color:#25324a;font-family:"Microsoft YaHei","Segoe UI",sans-serif}body{padding:38px}.sheet{overflow:hidden;background:#fff;border:1px solid #dfe6f0;border-radius:22px;box-shadow:0 16px 46px rgba(42,63,96,.1)}header{display:flex;align-items:end;justify-content:space-between;padding:28px 30px 22px;background:linear-gradient(120deg,#edf7fb,#f7f1fc)}h1{margin:0;font-size:28px}header p,footer{margin:7px 0 0;color:#738096;font-size:14px}.head,.row{display:grid;grid-template-columns:250px 140px 120px 145px 120px 90px minmax(250px,1fr);column-gap:12px;align-items:center}.head{min-height:48px;padding:0 30px;color:#64728a;background:#f8fafc;border-bottom:1px solid #e6ebf2;font-size:14px;font-weight:700;text-align:center}.head span:first-child{text-align:left}.row{position:relative;min-height:88px;padding:13px 30px 29px;border-bottom:1px solid #edf1f6;font-size:15px;text-align:center}.row:last-child{border-bottom:0}.primary,.notes{text-align:left}.primary strong,.primary span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.primary strong{font-size:18px}.primary span{margin-top:5px;color:#66758c}.notes{overflow:hidden;color:#526176;text-overflow:ellipsis;white-space:nowrap}.row p{position:absolute;left:30px;bottom:8px;margin:0;color:#6d7fa5;font-size:12px}footer{display:flex;justify-content:space-between;padding:15px 30px 19px;background:#fbfcfe}</style></head><body><main class="sheet"><header><div><h1>研迹 · 求职岗位</h1><p>${portableJobHtml(exportedAt)} 导出 · 共 ${jobs.length} 条（本页）</p></div><p>第 ${pageNumber}/${pageCount} 页</p></header><div class="head"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>截止时间</span><span>状态</span><span>优先级</span><span>备注</span></div>${rows || '<div style="padding:70px;text-align:center;color:#8290a5">暂无岗位数据</div>'}<footer><span>手机可直接查看此 PNG 图片</span><span>完整可导入数据保存在同名 JSON 文件</span></footer></main></body></html>`;
+}
+
+async function exportPortableJobPreview(jobs, jsonFilePath, exportedAt) {
+  const pageSize = 25;
+  const pages = jobs.length ? Array.from({ length: Math.ceil(jobs.length / pageSize) }, (_, index) => jobs.slice(index * pageSize, (index + 1) * pageSize)) : [[]];
+  const parsedPath = path.parse(jsonFilePath);
+  const outputPaths = [];
+  for (let index = 0; index < pages.length; index += 1) {
+    const pageJobs = pages[index];
+    const height = Math.max(420, 320 + pageJobs.length * 88);
+    const previewWindow = new BrowserWindow({
+      show: false,
+      width: 1400,
+      height,
+      useContentSize: true,
+      backgroundColor: '#f3f6fb',
+      webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, offscreen: true }
+    });
+    try {
+      const html = portableJobPreviewHtml(pageJobs, index + 1, pages.length, exportedAt);
+      await previewWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      await previewWindow.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
+      const image = await previewWindow.webContents.capturePage({ x: 0, y: 0, width: 1400, height });
+      if (image.isEmpty()) throw new Error('岗位预览图片生成失败。');
+      const suffix = pages.length > 1 ? `-${String(index + 1).padStart(2, '0')}` : '';
+      const imagePath = path.join(parsedPath.dir, `${parsedPath.name}-手机预览${suffix}.png`);
+      fs.writeFileSync(imagePath, image.toPNG());
+      outputPaths.push(imagePath);
+    } finally {
+      if (!previewWindow.isDestroyed()) previewWindow.destroy();
+    }
+  }
+  return outputPaths;
+}
+
 async function importWorkspaceJobApplications() {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: '导入求职岗位',
@@ -1034,13 +1091,15 @@ async function exportWorkspaceJobApplications() {
   });
   if (result.canceled || !result.filePath) return { canceled: true };
   const workspace = workspaceForRenderer();
+  const exportedAt = new Date().toISOString();
   fs.writeFileSync(result.filePath, JSON.stringify({
     format: 'papertrail-job-applications',
     version: 1,
-    exportedAt: new Date().toISOString(),
+    exportedAt,
     jobApplications: workspace.jobApplications
   }, null, 2), 'utf8');
-  return { canceled: false, filePath: result.filePath, count: workspace.jobApplications.length };
+  const imagePaths = await exportPortableJobPreview(workspace.jobApplications, result.filePath, exportedAt);
+  return { canceled: false, filePath: result.filePath, imagePaths, count: workspace.jobApplications.length };
 }
 
 function saveMetadataFields(input) {

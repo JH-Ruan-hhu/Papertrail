@@ -309,6 +309,8 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(workbenchJs, /workbenchApi\.getNoteAttachment/);
   assert.match(layoutCss, /\.note-inline-image/);
   assert.match(workbenchJs, /function setNoteImagePreviewZoom/);
+  assert.match(mainJs, /function exportPortableJobPreview/);
+  assert.match(mainJs, /-手机预览/);
   assert.match(layoutCss, /\.note-editor-modal\.is-workspace-fullscreen/);
   assert.match(indexHtml, /#1 · 多屏星空提醒/);
   assert.match(mainJs, /globalShortcut\.register/);

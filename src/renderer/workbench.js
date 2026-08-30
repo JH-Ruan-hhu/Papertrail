@@ -832,7 +832,7 @@ async function importJobRecords() {
 async function exportJobRecords() {
   try {
     const result = await workbenchApi.exportJobApplications();
-    if (!result?.canceled) showWorkbenchToast(`已导出 ${result.count || 0} 个岗位`);
+    if (!result?.canceled) showWorkbenchToast(`已导出 ${result.count || 0} 个岗位及手机预览图片`);
   } catch (exception) {
     showWorkbenchToast(exception.message || '岗位导出失败。', 'error');
   }
