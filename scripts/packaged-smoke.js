@@ -55,7 +55,9 @@ function launchSmoke(exePath, { disableUpdater = false, appPath = null } = {}) {
         assert.equal(result.dataFileExists, true);
         assert.equal(result.preloadExists, true);
         assert.equal(result.browserWindowCreated, true);
-        if (disableUpdater) assert.equal(result.updaterAvailable, false);
+        assert.equal(result.updaterAvailable, !disableUpdater, disableUpdater
+          ? '禁用更新组件时仍被加载。'
+          : '正常安装包未能加载自动更新组件。');
         resolve({ ...result, updaterFallback: disableUpdater });
       } catch (error) {
         reject(error);
