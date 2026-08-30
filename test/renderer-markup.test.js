@@ -697,12 +697,35 @@ test('v1.4.3 schedule, note, settings and attendance regressions stay wired', ()
   assert.match(indexHtml, /id="scheduleRepeatDailyInput"/);
   assert.match(workbenchJs, /schedule\.repeat !== 'daily'/);
   assert.match(workbenchJs, /repeat:\s*document\.getElementById\('scheduleRepeatDailyInput'\)\.checked \? 'daily' : null/);
+  assert.match(workbenchJs, /function scheduleEndTimeAfterStart\(startTime, minutes = 10\)/);
+  assert.match(workbenchJs, /scheduleStartTime'\)\.addEventListener\('input'/);
+  assert.match(css, /\.schedule-time-field input\[type="time"\][\s\S]*font-variant-numeric:\s*tabular-nums/);
   assert.match(motionJs, /exitAnimation\.cancel\(\)/);
   assert.match(css, /\.note-paper-scroll\s*\{[^}]*height:\s*100%[^}]*overflow-y:\s*auto/);
   assert.match(css, /grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.settings-page \.settings-liquid-filters\s*\{[^}]*position:\s*absolute/);
   assert.match(workbenchJs, /bar\.style\.left = `\$\{Number\(bar\.dataset\.attendanceLeft\)\}%`/);
   assert.doesNotMatch(workbenchJs, /class="attendance-bar[^`]*style="left:/);
+  assert.match(workbenchJs, /endTimestamp >= rowDayEnd\.getTime\(\) \? 1440/);
+});
+
+test('v1.4.9 job table and portable export use the simplified columns without losing import data', () => {
+  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  assert.match(indexHtml, /id="jobStatusFilter"[\s\S]*状态：不限[\s\S]*进行中[\s\S]*已结束/);
+  assert.doesNotMatch(indexHtml.match(/id="jobStatusFilter"[\s\S]*?<\/select>/)?.[0] || '', /准备中|暂停/);
+  assert.match(indexHtml, /优先级：不限/);
+  assert.match(indexHtml, /城市：不限/);
+  assert.match(indexHtml, /class="job-table-head"[\s\S]*预估年薪/);
+  assert.match(indexHtml, /id="jobSettingsButton"[\s\S]*<circle cx="12" cy="12" r="3"/);
+  assert.match(workbenchJs, /class="job-salary-cell"/);
+  assert.match(workbenchJs, /jobs\.filter\(\(job\) => job\.status !== 'closed'\)/);
+  assert.match(mainJs, /<span>预估年薪<\/span><span>状态<\/span>/);
+  assert.match(mainJs, /jobApplications:\s*workspace\.jobApplications/);
+  assert.match(mainJs, /annualSalaryWan/);
+  assert.match(mainJs, /document\.body\.scrollHeight/);
+  assert.match(mainJs, /setContentSize\(1400, captureHeight/);
 });
 
 test('release verification executes the packaged executable and inspects app.asar', () => {

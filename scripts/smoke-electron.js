@@ -730,6 +730,20 @@ app.whenReady().then(async () => {
         const cancelDiscarded = !scheduleDialog.open && !localStorage.getItem('yanji.scheduleDraft.v1');
         document.getElementById('addScheduleButton').click();
         const scheduleTitle = document.getElementById('scheduleTitle');
+        const scheduleStartTime = document.getElementById('scheduleStartTime');
+        const scheduleEndTime = document.getElementById('scheduleEndTime');
+        scheduleStartTime.value = '13:40';
+        scheduleStartTime.dispatchEvent(new Event('input', { bubbles: true }));
+        const endFollowsStart = scheduleEndTime.value === '13:50';
+        scheduleStartTime.value = '23:55';
+        scheduleStartTime.dispatchEvent(new Event('input', { bubbles: true }));
+        const endWrapsMidnight = scheduleEndTime.value === '00:05';
+        const startTimeRect = scheduleStartTime.getBoundingClientRect();
+        const endTimeRect = scheduleEndTime.getBoundingClientRect();
+        const timeFieldsPolished = startTimeRect.height >= 46
+          && Math.abs(startTimeRect.height - endTimeRect.height) <= 1
+          && parseFloat(getComputedStyle(scheduleStartTime).borderRadius) >= 12
+          && getComputedStyle(scheduleStartTime).fontVariantNumeric.includes('tabular-nums');
         document.getElementById('scheduleRepeatDailyInput').checked = true;
         scheduleTitle.value = '明天上午八点去采样，下午五点去洗澡';
         scheduleTitle.dispatchEvent(new Event('input', { bubbles: true }));
@@ -758,6 +772,9 @@ app.whenReady().then(async () => {
           multiPreview,
           multiSaved: document.body.dataset.savedScheduleCount === '2',
           dailyRepeatSaved: JSON.parse(document.body.dataset.lastSavedSchedule || '{}').repeat === 'daily',
+          endFollowsStart,
+          endWrapsMidnight,
+          timeFieldsPolished,
           draftClearedAfterSave: !localStorage.getItem('yanji.scheduleDraft.v1'),
           modalScrollbarHidden,
           allDayCompact,
@@ -770,7 +787,7 @@ app.whenReady().then(async () => {
         return result;
       })()
     `);
-    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || !scheduleResult.directionalAnimationRunning || !scheduleResult.directionalDateChange || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.dailyRepeatSaved || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || !scheduleResult.directionalAnimationRunning || !scheduleResult.directionalDateChange || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.dailyRepeatSaved || !scheduleResult.endFollowsStart || !scheduleResult.endWrapsMidnight || !scheduleResult.timeFieldsPolished || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
@@ -954,6 +971,13 @@ app.whenReady().then(async () => {
           return Math.abs(actualLeft - Number(bar.dataset.attendanceLeft)) <= .2
             && Math.abs(actualWidth - Number(bar.dataset.attendanceWidth)) <= .2;
         });
+        const midnightBar = [...document.querySelectorAll('#attendanceGanttRows .attendance-bar')]
+          .find((bar) => bar.textContent.includes('18:00–24:00'));
+        const midnightReachesDayEnd = Boolean(midnightBar) && (() => {
+          const track = midnightBar.parentElement.getBoundingClientRect();
+          const rect = midnightBar.getBoundingClientRect();
+          return Math.abs(rect.right - track.right) <= 2 && Number(midnightBar.dataset.attendanceWidth) >= 24.9;
+        })();
         return {
           pageVisible: !document.querySelector('[data-page="attendance"]').hidden,
           attendanceEntering,
@@ -962,6 +986,7 @@ app.whenReady().then(async () => {
           ganttRows: document.querySelectorAll('#attendanceGanttRows .attendance-gantt-row').length,
           ganttBars: document.querySelectorAll('#attendanceGanttRows .attendance-bar').length,
           ganttScaleAccurate,
+          midnightReachesDayEnd,
           appRows: document.querySelectorAll('#focusUsageList .focus-usage-row').length,
           usageWidths: [...document.querySelectorAll('#focusUsageList .focus-usage-row i')].map((item) => Math.round(item.getBoundingClientRect().width)),
           usageColors: [...document.querySelectorAll('#focusUsageList .focus-usage-row i')].map((item) => getComputedStyle(item).backgroundImage),
@@ -973,7 +998,7 @@ app.whenReady().then(async () => {
     const usageWidthsAreProportional = usagePixelWidths.length < 2
       || Math.max(...usagePixelWidths) - Math.min(...usagePixelWidths) >= 8;
     const usageColorsAreDistinct = attendanceResult.usageColors.length < 2 || new Set(attendanceResult.usageColors).size > 1;
-    if (!attendanceResult.pageVisible || !attendanceResult.attendanceEntering || !attendanceResult.ganttGrowRunning || !attendanceResult.usageGrowRunning || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 2 || !attendanceResult.ganttScaleAccurate || attendanceResult.appRows < 1 || !usageWidthsAreProportional || !usageColorsAreDistinct || attendanceResult.horizontalOverflow) {
+    if (!attendanceResult.pageVisible || !attendanceResult.attendanceEntering || !attendanceResult.ganttGrowRunning || !attendanceResult.usageGrowRunning || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 3 || !attendanceResult.ganttScaleAccurate || !attendanceResult.midnightReachesDayEnd || attendanceResult.appRows < 1 || !usageWidthsAreProportional || !usageColorsAreDistinct || attendanceResult.horizontalOverflow) {
       throw new Error(`Workbench attendance smoke failed: ${JSON.stringify(attendanceResult)}`);
     }
     console.log(`WORKBENCH_ATTENDANCE_OK ${JSON.stringify(attendanceResult)}`);
@@ -1096,7 +1121,7 @@ app.whenReady().then(async () => {
           row.querySelector('.job-company-cell')
           && row.querySelector('.job-type-cell')
           && row.querySelector('.job-city-cell')
-          && row.querySelector('.job-deadline-cell')
+          && row.querySelector('.job-salary-cell')
           && row.querySelector('[data-job-field="status"]')
           && row.querySelector('[data-job-field="priority"]')
           && !row.querySelector('[data-job-field="nextFollowUpAt"]')
@@ -1127,11 +1152,19 @@ app.whenReady().then(async () => {
           return [first ? Math.round(first.left + first.width / 2) : null, last ? Math.round(last.left + last.width / 2) : null];
         });
         const alignedEndpoints = endpointPairs.length > 0 && endpointPairs.every(([first, last]) => Math.abs(first - endpointPairs[0][0]) <= 1 && Math.abs(last - endpointPairs[0][1]) <= 1);
-        const noLegacyStatusOptions = !document.querySelector('#jobBoard option[value="submitted"], #jobBoard option[value="written-1"], #jobBoard option[value="interview"], #jobBoard option[value="offer"]');
+        const noLegacyStatusOptions = [...document.querySelectorAll('#jobBoard [data-job-field="status"]')].every((select) => (
+          select.options.length === 2
+          && !select.querySelector('option[value="preparing"], option[value="paused"]')
+        ));
         const metricIds = ['jobTotalJobs', 'jobTodayAdded', 'jobTodayApplied', 'jobAwaitingReview', 'jobDueSoon', 'jobInProgress'];
         const metricsRendered = metricIds.every((id) => document.getElementById(id)?.textContent !== '');
         const metricsCompact = [...document.querySelectorAll('.job-summary-grid article')].every((card) => card.firstElementChild?.matches('strong') && card.querySelector('span'));
-        const headerColumns = document.querySelectorAll('.job-table-head > span').length === 9;
+        const headerColumns = document.querySelectorAll('.job-table-head > span').length === 8
+          && document.querySelector('.job-table-head > span:nth-child(4)')?.textContent === '预估年薪';
+        const labeledFilters = document.querySelector('#jobStatusFilter option[value="all"]')?.textContent === '状态：不限'
+          && document.querySelector('#jobPriorityFilter option[value="all"]')?.textContent === '优先级：不限'
+          && document.querySelector('#jobCityFilter option[value="all"]')?.textContent === '城市：不限';
+        const gearIcon = (document.querySelector('#jobSettingsButton path')?.getAttribute('d') || '').includes('12.2 2h-.4');
         const quickFiltersRendered = document.querySelectorAll('#jobQuickFilters [data-job-quick-filter]').length >= 10;
         const headerCreateOnly = Boolean(document.getElementById('addJobButton')) && !document.querySelector('#jobBoard [data-add-job]');
         rows[0]?.querySelector('[data-edit-job]')?.click();
@@ -1147,15 +1180,16 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 80));
         const added = document.querySelectorAll('#jobBoard .job-position').length === initialRows + 1;
         const inlineStatus = document.querySelector('[data-job-id="job-submitted-1"][data-job-field="status"]');
-        inlineStatus.value = 'paused';
+        inlineStatus.value = 'closed';
         inlineStatus.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 100));
-        const inlineSaved = document.querySelector('[data-job-id="job-submitted-1"][data-job-field="status"]')?.value === 'paused';
+        const inlineSaved = document.querySelector('[data-job-id="job-submitted-1"][data-job-field="status"]')?.value === 'closed';
         const statusFilter = document.getElementById('jobStatusFilter');
-        statusFilter.value = 'paused';
+        statusFilter.value = 'closed';
         statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 35));
-        const filterWorks = document.querySelectorAll('#jobBoard .job-position').length === 1;
+        const filteredRows = [...document.querySelectorAll('#jobBoard .job-position')];
+        const filterWorks = filteredRows.length >= 1 && filteredRows.every((row) => row.querySelector('[data-job-field="status"]')?.value === 'closed');
         statusFilter.value = 'all';
         statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 35));
@@ -1220,6 +1254,8 @@ app.whenReady().then(async () => {
           metricsRendered,
           metricsCompact,
           headerColumns,
+          labeledFilters,
+          gearIcon,
           quickFiltersRendered,
           headerCreateOnly,
           detailEditorOpens,
@@ -1237,7 +1273,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.identicalBroadcastKeepsRows || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.identicalBroadcastKeepsRows || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.labeledFilters || !jobsResult.gearIcon || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);

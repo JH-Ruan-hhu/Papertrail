@@ -99,3 +99,34 @@ test('rejects incomplete records, unsupported URLs and missing deletes', () => {
   assert.throws(() => saveJobApplication([], { company: '公司', role: '工程师', annualSalaryWan: '-1' }), /预估年薪/);
   assert.throws(() => deleteJobApplication([], 'missing'), /找不到/);
 });
+
+test('keeps salary, workflow and legacy compatibility through a JSON export/import round trip', () => {
+  const original = normalizeJobApplication({
+    id: 'job-export-1',
+    company: '水环境公司',
+    role: '研发工程师',
+    companyType: '科技公司',
+    city: '上海',
+    deadline: '2026-12-31',
+    status: 'active',
+    priority: 'high',
+    annualSalaryWan: 38.6,
+    notes: '等待面试',
+    workflow: {
+      stages: [{ id: 'apply', name: '投递' }, { id: 'interview', name: '一面' }],
+      currentStageId: 'interview',
+      timeline: [{ stageId: 'apply', date: '2026-08-30' }]
+    },
+    createdAt: '2026-08-30T00:00:00.000Z'
+  });
+  const exported = JSON.stringify({
+    format: 'papertrail-job-applications',
+    version: 1,
+    jobApplications: [original]
+  });
+  const imported = normalizeJobApplication(JSON.parse(exported).jobApplications[0]);
+  assert.equal(imported.annualSalaryWan, 38.6);
+  assert.equal(imported.status, 'active');
+  assert.equal(imported.deadline, original.deadline);
+  assert.deepEqual(imported.workflow, original.workflow);
+});

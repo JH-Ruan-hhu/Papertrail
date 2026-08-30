@@ -54,9 +54,7 @@ const DAILY_PLAN_KEY = 'yanji.dailyPlanShown.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
 const jobPriorityRanks = Object.freeze({ high: 0, medium: 1, low: 2 });
 const JOB_LIFECYCLE_OPTIONS = Object.freeze([
-  ['preparing', '准备中'],
   ['active', '进行中'],
-  ['paused', '暂停'],
   ['closed', '已结束']
 ]);
 const JOB_PRIORITY_OPTIONS = Object.freeze([
@@ -555,6 +553,7 @@ function sortJobs(jobs) {
     if (wb.jobSort === 'company') comparison = textValue(left).localeCompare(textValue(right), 'zh-CN');
     else if (wb.jobSort === 'createdAt') comparison = dateValue(left.createdAt) - dateValue(right.createdAt);
     else if (wb.jobSort === 'deadline') comparison = dateValue(left.deadline) - dateValue(right.deadline);
+    else if (wb.jobSort === 'annualSalaryWan') comparison = Number(left.annualSalaryWan || 0) - Number(right.annualSalaryWan || 0);
     else if (wb.jobSort === 'nextFollowUpAt') comparison = dateValue(left.nextFollowUpAt) - dateValue(right.nextFollowUpAt);
     else comparison = dateValue(left.updatedAt) - dateValue(right.updatedAt);
     return comparison ? comparison * direction : textValue(left).localeCompare(textValue(right), 'zh-CN');
@@ -567,7 +566,7 @@ function renderHomeJobs() {
   if (!container) return;
   const jobs = wb.workspace.jobApplications || [];
   if (!jobs.length) {
-    container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="preparing" type="button">添加第一个岗位</button></div>';
+    container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="active" type="button">添加第一个岗位</button></div>';
     return;
   }
   const counts = jobFunnelCounts(jobs);
@@ -587,7 +586,7 @@ function renderJobCityFilter(jobs) {
   if (!select) return;
   const current = select.value;
   const cities = [...new Set(jobs.map((job) => job.city || job.location).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'zh-CN'));
-  select.innerHTML = `<option value="all">（不限）</option>${cities.map((city) => `<option value="${wbEscape(city)}">${wbEscape(city)}</option>`).join('')}`;
+  select.innerHTML = `<option value="all">城市：不限</option>${cities.map((city) => `<option value="${wbEscape(city)}">${wbEscape(city)}</option>`).join('')}`;
   select.value = cities.includes(current) ? current : 'all';
 }
 
@@ -606,7 +605,8 @@ function jobWorkflowTrackHtml(job) {
 }
 
 function jobStatusOptions(selected) {
-  return JOB_LIFECYCLE_OPTIONS.map(([status, label]) => `<option value="${status}"${selected === status ? ' selected' : ''}>${label}</option>`).join('');
+  const visibleStatus = selected === 'closed' ? 'closed' : 'active';
+  return JOB_LIFECYCLE_OPTIONS.map(([status, label]) => `<option value="${status}"${visibleStatus === status ? ' selected' : ''}>${label}</option>`).join('');
 }
 
 function jobPriorityOptions(selected) {
@@ -615,10 +615,9 @@ function jobPriorityOptions(selected) {
 
 function jobRowHtml(job) {
   const city = job.city || job.location || '';
-  const deadline = job.deadline ? jobDateLabel(job.deadline, { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—';
-  const deadlineClass = jobDateWithinNextDays(job.deadline, new Date(), 7) ? ' is-soon' : (Date.parse(job.deadline) < Date.now() ? ' is-overdue' : '');
+  const salary = Number(job.annualSalaryWan) > 0 ? `${Number(job.annualSalaryWan).toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 万` : '—';
   const currentStage = jobCurrentStage(job);
-  return `<article class="job-position job-row-status-${wbEscape(job.status)}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div></div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
+  return `<article class="job-position job-row-status-${wbEscape(job.status)}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div></div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-salary-cell">${salary}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
 }
 
 function renderJobs() {
@@ -635,7 +634,7 @@ function renderJobs() {
   const todayApplied = jobs.filter((job) => sameDay(job.appliedAt, now)).length;
   const awaitingReview = jobs.filter((job) => job.status === 'preparing').length;
   const dueSoon = jobs.filter((job) => jobDateWithinNextDays(job.deadline, now, 7)).length;
-  const inProgress = jobs.filter((job) => job.status === 'active').length;
+  const inProgress = jobs.filter((job) => job.status !== 'closed').length;
   document.getElementById('jobTotalJobs').textContent = String(jobs.length);
   document.getElementById('jobTodayAdded').textContent = String(todayAdded);
   document.getElementById('jobTodayApplied').textContent = String(todayApplied);
@@ -646,7 +645,7 @@ function renderJobs() {
 
   const visible = sortJobs(jobs.filter((job) => {
     const searchable = `${job.company} ${job.role} ${job.companyType || ''} ${job.city || job.location || ''} ${job.contact || ''} ${job.notes || ''} ${jobCurrentStage(job)?.name || ''}`.toLowerCase();
-    return (statusFilter === 'all' || job.status === statusFilter)
+    return (statusFilter === 'all' || (statusFilter === 'active' ? job.status !== 'closed' : job.status === 'closed'))
       && (priorityFilter === 'all' || job.priority === priorityFilter)
       && (cityFilter === 'all' || (job.city || job.location || '') === cityFilter)
       && (wb.jobQuickFilter === 'all' || jobMatchesQuickFilter(job, wb.jobQuickFilter, now))
@@ -656,7 +655,7 @@ function renderJobs() {
   document.getElementById('jobSortDirectionButton').textContent = wb.jobSortDirection === 'asc' ? '↑ 升序' : '↓ 降序';
   document.getElementById('jobBoard').innerHTML = visible.length
     ? visible.map(jobRowHtml).join('')
-    : `<div class="job-list-empty"><span>${jobs.length ? '⌕' : '＋'}</span><strong>${jobs.length ? '没有符合条件的岗位' : '还没有岗位记录'}</strong><p>${jobs.length ? '试试清空搜索或调整筛选条件。' : '添加第一条岗位，开始记录每一次机会。'}</p>${jobs.length ? '' : '<button class="button secondary" data-add-job="preparing" type="button">添加岗位</button>'}</div>`;
+    : `<div class="job-list-empty"><span>${jobs.length ? '⌕' : '＋'}</span><strong>${jobs.length ? '没有符合条件的岗位' : '还没有岗位记录'}</strong><p>${jobs.length ? '试试清空搜索或调整筛选条件。' : '添加第一条岗位，开始记录每一次机会。'}</p>${jobs.length ? '' : '<button class="button secondary" data-add-job="active" type="button">添加岗位</button>'}</div>`;
   window.YanjiMotion?.animateJobList(document.getElementById('jobBoard'));
 }
 
@@ -709,7 +708,7 @@ function readWorkflowEditor() {
   return workflow;
 }
 
-function openJobEditor(job = null, initialStatus = 'preparing') {
+function openJobEditor(job = null, initialStatus = 'active') {
   const dialog = document.getElementById('jobDialog');
   document.getElementById('jobForm').reset();
   document.getElementById('jobId').value = job?.id || '';
@@ -718,7 +717,7 @@ function openJobEditor(job = null, initialStatus = 'preparing') {
   document.getElementById('jobRole').value = job?.role || '';
   document.getElementById('jobCompanyType').value = job?.companyType || '';
   document.getElementById('jobCity').value = job?.city || job?.location || '';
-  dialog.dataset.initialStatus = JOB_LIFECYCLE_OPTIONS.some(([status]) => status === initialStatus) ? initialStatus : 'preparing';
+  dialog.dataset.initialStatus = initialStatus === 'closed' ? 'closed' : 'active';
   document.getElementById('jobPriority').value = job?.priority || 'medium';
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobAppliedAt').value = localDateInputValue(job?.appliedAt);
@@ -748,7 +747,7 @@ async function saveJobFromEditor() {
     location: city,
     deadline: existing?.deadline || null,
     priority: document.getElementById('jobPriority').value,
-    status: existing?.status || document.getElementById('jobDialog').dataset.initialStatus || 'preparing',
+    status: existing?.status === 'closed' ? 'closed' : (document.getElementById('jobDialog').dataset.initialStatus || 'active'),
     annualSalaryWan: document.getElementById('jobAnnualSalaryWan').value,
     appliedAt: dateInputToIso(document.getElementById('jobAppliedAt').value),
     nextFollowUpAt,
@@ -1029,14 +1028,20 @@ function renderAttendance() {
     const dateKey = localDateKey(date);
     const records = weekRecords.filter((item) => item.date === dateKey).sort((a, b) => Date.parse(a.clockInAt) - Date.parse(b.clockInAt));
     const isToday = dateKey === localDateKey(new Date());
+    const rowDayStart = new Date(date);
+    rowDayStart.setHours(0, 0, 0, 0);
+    const rowDayEnd = addDays(rowDayStart, 1);
     const bars = records.map((record, recordIndex) => {
       const start = new Date(record.clockInAt);
       const end = record.clockOutAt ? new Date(record.clockOutAt) : (isToday ? new Date() : new Date(start));
       const startMinutes = start.getHours() * 60 + start.getMinutes();
-      const endMinutes = record.clockOutAt || isToday ? Math.max(startMinutes + 8, Math.min(1440, end.getHours() * 60 + end.getMinutes())) : startMinutes + 8;
+      const endTimestamp = end.getTime();
+      const endMinutesOnClock = endTimestamp >= rowDayEnd.getTime() ? 1440 : end.getHours() * 60 + end.getMinutes();
+      const endMinutes = record.clockOutAt || isToday ? Math.max(startMinutes + 8, Math.min(1440, endMinutesOnClock)) : startMinutes + 8;
       const left = startMinutes / 1440 * 100;
       const width = Math.max(.6, (endMinutes - startMinutes) / 1440 * 100);
-      const label = record.clockOutAt ? `${formatTime(record.clockInAt)}–${formatTime(record.clockOutAt)}` : `${formatTime(record.clockInAt)}–进行中`;
+      const endLabel = endTimestamp >= rowDayEnd.getTime() ? '24:00' : formatTime(record.clockOutAt);
+      const label = record.clockOutAt ? `${formatTime(record.clockInAt)}–${endLabel}` : `${formatTime(record.clockInAt)}–进行中`;
       return `<button class="attendance-bar ${record.clockOutAt ? '' : 'open'}" data-attendance-left="${left}" data-attendance-width="${width}" data-attendance-top="${8 + recordIndex * 25}" data-edit-attendance="${wbEscape(record.id)}" type="button"><span>${label}</span></button>`;
     }).join('');
     return `<div class="attendance-gantt-row ${isToday ? 'today' : ''}" data-attendance-row-height="${Math.max(56, 16 + records.length * 25)}"><div class="attendance-day"><strong>${weekday[index]}</strong><small>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}${records.length > 1 ? ` · ${records.length} 段` : ''}</small></div><div class="attendance-row-track">${Array.from({ length: 8 }, () => '<i></i>').join('')}${bars}</div></div>`;
@@ -1317,6 +1322,13 @@ function openScheduleConvertDialog(schedule) {
 function closeScheduleConvertDialog() {
   const dialog = document.getElementById('scheduleConvertDialog');
   if (dialog.open) closeWorkbenchDialog(dialog);
+}
+
+function scheduleEndTimeAfterStart(startTime, minutes = 10) {
+  const match = /^(\d{2}):(\d{2})$/.exec(String(startTime || ''));
+  if (!match) return '';
+  const total = (Number(match[1]) * 60 + Number(match[2]) + minutes) % 1440;
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
 async function saveScheduleConversion() {
@@ -2104,6 +2116,10 @@ function bindWorkbenchEvents() {
     openScheduleEditor(null, null, { convertTodoId: todoId });
   });
   document.getElementById('scheduleAllDayInput').addEventListener('change', (event) => document.querySelectorAll('.schedule-time-field').forEach((field) => field.classList.toggle('is-hidden', event.target.checked)));
+  document.getElementById('scheduleStartTime').addEventListener('input', (event) => {
+    const endTime = scheduleEndTimeAfterStart(event.target.value);
+    if (endTime) document.getElementById('scheduleEndTime').value = endTime;
+  });
   document.getElementById('scheduleDetachTodoButton').addEventListener('click', async () => {
     const id = document.getElementById('scheduleId').value;
     if (!id) return;

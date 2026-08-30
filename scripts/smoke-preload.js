@@ -4,6 +4,12 @@ const { contextBridge } = require('electron');
 
 const now = Date.now();
 const todayAt = (hour, minute = 0) => new Date(new Date().setHours(hour, minute, 0, 0)).toISOString();
+const tomorrowAt = (hour, minute = 0) => {
+  const value = new Date();
+  value.setDate(value.getDate() + 1);
+  value.setHours(hour, minute, 0, 0);
+  return value.toISOString();
+};
 const todayKey = new Date().toLocaleDateString('en-CA');
 const smokeWorkflow = (prefix, names, currentIndex, dates = {}) => {
   const stages = names.map((name, index) => ({ id: `${prefix}-${index + 1}`, name }));
@@ -206,7 +212,8 @@ let smokeWorkspace = {
   metadataFields: [{ id: 'topic', name: '类型', type: 'select', options: ['实验', '文献', '写作'] }],
   attendance: [
     { id: 'attendance-morning', date: todayKey, clockInAt: todayAt(8, 45), clockOutAt: todayAt(12, 5), appUsage: { WINWORD: 1620, chrome: 840 }, createdAt: todayAt(8, 45), updatedAt: todayAt(12, 5) },
-    { id: 'attendance-afternoon', date: todayKey, clockInAt: todayAt(13, 20), clockOutAt: todayAt(17, 35), appUsage: { Zotero: 1320, WINWORD: 780 }, createdAt: todayAt(13, 20), updatedAt: todayAt(17, 35) }
+    { id: 'attendance-afternoon', date: todayKey, clockInAt: todayAt(13, 20), clockOutAt: todayAt(17, 35), appUsage: { Zotero: 1320, WINWORD: 780 }, createdAt: todayAt(13, 20), updatedAt: todayAt(17, 35) },
+    { id: 'attendance-midnight', date: todayKey, clockInAt: todayAt(18, 0), clockOutAt: tomorrowAt(0, 0), appUsage: { WINWORD: 5400 }, createdAt: todayAt(18, 0), updatedAt: tomorrowAt(0, 0) }
   ],
   focusSessions: [
     { id: 'focus-today', startedAt: todayAt(10, 0), endedAt: todayAt(10, 50), plannedMinutes: 50, status: 'completed', appUsage: { WINWORD: 1260, chrome: 980, Zotero: 510 }, suppressNotifications: true, notificationsSuppressed: true, notificationRestore: null, notificationRestoredAt: todayAt(10, 50), notificationError: null, createdAt: todayAt(10, 0), updatedAt: todayAt(10, 50) }
