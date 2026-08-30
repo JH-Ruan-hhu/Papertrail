@@ -6,6 +6,7 @@ const {
   DEFAULT_WORKFLOW_STAGES,
   JOB_LIFECYCLE_STATUSES,
   deleteJobApplication,
+  mergeImportedJobApplications,
   moveWorkflowStage,
   normalizeJobApplication,
   removeWorkflowStage,
@@ -129,4 +130,40 @@ test('keeps salary, workflow and legacy compatibility through a JSON export/impo
   assert.equal(imported.status, 'active');
   assert.equal(imported.deadline, original.deadline);
   assert.deepEqual(imported.workflow, original.workflow);
+});
+
+test('merges exported jobs by stable id without duplicating repeated imports', () => {
+  const local = normalizeJobApplication({
+    id: 'local-only', company: '本地公司', role: '本地岗位', status: 'active',
+    createdAt: '2026-08-30T01:00:00.000Z', updatedAt: '2026-08-30T01:00:00.000Z'
+  });
+  const exported = {
+    id: 'remote-stable-id', company: '异地公司', role: '研发岗位', status: 'active',
+    annualSalaryWan: 36, createdAt: '2026-08-30T02:00:00.000Z', updatedAt: '2026-08-30T02:00:00.000Z'
+  };
+  const first = mergeImportedJobApplications([local], [exported], '2026-08-30T03:00:00.000Z', () => 'generated-id');
+  assert.deepEqual({ added: first.added, updated: first.updated, skipped: first.skipped }, { added: 1, updated: 0, skipped: 0 });
+  assert.equal(first.jobs.find((job) => job.company === '异地公司').id, 'remote-stable-id');
+  assert.ok(first.jobs.some((job) => job.id === 'local-only'));
+  const repeated = mergeImportedJobApplications(first.jobs, [exported], '2026-08-30T04:00:00.000Z', () => 'unused-id');
+  assert.deepEqual({ added: repeated.added, updated: repeated.updated, skipped: repeated.skipped }, { added: 0, updated: 0, skipped: 1 });
+  assert.equal(repeated.jobs.filter((job) => job.id === 'remote-stable-id').length, 1);
+});
+
+test('updates only newer imported jobs and keeps newer local edits', () => {
+  const local = normalizeJobApplication({
+    id: 'shared-id', company: '公司', role: '本地新岗位', status: 'active', revision: 3,
+    createdAt: '2026-08-30T01:00:00.000Z', updatedAt: '2026-08-30T05:00:00.000Z'
+  });
+  const older = mergeImportedJobApplications([local], [{
+    ...local, role: '旧导出岗位', revision: 2, updatedAt: '2026-08-30T04:00:00.000Z'
+  }], '2026-08-30T06:00:00.000Z');
+  assert.equal(older.jobs[0].role, '本地新岗位');
+  assert.equal(older.skipped, 1);
+  const newer = mergeImportedJobApplications([local], [{
+    ...local, role: '异地更新岗位', revision: 4, updatedAt: '2026-08-30T06:00:00.000Z'
+  }], '2026-08-30T07:00:00.000Z');
+  assert.equal(newer.jobs[0].role, '异地更新岗位');
+  assert.equal(newer.updated, 1);
+  assert.equal(newer.jobs[0].id, 'shared-id');
 });

@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   deleteJobApplication: (id) => ipcRenderer.invoke('jobs:delete', id),
   importJobApplications: () => ipcRenderer.invoke('jobs:import'),
   exportJobApplications: () => ipcRenderer.invoke('jobs:export'),
+  exportJobApplicationImages: () => ipcRenderer.invoke('jobs:export-image'),
   saveMetadataFields: (fields) => ipcRenderer.invoke('metadata:save-fields', fields),
   clockAttendance: (action) => ipcRenderer.invoke('attendance:clock', action),
   saveAttendance: (input) => ipcRenderer.invoke('attendance:save', input),

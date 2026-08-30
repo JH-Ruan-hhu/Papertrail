@@ -230,6 +230,54 @@ function deleteJobApplication(list, id) {
   return list.filter((item) => item.id !== target.id);
 }
 
+function comparableImportedJob(job) {
+  const { imported: _imported, ...comparable } = job;
+  return JSON.stringify(comparable);
+}
+
+function mergeImportedJobApplications(list, sourceList, now = new Date().toISOString(), makeId = () => `job-${Date.now()}`) {
+  if (!Array.isArray(list) || !Array.isArray(sourceList)) throw new Error('岗位导入数据格式不正确。');
+  let jobs = [...list];
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
+  sourceList.forEach((source, index) => {
+    if (!asObject(source)) throw new Error(`第 ${index + 1} 条求职记录格式无效。`);
+    const sourceId = cleanText(source.id, 200);
+    const incoming = normalizeJobApplication({
+      ...source,
+      id: sourceId || makeId(),
+      imported: true
+    }, index, now);
+    const existingIndex = jobs.findIndex((candidate) => candidate.id === incoming.id);
+    if (existingIndex < 0) {
+      jobs.push(incoming);
+      added += 1;
+      return;
+    }
+    const existing = normalizeJobApplication(jobs[existingIndex], existingIndex, now);
+    if (comparableImportedJob(existing) === comparableImportedJob(incoming)) {
+      skipped += 1;
+      return;
+    }
+    const incomingUpdatedAt = Date.parse(incoming.updatedAt);
+    const existingUpdatedAt = Date.parse(existing.updatedAt);
+    const incomingIsNewer = incomingUpdatedAt > existingUpdatedAt
+      || (incomingUpdatedAt === existingUpdatedAt && incoming.revision > existing.revision);
+    if (!incomingIsNewer) {
+      skipped += 1;
+      return;
+    }
+    jobs[existingIndex] = {
+      ...incoming,
+      id: existing.id,
+      revision: Math.max(existing.revision, incoming.revision)
+    };
+    updated += 1;
+  });
+  return { jobs, added, updated, skipped, count: sourceList.length };
+}
+
 function workflowStageIndex(workflow, stageId) {
   const stages = Array.isArray(workflow?.stages) ? workflow.stages : [];
   const index = stages.findIndex((stage) => stage.id === stageId);
@@ -292,6 +340,7 @@ module.exports = {
   defaultWorkflow,
   normalizeWorkflow,
   normalizeJobApplication,
+  mergeImportedJobApplications,
   saveJobApplication,
   deleteJobApplication,
   workflowStageIndex,

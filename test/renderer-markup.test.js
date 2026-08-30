@@ -458,10 +458,15 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(indexHtml, /id="addJobButton"/);
   assert.match(indexHtml, /id="importJobsButton"/);
   assert.match(indexHtml, /id="exportJobsButton"/);
+  assert.match(indexHtml, /id="exportJobsImageButton"/);
+  assert.match(indexHtml, /id="exportJobsButton"[^>]*>导出数据<\/button>/);
+  assert.match(indexHtml, /id="exportJobsImageButton"[^>]*>导出图片<\/button>/);
   assert.match(mainJs, /ipcMain\.handle\('jobs:import'/);
   assert.match(mainJs, /ipcMain\.handle\('jobs:export'/);
+  assert.match(mainJs, /ipcMain\.handle\('jobs:export-image'/);
   assert.match(preloadJs, /importJobApplications/);
   assert.match(preloadJs, /exportJobApplications/);
+  assert.match(preloadJs, /exportJobApplicationImages/);
   assert.match(indexHtml, /id="dailyPlanDialog"/);
   assert.match(workbenchJs, /function maybeShowDailyPlan\(\)/);
   assert.match(workbenchJs, /localStorage\.setItem\(DAILY_PLAN_KEY, todayKey\)/);

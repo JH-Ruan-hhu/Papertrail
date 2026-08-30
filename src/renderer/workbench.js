@@ -822,7 +822,7 @@ async function importJobRecords() {
     wb.workspace.jobApplications = result.jobApplications || wb.workspace.jobApplications;
     renderHome();
     renderJobs();
-    showWorkbenchToast(`已导入 ${result.count || 0} 个岗位`);
+    showWorkbenchToast(`导入完成：新增 ${result.added || 0}，更新 ${result.updated || 0}，跳过 ${result.skipped || 0}`);
   } catch (exception) {
     showWorkbenchToast(exception.message || '岗位导入失败。', 'error');
   }
@@ -831,9 +831,18 @@ async function importJobRecords() {
 async function exportJobRecords() {
   try {
     const result = await workbenchApi.exportJobApplications();
-    if (!result?.canceled) showWorkbenchToast(`已导出 ${result.count || 0} 个岗位及手机预览图片`);
+    if (!result?.canceled) showWorkbenchToast(`已导出 ${result.count || 0} 个岗位数据`);
   } catch (exception) {
-    showWorkbenchToast(exception.message || '岗位导出失败。', 'error');
+    showWorkbenchToast(exception.message || '岗位数据导出失败。', 'error');
+  }
+}
+
+async function exportJobImages() {
+  try {
+    const result = await workbenchApi.exportJobApplicationImages();
+    if (!result?.canceled) showWorkbenchToast(`已导出 ${result.imagePaths?.length || 0} 张岗位图片`);
+  } catch (exception) {
+    showWorkbenchToast(exception.message || '岗位图片导出失败。', 'error');
   }
 }
 
@@ -2070,6 +2079,7 @@ function bindWorkbenchEvents() {
   document.getElementById('deleteJobButton').addEventListener('click', () => deleteJobById(document.getElementById('jobId').value));
   document.getElementById('importJobsButton').addEventListener('click', importJobRecords);
   document.getElementById('exportJobsButton').addEventListener('click', exportJobRecords);
+  document.getElementById('exportJobsImageButton').addEventListener('click', exportJobImages);
   document.getElementById('jobSettingsButton').addEventListener('click', () => switchWorkbenchPage('settings'));
   document.getElementById('resetJobWorkflowButton').addEventListener('click', () => {
     wb.editingJobWorkflow = defaultJobWorkflow();

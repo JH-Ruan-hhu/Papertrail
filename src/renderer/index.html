@@ -217,7 +217,8 @@
               <div class="job-table-actions">
                 <button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 新增岗位</button>
                 <button class="button secondary" id="importJobsButton" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4M5 14v5h14v-5"/></svg> 导入岗位</button>
-                <button class="button text-button job-export-button" id="exportJobsButton" type="button">导出 / 备份</button>
+                <button class="button text-button job-export-button" id="exportJobsButton" type="button">导出数据</button>
+                <button class="button text-button job-export-button" id="exportJobsImageButton" type="button">导出图片</button>
                 <button class="button icon-button" id="jobSettingsButton" type="button" aria-label="打开求职设置"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/></svg></button>
               </div>
             </div>
@@ -263,7 +264,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.4.10</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.4.11</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -400,7 +401,7 @@
                   <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button primary" id="updateActionButton" type="button">检查更新</button></div>
                 </div>
                 <div class="update-version-overview" aria-label="版本信息">
-                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.4.10</span></strong><small>正在使用</small></div>
+                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.4.11</span></strong><small>正在使用</small></div>
                   <span class="update-version-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
                   <div class="update-version-card target"><span>可用版本</span><strong id="updateTargetVersion">等待检查</strong><small>来自 GitHub Release</small></div>
                 </div>
@@ -432,7 +433,7 @@
           <button class="close-button update-prompt-close" id="closeUpdatePromptButton" type="button" aria-label="稍后处理更新">关闭</button>
         </div>
         <div class="update-prompt-version" aria-label="更新版本">
-          <div><small>当前版本</small><strong>v<span id="updatePromptCurrentVersion">1.4.10</span></strong></div>
+          <div><small>当前版本</small><strong>v<span id="updatePromptCurrentVersion">1.4.11</span></strong></div>
           <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
           <div class="target"><small>可用版本</small><strong id="updatePromptLatestVersion">等待检查</strong></div>
         </div>

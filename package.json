@@ -1,6 +1,6 @@
 {
   "name": "papertrail-desktop",
-  "version": "1.4.10",
+  "version": "1.4.11",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "Yanji contributors",

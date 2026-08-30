@@ -1165,6 +1165,8 @@ app.whenReady().then(async () => {
           && document.querySelector('#jobPriorityFilter option[value="all"]')?.textContent === '优先级：不限'
           && document.querySelector('#jobCityFilter option[value="all"]')?.textContent === '城市：不限';
         const gearIcon = (document.querySelector('#jobSettingsButton path')?.getAttribute('d') || '').includes('12.2 2h-.4');
+        const separateExportButtons = document.getElementById('exportJobsButton')?.textContent.trim() === '导出数据'
+          && document.getElementById('exportJobsImageButton')?.textContent.trim() === '导出图片';
         const quickFiltersRendered = document.querySelectorAll('#jobQuickFilters [data-job-quick-filter]').length >= 10;
         const headerCreateOnly = Boolean(document.getElementById('addJobButton')) && !document.querySelector('#jobBoard [data-add-job]');
         rows[0]?.querySelector('[data-edit-job]')?.click();
@@ -1256,6 +1258,7 @@ app.whenReady().then(async () => {
           headerColumns,
           labeledFilters,
           gearIcon,
+          separateExportButtons,
           quickFiltersRendered,
           headerCreateOnly,
           detailEditorOpens,
@@ -1273,7 +1276,7 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.identicalBroadcastKeepsRows || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.labeledFilters || !jobsResult.gearIcon || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.identicalBroadcastKeepsRows || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.labeledFilters || !jobsResult.gearIcon || !jobsResult.separateExportButtons || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);

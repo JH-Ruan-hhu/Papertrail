@@ -341,6 +341,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   deleteJobApplication: async (id) => { smokeWorkspace.jobApplications = smokeWorkspace.jobApplications.filter((item) => item.id !== id); return true; },
   importJobApplications: async () => ({ canceled: true }),
   exportJobApplications: async () => ({ canceled: true }),
+  exportJobApplicationImages: async () => ({ canceled: true }),
   saveMetadataFields: async (fields) => fields,
   clockAttendance: async () => smokeWorkspace.attendance[0],
   saveAttendance: async (input) => input,

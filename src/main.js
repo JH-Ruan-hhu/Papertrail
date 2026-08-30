@@ -41,7 +41,7 @@ const { createPlanningService } = require('./planning-service');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
-const { deleteJobApplication, normalizeJobApplication, saveJobApplication } = require('./job-core');
+const { deleteJobApplication, mergeImportedJobApplications, normalizeJobApplication, saveJobApplication } = require('./job-core');
 const { resolveStableUserDataPath } = require('./user-data-path');
 const {
   parseTrackingInput,
@@ -1010,7 +1010,7 @@ function portableJobPreviewHtml(jobs, pageNumber, pageCount, exportedAt) {
     const salary = Number(job.annualSalaryWan) > 0 ? `${Number(job.annualSalaryWan).toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 万` : '—';
     return `<section class="row"><div class="primary"><strong>${portableJobHtml(job.company || '未命名单位')}</strong><span>${portableJobHtml(job.role || '未命名岗位')}</span></div><div>${portableJobHtml(job.companyType || '—')}</div><div>${portableJobHtml(job.city || job.location || '—')}</div><div>${portableJobHtml(salary)}</div><div>${portableJobHtml(statusLabels[job.status] || '进行中')}</div><div>${portableJobHtml(priorityLabels[job.priority] || job.priority || '—')}</div><div class="notes">${portableJobHtml(job.notes || '—')}</div><p>招聘流程：${portableJobHtml(currentStage)} · ${portableJobHtml(progress)}</p></section>`;
   }).join('');
-  return `<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}html,body{margin:0;width:1400px;overflow:hidden;background:#f3f6fb;color:#25324a;font-family:"Microsoft YaHei","Segoe UI",sans-serif}body{padding:38px}.sheet{overflow:hidden;background:#fff;border:1px solid #dfe6f0;border-radius:22px;box-shadow:0 16px 46px rgba(42,63,96,.1)}header{display:flex;align-items:end;justify-content:space-between;padding:28px 30px 22px;background:linear-gradient(120deg,#edf7fb,#f7f1fc)}h1{margin:0;font-size:28px}header p,footer{margin:7px 0 0;color:#738096;font-size:14px}.head,.row{display:grid;grid-template-columns:250px 140px 120px 145px 120px 90px minmax(250px,1fr);column-gap:12px;align-items:center}.head{min-height:48px;padding:0 30px;color:#64728a;background:#f8fafc;border-bottom:1px solid #e6ebf2;font-size:14px;font-weight:700;text-align:center}.head span:first-child{text-align:left}.row{position:relative;min-height:88px;padding:13px 30px 29px;border-bottom:1px solid #edf1f6;font-size:15px;text-align:center}.row:last-child{border-bottom:0}.primary,.notes{text-align:left}.primary strong,.primary span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.primary strong{font-size:18px}.primary span{margin-top:5px;color:#66758c}.notes{overflow:hidden;color:#526176;text-overflow:ellipsis;white-space:nowrap}.row p{position:absolute;left:30px;bottom:8px;margin:0;color:#6d7fa5;font-size:12px}footer{display:flex;justify-content:space-between;padding:15px 30px 19px;background:#fbfcfe}</style></head><body><main class="sheet"><header><div><h1>研迹 · 求职岗位</h1><p>${portableJobHtml(exportedAt)} 导出 · 共 ${jobs.length} 条（本页）</p></div><p>第 ${pageNumber}/${pageCount} 页</p></header><div class="head"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>状态</span><span>优先级</span><span>备注</span></div>${rows || '<div style="padding:70px;text-align:center;color:#8290a5">暂无岗位数据</div>'}<footer><span>手机可直接查看此 PNG 图片</span><span>完整可导入数据保存在同名 JSON 文件</span></footer></main></body></html>`;
+  return `<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}html,body{margin:0;width:1400px;overflow:hidden;background:#f3f6fb;color:#25324a;font-family:"Microsoft YaHei","Segoe UI",sans-serif}body{padding:38px}.sheet{overflow:hidden;background:#fff;border:1px solid #dfe6f0;border-radius:22px;box-shadow:0 16px 46px rgba(42,63,96,.1)}header{display:flex;align-items:end;justify-content:space-between;padding:28px 30px 22px;background:linear-gradient(120deg,#edf7fb,#f7f1fc)}h1{margin:0;font-size:28px}header p,footer{margin:7px 0 0;color:#738096;font-size:14px}.head,.row{display:grid;grid-template-columns:250px 140px 120px 145px 120px 90px minmax(250px,1fr);column-gap:12px;align-items:center}.head{min-height:48px;padding:0 30px;color:#64728a;background:#f8fafc;border-bottom:1px solid #e6ebf2;font-size:14px;font-weight:700;text-align:center}.head span:first-child{text-align:left}.row{position:relative;min-height:88px;padding:13px 30px 29px;border-bottom:1px solid #edf1f6;font-size:15px;text-align:center}.row:last-child{border-bottom:0}.primary,.notes{text-align:left}.primary strong,.primary span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.primary strong{font-size:18px}.primary span{margin-top:5px;color:#66758c}.notes{overflow:hidden;color:#526176;text-overflow:ellipsis;white-space:nowrap}.row p{position:absolute;left:30px;bottom:8px;margin:0;color:#6d7fa5;font-size:12px}footer{display:flex;justify-content:space-between;padding:15px 30px 19px;background:#fbfcfe}</style></head><body><main class="sheet"><header><div><h1>研迹 · 求职岗位</h1><p>${portableJobHtml(exportedAt)} 导出 · 共 ${jobs.length} 条（本页）</p></div><p>第 ${pageNumber}/${pageCount} 页</p></header><div class="head"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>状态</span><span>优先级</span><span>备注</span></div>${rows || '<div style="padding:70px;text-align:center;color:#8290a5">暂无岗位数据</div>'}<footer><span>手机可直接查看此 PNG 图片</span><span>迁移岗位时请单独导出 JSON 数据文件</span></footer></main></body></html>`;
 }
 
 async function exportPortableJobPreview(jobs, jsonFilePath, exportedAt) {
@@ -1040,7 +1040,7 @@ async function exportPortableJobPreview(jobs, jsonFilePath, exportedAt) {
       const image = await previewWindow.webContents.capturePage({ x: 0, y: 0, width: 1400, height: captureHeight });
       if (image.isEmpty()) throw new Error('岗位预览图片生成失败。');
       const suffix = pages.length > 1 ? `-${String(index + 1).padStart(2, '0')}` : '';
-      const imagePath = path.join(parsedPath.dir, `${parsedPath.name}-手机预览${suffix}.png`);
+      const imagePath = path.join(parsedPath.dir, `${parsedPath.name}${suffix}.png`);
       fs.writeFileSync(imagePath, image.toPNG());
       outputPaths.push(imagePath);
     } finally {
@@ -1069,28 +1069,26 @@ async function importWorkspaceJobApplications() {
   if (!sourceList) throw new Error('岗位文件需要包含岗位数组。');
   if (sourceList.length > 500) throw new Error('一次最多导入 500 条岗位记录。');
 
-  const now = new Date().toISOString();
-  const normalized = sourceList.map((item, index) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`第 ${index + 1} 条求职记录格式无效。`);
-    return normalizeJobApplication({ ...item, imported: true }, index, now);
-  });
-  let jobs = store.listJobApplications();
-  const backup = createManagedDataBackup(store.filePath);
-  for (const item of normalized) {
-    const existing = jobs.find((candidate) => candidate.id === item.id);
-    jobs = saveJobApplication(jobs, existing
-      ? { ...item, id: existing.id, revision: existing.revision }
-      : { ...item, id: undefined, revision: 0 }, now, () => crypto.randomUUID());
+  const merge = mergeImportedJobApplications(store.listJobApplications(), sourceList, new Date().toISOString(), () => crypto.randomUUID());
+  if (merge.added || merge.updated) {
+    const backup = createManagedDataBackup(store.filePath);
+    if (backup) writeStoragePointer(path.dirname(store.filePath), [...knownBackupFiles(), backup], store.filePath);
+    store.setJobApplications(merge.jobs);
   }
-  if (backup) writeStoragePointer(path.dirname(store.filePath), [...knownBackupFiles(), backup], store.filePath);
-  store.setJobApplications(jobs);
   const workspace = broadcastWorkspace();
-  return { canceled: false, count: normalized.length, jobApplications: workspace.jobApplications };
+  return {
+    canceled: false,
+    count: merge.count,
+    added: merge.added,
+    updated: merge.updated,
+    skipped: merge.skipped,
+    jobApplications: workspace.jobApplications
+  };
 }
 
-async function exportWorkspaceJobApplications() {
+async function exportWorkspaceJobApplicationData() {
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: '导出求职岗位',
+    title: '导出岗位数据',
     defaultPath: path.join(app.getPath('documents'), `研迹求职岗位-${new Date().toISOString().slice(0, 10)}.json`),
     filters: [{ name: '研迹岗位 JSON', extensions: ['json'] }]
   });
@@ -1103,8 +1101,19 @@ async function exportWorkspaceJobApplications() {
     exportedAt,
     jobApplications: workspace.jobApplications
   }, null, 2), 'utf8');
-  const imagePaths = await exportPortableJobPreview(workspace.jobApplications, result.filePath, exportedAt);
-  return { canceled: false, filePath: result.filePath, imagePaths, count: workspace.jobApplications.length };
+  return { canceled: false, filePath: result.filePath, count: workspace.jobApplications.length };
+}
+
+async function exportWorkspaceJobApplicationImages() {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '导出岗位图片',
+    defaultPath: path.join(app.getPath('pictures'), `研迹求职岗位-${new Date().toISOString().slice(0, 10)}-手机预览.png`),
+    filters: [{ name: 'PNG 图片', extensions: ['png'] }]
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  const workspace = workspaceForRenderer();
+  const imagePaths = await exportPortableJobPreview(workspace.jobApplications, result.filePath, new Date().toISOString());
+  return { canceled: false, imagePaths, count: workspace.jobApplications.length };
 }
 
 function saveMetadataFields(input) {
@@ -2920,7 +2929,8 @@ function registerIpc() {
   ipcMain.handle('jobs:save', (_event, input) => saveWorkspaceJobApplication(input));
   ipcMain.handle('jobs:delete', (_event, id) => deleteWorkspaceJobApplication(String(id)));
   ipcMain.handle('jobs:import', () => importWorkspaceJobApplications());
-  ipcMain.handle('jobs:export', () => exportWorkspaceJobApplications());
+  ipcMain.handle('jobs:export', () => exportWorkspaceJobApplicationData());
+  ipcMain.handle('jobs:export-image', () => exportWorkspaceJobApplicationImages());
   ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
   ipcMain.handle('attendance:clock', (_event, action) => clockWorkspaceAttendance(String(action || '')));
   ipcMain.handle('attendance:save', (_event, input) => saveWorkspaceAttendance(input));
