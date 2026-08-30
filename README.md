@@ -1,6 +1,6 @@
 # 研迹 · Research Workbench
 
-Version 1.4.11 adds stable-ID differential job imports and separates JSON data export from PNG image export.
+Version 1.4.11 adds stable-ID differential job imports, separates JSON data export from PNG image export, and restores the v1.4.9 job-column layout.
 
 Version 1.4.10 distributes all eight job-table columns evenly, aligns every header and row value to the left edge of its own column, and restores the packaged automatic updater dependency chain.
 

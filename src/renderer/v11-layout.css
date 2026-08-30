@@ -1605,9 +1605,9 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-table-actions .button { min-height: 35px; padding-inline: 12px; border-radius: 8px; font-size: 12px; font-weight: 620; }
 .job-table-actions .button .ui-icon { width: 13px; height: 13px; margin-right: 3px; vertical-align: -3px; }
 .job-table-actions .icon-button { width: 33px; padding: 0; }
-.job-table-head, .job-position-main { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); align-items: center; gap: 7px; }
+.job-table-head, .job-position-main { display: grid; grid-template-columns: minmax(160px, 1.15fr) repeat(5, minmax(86px, 1fr)) minmax(130px, 1fr) 98px; align-items: center; gap: 7px; }
 .job-table-head { min-height: 40px; padding: 0 14px; color: #4f5e74; background: #fafbfc; border-bottom: 1px solid #e9edf2; font-size: 11.5px; font-weight: 730; letter-spacing: .01em; }
-.job-table-head > span { text-align: left; }
+.job-table-head > span:nth-child(n+2):nth-child(-n+7) { text-align: center; }
 .job-position { background: #fff; border-bottom: 1px solid #edf0f4; transition: background var(--motion-duration-fast) ease, box-shadow var(--motion-duration-fast) ease; }
 .job-position:last-child { border-bottom: 0; }
 .job-position:hover { background: #fcfdff; box-shadow: inset 3px 0 #3b66d5; }
@@ -1620,7 +1620,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-company-line strong { color: #1e2a3e; font-size: 10px; font-weight: 760; }
 .job-company-line span { margin-top: 4px; color: #718096; font-size: 9px; }
 .job-type-cell, .job-city-cell { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.job-type-cell, .job-city-cell, .job-salary-cell { text-align: left; }
+.job-type-cell, .job-city-cell, .job-salary-cell { text-align: center; }
 .job-salary-cell { color: #59677a; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .job-inline-control { min-width: 0; display: flex; align-items: center; }
 .job-inline-control select, .job-inline-control input { width: 100%; min-width: 0; height: 31px; padding: 0 8px; color: #3f4e64; background: #f2f3f5; border: 1px solid #e5e7ea; border-radius: 7px; box-shadow: none; font-size: 12px; font-weight: 570; }
@@ -1632,7 +1632,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .job-follow-cell input { width: 108px; }
 .job-notes-cell input { width: 96px; }
 .job-inline-control :is(select,input):focus { background: #f7f8fb; border-color: #8da4e4; box-shadow: 0 0 0 2px rgba(64,97,199,.1); }
-.job-position-actions { display: flex; align-items: center; justify-content: flex-start; gap: 5px; }
+.job-position-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
 .job-position-actions .job-row-action { min-height: 31px; padding: 0 8px; color: #334e9b; background: #f4f6fb; border-color: #e6eaf3; border-radius: 7px; font-size: 11.5px; font-weight: 620; }
 .job-position-actions .job-row-action span { white-space: nowrap; }
 .job-position-actions .job-row-action.danger { width: 29px; color: #c25559; background: #fff; border-color: #e9c8ca; }
@@ -1675,7 +1675,7 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 @media (max-width: 860px) {
   .job-table-shell { overflow-x: auto; }
   .job-table-toolbar, .job-table-head, .job-table-body { min-width: 1010px; }
-  .job-table-head, .job-position-main { grid-template-columns: repeat(8, 130px); }
+  .job-table-head, .job-position-main { grid-template-columns: 160px repeat(5, 110px) minmax(150px, 1fr) 98px; }
   .job-stage-option { grid-template-columns: 1fr 168px 88px; }
 }
 @media (max-width: 560px) {
