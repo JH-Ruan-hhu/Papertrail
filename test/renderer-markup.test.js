@@ -452,7 +452,7 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(workbenchJs, /data-workflow-stage-enabled/);
   assert.match(css, /\.job-workflow-track\s*\{[^}]*display:\s*flex[^}]*justify-content:\s*space-between/s);
   assert.match(css, /\.job-flow-stage:first-child,\s*\.job-flow-stage:last-child\s*\{[^}]*transform:\s*none/s);
-  assert.doesNotMatch(indexHtml, /id="job(?:Status|Deadline|NextFollowUpAt)"/);
+  assert.doesNotMatch(indexHtml, /id="job(?:Status|NextFollowUpAt)"/);
   assert.doesNotMatch(workbenchJs, /JOB_STATUSES|JOB_STATUS_LABELS/);
   assert.doesNotMatch(workbenchJs, /data-advance-job|function advanceJob/);
   assert.match(indexHtml, /id="addJobButton"/);
@@ -723,10 +723,15 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
   assert.match(indexHtml, /优先级：不限/);
   assert.match(indexHtml, /城市：不限/);
   assert.match(indexHtml, /class="job-table-head"[\s\S]*预估年薪/);
+  assert.match(indexHtml, /class="job-table-head"[\s\S]*截止日期/);
+  assert.match(indexHtml, /id="jobDeadline"/);
   assert.match(indexHtml, /id="jobSettingsButton"[\s\S]*<circle cx="12" cy="12" r="3"/);
   assert.match(workbenchJs, /class="job-salary-cell"/);
   assert.match(workbenchJs, /jobs\.filter\(\(job\) => job\.status !== 'closed'\)/);
-  assert.match(mainJs, /<span>预估年薪<\/span><span>状态<\/span>/);
+  assert.match(mainJs, /<span>预估年薪<\/span><span>截止日期<\/span><span>状态<\/span>/);
+  assert.match(mainJs, /JPG 图片/);
+  assert.match(mainJs, /image\.toJPEG\(92\)/);
+  assert.match(mainJs, /runJobDeadlineReminders/);
   assert.match(mainJs, /jobApplications:\s*workspace\.jobApplications/);
   assert.match(mainJs, /annualSalaryWan/);
   assert.match(mainJs, /document\.body\.scrollHeight/);

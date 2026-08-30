@@ -177,6 +177,7 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
     // Keep the v1.3.1 field name as a read/write alias for existing exports.
     location: city,
     deadline: isoDate(input.deadline ?? input.deadlineAt),
+    deadlineReminderSentAt: isoDate(input.deadlineReminderSentAt),
     priority: JOB_PRIORITIES.includes(input.priority) ? input.priority : 'medium',
     status: lifecycleStatusFor(input, rawStatus),
     nextFollowUpAt,
@@ -219,9 +220,21 @@ function saveJobApplication(list, input, now = new Date().toISOString(), makeId 
     updatedAt: now,
     revision: Math.max(0, Number(existing?.revision) || 0) + 1
   }, 0, now);
+  if (existing && candidate.deadline !== existing.deadline) candidate.deadlineReminderSentAt = null;
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
     : [candidate, ...list];
+}
+
+function jobDeadlineReminderDue(job, now = new Date()) {
+  if (!job || job.status === 'closed' || job.deadlineReminderSentAt) return false;
+  const due = new Date(job.deadline);
+  const current = now instanceof Date ? now : new Date(now);
+  if (!Number.isFinite(due.getTime()) || !Number.isFinite(current.getTime())) return false;
+  const reminderDay = new Date(due.getFullYear(), due.getMonth(), due.getDate() - 1);
+  return current.getFullYear() === reminderDay.getFullYear()
+    && current.getMonth() === reminderDay.getMonth()
+    && current.getDate() === reminderDay.getDate();
 }
 
 function deleteJobApplication(list, id) {
@@ -340,6 +353,7 @@ module.exports = {
   defaultWorkflow,
   normalizeWorkflow,
   normalizeJobApplication,
+  jobDeadlineReminderDue,
   mergeImportedJobApplications,
   saveJobApplication,
   deleteJobApplication,

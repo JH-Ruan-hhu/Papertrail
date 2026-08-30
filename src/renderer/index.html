@@ -222,7 +222,7 @@
                 <button class="button icon-button" id="jobSettingsButton" type="button" aria-label="打开求职设置"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/></svg></button>
               </div>
             </div>
-            <div class="job-table-head" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>状态</span><span>优先级</span><span>备注</span><span>操作</span></div>
+            <div class="job-table-head" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>截止日期</span><span>状态</span><span>优先级</span><span>备注</span><span>操作</span></div>
             <div id="jobBoard" class="job-table-body" aria-live="polite"></div>
           </section>
         </section>
@@ -613,6 +613,7 @@
               <div class="field"><label for="jobCity">城市</label><input id="jobCity" maxlength="200" placeholder="城市 / 远程"></div>
               <div class="field"><label for="jobPriority">优先级</label><select id="jobPriority"><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></div>
               <div class="field"><label for="jobAnnualSalaryWan">预估年薪（万元）</label><input id="jobAnnualSalaryWan" type="number" min="0.1" max="10000" step="0.1" inputmode="decimal" placeholder="41.1"></div>
+              <div class="field"><label for="jobDeadline">截止日期</label><input id="jobDeadline" type="date"><small>截止日前一天触发 #1 全屏提醒</small></div>
               <div class="field"><label for="jobAppliedAt">投递日期</label><input id="jobAppliedAt" type="date"></div>
               <div class="field full"><label for="jobContact">联系人 / 渠道</label><input id="jobContact" maxlength="300" placeholder="招聘平台、内推人或 HR"></div>
               <div class="field full"><label for="jobNotes">备注</label><textarea id="jobNotes" rows="3" maxlength="10000" placeholder="岗位亮点、准备重点、反馈与下一步"></textarea></div>

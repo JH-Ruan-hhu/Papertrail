@@ -6,6 +6,7 @@ const {
   DEFAULT_WORKFLOW_STAGES,
   JOB_LIFECYCLE_STATUSES,
   deleteJobApplication,
+  jobDeadlineReminderDue,
   mergeImportedJobApplications,
   moveWorkflowStage,
   normalizeJobApplication,
@@ -130,6 +131,21 @@ test('keeps salary, workflow and legacy compatibility through a JSON export/impo
   assert.equal(imported.status, 'active');
   assert.equal(imported.deadline, original.deadline);
   assert.deepEqual(imported.workflow, original.workflow);
+});
+
+test('reminds once on the day before an open job deadline and resets after the date changes', () => {
+  const job = normalizeJobApplication({
+    id: 'deadline-job', company: '环境公司', role: '研发工程师', status: 'active', deadline: '2026-09-01'
+  });
+  assert.equal(jobDeadlineReminderDue(job, new Date(2026, 7, 31, 9, 0)), true);
+  assert.equal(jobDeadlineReminderDue(job, new Date(2026, 7, 30, 23, 59)), false);
+  assert.equal(jobDeadlineReminderDue({ ...job, status: 'closed' }, new Date(2026, 7, 31, 9, 0)), false);
+  assert.equal(jobDeadlineReminderDue({ ...job, deadlineReminderSentAt: '2026-08-31T01:00:00.000Z' }, new Date(2026, 7, 31, 9, 0)), false);
+
+  const updated = saveJobApplication([{
+    ...job, deadlineReminderSentAt: '2026-08-31T01:00:00.000Z', revision: 1
+  }], { ...job, deadline: '2026-09-02', revision: 1 }, '2026-08-31T02:00:00.000Z');
+  assert.equal(updated[0].deadlineReminderSentAt, null);
 });
 
 test('merges exported jobs by stable id without duplicating repeated imports', () => {
