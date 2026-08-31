@@ -7,7 +7,6 @@ const highlights = document.getElementById('captureHighlights');
 const tabs = [...document.querySelectorAll('[data-mode]')];
 const kinds = [...document.querySelectorAll('input[name="captureItemKind"]')];
 const kindPicker = document.getElementById('captureKinds');
-const card = document.querySelector('.capture-card');
 let mode = 'item';
 let itemKind = 'task';
 let parseSequence = 0;
@@ -22,6 +21,16 @@ function escapeHtml(value) {
 
 function plainText() {
   return editor.value.replace(/\u00a0/g, ' ');
+}
+
+function captureDirective(text = plainText()) {
+  const prefix = text.match(/^\s*[~～]\s*/)?.[0] || '';
+  return { content: text.slice(prefix.length), repeat: prefix ? 'daily' : null, prefixLength: prefix.length };
+}
+
+function directiveMatches(directive, matches = []) {
+  const shifted = matches.map((match) => ({ ...match, start: match.start + directive.prefixLength, end: match.end + directive.prefixLength }));
+  return directive.prefixLength ? [{ start: 0, end: directive.prefixLength, text: '~' }, ...shifted] : shifted;
 }
 
 function formatWhen(schedule) {
@@ -85,8 +94,9 @@ function queueParse(delay = 120) {
 async function parseInput() {
   const sequence = ++parseSequence;
   const text = plainText();
+  const directive = captureDirective(text);
   result.classList.remove('error');
-  if (!text.trim()) {
+  if (!directive.content.trim()) {
     parsedSchedule = null;
     parsedTodo = null;
     renderHighlights(text);
@@ -102,21 +112,21 @@ async function parseInput() {
       return;
     }
     if (itemKind === 'event') {
-      const parsed = await api.parseSchedule(text);
+      const parsed = await api.parseSchedule(directive.content);
       if (sequence !== parseSequence) return;
       parsedSchedule = parsed;
       parsedTodo = null;
-      result.textContent = formatWhen(parsed);
-      renderHighlights(text, parsed.matches);
+      result.textContent = `${formatWhen(parsed)}${directive.repeat ? ' · 每天重复' : ''}`;
+      renderHighlights(text, directiveMatches(directive, parsed.matches));
       return;
     }
-    const [todo, schedule] = await Promise.all([api.parseTodo(text), api.parseSchedule(text)]);
+    const [todo, schedule] = await Promise.all([api.parseTodo(directive.content), api.parseSchedule(directive.content)]);
     if (sequence !== parseSequence) return;
     parsedTodo = todo;
     parsedSchedule = schedule;
     const hasTimeBlock = Boolean(todo?.meta?.explicitTime && schedule?.valid && schedule?.meta?.explicitTime);
-    result.textContent = hasTimeBlock ? `${formatWhen(schedule)} · 同时建立待办` : formatTodo(todo);
-    renderHighlights(text, hasTimeBlock ? schedule.matches : todo.matches);
+    result.textContent = `${hasTimeBlock ? `${formatWhen(schedule)} · 同时建立待办` : formatTodo(todo)}${directive.repeat ? ' · 每天重复' : ''}`;
+    renderHighlights(text, directiveMatches(directive, hasTimeBlock ? schedule.matches : todo.matches));
   } catch (error) {
     result.textContent = error.message || '暂时无法解析时间';
     result.classList.add('error');
@@ -143,12 +153,13 @@ function setItemKind(nextKind) {
 }
 
 async function submit() {
-  const content = plainText().trim();
+  const directive = captureDirective();
+  const content = directive.content.trim();
   if (!content) return;
   try {
     result.classList.remove('error');
     result.textContent = '正在保存…';
-    await api.submitCapture({ mode, itemKind, content });
+    await api.submitCapture({ mode, itemKind, content, repeat: directive.repeat });
     editor.value = '';
     renderHighlights('');
     api.setCaptureContentState(false);
@@ -188,13 +199,15 @@ document.addEventListener('keydown', (event) => {
     const modes = ['item', 'note'];
     setMode(modes[(modes.indexOf(mode) + (event.shiftKey ? modes.length - 1 : 1)) % modes.length]);
   } else if (event.key === 'Escape') {
-    if (!plainText().trim()) api.hideCapture();
-    else {
-      card.classList.remove('shake');
-      requestAnimationFrame(() => card.classList.add('shake'));
-      result.textContent = '内容尚未保存；清空后再按 Esc 关闭';
-      result.classList.add('error');
-    }
+    event.preventDefault();
+    clearTimeout(parseTimer);
+    parseSequence += 1;
+    editor.value = '';
+    parsedSchedule = null;
+    parsedTodo = null;
+    renderHighlights('');
+    api.setCaptureContentState(false);
+    api.hideCapture();
   } else if (event.key === 'Enter' && mode === 'note' && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
     submit();

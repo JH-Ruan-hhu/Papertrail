@@ -38,6 +38,7 @@ const {
 } = require('./storage-core');
 const { clearSystemRecovery, readSystemRecovery, writeSystemRecovery } = require('./system-recovery-core');
 const { createPlanningService } = require('./planning-service');
+const { normalizeCaptureInput } = require('./capture-core');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
@@ -2980,22 +2981,25 @@ function registerIpc() {
       return { mode: 'note', item: appendWorkspaceDailyNote({ content: String(input.content || '') }) };
     }
     if (input?.mode === 'item') {
+      const capture = normalizeCaptureInput(input);
+      if (!capture.content) throw new Error('请输入要创建的事项。');
       if (input?.itemKind === 'event') {
-        const parsed = parseNaturalLanguageSchedules(input?.content, new Date());
+        const parsed = parseNaturalLanguageSchedules(capture.content, new Date());
         if (!parsed.valid) throw new Error('没有识别到可创建的日程事件。');
-        const items = parsed.schedules.map((schedule) => saveWorkspaceSchedule(schedule));
+        const items = parsed.schedules.map((schedule) => saveWorkspaceSchedule({ ...schedule, repeat: capture.repeat }));
         return { mode: 'item', itemKind: 'event', item: items[0], items };
       }
-      const parsedTodo = parseNaturalLanguageTodo(input?.content, new Date());
+      const parsedTodo = parseNaturalLanguageTodo(capture.content, new Date());
       if (!parsedTodo.valid) throw new Error(parsedTodo.warning || '没有识别到可创建的任务。');
-      const parsedSchedules = parseNaturalLanguageSchedules(input?.content, new Date());
+      const parsedSchedules = parseNaturalLanguageSchedules(capture.content, new Date());
       if (parsedTodo.meta?.explicitTime && parsedSchedules.valid && parsedSchedules.schedules.every((schedule) => schedule.meta?.explicitTime)) {
         const items = parsedSchedules.schedules.map((schedule) => getPlanningService().createScheduledTodo({
           todo: { title: schedule.title, dueAt: schedule.endAt, priority: schedule.priority, reminderMode: 'none' },
-          schedule
+          schedule: { ...schedule, repeat: capture.repeat }
         }));
         return { mode: 'item', itemKind: 'task', item: items[0], items };
       }
+      if (capture.repeat === 'daily') throw new Error('每日重复任务需要写明具体时间，以便安排每天的时间块。');
       return { mode: 'item', itemKind: 'task', item: getPlanningService().saveTodo(parsedTodo) };
     }
     if (input?.mode === 'todo') {

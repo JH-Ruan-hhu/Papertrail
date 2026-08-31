@@ -430,6 +430,10 @@ test('quick capture preserves Chinese IME composition and closes empty on blur',
   assert.match(captureHtml, /data-mode="item"[\s\S]*事项[\s\S]*data-mode="note"/);
   assert.match(captureHtml, /name="captureItemKind" value="task"[\s\S]*name="captureItemKind" value="event"/);
   assert.match(captureJs, /#1 红、#2 黄、#3 绿/);
+  assert.match(captureJs, /event\.key === 'Escape'[\s\S]*clearTimeout\(parseTimer\)[\s\S]*editor\.value = ''[\s\S]*api\.hideCapture\(\)/);
+  assert.doesNotMatch(captureJs, /内容尚未保存；清空后再按 Esc 关闭/);
+  assert.match(captureJs, /\[~～\][\s\S]*repeat: prefix \? 'daily' : null/);
+  assert.match(mainJs, /normalizeCaptureInput\(input\)[\s\S]*repeat: capture\.repeat/);
 });
 
 test('settings omit promotional and explanatory introduction cards', () => {

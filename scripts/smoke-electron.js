@@ -127,11 +127,27 @@ app.whenReady().then(async () => {
     }
     const behavior = await window.webContents.executeJavaScript(`
       (async () => {
+        const waitForAnimation = async (dialog, duration) => {
+          for (let attempt = 0; attempt < 15; attempt += 1) {
+            if (dialog.getAnimations().some((animation) => animation.effect?.getTiming().duration === duration)) return true;
+            await new Promise((resolve) => setTimeout(resolve, 10));
+          }
+          return false;
+        };
+        document.querySelector('[data-workbench-page="home"]').click();
+        const homeCard = document.querySelector('#latestNotes [data-edit-note]');
+        homeCard.click();
+        const dialog = document.getElementById('noteDialog');
+        const homeOpeningMorph = dialog.getAnimations().find((animation) => animation.effect?.getTiming().duration === 260);
+        const homeMorphsFromCard = Boolean(homeOpeningMorph);
+        document.getElementById('saveNoteButton').click();
+        const homeMorphsBackToCard = await waitForAnimation(dialog, 220);
+        for (let attempt = 0; attempt < 20 && dialog.open; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+
         document.querySelector('[data-workbench-page="notes"]').click();
         localStorage.setItem('yanji.noteInspectorOpen.v1', 'true');
         const card = document.querySelector('#notesGrid .note-card');
         card.click();
-        const dialog = document.getElementById('noteDialog');
         const openingMorph = dialog.getAnimations().find((animation) => animation.effect?.getTiming().duration === 260);
         const openingKeyframes = openingMorph?.effect?.getKeyframes() || [];
         const morphsFromCard = Boolean(openingMorph)
@@ -142,8 +158,7 @@ app.whenReady().then(async () => {
         if (toggle.getAttribute('aria-expanded') === 'true') toggle.click();
         const closedBeforeReopen = toggle.getAttribute('aria-expanded') === 'false';
         document.getElementById('saveNoteButton').click();
-        await new Promise((resolve) => setTimeout(resolve, 20));
-        const morphsBackToCard = dialog.getAnimations().some((animation) => animation.effect?.getTiming().duration === 220);
+        const morphsBackToCard = await waitForAnimation(dialog, 220);
         for (let attempt = 0; attempt < 20 && dialog.open; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 50));
         document.querySelector('#notesGrid .note-card').click();
         const closedAfterReopen = toggle.getAttribute('aria-expanded') === 'false';
@@ -178,10 +193,10 @@ app.whenReady().then(async () => {
         scroll.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true }));
         const zoomLabel = document.getElementById('noteZoomLabel').textContent;
         const pageDuration = getComputedStyle(document.documentElement).getPropertyValue('--motion-duration-page').trim();
-        return { morphsFromCard, morphsBackToCard, openingDuration: openingMorph?.effect?.getTiming().duration || null, openingTransforms: openingKeyframes.map((frame) => frame.transform), closedBeforeReopen, closedAfterReopen, infiniteDocumentScrolls, continued, indented, outdented, smallHeaderClear, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, zoomLabel, pageDuration };
+        return { homeMorphsFromCard, homeMorphsBackToCard, morphsFromCard, morphsBackToCard, openingDuration: openingMorph?.effect?.getTiming().duration || null, openingTransforms: openingKeyframes.map((frame) => frame.transform), closedBeforeReopen, closedAfterReopen, infiniteDocumentScrolls, continued, indented, outdented, smallHeaderClear, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, zoomLabel, pageDuration };
       })()
     `);
-    if (!behavior.morphsFromCard || !behavior.morphsBackToCard || !behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.infiniteDocumentScrolls || !behavior.continued || !behavior.indented || !behavior.outdented || !behavior.smallHeaderClear || behavior.paperRadius !== '0px' || behavior.zoomLabel !== '110%' || behavior.pageDuration !== '360ms') {
+    if (!behavior.homeMorphsFromCard || !behavior.homeMorphsBackToCard || !behavior.morphsFromCard || !behavior.morphsBackToCard || !behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.infiniteDocumentScrolls || !behavior.continued || !behavior.indented || !behavior.outdented || !behavior.smallHeaderClear || behavior.paperRadius !== '0px' || behavior.zoomLabel !== '110%' || behavior.pageDuration !== '360ms') {
       throw new Error(`Note behavior smoke failed: ${JSON.stringify(behavior)}`);
     }
     console.log(`WORKBENCH_NOTE_BEHAVIOR_OK ${JSON.stringify(behavior)}`);
@@ -1311,23 +1326,37 @@ app.whenReady().then(async () => {
         editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', data: 'liu', isComposing: true }));
         editor.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter', isComposing: true }));
         const compositionPreserved = editor.value === 'liu' && document.body.dataset.hideRequested !== 'true';
-        editor.value = '明天下午 3 点到 5 点组会 #1';
+        editor.value = '~ 明天下午 3 点到 5 点组会 #1';
         editor.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '明天' }));
         editor.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 180));
         const priorityRendered = document.getElementById('parseResult').textContent.includes('最高优先级');
+        const dailyRepeatRendered = document.getElementById('parseResult').textContent.includes('每天重复');
         const highlighted = document.querySelectorAll('#captureHighlights mark').length >= 2;
-        document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Tab' }));
-        const switchedToTodo = document.querySelector('[data-mode="todo"]').classList.contains('active');
         document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Tab' }));
         const switchedToNote = document.querySelector('[data-mode="note"]').classList.contains('active');
         document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Tab' }));
-        const switchedBackToSchedule = document.querySelector('[data-mode="schedule"]').classList.contains('active');
+        const switchedBackToItem = document.querySelector('[data-mode="item"]').classList.contains('active');
         editor.value = '1. 第一项';
         editor.setSelectionRange(editor.value.length, editor.value.length);
         editor.dispatchEvent(new Event('input', { bubbles: true }));
         editor.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' }));
         const numberedEnterContinues = editor.value === '1. 第一项\\n2. ';
+        editor.value = '~ 明天下午 3 点到 5 点组会 #1';
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        editor.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter' }));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        const submitted = JSON.parse(document.body.dataset.captureSubmitted || '{}');
+        const dailyRepeatSubmitted = submitted.repeat === 'daily' && submitted.content === '明天下午 3 点到 5 点组会 #1';
+        document.body.dataset.hideRequested = 'false';
+        editor.value = '按 Esc 应直接丢弃';
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Escape' }));
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        const escapeCleared = editor.value === '';
+        const escapeClosed = document.body.dataset.hideRequested === 'true';
+        document.body.dataset.hideRequested = 'false';
         editor.value = '';
         editor.dispatchEvent(new Event('input', { bubbles: true }));
         window.dispatchEvent(new Event('blur'));
@@ -1340,7 +1369,7 @@ app.whenReady().then(async () => {
         const singleSurface = card.left === 0 && card.top === 0 && card.right === innerWidth && card.bottom === innerHeight;
         const transparentRoot = getComputedStyle(document.body).backgroundColor === 'rgba(0, 0, 0, 0)'
           && getComputedStyle(document.body).backgroundImage === 'none';
-        return { compositionPreserved, priorityRendered, highlighted, switchedToTodo, switchedToNote, switchedBackToSchedule, numberedEnterContinues, emptyBlurClosed, singleSurface, transparentRoot };
+        return { compositionPreserved, priorityRendered, dailyRepeatRendered, highlighted, switchedToNote, switchedBackToItem, numberedEnterContinues, dailyRepeatSubmitted, escapeCleared, escapeClosed, emptyBlurClosed, singleSurface, transparentRoot };
       })()
     `);
     if (!Object.values(captureResult).every(Boolean)) throw new Error(`Workbench capture smoke failed: ${JSON.stringify(captureResult)}`);

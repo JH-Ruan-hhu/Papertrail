@@ -194,8 +194,8 @@ function closeWorkbenchDialog(dialog) {
 
 function noteMotionSourceCard() {
   if (!wb.noteMotionSourceId) return null;
-  return [...document.querySelectorAll('#notesGrid [data-edit-note]')]
-    .find((card) => card.dataset.editNote === wb.noteMotionSourceId) || null;
+  return [...document.querySelectorAll('[data-edit-note]')]
+    .find((card) => card.dataset.editNote === wb.noteMotionSourceId && card.isConnected && card.getClientRects().length) || null;
 }
 
 function noteDialogMorphGeometry(dialog, sourceCard) {
