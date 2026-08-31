@@ -2922,6 +2922,7 @@ function registerIpc() {
   ipcMain.handle('todos:snooze', (_event, id, until) => getPlanningService().snoozeTodo(String(id), until));
   ipcMain.handle('todos:get-linked-schedules', (_event, id) => getPlanningService().getLinkedSchedules(String(id)));
   ipcMain.handle('todos:schedule', (_event, id, input) => getPlanningService().scheduleTodo(String(id), input || {}));
+  ipcMain.handle('todos:create-scheduled', (_event, input) => getPlanningService().createScheduledTodo(input || {}));
   ipcMain.handle('todos:convert-to-schedule', (_event, id, input) => getPlanningService().convertTodoToSchedule(String(id), input || {}));
   ipcMain.handle('schedule-widget:show', async () => {
     const result = await showScheduleWidget();
@@ -2977,6 +2978,25 @@ function registerIpc() {
   ipcMain.handle('capture:submit', (_event, input) => {
     if (input?.mode === 'note') {
       return { mode: 'note', item: appendWorkspaceDailyNote({ content: String(input.content || '') }) };
+    }
+    if (input?.mode === 'item') {
+      if (input?.itemKind === 'event') {
+        const parsed = parseNaturalLanguageSchedules(input?.content, new Date());
+        if (!parsed.valid) throw new Error('没有识别到可创建的日程事件。');
+        const items = parsed.schedules.map((schedule) => saveWorkspaceSchedule(schedule));
+        return { mode: 'item', itemKind: 'event', item: items[0], items };
+      }
+      const parsedTodo = parseNaturalLanguageTodo(input?.content, new Date());
+      if (!parsedTodo.valid) throw new Error(parsedTodo.warning || '没有识别到可创建的任务。');
+      const parsedSchedules = parseNaturalLanguageSchedules(input?.content, new Date());
+      if (parsedTodo.meta?.explicitTime && parsedSchedules.valid && parsedSchedules.schedules.every((schedule) => schedule.meta?.explicitTime)) {
+        const items = parsedSchedules.schedules.map((schedule) => getPlanningService().createScheduledTodo({
+          todo: { title: schedule.title, dueAt: schedule.endAt, priority: schedule.priority, reminderMode: 'none' },
+          schedule
+        }));
+        return { mode: 'item', itemKind: 'task', item: items[0], items };
+      }
+      return { mode: 'item', itemKind: 'task', item: getPlanningService().saveTodo(parsedTodo) };
     }
     if (input?.mode === 'todo') {
       const parsed = parseNaturalLanguageTodo(input?.content, new Date());

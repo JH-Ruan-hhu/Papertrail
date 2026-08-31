@@ -279,11 +279,16 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.doesNotMatch(indexHtml, /id="bingWallpaper"/);
   assert.match(indexHtml, /class="home-progress-strip"[\s\S]*id="homeProgressHeadline"/);
   assert.match(indexHtml, /id="homeProgressRateBar"/);
+  assert.match(indexHtml, /今日事项[\s\S]*id="homeTodayItemsList"/);
+  assert.doesNotMatch(indexHtml, /id="homeToday(?:Schedule|Todo)List"/);
   assert.match(indexHtml, /id="homeDayOverview"/);
   assert.match(indexHtml, /id="scheduleBoard"/);
   assert.doesNotMatch(indexHtml, /class="schedule-today-panel"|id="todayScheduleList"/);
   assert.doesNotMatch(indexHtml, /id="agendaList"/);
   assert.match(indexHtml, /id="scheduleRecognition"/);
+  assert.match(indexHtml, /name="scheduleEntryKind" value="task"[\s\S]*name="scheduleEntryKind" value="event"/);
+  assert.match(preloadJs, /createScheduledTodo:.*todos:create-scheduled/);
+  assert.match(mainJs, /todos:create-scheduled/);
   assert.match(indexHtml, /id="attendanceGanttRows"/);
   assert.match(indexHtml, /id="startFocusButton"/);
   assert.match(indexHtml, /id="focusUsageList"/);
@@ -422,7 +427,9 @@ test('quick capture preserves Chinese IME composition and closes empty on blur',
   assert.match(captureJs, /event\.isComposing \|\| composing \|\| event\.keyCode === 229/);
   assert.doesNotMatch(captureJs, /editor\.innerHTML\s*=/);
   assert.match(mainJs, /quickCaptureWindow\.on\('blur'/);
-  assert.match(captureHtml, /#1 红、#2 黄、#3 绿/);
+  assert.match(captureHtml, /data-mode="item"[\s\S]*事项[\s\S]*data-mode="note"/);
+  assert.match(captureHtml, /name="captureItemKind" value="task"[\s\S]*name="captureItemKind" value="event"/);
+  assert.match(captureJs, /#1 红、#2 黄、#3 绿/);
 });
 
 test('settings omit promotional and explanatory introduction cards', () => {
@@ -672,18 +679,18 @@ test('quick capture note submission imports and calls the daily-note append help
   assert.match(mainJs, /ipcMain\.handle\('capture:submit'[\s\S]*input\?\.mode === 'note'[\s\S]*appendWorkspaceDailyNote\(\{ content:/);
 });
 
-test('quick capture Tab cycles through schedule, todo, note and back to schedule', () => {
+test('quick capture Tab cycles between item and note modes', () => {
   const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
   const tabBranch = captureJs.indexOf("if (event.key === 'Tab')");
   const listEditingBranch = captureJs.indexOf("window.YanjiListEditing?.applyListEditing(editor, event)");
   assert.ok(tabBranch >= 0 && listEditingBranch > tabBranch);
-  assert.match(captureJs, /const modes = \['schedule', 'todo', 'note'\]/);
+  assert.match(captureJs, /const modes = \['item', 'note'\]/);
 });
 
 test('quick capture recognizes numbered Enter continuation before normal submission', () => {
   const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
   const continuationBranch = captureJs.indexOf("event.key === 'Enter' && !event.shiftKey && window.YanjiListEditing?.applyListEditing(editor, event)");
-  const submitBranch = captureJs.indexOf("event.key === 'Enter' && (mode === 'schedule' || mode === 'todo') && !event.shiftKey");
+  const submitBranch = captureJs.indexOf("event.key === 'Enter' && mode === 'item' && !event.shiftKey");
   assert.ok(continuationBranch >= 0 && continuationBranch < submitBranch);
   assert.doesNotMatch(captureJs.slice(continuationBranch, submitBranch), /mode === 'note'/);
 });

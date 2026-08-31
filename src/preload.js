@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   snoozeTodo: (id, until) => ipcRenderer.invoke('todos:snooze', id, until),
   getLinkedSchedules: (id) => ipcRenderer.invoke('todos:get-linked-schedules', id),
   scheduleTodo: (id, input) => ipcRenderer.invoke('todos:schedule', id, input),
+  createScheduledTodo: (input) => ipcRenderer.invoke('todos:create-scheduled', input),
   convertTodoToSchedule: (id, input) => ipcRenderer.invoke('todos:convert-to-schedule', id, input),
   showScheduleWidget: () => ipcRenderer.invoke('schedule-widget:show'),
   closeScheduleWidget: () => ipcRenderer.invoke('schedule-widget:close'),

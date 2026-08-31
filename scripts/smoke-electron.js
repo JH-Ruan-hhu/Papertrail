@@ -87,18 +87,18 @@ app.whenReady().then(async () => {
   }
   if (process.env.WORKBENCH_HOME_FAST_OUTPUT) {
     for (let attempt = 0; attempt < 20; attempt += 1) {
-      const ready = await window.webContents.executeJavaScript(`Boolean(document.querySelector('#homeTodayTodoList [data-home-todo-action="complete"]'))`);
+      const ready = await window.webContents.executeJavaScript(`Boolean(document.querySelector('#homeTodayItemsList [data-home-todo-action="complete"]'))`);
       if (ready) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     const homeInteraction = await window.webContents.executeJavaScript(`
       (async () => {
         document.querySelector('[data-workbench-page="home"]').click();
-        const checkbox = document.querySelector('#homeTodayTodoList [data-home-todo-action="complete"]');
+        const checkbox = document.querySelector('#homeTodayItemsList [data-home-todo-action="complete"]');
         checkbox?.click();
         await new Promise((resolve) => setTimeout(resolve, 90));
-        const completed = document.querySelector('#homeTodayTodoList .home-todo-row.is-completed');
-        const titleStyle = completed ? getComputedStyle(completed.querySelector('.home-todo-title strong')) : null;
+        const completed = document.querySelector('#homeTodayItemsList .home-item-row.is-completed');
+        const titleStyle = completed ? getComputedStyle(completed.querySelector('.home-item-title strong')) : null;
         const progressBottom = document.getElementById('homeTodoProgress').getBoundingClientRect().bottom;
         const clockBottom = document.getElementById('homeClockButton').getBoundingClientRect().bottom;
         const cardBottoms = [...document.querySelectorAll('.home-command-grid > article')].map((card) => Math.round(card.getBoundingClientRect().bottom));
@@ -343,7 +343,7 @@ app.whenReady().then(async () => {
       activate('schedule');
       activate('home');
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const selector = '.home-progress-strip, .home-next-event-card, .home-today-card:not(.home-today-todo-card), .home-today-todo-card, .home-attendance-card, .home-schedule-panel, .home-focus-timer, .latest-notes-panel, .home-job-panel';
+      const selector = '.home-progress-strip, .home-next-event-card, .home-today-items-card, .home-attendance-card, .home-schedule-panel, .home-focus-timer, .latest-notes-panel, .home-job-panel';
       const cards = [...document.querySelectorAll(selector)];
       const firstWaves = cards.map((card) => Number(card.style.getPropertyValue('--home-enter-wave')));
       const firstReplay = document.querySelector('[data-page="home"]').classList.contains('home-entering');
@@ -367,7 +367,7 @@ app.whenReady().then(async () => {
       };
     })()
   `);
-  if (homeMotionResult.cardCount !== 9 || !homeMotionResult.firstReplay || !homeMotionResult.repeatedReplay || !homeMotionResult.scheduleRestoresOpacity || !homeMotionResult.diagonalWaves || !homeMotionResult.waveCoordinatesMatch) {
+  if (homeMotionResult.cardCount !== 8 || !homeMotionResult.firstReplay || !homeMotionResult.repeatedReplay || !homeMotionResult.scheduleRestoresOpacity || !homeMotionResult.diagonalWaves || !homeMotionResult.waveCoordinatesMatch) {
     throw new Error(`Home motion smoke failed: ${JSON.stringify(homeMotionResult)}`);
   }
   console.log(`HOME_MOTION_SMOKE_OK ${JSON.stringify(homeMotionResult)}`);
@@ -720,6 +720,8 @@ app.whenReady().then(async () => {
         });
         document.getElementById('addScheduleButton').click();
         const scheduleDialog = document.getElementById('scheduleDialog');
+        const taskKindDefault = document.querySelector('input[name="scheduleEntryKind"][value="task"]').checked;
+        const kindChoicesVisible = !document.getElementById('scheduleEntryKindField').hidden;
         const draftTitle = document.getElementById('scheduleTitle');
         draftTitle.value = '后天上午十点整理草稿';
       scheduleDialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -752,6 +754,9 @@ app.whenReady().then(async () => {
           && Math.abs(startTimeRect.height - endTimeRect.height) <= 1
           && parseFloat(getComputedStyle(scheduleStartTime).borderRadius) >= 12
           && getComputedStyle(scheduleStartTime).fontVariantNumeric.includes('tabular-nums');
+        const eventKind = document.querySelector('input[name="scheduleEntryKind"][value="event"]');
+        eventKind.checked = true;
+        eventKind.dispatchEvent(new Event('change', { bubbles: true }));
         document.getElementById('scheduleRepeatDailyInput').checked = true;
         scheduleTitle.value = '明天上午八点去采样，下午五点去洗澡';
         scheduleTitle.dispatchEvent(new Event('input', { bubbles: true }));
@@ -777,6 +782,8 @@ app.whenReady().then(async () => {
           backdropPreserved,
           backdropRestored,
           cancelDiscarded,
+          taskKindDefault,
+          kindChoicesVisible,
           multiPreview,
           multiSaved: document.body.dataset.savedScheduleCount === '2',
           dailyRepeatSaved: JSON.parse(document.body.dataset.lastSavedSchedule || '{}').repeat === 'daily',
@@ -795,7 +802,7 @@ app.whenReady().then(async () => {
         return result;
       })()
     `);
-    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || !scheduleResult.directionalAnimationRunning || !scheduleResult.directionalDateChange || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.dailyRepeatSaved || !scheduleResult.endFollowsStart || !scheduleResult.endWrapsMidnight || !scheduleResult.timeFieldsPolished || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || !scheduleResult.directionalAnimationRunning || !scheduleResult.directionalDateChange || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.taskKindDefault || !scheduleResult.kindChoicesVisible || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.dailyRepeatSaved || !scheduleResult.endFollowsStart || !scheduleResult.endWrapsMidnight || !scheduleResult.timeFieldsPolished || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
@@ -808,8 +815,9 @@ app.whenReady().then(async () => {
       (async () => {
         document.querySelector('[data-workbench-page="home"]').click();
         window.scrollTo(0, 0);
-        document.querySelector('#homeTodayTodoList [data-home-todo-action="complete"]')?.click();
+        document.querySelector('#homeTodayItemsList [data-home-todo-action="complete"]')?.click();
         await new Promise((resolve) => setTimeout(resolve, 60));
+        document.querySelector('[data-page="home"]').getAnimations({ subtree: true }).forEach((animation) => animation.finish());
         const rect = (element) => {
           const value = element.getBoundingClientRect();
           return {
@@ -862,8 +870,8 @@ app.whenReady().then(async () => {
             && Boolean(document.querySelector('.home-attendance-card #homeClockButton')),
           attendanceStatus: Boolean(document.getElementById('homeAttendanceStatus')),
           todoCompletionVisible: (() => {
-            const row = document.querySelector('#homeTodayTodoList .home-todo-row.is-completed');
-            const titleStyle = row ? getComputedStyle(row.querySelector('.home-todo-title strong')) : null;
+            const row = document.querySelector('#homeTodayItemsList .home-item-row.is-completed');
+            const titleStyle = row ? getComputedStyle(row.querySelector('.home-item-title strong')) : null;
             return Boolean(row && titleStyle?.textDecorationLine.includes('line-through') && Number(titleStyle.opacity) < 1);
           })(),
           attendanceButtonInline: (() => {
@@ -872,7 +880,7 @@ app.whenReady().then(async () => {
             const card = document.querySelector('.home-attendance-card').getBoundingClientRect();
             return button.left > status.left && button.right <= card.right && button.top >= card.top && button.bottom <= card.bottom;
           })(),
-          todoCardLarger: (document.querySelector('.home-today-todo-card')?.getBoundingClientRect().width || 0)
+          todoCardLarger: (document.querySelector('.home-today-items-card')?.getBoundingClientRect().width || 0)
             > (document.querySelector('.home-next-event-card')?.getBoundingClientRect().width || 0),
           commandCardsTopAligned: commandCards.every((card) => Math.abs(card.top - commandCards[0].top) <= 1),
           attendanceIndependent: Boolean(document.querySelector('.home-attendance-card')),
@@ -909,7 +917,7 @@ app.whenReady().then(async () => {
             && content.top - focus.bottom >= 10,
           homeColumnsAligned: Math.abs(focus.left - content.left) <= 1
             && Math.abs(focus.right - content.right) <= 1,
-          commandCardsAligned: commandCards.length === 4
+          commandCardsAligned: commandCards.length === 3
             && commandCards.every((card) => Math.abs(card.top - commandCards[0].top) <= 1),
           fourDayMatrix: (() => {
             const cards = [...document.querySelectorAll('#homeDayOverview .day-card')];

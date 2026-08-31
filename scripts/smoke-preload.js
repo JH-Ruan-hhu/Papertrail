@@ -269,6 +269,14 @@ contextBridge.exposeInMainWorld('paperTrail', {
     document.body.dataset.lastSavedSchedule = JSON.stringify(input);
     return input;
   },
+  createScheduledTodo: async (input) => {
+    const todo = { ...input.todo, id: `todo-scheduled-${Date.now()}`, status: 'open', updatedAt: new Date().toISOString() };
+    const schedule = { ...input.schedule, id: `schedule-linked-${Date.now()}`, sourceRef: { type: 'todo', id: todo.id } };
+    smokeWorkspace.todos = [todo, ...(smokeWorkspace.todos || [])];
+    smokeWorkspace.schedules = [schedule, ...(smokeWorkspace.schedules || [])];
+    document.body.dataset.createdScheduledTodo = JSON.stringify({ todo, schedule });
+    return { todo, schedule };
+  },
   deleteSchedule: async () => true,
   completeSchedule: async () => true,
   showScheduleWidget: async () => ({ attached: true }),

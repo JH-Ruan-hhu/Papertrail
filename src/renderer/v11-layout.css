@@ -239,9 +239,8 @@ body { color: var(--yanji-text); }
    todo surface gets the room it needs and attendance stays independent. */
 .home-command-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
 .home-command-grid > .home-next-event-card { grid-column: span 3; }
-.home-command-grid > .home-today-card:not(.home-today-todo-card) { grid-column: span 3; }
-.home-command-grid > .home-today-todo-card { grid-column: span 4; }
-.home-command-grid > .home-attendance-card { grid-column: span 2; }
+.home-command-grid > .home-today-items-card { grid-column: span 6; }
+.home-command-grid > .home-attendance-card { grid-column: span 3; }
 .home-next-event-card, .home-today-card, .home-attendance-card {
   min-height: 190px;
   padding: 20px;
@@ -254,8 +253,19 @@ body { color: var(--yanji-text); }
 .home-next-event-card .next-event-content,
 .home-today-card .home-today-list,
 .home-attendance-card .home-attendance-content { flex: 1; }
-.home-today-todo-card .home-todo-progress { margin-top: auto; padding-top: 12px; }
-.home-today-todo-card { border-color: var(--yanji-line); background: var(--yanji-surface); }
+.home-today-items-card .home-todo-progress { margin-top: auto; padding-top: 10px; }
+.home-today-items-card { border-color: var(--yanji-line); background: var(--yanji-surface); }
+.home-items-links { display: flex; align-items: center; gap: 9px; }
+.home-today-items-list { display: grid; gap: 2px; }
+.home-item-row { grid-template-columns: 24px 72px minmax(0, 1fr); gap: 8px; }
+.home-item-row.is-event { grid-template-columns: 24px 72px minmax(0, 1fr); }
+.home-item-marker { width: 8px; height: 8px; justify-self: center; border-radius: 50%; background: var(--yanji-accent); }
+.home-item-time, .home-item-title { min-width: 0; padding: 0; border: 0; color: inherit; background: transparent; text-align: left; font: inherit; }
+button.home-item-time, button.home-item-title { cursor: pointer; }
+.home-item-time { color: var(--yanji-accent-strong); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.home-item-title strong, .home-item-title small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-item-title small { margin-top: 1px; color: var(--yanji-muted); font-size: 9px; }
+.home-item-row.is-completed .home-item-title strong { opacity: .55; text-decoration: line-through; }
 .home-today-card .panel-heading, .home-next-event-card .panel-heading, .home-attendance-card .panel-heading { margin-bottom: 18px; }
 .home-today-list { max-height: 142px; overflow-y: auto; scrollbar-width: thin; }
 .home-today-row { width: 100%; min-height: 28px; padding: 5px 2px; border: 0; border-radius: 8px; color: var(--yanji-text); background: transparent; text-align: left; }
@@ -306,8 +316,7 @@ body { color: var(--yanji-text); }
 }
 @media (max-width: 1040px) {
   .home-command-grid > .home-next-event-card { grid-column: span 6; }
-  .home-command-grid > .home-today-card:not(.home-today-todo-card) { grid-column: span 6; }
-  .home-command-grid > .home-today-todo-card { grid-column: span 8; }
+  .home-command-grid > .home-today-items-card { grid-column: span 8; }
   .home-command-grid > .home-attendance-card { grid-column: span 4; }
   .schedule-board { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
@@ -317,7 +326,7 @@ body { color: var(--yanji-text); }
   .home-command-grid > .home-next-event-card,
   .home-command-grid > .home-today-card,
   .home-command-grid > .home-attendance-card { grid-column: 1 / -1; }
-  .home-command-grid > .home-today-todo-card { grid-column: 1 / -1; }
+  .home-command-grid > .home-today-items-card { grid-column: 1 / -1; }
   .home-next-event-card, .home-today-card, .home-attendance-card { min-height: 164px; }
   .home-today-list { max-height: 120px; }
   .schedule-board { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -782,9 +791,8 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 
 .home-command-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); }
 .home-command-grid > .home-next-event-card { grid-column: span 3; }
-.home-command-grid > .home-today-card:not(.home-today-todo-card) { grid-column: span 3; }
-.home-command-grid > .home-today-todo-card { grid-column: span 4; }
-.home-command-grid > .home-attendance-card { grid-column: span 2; }
+.home-command-grid > .home-today-items-card { grid-column: span 6; }
+.home-command-grid > .home-attendance-card { grid-column: span 3; }
 .home-next-event-card,
 .home-today-card,
 .home-attendance-card {
@@ -801,6 +809,16 @@ html[data-appearance="classic"] .settings-page .settings-shell { background: tra
 .next-event-content { min-height: 64px; }
 .home-attendance-content { min-height: 82px; gap: 5px; }
 .home-attendance-content > span { min-height: 18px; }
+
+.schedule-entry-kind { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; padding: 0; border: 0; }
+.schedule-entry-kind[hidden] { display: none; }
+.schedule-entry-kind legend { margin-bottom: 7px; color: var(--yanji-muted); font-size: 12px; }
+.schedule-entry-kind label { position: relative; cursor: pointer; }
+.schedule-entry-kind input { position: absolute; opacity: 0; pointer-events: none; }
+.schedule-entry-kind label > span { display: grid; gap: 3px; min-height: 62px; padding: 11px 13px; border: 1px solid var(--yanji-line); border-radius: 12px; color: var(--yanji-text); background: rgba(255,255,255,.42); }
+.schedule-entry-kind label > span small { color: var(--yanji-muted); font-size: 10px; line-height: 1.4; }
+.schedule-entry-kind input:checked + span { border-color: rgba(31,120,152,.45); background: rgba(31,120,152,.09); box-shadow: inset 0 0 0 1px rgba(31,120,152,.08); }
+.schedule-entry-kind input:focus-visible + span { outline: 2px solid rgba(31,120,152,.32); outline-offset: 2px; }
 
 .home-schedule-panel,
 .home-focus-timer,

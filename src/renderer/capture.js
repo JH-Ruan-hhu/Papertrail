@@ -5,8 +5,11 @@ const editor = document.getElementById('captureEditor');
 const result = document.getElementById('parseResult');
 const highlights = document.getElementById('captureHighlights');
 const tabs = [...document.querySelectorAll('[data-mode]')];
+const kinds = [...document.querySelectorAll('input[name="captureItemKind"]')];
+const kindPicker = document.getElementById('captureKinds');
 const card = document.querySelector('.capture-card');
-let mode = 'schedule';
+let mode = 'item';
+let itemKind = 'task';
 let parseSequence = 0;
 let parsedSchedule = null;
 let parsedTodo = null;
@@ -68,7 +71,9 @@ function syncScroll() {
 }
 
 function activeMatches() {
-  return mode === 'schedule' ? parsedSchedule?.matches : mode === 'todo' ? parsedTodo?.matches : [];
+  if (mode !== 'item') return [];
+  if (itemKind === 'event') return parsedSchedule?.matches || [];
+  return parsedTodo?.meta?.explicitTime && parsedSchedule?.valid ? parsedSchedule.matches : parsedTodo?.matches || [];
 }
 
 function queueParse(delay = 120) {
@@ -85,7 +90,7 @@ async function parseInput() {
     parsedSchedule = null;
     parsedTodo = null;
     renderHighlights(text);
-    result.textContent = mode === 'note' ? '笔记保留原文，不解析时间' : mode === 'todo' ? '自动识别截止日期；没有日期会进入收件箱' : '自动识别时间；#1 红、#2 黄、#3 绿，默认绿色';
+    result.textContent = mode === 'note' ? '笔记保留原文，不解析时间' : itemKind === 'event' ? '自动识别事件时间；#1 红、#2 黄、#3 绿' : '有具体时段会同时安排时间；只有日期则作为截止日期';
     return;
   }
   try {
@@ -96,12 +101,22 @@ async function parseInput() {
       renderHighlights(text);
       return;
     }
-    const parsed = mode === 'todo' ? await api.parseTodo(text) : await api.parseSchedule(text);
+    if (itemKind === 'event') {
+      const parsed = await api.parseSchedule(text);
+      if (sequence !== parseSequence) return;
+      parsedSchedule = parsed;
+      parsedTodo = null;
+      result.textContent = formatWhen(parsed);
+      renderHighlights(text, parsed.matches);
+      return;
+    }
+    const [todo, schedule] = await Promise.all([api.parseTodo(text), api.parseSchedule(text)]);
     if (sequence !== parseSequence) return;
-    parsedSchedule = mode === 'schedule' ? parsed : null;
-    parsedTodo = mode === 'todo' ? parsed : null;
-    result.textContent = mode === 'todo' ? formatTodo(parsed) : mode === 'schedule' ? formatWhen(parsed) : '笔记保留原文，不解析时间';
-    renderHighlights(text, parsed.matches);
+    parsedTodo = todo;
+    parsedSchedule = schedule;
+    const hasTimeBlock = Boolean(todo?.meta?.explicitTime && schedule?.valid && schedule?.meta?.explicitTime);
+    result.textContent = hasTimeBlock ? `${formatWhen(schedule)} · 同时建立待办` : formatTodo(todo);
+    renderHighlights(text, hasTimeBlock ? schedule.matches : todo.matches);
   } catch (error) {
     result.textContent = error.message || '暂时无法解析时间';
     result.classList.add('error');
@@ -111,17 +126,20 @@ async function parseInput() {
 function setMode(nextMode) {
   mode = nextMode;
   tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.mode === mode));
-  editor.placeholder = mode === 'schedule'
-    ? '例如：明天下午 3 点到 5 点组会 #1'
-    : mode === 'todo'
-      ? '例如：周五前提交论文修改稿 #1'
-      : '随手记录想法…（Ctrl + Enter 保存）';
-  document.getElementById('submitHint').innerHTML = mode === 'schedule'
-    ? '<kbd>Enter</kbd> 创建'
-    : mode === 'todo' ? '<kbd>Enter</kbd> 创建' : '<kbd>Ctrl Enter</kbd> 保存';
+  kindPicker.hidden = mode === 'note';
+  editor.placeholder = mode === 'note'
+    ? '随手记录想法…（Ctrl + Enter 保存）'
+    : itemKind === 'event' ? '例如：明天下午 3 点到 5 点组会 #1' : '例如：明天下午 3 点到 5 点修改论文 #1';
+  document.getElementById('submitHint').innerHTML = mode === 'note' ? '<kbd>Ctrl Enter</kbd> 保存' : '<kbd>Enter</kbd> 创建';
   renderHighlights(plainText());
   placeCaretAtEnd();
   queueParse(0);
+}
+
+function setItemKind(nextKind) {
+  itemKind = nextKind;
+  kinds.forEach((input) => { input.checked = input.value === itemKind; });
+  setMode('item');
 }
 
 async function submit() {
@@ -130,7 +148,7 @@ async function submit() {
   try {
     result.classList.remove('error');
     result.textContent = '正在保存…';
-    await api.submitCapture({ mode, content });
+    await api.submitCapture({ mode, itemKind, content });
     editor.value = '';
     renderHighlights('');
     api.setCaptureContentState(false);
@@ -144,6 +162,7 @@ async function submit() {
 }
 
 tabs.forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
+kinds.forEach((input) => input.addEventListener('change', () => setItemKind(input.value)));
 editor.addEventListener('input', () => {
   const text = plainText();
   api.setCaptureContentState(Boolean(text.trim()));
@@ -166,7 +185,7 @@ document.addEventListener('keydown', (event) => {
   if (event.isComposing || composing || event.keyCode === 229) return;
   if (event.key === 'Tab') {
     event.preventDefault();
-    const modes = ['schedule', 'todo', 'note'];
+    const modes = ['item', 'note'];
     setMode(modes[(modes.indexOf(mode) + (event.shiftKey ? modes.length - 1 : 1)) % modes.length]);
   } else if (event.key === 'Escape') {
     if (!plainText().trim()) api.hideCapture();
@@ -181,7 +200,7 @@ document.addEventListener('keydown', (event) => {
     submit();
   } else if (event.key === 'Enter' && !event.shiftKey && window.YanjiListEditing?.applyListEditing(editor, event)) {
     event.preventDefault();
-  } else if (event.key === 'Enter' && (mode === 'schedule' || mode === 'todo') && !event.shiftKey) {
+  } else if (event.key === 'Enter' && mode === 'item' && !event.shiftKey) {
     event.preventDefault();
     submit();
   }

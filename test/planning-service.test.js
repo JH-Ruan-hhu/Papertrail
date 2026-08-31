@@ -51,6 +51,31 @@ test('saves a todo, schedules linked work and deletes the todo without deleting 
   assert.equal(store.data.schedules[0].sourceRef, null);
 });
 
+test('creates a task and its execution block in one atomic workspace write', () => {
+  const store = makeStore();
+  let id = 0;
+  let writes = 0;
+  const originalUpdate = store.updateWorkspace.bind(store);
+  store.updateWorkspace = (updater) => {
+    writes += 1;
+    return originalUpdate(updater);
+  };
+  const service = createPlanningService({
+    store,
+    makeId: (kind) => `${kind}-${++id}`,
+    now: () => new Date('2026-08-31T08:00:00.000Z')
+  });
+  const result = service.createScheduledTodo({
+    todo: { title: '修改论文', dueAt: '2026-09-03T09:00:00.000Z', priority: 'high' },
+    schedule: { title: '修改论文', startAt: '2026-09-03T07:00:00.000Z', endAt: '2026-09-03T09:00:00.000Z' }
+  });
+  assert.equal(writes, 1);
+  assert.equal(store.data.todos.length, 1);
+  assert.equal(store.data.schedules.length, 1);
+  assert.deepEqual(result.schedule.sourceRef, { type: 'todo', id: result.todo.id });
+  assert.equal(result.todo.reminderMode, 'none');
+});
+
 test('converts a normal schedule to a linked todo and supports removing the source block', () => {
   const store = makeStore();
   let id = 0;

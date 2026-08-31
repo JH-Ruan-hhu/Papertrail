@@ -5,8 +5,7 @@
   const HOME_MATRIX_SELECTOR = [
     '.home-progress-strip',
     '.home-next-event-card',
-    '.home-today-card:not(.home-today-todo-card)',
-    '.home-today-todo-card',
+    '.home-today-items-card',
     '.home-attendance-card',
     '.home-schedule-panel',
     '.home-focus-timer',

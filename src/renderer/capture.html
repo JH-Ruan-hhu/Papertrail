@@ -13,18 +13,18 @@
     <main class="capture-card">
       <header>
         <div class="capture-tabs" role="tablist">
-          <button class="active" data-mode="schedule" type="button">日程</button>
-          <button data-mode="todo" type="button">待办</button>
+          <button class="active" data-mode="item" type="button">事项</button>
           <button data-mode="note" type="button">笔记</button>
         </div>
         <span><kbd>Tab</kbd> 切换</span>
       </header>
+      <div class="capture-kinds" id="captureKinds" aria-label="事项类型"><label><input type="radio" name="captureItemKind" value="task" checked><span>要完成的任务</span></label><label><input type="radio" name="captureItemKind" value="event"><span>仅日程事件</span></label></div>
       <div class="capture-input-shell">
         <div id="captureHighlights" class="capture-highlights" aria-hidden="true"></div>
-        <textarea id="captureEditor" class="capture-editor" rows="3" spellcheck="false" aria-label="即写即走输入框" placeholder="例如：明天下午 3 点到 5 点组会 #1"></textarea>
+        <textarea id="captureEditor" class="capture-editor" rows="3" spellcheck="false" aria-label="即写即走输入框" placeholder="例如：明天下午 3 点到 5 点修改论文 #1"></textarea>
       </div>
       <footer>
-        <div id="parseResult" class="parse-result">自动识别时间；#1 红、#2 黄、#3 绿，默认绿色</div>
+        <div id="parseResult" class="parse-result">有具体时段会同时安排时间；只有日期则作为截止日期</div>
         <div><span id="submitHint"><kbd>Enter</kbd> 创建</span><span><kbd>Esc</kbd> 关闭</span></div>
       </footer>
     </main>

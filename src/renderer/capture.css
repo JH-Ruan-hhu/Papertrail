@@ -8,8 +8,15 @@ header > span, footer { color: #6b8493; font-size: 12px; }
 .capture-tabs { display: flex; padding: 2px; gap: 2px; border-radius: 6px; background: #e5f1f7; -webkit-app-region: no-drag; }
 .capture-tabs button { min-width: 60px; padding: 6px 12px; border: 0; border-radius: 8px; color: #587487; background: transparent; font: inherit; font-size: 13px; cursor: pointer; }
 .capture-tabs button.active { color: #f8fcfe; background: #5f96b6; box-shadow: none; }
-.capture-input-shell { position: relative; min-height: 104px; max-height: 104px; margin: 8px -4px 6px; overflow: hidden; -webkit-app-region: no-drag; }
-.capture-editor, .capture-highlights { position: absolute; inset: 0; width: 100%; height: 104px; margin: 0; padding: 14px 4px; overflow: auto; border: 0; outline: 0; font: inherit; font-size: 23px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 4; }
+.capture-kinds { display: flex; gap: 8px; margin-top: 7px; -webkit-app-region: no-drag; }
+.capture-kinds[hidden] { display: none; }
+.capture-kinds label { cursor: pointer; }
+.capture-kinds input { position: absolute; opacity: 0; pointer-events: none; }
+.capture-kinds span { display: block; padding: 4px 9px; border: 1px solid #cddfe8; border-radius: 999px; color: #66808f; background: rgba(255,255,255,.56); font-size: 11px; }
+.capture-kinds input:checked + span { border-color: rgba(70,132,164,.38); color: #356f8f; background: #dceef6; }
+.capture-kinds input:focus-visible + span { outline: 2px solid rgba(78,134,167,.38); outline-offset: 2px; }
+.capture-input-shell { position: relative; min-height: 82px; max-height: 82px; margin: 3px -4px 4px; overflow: hidden; -webkit-app-region: no-drag; }
+.capture-editor, .capture-highlights { position: absolute; inset: 0; width: 100%; height: 82px; margin: 0; padding: 9px 4px; overflow: auto; border: 0; outline: 0; font: inherit; font-size: 22px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: break-word; tab-size: 4; }
 .capture-editor { z-index: 2; resize: none; color: #29485b; background: transparent; caret-color: #4e86a7; }
 .capture-editor::placeholder { color: #8ca0ad; }
 .capture-highlights { z-index: 1; color: transparent; pointer-events: none; scrollbar-width: none; }

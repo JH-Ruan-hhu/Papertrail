@@ -887,14 +887,48 @@ function renderHomeCommandCards(today = new Date()) {
   const todos = wb.workspace.todos || [];
   const openTodos = todos.filter((todo) => todo.status === 'open' && todo.dueAt && (sameDay(todo.dueAt, today) || Date.parse(todo.dueAt) < Date.now()));
   const completedTodos = todos.filter((todo) => todo.status === 'completed' && sameDay(todo.completedAt, today));
-  const visibleTodos = [...openTodos, ...completedTodos].slice(0, 4);
   const next = events.find((item) => Date.parse(item.endAt || item.startAt) >= Date.now()) || events[0];
-  document.getElementById('homeNextEventTitle').textContent = next ? next.title : (openTodos[0]?.title || '今天还没有安排');
-  document.getElementById('homeNextEventMeta').textContent = next ? `${next.allDay ? '全天' : formatTime(next.startAt)} · ${priorityLabels[next.priority]}优先级` : openTodos[0] ? '来自今日待办 · 现在开始也来得及' : '添加一条日程，让今天有下一步';
-  document.getElementById('homeTodayScheduleList').innerHTML = events.slice(0, 4).map((item) => `<button class="home-today-row" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${item.allDay ? '全天' : formatTime(item.startAt)}</time><strong>${wbEscape(item.title)}</strong></button>`).join('') || '<p class="empty-mini">今天还没有日程</p>';
-  document.getElementById('homeTodayTodoList').innerHTML = visibleTodos.map((todo) => `<div class="home-today-row home-todo-row tone-${todo.priority} ${todo.status === 'completed' ? 'is-completed' : ''}"><button class="home-todo-check" data-home-todo-action="${todo.status === 'completed' ? 'reopen' : 'complete'}" data-home-todo-id="${wbEscape(todo.id)}" type="button" aria-label="${todo.status === 'completed' ? '重新打开' : '完成'}${wbEscape(todo.title)}">${todo.status === 'completed' ? uiIcon('check') : ''}</button><button class="home-todo-title" data-edit-todo="${wbEscape(todo.id)}" type="button"><strong>${wbEscape(todo.title)}</strong></button></div>`).join('') || '<p class="empty-mini">今天还没有待办</p>';
-  const total = openTodos.length + completedTodos.length;
-  const rate = total ? Math.round(completedTodos.length / total * 100) : 0;
+  const nextTodo = next ? linkedTodoForSchedule(next) : null;
+  document.getElementById('homeNextEventTitle').textContent = nextTodo?.title || next?.title || openTodos[0]?.title || '今天还没有事项';
+  document.getElementById('homeNextEventMeta').textContent = next
+    ? `${next.allDay ? '全天' : formatTime(next.startAt)} · ${nextTodo ? '任务时间块' : '日程事件'}`
+    : openTodos[0] ? '尚未安排时间 · 现在开始也来得及' : '添加任务或日程，让今天有下一步';
+
+  const linkedEvents = new Map();
+  const items = [];
+  for (const event of events) {
+    const todo = linkedTodoForSchedule(event);
+    if (!todo) {
+      items.push({ kind: 'event', event, sortAt: Date.parse(event.startAt) });
+      continue;
+    }
+    const group = linkedEvents.get(todo.id) || { kind: 'task', todo, events: [], sortAt: Date.parse(event.startAt) };
+    group.events.push(event);
+    group.sortAt = Math.min(group.sortAt, Date.parse(event.startAt));
+    linkedEvents.set(todo.id, group);
+  }
+  items.push(...linkedEvents.values());
+  for (const todo of [...openTodos, ...completedTodos]) {
+    if (!linkedEvents.has(todo.id)) items.push({ kind: 'task', todo, events: [], sortAt: Number.isFinite(Date.parse(todo.dueAt)) ? Date.parse(todo.dueAt) : Number.MAX_SAFE_INTEGER });
+  }
+  items.sort((a, b) => a.sortAt - b.sortAt || a.kind.localeCompare(b.kind));
+  document.getElementById('homeTodayItemsList').innerHTML = items.slice(0, 6).map((item) => {
+    if (item.kind === 'event') {
+      return `<div class="home-today-row home-item-row is-event"><span class="home-item-marker" aria-hidden="true"></span><button class="home-item-time" data-edit-schedule="${wbEscape(item.event.id)}" type="button">${item.event.allDay ? '全天' : formatTime(item.event.startAt)}</button><button class="home-item-title" data-edit-schedule="${wbEscape(item.event.id)}" type="button"><strong>${wbEscape(item.event.title)}</strong><small>日程事件</small></button></div>`;
+    }
+    const completed = item.todo.status === 'completed';
+    const timeLabel = item.events.length
+      ? item.events.map((event) => event.allDay ? '全天' : formatTime(event.startAt)).join('、')
+      : Date.parse(item.todo.dueAt) < Date.now() && !sameDay(item.todo.dueAt, today) ? '已逾期' : item.todo.dueAt ? `截止 ${formatTime(item.todo.dueAt)}` : '未排期';
+    const scheduleId = item.events[0]?.id;
+    const timeControl = scheduleId
+      ? `<button class="home-item-time" data-edit-schedule="${wbEscape(scheduleId)}" type="button">${wbEscape(timeLabel)}</button>`
+      : `<span class="home-item-time">${wbEscape(timeLabel)}</span>`;
+    return `<div class="home-today-row home-item-row is-task tone-${item.todo.priority} ${completed ? 'is-completed' : ''}"><button class="home-todo-check" data-home-todo-action="${completed ? 'reopen' : 'complete'}" data-home-todo-id="${wbEscape(item.todo.id)}" type="button" aria-label="${completed ? '重新打开' : '完成'}${wbEscape(item.todo.title)}">${completed ? uiIcon('check') : ''}</button>${timeControl}<button class="home-item-title" data-edit-todo="${wbEscape(item.todo.id)}" type="button"><strong>${wbEscape(item.todo.title)}</strong><small>${item.events.length ? '任务 · 已安排时间' : '任务'}</small></button></div>`;
+  }).join('') || '<p class="empty-mini">今天还没有事项</p>';
+  const taskTodos = [...new Map(items.filter((item) => item.kind === 'task').map((item) => [item.todo.id, item.todo])).values()];
+  const completed = taskTodos.filter((todo) => todo.status === 'completed').length;
+  const rate = taskTodos.length ? Math.round(completed / taskTodos.length * 100) : 0;
   const progress = document.getElementById('homeTodoProgress');
   progress.style.setProperty('--todo-progress-scale', String(rate / 100));
   progress.querySelector('span').textContent = `${rate}% 完成`;
@@ -1181,6 +1215,26 @@ async function saveAttendanceFromEditor() {
   }
 }
 
+function selectedScheduleEntryKind() {
+  return document.querySelector('input[name="scheduleEntryKind"]:checked')?.value || 'task';
+}
+
+function updateScheduleEntryKindPresentation() {
+  const field = document.getElementById('scheduleEntryKindField');
+  const taskMode = selectedScheduleEntryKind() === 'task';
+  const choosingKind = !field.hidden;
+  document.getElementById('scheduleTitleLabel').textContent = taskMode ? '任务内容' : '日程内容';
+  document.getElementById('scheduleTitle').placeholder = taskMode ? '例如：明天下午四点修改论文' : '例如：明天下午四点参加组会';
+  document.getElementById('scheduleDialogDescription').textContent = taskMode
+    ? '记录要完成的结果，并为它安排执行时间'
+    : '记录会议、预约或出行等时间占用';
+  if (choosingKind) document.getElementById('scheduleDialogTitle').textContent = taskMode ? '新建任务并安排' : '新建日程事件';
+  document.getElementById('saveScheduleButton').textContent = choosingKind && taskMode ? '创建任务并安排' : '保存日程';
+  const repeatInput = document.getElementById('scheduleRepeatDailyInput');
+  if (choosingKind && taskMode) repeatInput.checked = false;
+  repeatInput.closest('label').hidden = taskMode;
+}
+
 function openScheduleEditor(schedule = null, sourceTodo = null, options = {}) {
   const dialog = document.getElementById('scheduleDialog');
   const convertingTodoId = options.convertTodoId || null;
@@ -1215,6 +1269,10 @@ function openScheduleEditor(schedule = null, sourceTodo = null, options = {}) {
   document.getElementById('scheduleReminderSelect').value = reminder;
   document.querySelector(`input[name="schedulePriority"][value="${schedule?.priority || convertingTodo?.priority || draft?.priority || pendingTodo?.priority || 'low'}"]`).checked = true;
   const linkedTodo = schedule?.sourceRef?.type === 'todo' ? wb.workspace.todos.find((todo) => todo.id === schedule.sourceRef.id) : pendingTodo;
+  const canChooseEntryKind = !schedule && !convertingTodo && !linkedTodo;
+  const entryKind = canChooseEntryKind ? draft?.entryKind || 'task' : linkedTodo || convertingTodo ? 'task' : 'event';
+  document.getElementById('scheduleEntryKindField').hidden = !canChooseEntryKind;
+  document.querySelector(`input[name="scheduleEntryKind"][value="${entryKind}"]`).checked = true;
   wb.editingScheduleTodoId = linkedTodo?.id || null;
   wb.pendingTodoId = null;
   document.getElementById('scheduleLinkedTodoPanel').hidden = !linkedTodo;
@@ -1234,6 +1292,7 @@ function openScheduleEditor(schedule = null, sourceTodo = null, options = {}) {
   document.getElementById('deleteScheduleButton').hidden = !schedule;
   document.getElementById('convertScheduleButton').hidden = !schedule || Boolean(schedule.sourceRef);
   document.getElementById('scheduleError').textContent = '';
+  updateScheduleEntryKindPresentation();
   openWorkbenchDialog(dialog);
   setTimeout(() => document.getElementById('scheduleTitle').focus(), 20);
 }
@@ -1249,6 +1308,7 @@ function captureScheduleDraft() {
     allDay: document.getElementById('scheduleAllDayInput').checked,
     repeat: document.getElementById('scheduleRepeatDailyInput').checked ? 'daily' : null,
     reminderMinutesBefore: document.getElementById('scheduleReminderSelect').value === 'null' ? null : Number(document.getElementById('scheduleReminderSelect').value),
+    entryKind: selectedScheduleEntryKind(),
     recognition: wb.scheduleRecognition?.input === title.trim() ? wb.scheduleRecognition : null
   };
 }
@@ -1431,6 +1491,7 @@ async function saveScheduleFromEditor() {
   const startTime = document.getElementById('scheduleStartTime').value;
   const endTime = document.getElementById('scheduleEndTime').value;
   const allDay = document.getElementById('scheduleAllDayInput').checked;
+  const creatingTask = !scheduleId && !wb.editingScheduleTodoId && !wb.convertingTodoId && selectedScheduleEntryKind() === 'task';
   if (!date || (!allDay && (!startTime || !endTime))) {
     error.textContent = allDay ? '请选择日期' : '请选择日期、开始时间和结束时间';
     return;
@@ -1446,14 +1507,21 @@ async function saveScheduleFromEditor() {
   try {
     if (!scheduleId && !wb.convertingTodoId && recognizedSchedules.length > 1) {
       for (const schedule of recognizedSchedules) {
-        const repeatedSchedule = { ...schedule, repeat: document.getElementById('scheduleRepeatDailyInput').checked ? 'daily' : null };
+        const repeatedSchedule = { ...schedule, repeat: creatingTask ? null : document.getElementById('scheduleRepeatDailyInput').checked ? 'daily' : null };
         if (!await confirmScheduleConflict(repeatedSchedule)) return;
-        await workbenchApi.saveSchedule(repeatedSchedule);
+        if (creatingTask) {
+          await workbenchApi.createScheduledTodo({
+            todo: { title: schedule.title, dueAt: schedule.endAt, priority: schedule.priority, reminderMode: 'none' },
+            schedule: repeatedSchedule
+          });
+        } else {
+          await workbenchApi.saveSchedule(repeatedSchedule);
+        }
       }
       wb.selectedDate = new Date(recognizedSchedules[0].startAt);
       clearScheduleDraft();
       closeWorkbenchDialog(document.getElementById('scheduleDialog'));
-      showWorkbenchToast(`已创建 ${recognizedSchedules.length} 条日程。`);
+      showWorkbenchToast(creatingTask ? `已创建并安排 ${recognizedSchedules.length} 项任务。` : `已创建 ${recognizedSchedules.length} 条日程。`);
       return;
     }
     const payload = {
@@ -1485,7 +1553,13 @@ async function saveScheduleFromEditor() {
       return;
     }
     if (!await confirmScheduleConflict(payload)) return;
-    const savedSchedule = await workbenchApi.saveSchedule(payload);
+    const savedResult = creatingTask
+      ? await workbenchApi.createScheduledTodo({
+        todo: { title: payload.title, dueAt: new Date(endAt.getTime() - (allDay ? 60_000 : 0)).toISOString(), priority: payload.priority, reminderMode: 'none' },
+        schedule: { ...payload, repeat: null, sourceRef: null }
+      })
+      : await workbenchApi.saveSchedule(payload);
+    const savedSchedule = creatingTask ? savedResult.schedule : savedResult;
     wb.selectedDate = dateFromKey(date);
     if (!scheduleId && savedSchedule?.id) {
       wb.pendingScheduleHighlightId = savedSchedule.id;
@@ -1493,7 +1567,7 @@ async function saveScheduleFromEditor() {
     }
     if (!scheduleId) clearScheduleDraft();
     closeWorkbenchDialog(document.getElementById('scheduleDialog'));
-    showWorkbenchToast('日程已保存。');
+    showWorkbenchToast(creatingTask ? '任务已创建并安排时间。' : '日程已保存。');
     resetScheduleConversionContext();
   } catch (exception) {
     error.textContent = exception.message || '日程保存失败。';
@@ -2129,6 +2203,7 @@ function bindWorkbenchEvents() {
     openScheduleEditor(null, null, { convertTodoId: todoId });
   });
   document.getElementById('scheduleAllDayInput').addEventListener('change', (event) => document.querySelectorAll('.schedule-time-field').forEach((field) => field.classList.toggle('is-hidden', event.target.checked)));
+  document.querySelectorAll('input[name="scheduleEntryKind"]').forEach((input) => input.addEventListener('change', updateScheduleEntryKindPresentation));
   document.getElementById('scheduleStartTime').addEventListener('input', (event) => {
     const endTime = scheduleEndTimeAfterStart(event.target.value);
     if (endTime) document.getElementById('scheduleEndTime').value = endTime;

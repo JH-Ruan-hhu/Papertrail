@@ -252,6 +252,50 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
     });
   }
 
+  function createScheduledTodo(input = {}) {
+    const requestedTodo = pick(input.todo, TODO_INPUT_KEYS);
+    const requestedSchedule = pick(input.schedule, SCHEDULE_INPUT_KEYS);
+    if (!requestedSchedule.startAt || !requestedSchedule.endAt) {
+      throw new Error('创建有时间安排的任务时必须选择开始和结束时间。');
+    }
+    const timestamp = getNow();
+    let result;
+    commit(store, (workspace) => {
+      ensureCollections(workspace);
+      const todoId = requestedTodo.id ? safeId(requestedTodo.id, '待办') : makeTodoId();
+      const scheduleId = requestedSchedule.id ? safeId(requestedSchedule.id, '日程') : makeScheduleId();
+      if (workspace.todos.some((item) => item.id === todoId)) throw new Error('任务 ID 已存在。');
+      if (workspace.schedules.some((item) => item.id === scheduleId)) throw new Error('时间块 ID 已存在。');
+      const title = String(requestedTodo.title || requestedSchedule.title || '').trim();
+      const todo = normalizeTodo({
+        ...requestedTodo,
+        id: todoId,
+        title,
+        priority: requestedTodo.priority || requestedSchedule.priority,
+        dueAt: requestedTodo.dueAt || requestedSchedule.endAt,
+        reminderMode: requestedTodo.reminderMode || 'none',
+        createdAt: timestamp,
+        updatedAt: timestamp
+      }, 0, timestamp);
+      const schedule = normalizeSchedule({
+        ...requestedSchedule,
+        id: scheduleId,
+        title: requestedSchedule.title || todo.title,
+        priority: requestedSchedule.priority || todo.priority,
+        sourceRef: { type: 'todo', id: todo.id },
+        createdAt: timestamp,
+        updatedAt: timestamp
+      }, 0, timestamp);
+      workspace.todos = [todo, ...workspace.todos];
+      workspace.schedules = [schedule, ...workspace.schedules];
+      result = { todo, schedule };
+      return workspace;
+    });
+    notify('created', result.todo.id, ['dueAt', 'priority', 'sourceRef']);
+    notify('created', result.schedule.id, ['startAt', 'endAt', 'priority', 'sourceRef']);
+    return clone(result);
+  }
+
   function convertScheduleToTodo(scheduleIdValue, input = {}) {
     const scheduleId = safeId(scheduleIdValue, '日程');
     const schedule = findById(listSchedules(), scheduleId, '日程');
@@ -330,6 +374,7 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
   return {
     cancelTodo: (id) => updateTodoStatus(id, 'cancel'),
     completeTodo: (id) => updateTodoStatus(id, 'complete'),
+    createScheduledTodo,
     convertScheduleToTodo,
     convertTodoToSchedule,
     deleteSchedule: deleteScheduleItem,
