@@ -483,7 +483,7 @@ test('note editor autosaves a full daily document and opens from its card', () =
   assert.match(workbenchJs, /function openNoteEditor[\s\S]*openWorkbenchDialog\(dialog, \{ animate: !sourceCard \}\)[\s\S]*animateNoteDialogFromCard\(dialog, sourceCard\)/);
   assert.match(workbenchJs, /function closeNoteDialogToCard[\s\S]*duration:\s*220/);
   assert.match(noteEditorJs, /duration:\s*260/);
-  assert.doesNotMatch(workbenchJs, /noteDialog'\)\.addEventListener\('click'/);
+  assert.match(workbenchJs, /noteDialog\.addEventListener\('pointerdown'[\s\S]*event\.target === event\.currentTarget[\s\S]*noteDialog\.addEventListener\('click'[\s\S]*notePointerStartedOnBackdrop && event\.target === event\.currentTarget[\s\S]*closeNoteEditorSafely\(event\.currentTarget\)/);
   assert.match(indexHtml, /class="note-paper"/);
   assert.match(indexHtml, /id="noteDocumentTitle"/);
   assert.match(indexHtml, /id="noteWordCount"/);

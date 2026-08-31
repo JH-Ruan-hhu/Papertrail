@@ -203,6 +203,7 @@ app.whenReady().then(async () => {
         const card = document.querySelector('#notesGrid .note-card');
         const originalCardText = card.querySelector('p').textContent;
         card.click();
+        document.getElementById('noteDialog').getAnimations().forEach((animation) => animation.finish());
         const editor = document.getElementById('noteContent');
         editor.innerHTML = '<p>这是尚未保存的弹窗草稿</p>';
         editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '草稿' }));
@@ -245,16 +246,23 @@ app.whenReady().then(async () => {
     await captureStablePage(process.env.WORKBENCH_NOTE_MODAL_OUTPUT);
     const savedResult = await window.webContents.executeJavaScript(`
       (async () => {
-        document.getElementById('saveNoteButton').click();
-        await new Promise((resolve) => setTimeout(resolve, 120));
+        const dialog = document.getElementById('noteDialog');
+        const editor = document.getElementById('noteContent');
+        editor.insertAdjacentHTML('beforeend', '<p>遮罩关闭前的更改</p>');
+        editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '遮罩关闭前的更改' }));
+        dialog.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        dialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 20));
+        dialog.getAnimations().forEach((animation) => animation.finish());
+        for (let attempt = 0; attempt < 20 && dialog.open; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 50));
         return {
-          closedAfterSave: !document.getElementById('noteDialog').open,
-          cardUpdatedAfterSave: document.querySelector('#notesGrid .note-card p')?.textContent.includes('尚未保存的弹窗草稿')
+          closedAfterBackdrop: !dialog.open,
+          cardUpdatedAfterBackdrop: document.querySelector('#notesGrid .note-card p')?.textContent.includes('遮罩关闭前的更改')
         };
       })()
     `);
     const noteModalResult = { ...draftResult, ...savedResult };
-    if (!noteModalResult.draftDoesNotLeak || !noteModalResult.hintShowsUnsaved || !noteModalResult.widerEditor || !noteModalResult.tallerEditor || !noteModalResult.centered || !noteModalResult.propertyPanelOpen || !noteModalResult.propertyPanelClosed || !noteModalResult.propertyPanelFullyHidden || !noteModalResult.paperCenteredAfterClose || !noteModalResult.closedAfterSave || !noteModalResult.cardUpdatedAfterSave) throw new Error(`Note modal smoke failed: ${JSON.stringify(noteModalResult)}`);
+    if (!noteModalResult.draftDoesNotLeak || !noteModalResult.hintShowsUnsaved || !noteModalResult.widerEditor || !noteModalResult.tallerEditor || !noteModalResult.centered || !noteModalResult.propertyPanelOpen || !noteModalResult.propertyPanelClosed || !noteModalResult.propertyPanelFullyHidden || !noteModalResult.paperCenteredAfterClose || !noteModalResult.closedAfterBackdrop || !noteModalResult.cardUpdatedAfterBackdrop) throw new Error(`Note modal smoke failed: ${JSON.stringify(noteModalResult)}`);
     console.log(`WORKBENCH_NOTE_MODAL_OK ${JSON.stringify(noteModalResult)}`);
     window.destroy();
     app.quit();

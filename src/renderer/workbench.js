@@ -2448,6 +2448,18 @@ function bindWorkbenchEvents() {
     }
     closeNoteEditorSafely(dialog, { morph: false }).catch(() => {});
   });
+  const noteDialog = document.getElementById('noteDialog');
+  let notePointerStartedOnBackdrop = false;
+  noteDialog.addEventListener('pointerdown', (event) => {
+    notePointerStartedOnBackdrop = event.target === event.currentTarget;
+  });
+  noteDialog.addEventListener('pointercancel', () => { notePointerStartedOnBackdrop = false; });
+  noteDialog.addEventListener('click', (event) => {
+    const clickedBackdrop = notePointerStartedOnBackdrop && event.target === event.currentTarget;
+    notePointerStartedOnBackdrop = false;
+    if (!clickedBackdrop) return;
+    closeNoteEditorSafely(event.currentTarget).catch(() => {});
+  });
   document.getElementById('noteDialog').addEventListener('close', () => setNoteEditorFullscreen(false));
   document.getElementById('noteImagePreviewDialog').addEventListener('click', (event) => {
     if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget);
