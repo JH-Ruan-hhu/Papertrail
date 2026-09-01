@@ -7,6 +7,7 @@ const {
   normalizeNote
 } = require('./workbench-core');
 const { normalizeJobApplication } = require('./job-core');
+const { normalizeCountdown } = require('./countdown-core');
 const { DATA_VERSION, migrateSchema7To8, migrateSchema8To9, migrateSchema9To10, migrateSchema10To11 } = require('./migration-core');
 
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
@@ -230,6 +231,7 @@ function migrateData(parsed, defaultSettings) {
     ? migrateSchema10To11(v10.data)
     : v10;
   const source = migrated.data;
+  if (source.countdowns != null && !Array.isArray(source.countdowns)) throw new Error('倒计时列表格式无效。');
   const settings = source.settings;
   const papers = (source.papers || []).map(migratePaper).map((paper) => (
     paper.lastError && !paper.nextRetryAt
@@ -250,6 +252,7 @@ function migrateData(parsed, defaultSettings) {
     papers,
     schedules: source.schedules || [],
     todos: source.todos || [],
+    countdowns: (source.countdowns || []).map(normalizeCountdown).filter(Boolean),
     notes,
     metadataFields,
     attendance,

@@ -48,6 +48,8 @@ function normalizeSettings(source, defaults) {
   settings.widgetShowTodos = input.widgetShowTodos !== false;
   settings.widgetShowCompletedTodos = input.widgetShowCompletedTodos === true;
   settings.appearanceTheme = input.appearanceTheme === 'classic' ? 'classic' : (input.appearanceTheme === 'liquid-glass' ? 'liquid-glass' : (safeDefaults.appearanceTheme || 'liquid-glass'));
+  settings.homeBannerImageMode = ['default', 'local', 'bing'].includes(input.homeBannerImageMode) ? input.homeBannerImageMode : (safeDefaults.homeBannerImageMode || 'default');
+  settings.homeBannerImageCredit = String(input.homeBannerImageCredit || '').slice(0, 300);
   settings.eventNotifications = input.eventNotifications !== false;
   settings.todoNotifications = input.todoNotifications !== false;
   const allowedEventReminders = new Set([null, 0, 5, 10, 15, 30, 60, 1440]);

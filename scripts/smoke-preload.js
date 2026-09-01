@@ -215,6 +215,7 @@ let smokeWorkspace = {
     { id: 'attendance-afternoon', date: todayKey, clockInAt: todayAt(13, 20), clockOutAt: todayAt(17, 35), appUsage: { Zotero: 1320, WINWORD: 780 }, createdAt: todayAt(13, 20), updatedAt: todayAt(17, 35) },
     { id: 'attendance-midnight', date: todayKey, clockInAt: todayAt(18, 0), clockOutAt: tomorrowAt(0, 0), appUsage: { WINWORD: 5400 }, createdAt: todayAt(18, 0), updatedAt: tomorrowAt(0, 0) }
   ],
+  countdowns: [{ id: 'countdown-smoke-1', title: '论文返修截止', targetAt: new Date(now + 17 * 86_400_000).toISOString(), createdAt: new Date(now - 86_400_000).toISOString(), updatedAt: new Date(now - 86_400_000).toISOString() }],
   focusSessions: [
     { id: 'focus-today', startedAt: todayAt(10, 0), endedAt: todayAt(10, 50), plannedMinutes: 50, status: 'completed', appUsage: { WINWORD: 1260, chrome: 980, Zotero: 510 }, suppressNotifications: true, notificationsSuppressed: true, notificationRestore: null, notificationRestoredAt: todayAt(10, 50), notificationError: null, createdAt: todayAt(10, 0), updatedAt: todayAt(10, 50) }
   ],
@@ -278,7 +279,25 @@ contextBridge.exposeInMainWorld('paperTrail', {
     return { todo, schedule };
   },
   deleteSchedule: async () => true,
-  completeSchedule: async () => true,
+  completeSchedule: async (id, completed) => {
+    let updated = null;
+    smokeWorkspace.schedules = (smokeWorkspace.schedules || []).map((schedule) => {
+      if (schedule.id !== id) return schedule;
+      updated = { ...schedule, completedAt: completed ? new Date().toISOString() : null };
+      return updated;
+    });
+    return updated;
+  },
+  saveCountdown: async (input) => {
+    const existing = (smokeWorkspace.countdowns || []).find((item) => item.id === input?.id);
+    const saved = { ...existing, ...input, id: existing?.id || `countdown-${Date.now()}`, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+    smokeWorkspace.countdowns = [saved, ...(smokeWorkspace.countdowns || []).filter((item) => item.id !== saved.id)];
+    return saved;
+  },
+  deleteCountdown: async (id) => {
+    smokeWorkspace.countdowns = (smokeWorkspace.countdowns || []).filter((item) => item.id !== id);
+    return true;
+  },
   showScheduleWidget: async () => ({ attached: true }),
   closeScheduleWidget: async () => { document.body.dataset.closeRequested = 'true'; return true; },
   openScheduleWidgetMain: async () => { document.body.dataset.openMainRequested = 'true'; return true; },
@@ -391,6 +410,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
     autoCheckUpdates: true,
     quickCaptureShortcut: 'CommandOrControl+Shift+Space',
     stickyNoteShortcut: 'CommandOrControl+Alt+N',
+    homeBannerImageMode: 'default',
+    homeBannerImageCredit: '',
+    homeBannerImageDataUrl: '',
     appVersion: '1.0.0',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\Yanji Data',
     backupCount: 1,
@@ -398,6 +420,19 @@ contextBridge.exposeInMainWorld('paperTrail', {
     isDefaultDataDirectory: false
   }),
   updateSettings: async (settings) => settings,
+  chooseHomeBannerImage: async () => ({
+    canceled: false,
+    settings: {
+      homeBannerImageMode: 'local',
+      homeBannerImageCredit: '',
+      homeBannerImageDataUrl: 'data:image/jpeg;base64,/9j/2Q=='
+    }
+  }),
+  refreshBingHomeBanner: async () => ({
+    homeBannerImageMode: 'bing',
+    homeBannerImageCredit: '示例必应每日图片',
+    homeBannerImageDataUrl: 'data:image/jpeg;base64,/9j/2Q=='
+  }),
   chooseDataDirectory: async () => ({
     canceled: false,
     settings: {

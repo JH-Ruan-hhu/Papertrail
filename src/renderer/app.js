@@ -100,6 +100,8 @@ const elements = {
   closeSettingsDialogButton: document.getElementById('closeSettingsDialogButton'),
   cancelSettingsButton: document.getElementById('cancelSettingsButton'),
   changeDataDirectoryButton: document.getElementById('changeDataDirectoryButton'),
+  chooseHomeBannerButton: document.getElementById('chooseHomeBannerButton'),
+  refreshBingBannerButton: document.getElementById('refreshBingBannerButton'),
   deleteBackupsButton: document.getElementById('deleteBackupsButton'),
   dataDirectory: document.getElementById('dataDirectory'),
   backupSummary: document.getElementById('backupSummary'),
@@ -922,6 +924,7 @@ function populateSettings() {
   document.getElementById('widgetShowSchedules').checked = settings.widgetShowSchedules !== false;
   document.getElementById('widgetShowTodos').checked = settings.widgetShowTodos !== false;
   document.querySelectorAll('input[name="appearanceTheme"]').forEach((input) => { input.checked = input.value === (settings.appearanceTheme || 'liquid-glass'); });
+  document.querySelectorAll('input[name="homeBannerImageMode"]').forEach((input) => { input.checked = input.value === (settings.homeBannerImageMode || 'default'); });
   document.getElementById('closeToTray').checked = settings.closeToTray;
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
@@ -929,7 +932,52 @@ function populateSettings() {
   document.getElementById('stickyNoteShortcut').value = settings.stickyNoteShortcut || 'CommandOrControl+Alt+N';
   syncReminderSettings();
   syncTodayWidgetSettings();
+  syncHomeBannerSettings();
   populateSettingsMetadata();
+}
+
+function syncHomeBannerSettings() {
+  const mode = document.querySelector('input[name="homeBannerImageMode"]:checked')?.value || 'default';
+  const hasImage = Boolean(state.settings?.homeBannerImageDataUrl);
+  elements.chooseHomeBannerButton.hidden = mode !== 'local';
+  elements.refreshBingBannerButton.hidden = mode !== 'bing';
+  const status = document.getElementById('homeBannerImageStatus');
+  const credit = document.getElementById('homeBannerImageCredit');
+  status.textContent = mode === 'bing' ? (hasImage ? '已缓存必应每日图片' : '尚未获取必应图片') : mode === 'local' ? (hasImage ? '已选择本地图片' : '尚未选择本地图片') : '使用默认柔和背景';
+  credit.textContent = mode === 'bing' && state.settings?.homeBannerImageCredit
+    ? state.settings.homeBannerImageCredit
+    : mode === 'default' ? '不联网，也不读取本地图片' : '图片会保存在研迹的私有缓存中';
+}
+
+async function chooseHomeBannerImage() {
+  elements.settingsError.textContent = '';
+  elements.chooseHomeBannerButton.disabled = true;
+  try {
+    const result = await api.chooseHomeBannerImage();
+    if (result?.settings) state.settings = result.settings;
+    populateSettings();
+    if (!result?.canceled) showToast('首页横幅图片已更新。');
+  } catch (error) {
+    elements.settingsError.textContent = getErrorMessage(error);
+  } finally {
+    elements.chooseHomeBannerButton.disabled = false;
+  }
+}
+
+async function refreshBingHomeBanner() {
+  elements.settingsError.textContent = '';
+  elements.refreshBingBannerButton.disabled = true;
+  elements.refreshBingBannerButton.textContent = '正在获取…';
+  try {
+    state.settings = await api.refreshBingHomeBanner();
+    populateSettings();
+    showToast('已更新为今日必应图片。');
+  } catch (error) {
+    elements.settingsError.textContent = getErrorMessage(error);
+  } finally {
+    elements.refreshBingBannerButton.disabled = false;
+    elements.refreshBingBannerButton.textContent = '获取今日图片';
+  }
 }
 
 function syncReminderSettings() {
@@ -1093,6 +1141,7 @@ async function saveSettings() {
       defaultEventReminderMinutes: document.getElementById('defaultEventReminderMinutes').value === 'null' ? null : Number(document.getElementById('defaultEventReminderMinutes').value),
       defaultTodoReminderMode: document.getElementById('defaultTodoReminderMode').value,
       appearanceTheme: document.querySelector('input[name="appearanceTheme"]:checked')?.value || 'liquid-glass',
+      homeBannerImageMode: document.querySelector('input[name="homeBannerImageMode"]:checked')?.value || 'default',
       todayWidgetEnabled: document.getElementById('todayWidgetEnabled').checked,
       widgetShowSchedules: document.getElementById('widgetShowSchedules').checked,
       widgetShowTodos: document.getElementById('widgetShowTodos').checked,
@@ -1298,6 +1347,9 @@ function bindEvents() {
     document.querySelector('[data-workbench-page="home"]').click();
   });
   elements.changeDataDirectoryButton.addEventListener('click', changeDataDirectory);
+  elements.chooseHomeBannerButton.addEventListener('click', chooseHomeBannerImage);
+  elements.refreshBingBannerButton.addEventListener('click', refreshBingHomeBanner);
+  document.querySelectorAll('input[name="homeBannerImageMode"]').forEach((input) => input.addEventListener('change', syncHomeBannerSettings));
   elements.deleteBackupsButton.addEventListener('click', deleteDataBackups);
   elements.updateActionButton.addEventListener('click', handleUpdateAction);
   elements.updatePromptActionButton.addEventListener('click', handleUpdatePromptAction);

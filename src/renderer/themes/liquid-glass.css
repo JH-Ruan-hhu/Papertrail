@@ -475,7 +475,28 @@ html[data-appearance="liquid-glass"] :is(
 }
 html[data-appearance="liquid-glass"] .job-position:hover,
 html[data-appearance="liquid-glass"] .job-stage-option.is-selected { background: rgba(255,255,255,.7); }
+html[data-appearance="liquid-glass"] .job-position.is-pinned { background: linear-gradient(90deg, rgba(92,126,219,.18), rgba(255,255,255,.62) 46%); box-shadow: inset 3px 0 rgba(56,96,204,.82); }
+html[data-appearance="liquid-glass"] .job-pin-divider { background: rgba(244,247,252,.46); }
+html[data-appearance="liquid-glass"] .job-pin-divider::before,
+html[data-appearance="liquid-glass"] .job-pin-divider::after { background: rgba(91,112,157,.16); }
 html[data-appearance="liquid-glass"] .job-table-toolbar,
 html[data-appearance="liquid-glass"] .job-table-head { border-bottom-color: rgba(91,112,157,.12); }
 html[data-appearance="liquid-glass"] .job-position { border-bottom-color: rgba(91,112,157,.1); }
 html[data-appearance="liquid-glass"] .home-job-row { background: transparent; box-shadow: none; }
+
+/* Home matrices already have borders and a shared ambient canvas. Keep only
+   the inset highlight so no pair of neighboring rows creates a gray band. */
+html[data-appearance="liquid-glass"] :is(
+  .home-progress-strip,
+  .home-command-grid > article,
+  .home-top-grid > section,
+  .home-utility-stack > section,
+  .home-content-grid > section
+) { box-shadow: var(--glass-highlight); }
+html[data-appearance="classic"] :is(
+  .home-progress-strip,
+  .home-command-grid > article,
+  .home-top-grid > section,
+  .home-utility-stack > section,
+  .home-content-grid > section
+) { box-shadow: none; }

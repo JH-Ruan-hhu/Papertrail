@@ -136,6 +136,28 @@ function parseDateExpression(text, baseDate) {
     return { date, token: slashDate[0], explicit: true };
   }
 
+  // A bare day such as “2号晚上” means the next occurrence of that day in
+  // the current or following month. Consume an optional “前” so deadline
+  // wording leaves a clean task title.
+  const dayOnly = text.match(/(?<![\d月])(\d{1,2})\s*(?:日|号)(?:前)?(?=$|[^\d])/);
+  if (dayOnly) {
+    const day = Number(dayOnly[1]);
+    let year = base.getFullYear();
+    let month = base.getMonth() + 1;
+    let date = atLocalDate(year, month, day, 12);
+    if (!date) return { invalid: true, token: dayOnly[0].trim(), explicit: true };
+    if (date < addLocalDays(base, -1)) {
+      month += 1;
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+      date = atLocalDate(year, month, day, 12);
+      if (!date) return { invalid: true, token: dayOnly[0].trim(), explicit: true };
+    }
+    return { date, token: dayOnly[0].trim(), explicit: true };
+  }
+
   const week = text.match(/(下周|下星期|本周|本星期|这周|这星期|周|星期)([一二三四五六日天])/);
   if (week) {
     const target = WEEKDAYS[week[2]];

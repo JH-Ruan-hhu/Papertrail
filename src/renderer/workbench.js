@@ -7,7 +7,7 @@ const wb = {
   pendingTodoId: null,
   convertingTodoId: null,
   editingScheduleTodoId: null,
-  workspace: { schedules: [], todos: [], notes: [], metadataFields: [], attendance: [], focusSessions: [], jobApplications: [] },
+  workspace: { schedules: [], todos: [], countdowns: [], notes: [], metadataFields: [], attendance: [], focusSessions: [], jobApplications: [] },
   selectedDate: new Date(),
   attendanceWeekStart: null,
   editingNote: null,
@@ -45,7 +45,6 @@ function syncViewportDensity() {
 
 syncViewportDensity();
 window.addEventListener('resize', syncViewportDensity, { passive: true });
-window.addEventListener('resize', () => requestAnimationFrame(fitHomeDayCards), { passive: true });
 window.visualViewport?.addEventListener('resize', syncViewportDensity, { passive: true });
 
 const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', jobs: '求职', submissions: '投稿', settings: '设置' });
@@ -97,6 +96,7 @@ const UI_ICON_PATHS = Object.freeze({
   note: '<path d="M6 3.5h9l3 3v14H6z"/><path d="M15 3.5v4h4M9 12h6M9 16h4"/>',
   external: '<path d="M13 5h6v6M19 5l-8 8"/><path d="M17 13v6H5V7h6"/>',
   eye: '<path d="M3.5 12s3.1-5 8.5-5 8.5 5 8.5 5-3.1 5-8.5 5-8.5-5-8.5-5Z"/><circle cx="12" cy="12" r="2"/>',
+  pin: '<path d="m9 3 6 6-2 2 3 3-2 2-3-3-4.5 4.5-.5-.5L10 12 7 9z"/><path d="m6.5 17.5-3 3"/>',
   trash: '<path d="M5 7h14M9 7V4h6v3M7 7l.8 13h8.4L17 7M10 11v5M14 11v5"/>',
   upload: '<path d="M12 16V4M8 8l4-4 4 4M5 14v5h14v-5"/>',
   download: '<path d="M12 4v12M8 12l4 4 4-4M5 19h14"/>',
@@ -288,7 +288,19 @@ function renderClock() {
   const clock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(now);
   document.getElementById('topbarClock').textContent = clock;
   renderHomeAttendance();
+  renderHomeDeadlines(now);
   renderFocus();
+}
+
+function applyHomeBannerSettings(settings = wb.settings || {}) {
+  const strip = document.querySelector('.home-progress-strip');
+  if (!strip) return;
+  const mode = settings.homeBannerImageMode || 'default';
+  const image = mode === 'default' ? '' : settings.homeBannerImageDataUrl;
+  strip.classList.toggle('has-banner-image', Boolean(image));
+  strip.style.setProperty('--home-banner-image', image ? `url("${String(image).replaceAll('"', '%22')}")` : 'none');
+  strip.dataset.bannerMode = image ? mode : 'default';
+  strip.title = mode === 'bing' && settings.homeBannerImageCredit ? settings.homeBannerImageCredit : '';
 }
 
 function schedulesForDay(date) {
@@ -327,18 +339,67 @@ function scheduleTimeForDay(schedule, date) {
   };
 }
 
+function homeItemsForDay(date) {
+  const today = new Date();
+  const events = schedulesForDay(date);
+  const linkedTasks = new Map();
+  const items = [];
+  for (const event of events) {
+    const todo = linkedTodoForSchedule(event);
+    if (!todo) {
+      items.push({ kind: 'event', event, sortAt: Date.parse(event.startAt) });
+      continue;
+    }
+    const group = linkedTasks.get(todo.id) || { kind: 'task', todo, events: [], sortAt: Date.parse(event.startAt) };
+    group.events.push(event);
+    group.sortAt = Math.min(group.sortAt, Date.parse(event.startAt));
+    linkedTasks.set(todo.id, group);
+  }
+  items.push(...linkedTasks.values());
+  const dayTodos = (wb.workspace.todos || []).filter((todo) => {
+    if (todo.status === 'cancelled' || linkedTasks.has(todo.id)) return false;
+    const scheduledInHomeRange = Array.from({ length: 4 }, (_, index) => schedulesForDay(addDays(today, index)))
+      .some((dayEvents) => dayEvents.some((event) => event.sourceRef?.type === 'todo' && event.sourceRef.id === todo.id));
+    if (scheduledInHomeRange) return false;
+    if (todo.status === 'completed') return sameDay(date, today) && sameDay(todo.completedAt, date);
+    if (todo.status !== 'open' || !todo.dueAt) return false;
+    return sameDay(todo.dueAt, date) || (sameDay(date, today) && Date.parse(todo.dueAt) < new Date(date).setHours(0, 0, 0, 0));
+  });
+  items.push(...dayTodos.map((todo) => ({ kind: 'task', todo, events: [], sortAt: Date.parse(todo.dueAt) })));
+  return items.sort((a, b) => a.sortAt - b.sortAt || a.kind.localeCompare(b.kind));
+}
+
+function homeDayItemHtml(item, date) {
+  if (item.kind === 'event') {
+    const completed = Boolean(item.event.completedAt);
+    const timeLabel = item.event.allDay ? '全天' : scheduleTimeForDay(item.event, date).label;
+    const kindLabel = item.event.repeat === 'daily' ? '日程 · 每日重复' : '日程';
+    return `<div class="day-mini-item is-event tone-${item.event.priority} ${completed ? 'is-completed' : ''}" data-day-item><button class="home-item-check" data-home-schedule-action="${completed ? 'reopen' : 'complete'}" data-home-schedule-id="${wbEscape(item.event.id)}" type="button" aria-label="${completed ? '重新打开' : '完成'}${wbEscape(item.event.title)}">${completed ? '✓' : ''}</button><div class="day-mini-copy"><button class="day-mini-title" data-edit-schedule="${wbEscape(item.event.id)}" type="button"><strong>${wbEscape(item.event.title)}</strong></button><div class="day-mini-meta"><button class="day-mini-time" data-edit-schedule="${wbEscape(item.event.id)}" type="button">${wbEscape(timeLabel)}</button><span>${kindLabel}</span></div></div></div>`;
+  }
+  const completed = item.todo.status === 'completed';
+  const scheduleId = item.events[0]?.id;
+  const timeLabel = item.events.length
+    ? item.events.map((event) => event.allDay ? '全天' : formatTime(event.startAt)).join('、')
+    : Date.parse(item.todo.dueAt) < new Date(date).setHours(0, 0, 0, 0) ? '逾期' : formatTime(item.todo.dueAt);
+  const time = scheduleId
+    ? `<button class="day-mini-time" data-edit-schedule="${wbEscape(scheduleId)}" type="button">${wbEscape(timeLabel)}</button>`
+    : `<span class="day-mini-time">${wbEscape(timeLabel)}</span>`;
+  return `<div class="day-mini-item is-task tone-${item.todo.priority} ${completed ? 'is-completed' : ''}" data-day-item><button class="home-item-check home-todo-check" data-home-todo-action="${completed ? 'reopen' : 'complete'}" data-home-todo-id="${wbEscape(item.todo.id)}" type="button" aria-label="${completed ? '重新打开' : '完成'}${wbEscape(item.todo.title)}">${completed ? '✓' : ''}</button><div class="day-mini-copy"><button class="day-mini-title" data-edit-todo="${wbEscape(item.todo.id)}" type="button"><strong>${wbEscape(item.todo.title)}</strong></button><div class="day-mini-meta">${time}<span>${item.events.length ? '任务 · 已安排' : '任务'}</span></div></div></div>`;
+}
+
 function renderHome() {
   const today = new Date();
   const labels = ['今天', '明天', '后天', '三天后'];
   const overview = labels.map((label, index) => {
     const date = addDays(today, index);
-    const events = schedulesForDay(date);
-    const items = events.map((item) => `<button class="day-mini-event tone-${item.priority}" data-day-event="${wbEscape(item.id)}" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${formatTime(item.startAt)}</time><span>${wbEscape(item.title)}</span></button>`).join('');
-    return `<article class="day-card ${index === 0 ? 'today' : ''}"><header><div><strong>${label}</strong><span>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date)}</span></div><b>${events.length}</b></header><div>${items || '<p class="empty-mini">暂时没有安排</p>'}<small class="day-more" hidden></small></div></article>`;
+    const items = homeItemsForDay(date);
+    const content = items.map((item) => homeDayItemHtml(item, date)).join('');
+    return `<article class="day-card ${index === 0 ? 'today' : ''}"><header><div><strong>${label}</strong><span>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(date)}</span></div><b>${items.length}</b></header><div>${content || '<p class="empty-mini">暂时没有事项</p>'}</div></article>`;
   }).join('');
   document.getElementById('homeDayOverview').innerHTML = overview;
-  requestAnimationFrame(fitHomeDayCards);
   renderHomeProgress();
+  renderHomeActivity();
+  renderHomeDeadlines(today);
 
   const notes = wb.workspace.notes.slice(0, 3);
   document.getElementById('latestNotes').innerHTML = notes.length ? notes.map((note) => `<button class="latest-note" data-edit-note="${wbEscape(note.id)}" type="button"><strong>${wbEscape(note.title)}</strong><p>${wbEscape(notePlainText(note.content).slice(0, 72) || '空白笔记')}</p><span>${formatUpdated(note.updatedAt)}</span></button>`).join('') : `<div class="workbench-empty"><span class="empty-line-icon">${uiIcon('note')}</span><p>还没有笔记，先记下一条想法吧。</p></div>`;
@@ -356,6 +417,94 @@ function jobMeterClass(value, maximum) {
   if (!value || !maximum) return 'job-width-0';
   const percentage = Math.max(5, Math.min(100, Math.round(value / maximum * 20) * 5));
   return `job-width-${percentage}`;
+}
+
+function renderHomeActivity() {
+  const heatmap = document.getElementById('homeActivityHeatmap');
+  if (!heatmap) return;
+  const today = new Date();
+  today.setHours(12, 0, 0, 0);
+  const firstIncluded = addDays(today, -364);
+  const gridStart = startOfWeek(firstIncluded);
+  const gridEnd = addDays(startOfWeek(today), 6);
+  const counts = new Map();
+  (wb.workspace.notes || []).forEach((note) => {
+    const created = new Date(note.createdAt);
+    if (!Number.isFinite(created.getTime()) || created < firstIncluded || created > addDays(today, 1)) return;
+    const key = localDateKey(created);
+    counts.set(key, (counts.get(key) || 0) + 1);
+  });
+  const total = [...counts.values()].reduce((sum, count) => sum + count, 0);
+  document.getElementById('homeActivityTotal').textContent = `${total} 篇`;
+  const cells = [];
+  for (let date = gridStart; date <= gridEnd; date = addDays(date, 1)) {
+    const outside = date < firstIncluded || date > today;
+    const key = localDateKey(date);
+    const count = outside ? 0 : (counts.get(key) || 0);
+    const level = count === 0 ? 0 : count === 1 ? 1 : count === 2 ? 2 : count <= 4 ? 3 : 4;
+    const label = `${new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric' }).format(date)}：新增 ${count} 篇文件`;
+    cells.push(`<span class="home-activity-cell level-${level}${outside ? ' is-outside' : ''}"${outside ? '' : ` tabindex="0" data-activity-label="${wbEscape(label)}" title="${wbEscape(label)}"`} aria-label="${wbEscape(label)}"></span>`);
+  }
+  heatmap.innerHTML = cells.join('');
+}
+
+function deadlineCountdown(dueAt, now = new Date()) {
+  const difference = Date.parse(dueAt) - now.getTime();
+  const overdue = difference < 0;
+  let minutes = Math.floor(Math.abs(difference) / 60_000);
+  const days = Math.floor(minutes / 1440);
+  minutes -= days * 1440;
+  const hours = Math.floor(minutes / 60);
+  minutes -= hours * 60;
+  return { overdue, days, hours, minutes };
+}
+
+function renderHomeDeadlines(now = new Date()) {
+  const matrix = document.getElementById('homeDeadlineMatrix');
+  if (!matrix || !wb.workspace) return;
+  const countdowns = (wb.workspace.countdowns || [])
+    .filter((countdown) => countdown.targetAt && Number.isFinite(Date.parse(countdown.targetAt)))
+    .sort((a, b) => Date.parse(a.targetAt) - Date.parse(b.targetAt))
+    .slice(0, 2);
+  if (!countdowns.length) {
+    matrix.innerHTML = '<button class="home-deadline-empty" data-add-countdown type="button"><strong>添加倒计时</strong><span>单独设置名称与目标时间</span></button>';
+    return;
+  }
+  matrix.innerHTML = countdowns.map((countdown) => {
+    const remaining = deadlineCountdown(countdown.targetAt, now);
+    return `<button class="home-deadline-item${remaining.overdue ? ' is-overdue' : ''}" data-edit-countdown="${wbEscape(countdown.id)}" type="button"><span class="home-deadline-title">${wbEscape(countdown.title)}</span><span class="home-countdown"><b>${remaining.days}<small>天</small></b><b>${remaining.hours}<small>时</small></b><b>${remaining.minutes}<small>分</small></b></span><span class="home-deadline-date">${remaining.overdue ? '已到期 · ' : '目标 · '}${new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'numeric', day: 'numeric' }).format(new Date(countdown.targetAt))}</span></button>`;
+  }).join('');
+}
+
+function openCountdownEditor(countdown = null) {
+  const defaultTarget = new Date();
+  defaultTarget.setDate(defaultTarget.getDate() + 30);
+  defaultTarget.setHours(18, 0, 0, 0);
+  document.getElementById('countdownId').value = countdown?.id || '';
+  document.getElementById('countdownTitle').value = countdown?.title || '';
+  document.getElementById('countdownTargetAt').value = localDateTimeInputValue(countdown?.targetAt || defaultTarget.toISOString());
+  document.getElementById('countdownDialogTitle').textContent = countdown ? '编辑倒计时' : '添加倒计时';
+  document.getElementById('deleteCountdownButton').hidden = !countdown;
+  document.getElementById('countdownError').textContent = '';
+  openWorkbenchDialog(document.getElementById('countdownDialog'));
+  requestAnimationFrame(() => document.getElementById('countdownTitle').focus());
+}
+
+async function saveCountdownFromEditor() {
+  const targetValue = document.getElementById('countdownTargetAt').value;
+  try {
+    const saved = await workbenchApi.saveCountdown({
+      id: document.getElementById('countdownId').value || undefined,
+      title: document.getElementById('countdownTitle').value,
+      targetAt: targetValue ? new Date(targetValue).toISOString() : null
+    });
+    wb.workspace.countdowns = [saved, ...(wb.workspace.countdowns || []).filter((item) => item.id !== saved.id)];
+    closeWorkbenchDialog(document.getElementById('countdownDialog'));
+    renderHomeDeadlines();
+    showWorkbenchToast('倒计时已保存');
+  } catch (error) {
+    document.getElementById('countdownError').textContent = error.message || '倒计时保存失败';
+  }
 }
 
 function jobDateLabel(value, options = { month: 'numeric', day: 'numeric' }) {
@@ -541,6 +690,8 @@ function sortJobs(jobs) {
     return Number.isFinite(timestamp) ? timestamp : 0;
   };
   sorted.sort((left, right) => {
+    const pinnedDifference = Number(Boolean(right.pinned)) - Number(Boolean(left.pinned));
+    if (pinnedDifference) return pinnedDifference;
     if (wb.jobSort === 'priorityProgress') {
       const priority = (jobPriorityRanks[left.priority] ?? 1) - (jobPriorityRanks[right.priority] ?? 1);
       if (priority) return wb.jobSortDirection === 'desc' ? priority : -priority;
@@ -619,7 +770,8 @@ function jobRowHtml(job) {
   const deadline = job.deadline ? jobDateLabel(job.deadline, { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—';
   const deadlineClass = jobDateWithinNextDays(job.deadline, new Date(), 7) ? ' is-soon' : (Date.parse(job.deadline) < Date.now() ? ' is-overdue' : '');
   const currentStage = jobCurrentStage(job);
-  return `<article class="job-position job-row-status-${wbEscape(job.status)}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div></div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-salary-cell">${salary}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
+  const pinLabel = job.pinned ? '取消置顶' : '置顶';
+  return `<article class="job-position job-row-status-${wbEscape(job.status)}${job.pinned ? ' is-pinned' : ''}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}${job.pinned ? '，已置顶' : ''}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><button class="job-pin-button${job.pinned ? ' is-active' : ''}" data-toggle-job-pin="${wbEscape(job.id)}" type="button" aria-pressed="${job.pinned ? 'true' : 'false'}" aria-label="${pinLabel} ${wbEscape(job.company)} · ${wbEscape(job.role)}" title="${pinLabel}">${uiIcon('pin')}</button><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div></div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-salary-cell">${salary}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
 }
 
 function renderJobs() {
@@ -656,7 +808,7 @@ function renderJobs() {
   document.getElementById('jobResultSummary').textContent = `${visible.length} / ${jobs.length} 个岗位`;
   document.getElementById('jobSortDirectionButton').textContent = wb.jobSortDirection === 'asc' ? '↑ 升序' : '↓ 降序';
   document.getElementById('jobBoard').innerHTML = visible.length
-    ? visible.map(jobRowHtml).join('')
+    ? visible.map((job, index) => `${index > 0 && visible[index - 1].pinned && !job.pinned ? '<div class="job-pin-divider" role="separator"><span>其他岗位</span></div>' : ''}${jobRowHtml(job)}`).join('')
     : `<div class="job-list-empty"><span>${jobs.length ? '⌕' : '＋'}</span><strong>${jobs.length ? '没有符合条件的岗位' : '还没有岗位记录'}</strong><p>${jobs.length ? '试试清空搜索或调整筛选条件。' : '添加第一条岗位，开始记录每一次机会。'}</p>${jobs.length ? '' : '<button class="button secondary" data-add-job="active" type="button">添加岗位</button>'}</div>`;
   window.YanjiMotion?.animateJobList(document.getElementById('jobBoard'));
 }
@@ -796,6 +948,21 @@ async function saveJobInlineField(id, field, value) {
   }
 }
 
+async function toggleJobPinned(id) {
+  const current = wb.workspace.jobApplications.find((item) => item.id === id);
+  if (!current) return;
+  const pinned = !current.pinned;
+  try {
+    const saved = await workbenchApi.saveJobApplication({ ...current, pinned, revision: current.revision });
+    wb.workspace.jobApplications = wb.workspace.jobApplications.map((item) => item.id === saved.id ? saved : item);
+    renderHome();
+    renderJobs();
+    showWorkbenchToast(pinned ? '岗位已置顶' : '已取消置顶');
+  } catch (exception) {
+    showWorkbenchToast(exception.message || '置顶状态更新失败。', 'error');
+  }
+}
+
 async function deleteJobById(id) {
   const job = wb.workspace.jobApplications.find((item) => item.id === id);
   if (!job) return false;
@@ -849,26 +1016,6 @@ async function exportJobImages() {
   }
 }
 
-function fitHomeDayCards() {
-  document.querySelectorAll('#homeDayOverview .day-card').forEach((card) => {
-    const body = card.querySelector(':scope > div');
-    const events = [...card.querySelectorAll('[data-day-event]')];
-    const more = card.querySelector('.day-more');
-    if (!body || !more) return;
-    events.forEach((event) => { event.hidden = false; });
-    more.hidden = true;
-    if (body.scrollHeight <= body.clientHeight) return;
-    more.hidden = false;
-    let hidden = 0;
-    for (let index = events.length - 1; index >= 0 && body.scrollHeight > body.clientHeight; index -= 1) {
-      events[index].hidden = true;
-      hidden += 1;
-    }
-    more.textContent = hidden ? `还有 ${hidden} 项` : '';
-    more.hidden = hidden === 0;
-  });
-}
-
 function linkedTodoForSchedule(schedule) {
   return schedule?.sourceRef?.type === 'todo'
     ? wb.workspace.todos.find((todo) => todo.id === schedule.sourceRef.id) || null
@@ -886,52 +1033,12 @@ function renderHomeCommandCards(today = new Date()) {
   const events = schedulesForDay(today);
   const todos = wb.workspace.todos || [];
   const openTodos = todos.filter((todo) => todo.status === 'open' && todo.dueAt && (sameDay(todo.dueAt, today) || Date.parse(todo.dueAt) < Date.now()));
-  const completedTodos = todos.filter((todo) => todo.status === 'completed' && sameDay(todo.completedAt, today));
   const next = events.find((item) => Date.parse(item.endAt || item.startAt) >= Date.now()) || events[0];
   const nextTodo = next ? linkedTodoForSchedule(next) : null;
   document.getElementById('homeNextEventTitle').textContent = nextTodo?.title || next?.title || openTodos[0]?.title || '今天还没有事项';
   document.getElementById('homeNextEventMeta').textContent = next
     ? `${next.allDay ? '全天' : formatTime(next.startAt)} · ${nextTodo ? '任务时间块' : '日程事件'}`
     : openTodos[0] ? '尚未安排时间 · 现在开始也来得及' : '添加任务或日程，让今天有下一步';
-
-  const linkedEvents = new Map();
-  const items = [];
-  for (const event of events) {
-    const todo = linkedTodoForSchedule(event);
-    if (!todo) {
-      items.push({ kind: 'event', event, sortAt: Date.parse(event.startAt) });
-      continue;
-    }
-    const group = linkedEvents.get(todo.id) || { kind: 'task', todo, events: [], sortAt: Date.parse(event.startAt) };
-    group.events.push(event);
-    group.sortAt = Math.min(group.sortAt, Date.parse(event.startAt));
-    linkedEvents.set(todo.id, group);
-  }
-  items.push(...linkedEvents.values());
-  for (const todo of [...openTodos, ...completedTodos]) {
-    if (!linkedEvents.has(todo.id)) items.push({ kind: 'task', todo, events: [], sortAt: Number.isFinite(Date.parse(todo.dueAt)) ? Date.parse(todo.dueAt) : Number.MAX_SAFE_INTEGER });
-  }
-  items.sort((a, b) => a.sortAt - b.sortAt || a.kind.localeCompare(b.kind));
-  document.getElementById('homeTodayItemsList').innerHTML = items.slice(0, 6).map((item) => {
-    if (item.kind === 'event') {
-      return `<div class="home-today-row home-item-row is-event"><span class="home-item-marker" aria-hidden="true"></span><button class="home-item-time" data-edit-schedule="${wbEscape(item.event.id)}" type="button">${item.event.allDay ? '全天' : formatTime(item.event.startAt)}</button><button class="home-item-title" data-edit-schedule="${wbEscape(item.event.id)}" type="button"><strong>${wbEscape(item.event.title)}</strong><small>日程事件</small></button></div>`;
-    }
-    const completed = item.todo.status === 'completed';
-    const timeLabel = item.events.length
-      ? item.events.map((event) => event.allDay ? '全天' : formatTime(event.startAt)).join('、')
-      : Date.parse(item.todo.dueAt) < Date.now() && !sameDay(item.todo.dueAt, today) ? '已逾期' : item.todo.dueAt ? `截止 ${formatTime(item.todo.dueAt)}` : '未排期';
-    const scheduleId = item.events[0]?.id;
-    const timeControl = scheduleId
-      ? `<button class="home-item-time" data-edit-schedule="${wbEscape(scheduleId)}" type="button">${wbEscape(timeLabel)}</button>`
-      : `<span class="home-item-time">${wbEscape(timeLabel)}</span>`;
-    return `<div class="home-today-row home-item-row is-task tone-${item.todo.priority} ${completed ? 'is-completed' : ''}"><button class="home-todo-check" data-home-todo-action="${completed ? 'reopen' : 'complete'}" data-home-todo-id="${wbEscape(item.todo.id)}" type="button" aria-label="${completed ? '重新打开' : '完成'}${wbEscape(item.todo.title)}">${completed ? uiIcon('check') : ''}</button>${timeControl}<button class="home-item-title" data-edit-todo="${wbEscape(item.todo.id)}" type="button"><strong>${wbEscape(item.todo.title)}</strong><small>${item.events.length ? '任务 · 已安排时间' : '任务'}</small></button></div>`;
-  }).join('') || '<p class="empty-mini">今天还没有事项</p>';
-  const taskTodos = [...new Map(items.filter((item) => item.kind === 'task').map((item) => [item.todo.id, item.todo])).values()];
-  const completed = taskTodos.filter((todo) => todo.status === 'completed').length;
-  const rate = taskTodos.length ? Math.round(completed / taskTodos.length * 100) : 0;
-  const progress = document.getElementById('homeTodoProgress');
-  progress.style.setProperty('--todo-progress-scale', String(rate / 100));
-  progress.querySelector('span').textContent = `${rate}% 完成`;
 }
 
 function renderHomeAttendance() {
@@ -976,6 +1083,7 @@ function renderHomeProgress() {
   document.getElementById('homeProgressRate').textContent = `${rate}%`;
   document.getElementById('homeProgressRateBar').style.transform = `scaleX(${rate / 100})`;
   document.getElementById('homeProgressFocus').textContent = String(Math.round(focusMs / 60_000));
+  document.getElementById('homeBannerDate').textContent = new Intl.DateTimeFormat('zh-CN', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', hour: '2-digit', minute: '2-digit', hour12: false }).format(today);
 }
 
 function closeDailyPlanDialog() {
@@ -2107,6 +2215,7 @@ async function refreshWorkspace(workspace = null) {
   }
   wb.workspace = nextWorkspace;
   wb.workspace.todos ||= [];
+  wb.workspace.countdowns ||= [];
   wb.workspace.attendance ||= [];
   wb.workspace.focusSessions ||= [];
   wb.workspace.jobApplications ||= [];
@@ -2125,6 +2234,26 @@ function bindWorkbenchEvents() {
   }));
   document.querySelectorAll('[data-go-page]').forEach((button) => button.addEventListener('click', () => switchWorkbenchPage(button.dataset.goPage)));
   document.getElementById('quickScheduleButton').addEventListener('click', () => openScheduleEditor());
+  document.getElementById('addCountdownButton').addEventListener('click', () => openCountdownEditor());
+  document.getElementById('saveCountdownButton').addEventListener('click', saveCountdownFromEditor);
+  document.getElementById('countdownForm').addEventListener('submit', (event) => { event.preventDefault(); saveCountdownFromEditor(); });
+  document.getElementById('cancelCountdownButton').addEventListener('click', () => closeWorkbenchDialog(document.getElementById('countdownDialog')));
+  document.getElementById('countdownDialog').addEventListener('cancel', (event) => { event.preventDefault(); closeWorkbenchDialog(event.currentTarget); });
+  document.getElementById('countdownDialog').addEventListener('click', (event) => { if (event.target === event.currentTarget) closeWorkbenchDialog(event.currentTarget); });
+  document.getElementById('deleteCountdownButton').addEventListener('click', async () => {
+    const id = document.getElementById('countdownId').value;
+    const accepted = id && await window.yanjiConfirm({ title: '删除倒计时', message: '这个倒计时将从首页移除，此操作无法撤销', confirmText: '删除倒计时', tone: 'danger' });
+    if (!accepted) return;
+    try {
+      await workbenchApi.deleteCountdown(id);
+      wb.workspace.countdowns = (wb.workspace.countdowns || []).filter((item) => item.id !== id);
+      closeWorkbenchDialog(document.getElementById('countdownDialog'));
+      renderHomeDeadlines();
+      showWorkbenchToast('倒计时已删除');
+    } catch (error) {
+      document.getElementById('countdownError').textContent = error.message || '倒计时删除失败';
+    }
+  });
   document.getElementById('quickNoteButton').addEventListener('click', () => openNoteEditor());
   document.getElementById('addScheduleButton').addEventListener('click', () => openScheduleEditor());
   document.getElementById('addJobButton').addEventListener('click', () => openJobEditor());
@@ -2572,6 +2701,8 @@ function bindWorkbenchEvents() {
     }
     const addJobTarget = event.target.closest('[data-add-job]');
     if (addJobTarget) return openJobEditor(null, addJobTarget.dataset.addJob);
+    const pinJobTarget = event.target.closest('[data-toggle-job-pin]');
+    if (pinJobTarget) return toggleJobPinned(pinJobTarget.dataset.toggleJobPin);
     const deleteJobTarget = event.target.closest('[data-delete-job]');
     if (deleteJobTarget) return deleteJobById(deleteJobTarget.dataset.deleteJob);
     const sourceJobTarget = event.target.closest('[data-open-job-source]');
@@ -2593,6 +2724,9 @@ function bindWorkbenchEvents() {
     if (linkedTodoTarget?.dataset.openLinkedTodo) return window.YanjiTodoView?.openEditDialog(wb.workspace.todos.find((todo) => todo.id === linkedTodoTarget.dataset.openLinkedTodo));
     const scheduleTarget = event.target.closest('[data-edit-schedule]');
     if (scheduleTarget) return openScheduleEditor(wb.workspace.schedules.find((item) => item.id === scheduleTarget.dataset.editSchedule));
+    const countdownTarget = event.target.closest('[data-edit-countdown]');
+    if (countdownTarget) return openCountdownEditor((wb.workspace.countdowns || []).find((item) => item.id === countdownTarget.dataset.editCountdown));
+    if (event.target.closest('[data-add-countdown]')) return openCountdownEditor();
     const todoTarget = event.target.closest('[data-edit-todo]');
     if (todoTarget) return window.YanjiTodoView?.openEditDialog(wb.workspace.todos.find((item) => item.id === todoTarget.dataset.editTodo));
     const homeTodoAction = event.target.closest('[data-home-todo-action]');
@@ -2611,6 +2745,20 @@ function bindWorkbenchEvents() {
       }
       return;
     }
+    const homeScheduleAction = event.target.closest('[data-home-schedule-action]');
+    if (homeScheduleAction) {
+      try {
+        const id = homeScheduleAction.dataset.homeScheduleId;
+        const completed = homeScheduleAction.dataset.homeScheduleAction === 'complete';
+        const updated = await workbenchApi.completeSchedule(id, completed);
+        wb.workspace.schedules = wb.workspace.schedules.map((schedule) => schedule.id === updated.id ? updated : schedule);
+        renderHome();
+        showWorkbenchToast(completed ? '日程已完成' : '日程已重新打开');
+      } catch (error) {
+        showWorkbenchToast(error.message || '日程状态更新失败', 'error');
+      }
+      return;
+    }
     const stickyTarget = event.target.closest('[data-sticky-note]');
     if (stickyTarget) { event.stopPropagation(); return workbenchApi.openStickyNote(stickyTarget.dataset.stickyNote); }
     const noteTarget = event.target.closest('[data-edit-note]');
@@ -2622,6 +2770,18 @@ function bindWorkbenchEvents() {
     event.preventDefault();
     openJobEditor(wb.workspace.jobApplications.find((item) => item.id === card.dataset.jobId));
   });
+  const activityHeatmap = document.getElementById('homeActivityHeatmap');
+  const activityTooltip = document.getElementById('homeActivityTooltip');
+  const showActivityTooltip = (target) => {
+    const cell = target.closest?.('[data-activity-label]');
+    if (!cell) return;
+    activityTooltip.textContent = cell.dataset.activityLabel;
+    activityTooltip.hidden = false;
+  };
+  activityHeatmap.addEventListener('pointerover', (event) => showActivityTooltip(event.target));
+  activityHeatmap.addEventListener('pointerleave', () => { activityTooltip.hidden = true; });
+  activityHeatmap.addEventListener('focusin', (event) => showActivityTooltip(event.target));
+  activityHeatmap.addEventListener('focusout', () => { activityTooltip.hidden = true; });
   document.getElementById('openQuickCaptureButton').addEventListener('click', () => workbenchApi.showCapture());
   document.getElementById('createStickyNoteButton').addEventListener('click', () => workbenchApi.createStickyNote());
   document.getElementById('openScheduleWidgetButton').addEventListener('click', async () => {
@@ -2645,11 +2805,15 @@ async function initializeWorkbench() {
   });
   const settings = await workbenchApi.getSettings().catch(() => null);
   wb.settings = settings || {};
+  applyHomeBannerSettings(wb.settings);
   if (settings?.quickCaptureShortcut) document.getElementById('shortcutTip').textContent = settings.quickCaptureShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
   if (settings?.stickyNoteShortcut) document.getElementById('stickyShortcutTip').textContent = settings.stickyNoteShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
   await refreshWorkspace();
   workbenchApi.onWorkspaceChanged(refreshWorkspace);
-  workbenchApi.onSettingsChanged((settings) => { wb.settings = settings || wb.settings; });
+  workbenchApi.onSettingsChanged((settings) => {
+    wb.settings = settings || wb.settings;
+    applyHomeBannerSettings(wb.settings);
+  });
   workbenchApi.onWorkspaceNavigate((target) => {
     const page = typeof target === 'string' ? target : target?.page;
     if (!page) return;

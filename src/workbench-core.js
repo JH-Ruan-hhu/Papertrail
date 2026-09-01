@@ -427,13 +427,13 @@ function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOStrin
     reminderOccurrence: /^\d{4}-\d{2}-\d{2}$/.test(String(value.reminderOccurrence || '')) ? String(value.reminderOccurrence) : null,
     repeat: value.repeat === 'daily' ? 'daily' : null,
     sourceRef,
+    completedAt: isoDate(value.completedAt || legacy.completedAt),
     createdAt,
     updatedAt: isoDate(value.updatedAt, createdAt),
     legacy
   };
   Object.defineProperties(schedule, {
     deadline: { value: Boolean(value.deadline || legacy.deadline), enumerable: false, configurable: true, writable: true },
-    completedAt: { value: isoDate(value.completedAt || legacy.completedAt), enumerable: false, configurable: true, writable: true },
     remindedAt: { value: reminderSentAt, enumerable: false, configurable: true, writable: true }
   });
   return schedule;

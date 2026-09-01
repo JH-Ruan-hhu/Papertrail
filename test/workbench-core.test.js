@@ -184,6 +184,17 @@ test('notes preserve typed metadata and metadata fields support custom selects',
   assert.equal(notes[0].metadata.reviewed, true);
 });
 
+test('schedule completion is enumerable so the homepage check survives persistence', () => {
+  const [saved] = saveSchedule([], {
+    title: '完成实验',
+    startAt: '2026-09-01T08:00:00.000Z',
+    endAt: '2026-09-01T09:00:00.000Z',
+    completedAt: '2026-09-01T09:05:00.000Z'
+  }, '2026-08-31T08:00:00.000Z', () => 'schedule-completed');
+  assert.equal(saved.completedAt, '2026-09-01T09:05:00.000Z');
+  assert.equal(JSON.parse(JSON.stringify(saved)).completedAt, '2026-09-01T09:05:00.000Z');
+});
+
 test('first and second quick captures create one daily document with one natural blank line', () => {
   const first = appendDailyNoteContent([], {
     dateKey: '2026-08-28',

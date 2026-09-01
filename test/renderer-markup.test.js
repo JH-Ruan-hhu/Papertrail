@@ -279,7 +279,17 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.doesNotMatch(indexHtml, /id="bingWallpaper"/);
   assert.match(indexHtml, /class="home-progress-strip"[\s\S]*id="homeProgressHeadline"/);
   assert.match(indexHtml, /id="homeProgressRateBar"/);
-  assert.match(indexHtml, /今日事项[\s\S]*id="homeTodayItemsList"/);
+  assert.doesNotMatch(indexHtml, /快速开始|data-home-quick-action/);
+  assert.match(indexHtml, /id="homeActivityHeatmap"[\s\S]*id="homeDeadlineMatrix"/);
+  assert.match(indexHtml, /id="addCountdownButton"[\s\S]*id="countdownDialog"[\s\S]*id="countdownTargetAt"/);
+  assert.match(preloadJs, /countdowns:save/);
+  assert.match(mainJs, /countdowns:save/);
+  assert.match(workbenchJs, /workspace\.countdowns[\s\S]*data-edit-countdown/);
+  assert.match(workbenchJs, /data-home-schedule-action[\s\S]*completeSchedule/);
+  assert.match(indexHtml, /name="homeBannerImageMode" value="default"[\s\S]*value="local"[\s\S]*value="bing"/);
+  assert.match(preloadJs, /settings:choose-home-banner/);
+  assert.match(mainJs, /HPImageArchive\.aspx/);
+  assert.match(indexHtml, /未来四天[\s\S]*任务与日程按日期统一排列/);
   assert.doesNotMatch(indexHtml, /id="homeToday(?:Schedule|Todo)List"/);
   assert.match(indexHtml, /id="homeDayOverview"/);
   assert.match(indexHtml, /id="scheduleBoard"/);
@@ -357,7 +367,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(scheduleWidgetHtml, /id="widgetScheduleList"/);
   assert.match(scheduleWidgetHtml, /id="closeWidgetButton"/);
   assert.match(scheduleWidgetJs, /schedulesForToday/);
-  assert.doesNotMatch(preloadJs, /completeSchedule/);
+  assert.match(preloadJs, /completeSchedule/);
   assert.doesNotMatch(scheduleWidgetJs, /completeSchedule/);
   assert.match(scheduleWidgetCss, /:root[\s\S]*background: transparent/);
   assert.match(scheduleWidgetCss, /-webkit-line-clamp: 2/);

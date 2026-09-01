@@ -35,6 +35,20 @@ test('parses explicit dates and treats a time range end as the due time with a w
   assert.equal(new Date(parsed.dueAt).getDate(), 28);
 });
 
+test('parses a bare day-of-month followed by an evening day part', () => {
+  const parsed = parseNaturalLanguageTodo('2号晚上前完成远景科技和宁德时代的测评', new Date(2026, 8, 1, 10, 0));
+  const due = new Date(parsed.dueAt);
+  assert.equal(parsed.valid, true);
+  assert.equal(parsed.title, '完成远景科技和宁德时代的测评');
+  assert.equal(parsed.meta.explicitDate, true);
+  assert.equal(due.getMonth(), 8);
+  assert.equal(due.getDate(), 2);
+  assert.equal(due.getHours(), 23);
+  assert.equal(due.getMinutes(), 59);
+  assert.ok(parsed.matches.some((match) => match.text === '2号'));
+  assert.ok(parsed.matches.some((match) => match.text === '晚上'));
+});
+
 test('natural language without a date becomes an inbox todo without a reminder', () => {
   const parsed = parseNaturalLanguageTodo('整理实验记录', base);
   assert.equal(parsed.valid, true);

@@ -20,6 +20,8 @@ const DEFAULT_SETTINGS = Object.freeze({
   widgetShowTodos: true,
   widgetShowCompletedTodos: false,
   appearanceTheme: 'liquid-glass',
+  homeBannerImageMode: 'default',
+  homeBannerImageCredit: '',
   eventNotifications: true,
   todoNotifications: true,
   defaultEventReminderMinutes: 10,
@@ -40,6 +42,7 @@ class JsonStore {
       papers: [],
       schedules: [],
       todos: [],
+      countdowns: [],
       notes: [],
       metadataFields: [],
       attendance: [],
@@ -204,6 +207,16 @@ class JsonStore {
     this.data.todos = todos;
     this.save();
     return this.data.todos;
+  }
+
+  listCountdowns() {
+    return this.data.countdowns || [];
+  }
+
+  setCountdowns(countdowns) {
+    this.data.countdowns = countdowns;
+    this.save();
+    return this.data.countdowns;
   }
 
   listNotes() {

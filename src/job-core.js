@@ -179,6 +179,7 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
     deadline: isoDate(input.deadline ?? input.deadlineAt),
     deadlineReminderSentAt: isoDate(input.deadlineReminderSentAt),
     priority: JOB_PRIORITIES.includes(input.priority) ? input.priority : 'medium',
+    pinned: input.pinned === true,
     status: lifecycleStatusFor(input, rawStatus),
     nextFollowUpAt,
     nextActionAt: nextFollowUpAt,

@@ -39,6 +39,7 @@ const {
 const { clearSystemRecovery, readSystemRecovery, writeSystemRecovery } = require('./system-recovery-core');
 const { createPlanningService } = require('./planning-service');
 const { normalizeCaptureInput } = require('./capture-core');
+const { deleteCountdown, saveCountdown } = require('./countdown-core');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
@@ -547,6 +548,7 @@ function settingsForRenderer() {
   const pointer = storagePointerValue();
   return {
     ...store.getSettings(),
+    homeBannerImageDataUrl: readHomeBannerImageDataUrl(),
     appVersion: app.getVersion(),
     dataDirectory,
     backupCount: backupFiles.length,
@@ -558,6 +560,58 @@ function settingsForRenderer() {
     isDefaultDataDirectory: path.resolve(dataDirectory) === path.resolve(path.dirname(defaultDataFilePath())),
     systemRecoveryWarning
   };
+}
+
+function homeBannerImagePath() {
+  return path.join(app.getPath('userData'), 'home-banner.jpg');
+}
+
+function readHomeBannerImageDataUrl() {
+  try {
+    const filePath = homeBannerImagePath();
+    if (!fs.existsSync(filePath)) return '';
+    return `data:image/jpeg;base64,${fs.readFileSync(filePath).toString('base64')}`;
+  } catch {
+    return '';
+  }
+}
+
+function cacheHomeBannerImage(image) {
+  if (!image || image.isEmpty()) throw new Error('无法读取这张图片，请选择 JPG、PNG 或 WebP 文件。');
+  fs.mkdirSync(path.dirname(homeBannerImagePath()), { recursive: true });
+  fs.writeFileSync(homeBannerImagePath(), image.toJPEG(88));
+}
+
+async function chooseHomeBannerImage() {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: '选择首页横幅图片',
+    properties: ['openFile'],
+    filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp'] }]
+  });
+  if (result.canceled || !result.filePaths[0]) return { canceled: true, settings: settingsForRenderer() };
+  cacheHomeBannerImage(nativeImage.createFromPath(result.filePaths[0]));
+  store.updateSettings({ homeBannerImageMode: 'local', homeBannerImageCredit: '' });
+  broadcastSettings();
+  return { canceled: false, settings: settingsForRenderer() };
+}
+
+async function refreshBingHomeBanner() {
+  const archiveResponse = await net.fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN');
+  if (!archiveResponse.ok) throw new Error('暂时无法获取必应每日图片。');
+  const archive = await archiveResponse.json();
+  const item = archive?.images?.[0];
+  if (!item?.url || !String(item.url).startsWith('/')) throw new Error('必应每日图片信息无效。');
+  const imageResponse = await net.fetch(`https://www.bing.com${item.url}`);
+  if (!imageResponse.ok) throw new Error('必应每日图片下载失败。');
+  const buffer = Buffer.from(await imageResponse.arrayBuffer());
+  if (!buffer.length || buffer.length > 25 * 1024 * 1024) throw new Error('必应每日图片大小异常。');
+  cacheHomeBannerImage(nativeImage.createFromBuffer(buffer));
+  store.updateSettings({
+    homeBannerImageMode: 'bing',
+    homeBannerImageCredit: String(item.copyright || '必应每日图片').slice(0, 300)
+  });
+  broadcastSettings();
+  return settingsForRenderer();
 }
 
 function setModalTitleBar(active) {
@@ -816,6 +870,7 @@ function workspaceForRenderer() {
   return {
     schedules: [...store.listSchedules()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)),
     todos: [...store.listTodos()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+    countdowns: [...store.listCountdowns()].sort((a, b) => Date.parse(a.targetAt) - Date.parse(b.targetAt)),
     notes: [...store.listNotes()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     metadataFields: store.listMetadataFields(),
     attendance: [...store.listAttendance()]
@@ -906,6 +961,19 @@ function saveWorkspaceNote(input) {
   store.setNotes(savedNotes);
   broadcastWorkspace();
   return saved;
+}
+
+function saveWorkspaceCountdown(input) {
+  const result = saveCountdown(store.listCountdowns(), input, new Date().toISOString(), () => crypto.randomUUID());
+  store.setCountdowns(result.countdowns);
+  broadcastWorkspace();
+  return result.countdown;
+}
+
+function deleteWorkspaceCountdown(id) {
+  store.setCountdowns(deleteCountdown(store.listCountdowns(), id));
+  broadcastWorkspace();
+  return true;
 }
 
 function appendWorkspaceDailyNote(input) {
@@ -2552,6 +2620,11 @@ function validateSettings(patch) {
     if (!['liquid-glass', 'classic'].includes(theme)) throw new Error('外观主题不受支持。');
     allowed.appearanceTheme = theme;
   }
+  if ('homeBannerImageMode' in patch) {
+    const mode = String(patch.homeBannerImageMode || 'default');
+    if (!['default', 'local', 'bing'].includes(mode)) throw new Error('首页横幅背景模式不受支持。');
+    allowed.homeBannerImageMode = mode;
+  }
   if ('defaultEventReminderMinutes' in patch) {
     const minutes = patch.defaultEventReminderMinutes == null ? null : Number(patch.defaultEventReminderMinutes);
     if (![null, 0, 5, 10, 15, 30, 60, 1440].includes(minutes)) throw new Error('日程提醒时间不受支持。');
@@ -2912,6 +2985,8 @@ function registerIpc() {
   ipcMain.handle('schedules:save', (_event, input) => getPlanningService().saveSchedule(input));
   ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
   ipcMain.handle('schedules:complete', (_event, id, completed) => setWorkspaceScheduleCompleted(String(id), Boolean(completed)));
+  ipcMain.handle('countdowns:save', (_event, input) => saveWorkspaceCountdown(input));
+  ipcMain.handle('countdowns:delete', (_event, id) => deleteWorkspaceCountdown(String(id)));
   ipcMain.handle('schedules:convert-to-todo', (_event, id, input) => getPlanningService().convertScheduleToTodo(String(id), input || {}));
   ipcMain.handle('schedules:detach', (_event, id) => getPlanningService().detachSchedule(String(id)));
   ipcMain.handle('todos:parse', (_event, input) => parseNaturalLanguageTodo(input, new Date()));
@@ -3106,6 +3181,8 @@ function registerIpc() {
     return settingsForRenderer();
   });
   ipcMain.handle('settings:choose-data-directory', (_event, request) => chooseDataDirectory(request));
+  ipcMain.handle('settings:choose-home-banner', () => chooseHomeBannerImage());
+  ipcMain.handle('settings:refresh-bing-banner', () => refreshBingHomeBanner());
   ipcMain.handle('settings:delete-data-backups', (_event, confirmed) => deleteDataBackups(Boolean(confirmed)));
   ipcMain.handle('updates:get-state', () => updateStateForRenderer());
   ipcMain.handle('updates:check', () => checkForAppUpdate());

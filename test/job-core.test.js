@@ -24,6 +24,7 @@ test('normalizes a local job application with an independent lifecycle and workf
     city: '南京',
     deadline: '2026-09-30',
     priority: 'high',
+    pinned: true,
     status: 'active',
     nextFollowUpAt: '2026-08-28',
     workflow: {
@@ -42,12 +43,14 @@ test('normalizes a local job application with an independent lifecycle and workf
   assert.equal(job.city, '南京');
   assert.equal(job.location, '南京');
   assert.equal(job.priority, 'high');
+  assert.equal(job.pinned, true);
   assert.equal(job.workflow.currentStageId, 'screen');
   assert.deepEqual(job.workflow.stages.map((stage) => stage.id), ['apply', 'screen', 'final']);
   assert.equal(job.workflow.timeline[1].stageId, 'screen');
   assert.equal(job.annualSalaryWan, 41.1);
   assert.equal(job.sourceUrl, 'https://jobs.example.com/role?id=1');
   assert.equal(normalizeJobApplication({ sourceUrl: 'file:///secret' }).sourceUrl, null);
+  assert.equal(normalizeJobApplication({ company: '单位', role: '岗位' }).pinned, false);
 });
 
 test('maps legacy stage statuses without forcing a startup rewrite', () => {
@@ -85,6 +88,9 @@ test('creates, updates and deletes workflow stages while keeping the current sta
   assert.equal(jobs[0].status, 'active');
   assert.equal(jobs[0].workflow.currentStageId, 'case');
   assert.equal(jobs[0].revision, 2);
+  jobs = saveJobApplication(jobs, { ...jobs[0], pinned: true }, '2026-08-25T09:00:00.000Z');
+  assert.equal(jobs[0].pinned, true);
+  assert.equal(jobs[0].revision, 3);
   const renamed = renameWorkflowStage(jobs[0].workflow, 'case', '技术面');
   assert.equal(renamed.stages[1].name, '技术面');
   const moved = moveWorkflowStage(renamed, 'case', 'up');
@@ -112,6 +118,7 @@ test('keeps salary, workflow and legacy compatibility through a JSON export/impo
     deadline: '2026-12-31',
     status: 'active',
     priority: 'high',
+    pinned: true,
     annualSalaryWan: 38.6,
     notes: '等待面试',
     workflow: {
@@ -129,6 +136,7 @@ test('keeps salary, workflow and legacy compatibility through a JSON export/impo
   const imported = normalizeJobApplication(JSON.parse(exported).jobApplications[0]);
   assert.equal(imported.annualSalaryWan, 38.6);
   assert.equal(imported.status, 'active');
+  assert.equal(imported.pinned, true);
   assert.equal(imported.deadline, original.deadline);
   assert.deepEqual(imported.workflow, original.workflow);
 });
