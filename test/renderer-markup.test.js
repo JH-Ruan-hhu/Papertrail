@@ -418,8 +418,12 @@ test('quick capture preserves Chinese IME composition and closes empty on blur',
   assert.doesNotMatch(captureJs, /editor\.innerHTML\s*=/);
   assert.match(mainJs, /quickCaptureWindow\.on\('blur'/);
   assert.match(captureHtml, /data-mode="item"[\s\S]*事项[\s\S]*data-mode="note"/);
+  assert.doesNotMatch(captureHtml, /capture-brand|QUICK CAPTURE/);
+  assert.match(captureHtml, /data-capture-state="neutral"/);
+  assert.doesNotMatch(captureHtml, /motion-aux-window/);
   assert.match(captureHtml, /name="captureItemKind" value="task"[\s\S]*name="captureItemKind" value="event"/);
   assert.match(captureJs, /#1 红、#2 黄、#3 绿/);
+  assert.match(captureJs, /dataset\.captureState = state/);
   assert.match(captureJs, /event\.key === 'Escape'[\s\S]*clearTimeout\(parseTimer\)[\s\S]*editor\.value = ''[\s\S]*api\.hideCapture\(\)/);
   assert.doesNotMatch(captureJs, /内容尚未保存；清空后再按 Esc 关闭/);
   assert.match(captureJs, /\[~～\][\s\S]*repeat: prefix \? 'daily' : null/);
@@ -592,8 +596,9 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
   const motionJs = readProjectFile('src', 'renderer', 'motion-system.js');
   const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
   const todoViewJs = readProjectFile('src', 'renderer', 'todo-view.js');
-  const auxiliaryPages = ['sticky.html', 'deadline.html', 'capture.html', 'schedule-widget.html']
+  const auxiliaryPages = ['sticky.html', 'deadline.html', 'schedule-widget.html']
     .map((file) => readProjectFile('src', 'renderer', file));
+  const captureHtml = readProjectFile('src', 'renderer', 'capture.html');
   assert.match(indexHtml, /motion-tokens\.css/);
   assert.match(indexHtml, /motion-system\.css/);
   assert.match(indexHtml, /motion-system\.js/);
@@ -609,6 +614,8 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
     assert.match(html, /motion-tokens\.css/);
     assert.match(html, /<body class="[^"]*\bmotion-aux-window\b[^"]*">/);
   }
+  assert.match(captureHtml, /motion-tokens\.css/);
+  assert.doesNotMatch(captureHtml, /motion-aux-window/);
   assert.match(motionCss, /\.workbench-page\.page-entering/);
   assert.match(motionCss, /\.modal\.dialog-entering/);
   assert.match(motionCss, /\.motion-tab-entering/);

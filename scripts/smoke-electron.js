@@ -1392,7 +1392,7 @@ app.whenReady().then(async () => {
     await captureStablePage(process.env.WORKBENCH_JOBS_OUTPUT);
   }
   if (process.env.WORKBENCH_CAPTURE_OUTPUT) {
-    window.setSize(720, 222);
+    window.setSize(760, 258);
     await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'capture.html'));
     await new Promise((resolve) => setTimeout(resolve, 150));
     const captureResult = await window.webContents.executeJavaScript(`

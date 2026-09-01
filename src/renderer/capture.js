@@ -15,6 +15,12 @@ let parsedTodo = null;
 let composing = false;
 let parseTimer = null;
 
+function updateResult(message, state = 'neutral') {
+  result.textContent = message;
+  result.classList.toggle('error', state === 'error');
+  document.body.dataset.captureState = state;
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
 }
@@ -95,19 +101,18 @@ async function parseInput() {
   const sequence = ++parseSequence;
   const text = plainText();
   const directive = captureDirective(text);
-  result.classList.remove('error');
   if (!directive.content.trim()) {
     parsedSchedule = null;
     parsedTodo = null;
     renderHighlights(text);
-    result.textContent = mode === 'note' ? '笔记保留原文，不解析时间' : itemKind === 'event' ? '自动识别事件时间；#1 红、#2 黄、#3 绿' : '有具体时段会同时安排时间；只有日期则作为截止日期';
+    updateResult(mode === 'note' ? '笔记保留原文，不解析时间' : itemKind === 'event' ? '自动识别事件时间；#1 红、#2 黄、#3 绿' : '有具体时段会同时安排时间；只有日期则作为截止日期');
     return;
   }
   try {
     if (mode === 'note') {
       parsedSchedule = null;
       parsedTodo = null;
-      result.textContent = '笔记保留原文，不解析时间';
+      updateResult('笔记保留原文，不解析时间');
       renderHighlights(text);
       return;
     }
@@ -116,7 +121,7 @@ async function parseInput() {
       if (sequence !== parseSequence) return;
       parsedSchedule = parsed;
       parsedTodo = null;
-      result.textContent = `${formatWhen(parsed)}${directive.repeat ? ' · 每天重复' : ''}`;
+      updateResult(`${formatWhen(parsed)}${directive.repeat ? ' · 每天重复' : ''}`, parsed?.valid ? 'ready' : 'neutral');
       renderHighlights(text, directiveMatches(directive, parsed.matches));
       return;
     }
@@ -125,17 +130,21 @@ async function parseInput() {
     parsedTodo = todo;
     parsedSchedule = schedule;
     const hasTimeBlock = Boolean(todo?.meta?.explicitTime && schedule?.valid && schedule?.meta?.explicitTime);
-    result.textContent = `${hasTimeBlock ? `${formatWhen(schedule)} · 同时建立待办` : formatTodo(todo)}${directive.repeat ? ' · 每天重复' : ''}`;
+    updateResult(`${hasTimeBlock ? `${formatWhen(schedule)} · 同时建立待办` : formatTodo(todo)}${directive.repeat ? ' · 每天重复' : ''}`, todo?.valid ? 'ready' : 'neutral');
     renderHighlights(text, directiveMatches(directive, hasTimeBlock ? schedule.matches : todo.matches));
   } catch (error) {
-    result.textContent = error.message || '暂时无法解析时间';
-    result.classList.add('error');
+    updateResult(error.message || '暂时无法解析时间', 'error');
   }
 }
 
 function setMode(nextMode) {
   mode = nextMode;
-  tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.mode === mode));
+  tabs.forEach((tab) => {
+    const active = tab.dataset.mode === mode;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+  document.body.dataset.captureMode = mode;
   kindPicker.hidden = mode === 'note';
   editor.placeholder = mode === 'note'
     ? '随手记录想法…（Ctrl + Enter 保存）'
@@ -157,8 +166,7 @@ async function submit() {
   const content = directive.content.trim();
   if (!content) return;
   try {
-    result.classList.remove('error');
-    result.textContent = '正在保存…';
+    updateResult('正在保存…', 'busy');
     await api.submitCapture({ mode, itemKind, content, repeat: directive.repeat });
     editor.value = '';
     renderHighlights('');
@@ -167,8 +175,7 @@ async function submit() {
     parsedTodo = null;
     await api.hideCapture();
   } catch (error) {
-    result.textContent = error.message || '保存失败';
-    result.classList.add('error');
+    updateResult(error.message || '保存失败', 'error');
   }
 }
 

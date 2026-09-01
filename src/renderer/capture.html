@@ -9,23 +9,25 @@
     <link rel="stylesheet" href="motion-tokens.css">
     <link rel="stylesheet" href="capture.css">
   </head>
-  <body class="capture-window motion-aux-window">
+  <body class="capture-window" data-capture-state="neutral">
     <main class="capture-card">
-      <header>
+      <header class="capture-header">
         <div class="capture-tabs" role="tablist">
-          <button class="active" data-mode="item" type="button">事项</button>
-          <button data-mode="note" type="button">笔记</button>
+          <button class="active" data-mode="item" type="button" role="tab" aria-selected="true">事项</button>
+          <button data-mode="note" type="button" role="tab" aria-selected="false">笔记</button>
         </div>
-        <span><kbd>Tab</kbd> 切换</span>
+        <span class="capture-switch-hint"><kbd>Tab</kbd> 切换</span>
       </header>
-      <div class="capture-kinds" id="captureKinds" aria-label="事项类型"><label><input type="radio" name="captureItemKind" value="task" checked><span>要完成的任务</span></label><label><input type="radio" name="captureItemKind" value="event"><span>仅日程事件</span></label></div>
-      <div class="capture-input-shell">
-        <div id="captureHighlights" class="capture-highlights" aria-hidden="true"></div>
-        <textarea id="captureEditor" class="capture-editor" rows="3" spellcheck="false" aria-label="即写即走输入框" placeholder="例如：明天下午 3 点到 5 点修改论文 #1"></textarea>
-      </div>
-      <footer>
-        <div id="parseResult" class="parse-result">有具体时段会同时安排时间；只有日期则作为截止日期</div>
-        <div><span id="submitHint"><kbd>Enter</kbd> 创建</span><span><kbd>Esc</kbd> 关闭</span></div>
+      <section class="capture-compose">
+        <div class="capture-kinds" id="captureKinds" aria-label="事项类型"><label><input type="radio" name="captureItemKind" value="task" checked><span>待办与时间块</span></label><label><input type="radio" name="captureItemKind" value="event"><span>仅日程事件</span></label></div>
+        <div class="capture-input-shell">
+          <div id="captureHighlights" class="capture-highlights" aria-hidden="true"></div>
+          <textarea id="captureEditor" class="capture-editor" rows="3" spellcheck="false" aria-label="即写即走输入框" placeholder="例如：明天下午 3 点到 5 点修改论文 #1"></textarea>
+        </div>
+      </section>
+      <footer class="capture-footer">
+        <div class="capture-status"><i class="capture-status-dot" aria-hidden="true"></i><div id="parseResult" class="parse-result">有具体时段会同时安排时间；只有日期则作为截止日期</div></div>
+        <div class="capture-actions"><span id="submitHint"><kbd>Enter</kbd> 创建</span><span><kbd>Esc</kbd> 关闭</span></div>
       </footer>
     </main>
     <script src="theme-runtime.js"></script>

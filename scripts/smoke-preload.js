@@ -321,7 +321,11 @@ contextBridge.exposeInMainWorld('paperTrail', {
     smokeWorkspace.todos = [todo, ...(smokeWorkspace.todos || []).filter((item) => item.id !== todo.id)];
     return todo;
   },
-  parseTodo: async (input) => ({ valid: true, title: String(input || '').replace(/明天.*?点半?/u, '').trim(), dueAt: null, reminderMode: 'none', priority: 'medium' }),
+  parseTodo: async (input) => {
+    const text = String(input || '');
+    const matches = ['明天', '下午 3 点到 5 点', '#1'].map((token) => ({ start: text.indexOf(token), end: text.indexOf(token) + token.length, text: token })).filter((match) => match.start >= 0);
+    return { valid: true, title: text.replace(/明天.*?点半?/u, '').trim(), dueAt: new Date(now + 86_400_000).toISOString(), reminderMode: 'at-time', priority: /#1/.test(text) ? 'high' : 'medium', matches, meta: { explicitTime: /点/.test(text) } };
+  },
   deleteTodo: async (id) => { smokeWorkspace.todos = smokeWorkspace.todos.filter((todo) => todo.id !== id); return true; },
   reopenTodo: async (id) => {
     let updated = null;

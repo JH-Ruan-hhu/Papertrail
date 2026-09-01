@@ -1718,8 +1718,8 @@ function resumeAttendanceRuntime() {
 function createQuickCaptureWindow() {
   if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) return quickCaptureWindow;
   quickCaptureWindow = new BrowserWindow({
-    width: 720,
-    height: 222,
+    width: 760,
+    height: 258,
     show: false,
     frame: false,
     transparent: true,
