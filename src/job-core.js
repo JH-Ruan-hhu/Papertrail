@@ -344,7 +344,7 @@ function setWorkflowCurrentStage(workflow, stageId) {
   return normalizeWorkflow({ ...normalized, currentStageId: stageId });
 }
 
-module.exports = {
+const jobCoreApi = {
   DEFAULT_WORKFLOW_STAGES,
   JOB_LIFECYCLE_LABELS,
   JOB_LIFECYCLE_STATUSES,
@@ -365,3 +365,6 @@ module.exports = {
   removeWorkflowStage,
   setWorkflowCurrentStage
 };
+
+if (typeof window !== 'undefined') window.YanjiJobCore = jobCoreApi;
+if (typeof module !== 'undefined' && module.exports) module.exports = jobCoreApi;

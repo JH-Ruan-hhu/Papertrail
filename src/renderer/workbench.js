@@ -1,6 +1,12 @@
 'use strict';
 
 const workbenchApi = window.paperTrail;
+const {
+  DEFAULT_WORKFLOW_STAGES: DEFAULT_JOB_WORKFLOW_STAGES,
+  defaultWorkflow: defaultJobWorkflow,
+  normalizeWorkflow: clientJobWorkflow,
+  workflowStageIndex: sharedWorkflowStageIndex
+} = window.YanjiJobCore;
 const wb = {
   page: 'home',
   settings: {},
@@ -74,15 +80,6 @@ const JOB_QUICK_FILTER_OPTIONS = Object.freeze([
   ['imported', '历史导入'],
   ['has-notes', '有备注'],
   ['closed', '已结束']
-]);
-const DEFAULT_JOB_WORKFLOW_STAGES = Object.freeze([
-  Object.freeze({ id: 'stage-apply', name: '投递' }),
-  Object.freeze({ id: 'stage-assessment', name: '测评' }),
-  Object.freeze({ id: 'stage-first-interview', name: '一面' }),
-  Object.freeze({ id: 'stage-second-interview', name: '二面' }),
-  Object.freeze({ id: 'stage-third-interview', name: '三面' }),
-  Object.freeze({ id: 'stage-final-interview', name: '终面' }),
-  Object.freeze({ id: 'stage-offer', name: 'Offer' })
 ]);
 const HOME_JOB_FUNNEL_OPTIONS = Object.freeze([
   ['submitted', '已投递'],
@@ -525,41 +522,6 @@ function dateInputToIso(value) {
   return Number.isFinite(date.getTime()) ? date.toISOString() : null;
 }
 
-function defaultJobWorkflow() {
-  const stages = DEFAULT_JOB_WORKFLOW_STAGES.map((stage) => ({ ...stage }));
-  return { stages, currentStageId: stages[0].id, timeline: [] };
-}
-
-function clientJobWorkflow(value) {
-  const source = value && typeof value === 'object' && !Array.isArray(value) ? value : {};
-  const rawStages = Array.isArray(source.stages) && source.stages.length ? source.stages : defaultJobWorkflow().stages;
-  const used = new Set();
-  const stages = rawStages.map((rawStage, index) => {
-    const stage = rawStage && typeof rawStage === 'object' ? rawStage : {};
-    const baseId = String(stage.id || `stage-${index + 1}`).trim().slice(0, 120) || `stage-${index + 1}`;
-    let id = baseId;
-    let suffix = 2;
-    while (used.has(id)) id = `${baseId}-${suffix++}`;
-    used.add(id);
-    return { id, name: String(stage.name || `阶段 ${index + 1}`).trim().slice(0, 120) || `阶段 ${index + 1}` };
-  });
-  const stageIds = new Set(stages.map((stage) => stage.id));
-  const timelineByStage = new Map();
-  if (Array.isArray(source.timeline)) {
-    source.timeline.forEach((item) => {
-      const stageId = String(item?.stageId || '').trim();
-      if (!stageIds.has(stageId) || !item?.date || !Number.isFinite(Date.parse(item.date))) return;
-      timelineByStage.set(stageId, { stageId, date: new Date(item.date).toISOString() });
-    });
-  }
-  const currentStageId = stageIds.has(source.currentStageId) ? source.currentStageId : stages[0].id;
-  return {
-    stages,
-    currentStageId,
-    timeline: stages.filter((stage) => timelineByStage.has(stage.id)).map((stage) => timelineByStage.get(stage.id))
-  };
-}
-
 function cloneJobWorkflow(value) {
   return JSON.parse(JSON.stringify(clientJobWorkflow(value)));
 }
@@ -607,8 +569,7 @@ function workflowForStagePicker(value) {
 
 function jobWorkflowStageIndex(job) {
   const workflow = clientJobWorkflow(job?.workflow);
-  const index = workflow.stages.findIndex((stage) => stage.id === workflow.currentStageId);
-  return index >= 0 ? index : 0;
+  return sharedWorkflowStageIndex(workflow, workflow.currentStageId);
 }
 
 function jobCurrentStage(job) {

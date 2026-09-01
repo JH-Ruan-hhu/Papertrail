@@ -19,4 +19,4 @@ function parseMinuteToken(value) {
   return chineseNumber(value);
 }
 
-module.exports = { TIME_NUMBER_PATTERN, parseMinuteToken };
+module.exports = { TIME_NUMBER_PATTERN, chineseNumber, parseMinuteToken };

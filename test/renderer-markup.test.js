@@ -5,30 +5,28 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const projectFileCache = new Map();
+function readProjectFile(...segments) {
+  const filePath = path.join(__dirname, '..', ...segments);
+  if (!projectFileCache.has(filePath)) projectFileCache.set(filePath, fs.readFileSync(filePath, 'utf8'));
+  return projectFileCache.get(filePath);
+}
+
 test('add-dialog cancel controls do not submit the required form', () => {
-  const html = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'index.html'),
-    'utf8'
-  );
+  const html = readProjectFile('src', 'renderer', 'index.html');
   assert.match(html, /id="closeAddDialogButton"\s+type="button"/);
   assert.match(html, /id="cancelAddButton"\s+type="button"/);
   assert.doesNotMatch(html, /id="(?:closeAddDialogButton|cancelAddButton)"[^>]*type="submit"/);
 });
 
 test('top bar does not expose a minimize-to-tray button', () => {
-  const html = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'index.html'),
-    'utf8'
-  );
+  const html = readProjectFile('src', 'renderer', 'index.html');
   assert.doesNotMatch(html, /id="hideButton"/);
   assert.doesNotMatch(html, /最小化到托盘/);
 });
 
 test('uses a sidebar layout with settings at the bottom and two add modes', () => {
-  const html = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'index.html'),
-    'utf8'
-  );
+  const html = readProjectFile('src', 'renderer', 'index.html');
   assert.match(html, /<aside class="sidebar">/);
   assert.match(html, /class="sidebar-bottom"[\s\S]*id="settingsButton"/);
   assert.match(html, /id="addModeLink"/);
@@ -61,14 +59,8 @@ test('uses a sidebar layout with settings at the bottom and two add modes', () =
 });
 
 test('production DOI supports full-link hover and copy', () => {
-  const appJs = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'app.js'),
-    'utf8'
-  );
-  const css = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'styles.css'),
-    'utf8'
-  );
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
+  const css = readProjectFile('src', 'renderer', 'styles.css');
   assert.match(appJs, /data-action="copy-doi"/);
   assert.match(appJs, /https:\/\/doi\.org\//);
   assert.match(appJs, /<small>DOI<\/small>/);
@@ -79,10 +71,10 @@ test('production DOI supports full-link hover and copy', () => {
 });
 
 test('settings expose backup deletion, current version and cold-start refresh', () => {
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const storageCoreJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'storage-core.js'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
-  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  const mainJs = readProjectFile('src', 'main.js');
+  const storageCoreJs = readProjectFile('src', 'storage-core.js');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
+  const preloadJs = readProjectFile('src', 'preload.js');
   assert.match(mainJs, /settings:delete-data-backups/);
   assert.match(mainJs, /isManagedBackupPath\(backupFile/);
   assert.match(storageCoreJs, /papertrail-backup-/);
@@ -95,10 +87,10 @@ test('settings expose backup deletion, current version and cold-start refresh', 
 });
 
 test('settings expose a main-process GitHub Release update workflow', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const html = readProjectFile('src', 'renderer', 'index.html');
+  const mainJs = readProjectFile('src', 'main.js');
+  const preloadJs = readProjectFile('src', 'preload.js');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
   assert.match(html, /id="updateActionButton"/);
   assert.match(html, /id="updateProgress"[\s\S]*role="progressbar"/);
   assert.match(html, /id="updatePromptDialog"/);
@@ -119,9 +111,9 @@ test('settings expose a main-process GitHub Release update workflow', () => {
 });
 
 test('0.5.x exposes unread, archive, retry and credential-safe export actions', () => {
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const mainJs = readProjectFile('src', 'main.js');
+  const preloadJs = readProjectFile('src', 'preload.js');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
   assert.match(mainJs, /papers:mark-read/);
   assert.match(mainJs, /papers:mark-all-read/);
   assert.match(mainJs, /papers:archive/);
@@ -138,9 +130,9 @@ test('0.5.x exposes unread, archive, retry and credential-safe export actions', 
 });
 
 test('keeps search in the list heading and empty refresh visibly unavailable', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8');
+  const html = readProjectFile('src', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
+  const css = readProjectFile('src', 'renderer', 'styles.css');
   assert.match(html, /class="section-heading"[\s\S]*id="paperSearch"/);
   assert.doesNotMatch(html, /class="list-toolbar"/);
   assert.match(html, />暂无稿件</);
@@ -154,10 +146,10 @@ test('keeps search in the list heading and empty refresh visibly unavailable', (
 });
 
 test('supports locally linking cross-journal submission journeys', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const html = readProjectFile('src', 'renderer', 'index.html');
+  const mainJs = readProjectFile('src', 'main.js');
+  const preloadJs = readProjectFile('src', 'preload.js');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
   assert.match(html, /id="journeyDialog"/);
   assert.match(html, /仅关联研迹中的本地记录/);
   assert.match(mainJs, /papers:link-journey/);
@@ -169,10 +161,10 @@ test('supports locally linking cross-journal submission journeys', () => {
 });
 
 test('0.6 exposes local deadlines, revision rounds, manuscript details and detailed review events', () => {
-  const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const html = readProjectFile('src', 'renderer', 'index.html');
+  const mainJs = readProjectFile('src', 'main.js');
+  const preloadJs = readProjectFile('src', 'preload.js');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
   assert.match(html, /id="workflowDialog"/);
   assert.match(html, /id="detailManuscriptId"/);
   assert.match(html, /版权\/许可文件截止日期/);
@@ -188,22 +180,10 @@ test('0.6 exposes local deadlines, revision rounds, manuscript details and detai
 });
 
 test('interaction polish uses explicit motion and supports reduced motion', () => {
-  const css = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'styles.css'),
-    'utf8'
-  );
-  const tokens = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'motion-tokens.css'),
-    'utf8'
-  );
-  const appJs = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'app.js'),
-    'utf8'
-  );
-  const motionJs = fs.readFileSync(
-    path.join(__dirname, '..', 'src', 'renderer', 'motion-system.js'),
-    'utf8'
-  );
+  const css = readProjectFile('src', 'renderer', 'styles.css');
+  const tokens = readProjectFile('src', 'renderer', 'motion-tokens.css');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
+  const motionJs = readProjectFile('src', 'renderer', 'motion-system.js');
   assert.match(tokens, /--motion-ease-enter:\s*cubic-bezier\(\.23,\s*1,\s*\.32,\s*1\)/);
   assert.match(css, /@media \(prefers-reduced-motion: reduce\)/);
   assert.match(css, /\.button:not\(:disabled\):active\s*\{\s*transform:\s*scale\(\.97\)/);
@@ -218,9 +198,9 @@ test('interaction polish uses explicit motion and supports reduced motion', () =
 });
 
 test('pointer sidebar navigation settles gently while keyboard navigation stays immediate', () => {
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.css'), 'utf8');
-  const tokens = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-tokens.css'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const css = readProjectFile('src', 'renderer', 'motion-system.css');
+  const tokens = readProjectFile('src', 'renderer', 'motion-tokens.css');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
   assert.match(tokens, /--motion-duration-page:\s*360ms/);
   assert.match(css, /\.workbench-page\.page-entering\s*\{[^}]*motion-page-fade var\(--motion-duration-page\)/s);
   assert.match(css, /\.workbench-page\.page-entering > \.page-head-row\s*\{[^}]*motion-heading-enter var\(--motion-duration-page\)/s);
@@ -231,11 +211,11 @@ test('pointer sidebar navigation settles gently while keyboard navigation stays 
 });
 
 test('installer uses the stock electron-builder wizard while retaining upgrade safety', () => {
-  const packageJson = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-  const installer = fs.readFileSync(path.join(__dirname, '..', 'build', 'installer.nsh'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const packageJson = JSON.parse(readProjectFile('package.json'));
+  const installer = readProjectFile('build', 'installer.nsh');
+  const mainJs = readProjectFile('src', 'main.js');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
   assert.equal(packageJson.build.nsis.include, 'build/installer.nsh');
   assert.equal(packageJson.build.nsis.oneClick, false);
   assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, true);
@@ -259,17 +239,17 @@ test('installer uses the stock electron-builder wizard while retaining upgrade s
 });
 
 test('research workbench exposes home, rolling schedule board, metadata notes and quick capture', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'styles.css'), 'utf8');
-  const layoutCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
-  const liquidCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'themes', 'liquid-glass.css'), 'utf8');
-  const storeJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'store.js'), 'utf8');
-  const scheduleWidgetHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.html'), 'utf8');
-  const scheduleWidgetJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.js'), 'utf8');
-  const scheduleWidgetCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'schedule-widget.css'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const mainJs = readProjectFile('src', 'main.js');
+  const preloadJs = readProjectFile('src', 'preload.js');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const css = readProjectFile('src', 'renderer', 'styles.css');
+  const layoutCss = readProjectFile('src', 'renderer', 'v11-layout.css');
+  const liquidCss = readProjectFile('src', 'renderer', 'themes', 'liquid-glass.css');
+  const storeJs = readProjectFile('src', 'store.js');
+  const scheduleWidgetHtml = readProjectFile('src', 'renderer', 'schedule-widget.html');
+  const scheduleWidgetJs = readProjectFile('src', 'renderer', 'schedule-widget.js');
+  const scheduleWidgetCss = readProjectFile('src', 'renderer', 'schedule-widget.css');
   assert.match(indexHtml, /data-workbench-page="home"/);
   assert.match(indexHtml, /data-workbench-page="schedule"/);
   assert.match(indexHtml, /data-workbench-page="attendance"/);
@@ -427,9 +407,9 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
 });
 
 test('quick capture preserves Chinese IME composition and closes empty on blur', () => {
-  const captureHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.html'), 'utf8');
-  const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const captureHtml = readProjectFile('src', 'renderer', 'capture.html');
+  const captureJs = readProjectFile('src', 'renderer', 'capture.js');
+  const mainJs = readProjectFile('src', 'main.js');
   assert.match(captureHtml, /<textarea id="captureEditor"/);
   assert.match(captureHtml, /id="captureHighlights"/);
   assert.doesNotMatch(captureHtml, /contenteditable/);
@@ -447,18 +427,20 @@ test('quick capture preserves Chinese IME composition and closes empty on blur',
 });
 
 test('settings omit promotional and explanatory introduction cards', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
   assert.doesNotMatch(indexHtml, /数据只属于你|产品说明|只提醒值得关注的变化/);
   assert.doesNotMatch(indexHtml, /class="settings-note\b/);
   assert.doesNotMatch(indexHtml, /class="privacy-note"/);
 });
 
 test('job dashboard uses independent lifecycle states and selectable standard workflow rails', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const css = readProjectFile('src', 'renderer', 'v11-layout.css');
+  const mainJs = readProjectFile('src', 'main.js');
+  const preloadJs = readProjectFile('src', 'preload.js');
+  assert.match(indexHtml, /<script src="\.\.\/job-core\.js"><\/script>[\s\S]*<script src="workbench\.js"><\/script>/);
+  assert.match(workbenchJs, /window\.YanjiJobCore/);
   assert.match(indexHtml, /id="jobTotalJobs"/);
   assert.match(indexHtml, /id="jobTodayAdded"/);
   assert.match(indexHtml, /id="jobQuickFilters"/);
@@ -495,9 +477,9 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
 });
 
 test('note editor autosaves a full daily document and opens from its card', () => {
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const noteEditorJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'note-editor.js'), 'utf8');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const noteEditorJs = readProjectFile('src', 'renderer', 'note-editor.js');
   assert.match(workbenchJs, /有未保存更改/);
   assert.match(workbenchJs, /setTimeout\(\(\) => flushNoteEditor\(\{ silent: true \}\), 550\)/);
   assert.match(workbenchJs, /function animateNoteDialogFromCard[\s\S]*duration:\s*260[\s\S]*cubic-bezier\(0\.77, 0, 0\.175, 1\)/);
@@ -513,15 +495,15 @@ test('note editor autosaves a full daily document and opens from its card', () =
 });
 
 test('unchanged workspace broadcasts do not rebuild the visible job table', () => {
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
   assert.match(workbenchJs, /const jobsChanged = JSON\.stringify\(wb\.workspace\.jobApplications \|\| \[\]\) !== JSON\.stringify\(nextWorkspace\.jobApplications \|\| \[\]\)/);
   assert.match(workbenchJs, /if \(wb\.page === 'jobs' && jobsChanged\) renderJobs\(\)/);
 });
 
 test('daily document renderer no longer exposes the legacy entry editor', () => {
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const mainJs = readProjectFile('src', 'main.js');
   for (const source of [workbenchJs, indexHtml]) {
     assert.doesNotMatch(source, /noteAppendMode|noteEntryId|noteDailyHistory|renderNoteDailyHistory|appendEntry/);
   }
@@ -534,8 +516,8 @@ test('daily document renderer no longer exposes the legacy entry editor', () => 
 });
 
 test('update center shows current and available versions with a local-data safety boundary', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
   assert.match(indexHtml, /RELEASE CENTER/);
   assert.match(indexHtml, /id="updateTargetVersion"/);
   assert.match(indexHtml, /只替换程序文件，不移动日程、笔记、投稿或求职数据/);
@@ -543,8 +525,8 @@ test('update center shows current and available versions with a local-data safet
 });
 
 test('settings render as a workspace page with exact horizontal tabs', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
   assert.match(indexHtml, /<section id="settingsDialog"[^>]*data-page="settings"/);
   assert.doesNotMatch(indexHtml, /<dialog id="settingsDialog"/);
   assert.match(indexHtml, /aria-orientation="horizontal"/);
@@ -554,18 +536,18 @@ test('settings render as a workspace page with exact horizontal tabs', () => {
 });
 
 test('destructive workbench actions use the Yanji confirmation dialog', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const sharedUiJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'shared-ui.js'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const sharedUiJs = readProjectFile('src', 'renderer', 'shared-ui.js');
   assert.match(indexHtml, /id="yanjiConfirmDialog"/);
   assert.match(sharedUiJs, /window\.yanjiConfirm/);
   assert.doesNotMatch(workbenchJs, /\bconfirm\s*\(/);
 });
 
 test('hidden renderer work is throttled and the close-to-tray window is released', () => {
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
+  const mainJs = readProjectFile('src', 'main.js');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
   assert.match(mainJs, /backgroundThrottling:\s*true/);
   assert.match(mainJs, /scheduleHiddenMainWindowRelease\(\)/);
   assert.match(mainJs, /!candidate\.isVisible\(\)\) candidate\.destroy\(\)/);
@@ -574,9 +556,9 @@ test('hidden renderer work is throttled and the close-to-tray window is released
 });
 
 test('storage location changes require a restart and legacy user data remains discoverable', () => {
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const preloadJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'preload.js'), 'utf8');
-  const appJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'app.js'), 'utf8');
+  const mainJs = readProjectFile('src', 'main.js');
+  const preloadJs = readProjectFile('src', 'preload.js');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
   assert.ok(mainJs.indexOf("app.setPath('userData'") < mainJs.indexOf("app.setName('研迹')"));
   assert.match(mainJs, /resolveStableUserDataPath\(app\.getPath\('appData'\)\)/);
   assert.match(mainJs, /restartRequired:\s*true/);
@@ -587,15 +569,15 @@ test('storage location changes require a restart and legacy user data remains di
 });
 
 test('the submissions heading uses the same page header baseline as other workbench pages', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const css = readProjectFile('src', 'renderer', 'v11-layout.css');
   assert.match(indexHtml, /class="workspace-header page-head-row submissions-page-head"/);
   assert.match(css, /\.submissions-page > \.page-head-row/);
 });
 
 test('packaged BrowserWindows load the unpacked Yanji taskbar icon', () => {
-  const packageJson = fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const packageJson = readProjectFile('package.json');
+  const mainJs = readProjectFile('src', 'main.js');
   assert.match(packageJson, /"build\/icon\.ico"/);
   assert.match(packageJson, /"build\/icon\.png"/);
   assert.match(mainJs, /app\.isPackaged[\s\S]*app\.asar\.unpacked[\s\S]*build/);
@@ -604,14 +586,14 @@ test('packaged BrowserWindows load the unpacked Yanji taskbar icon', () => {
 });
 
 test('global motion tokens cover routes, dialogs, tabs and reduced motion without a new dependency', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const tokens = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-tokens.css'), 'utf8');
-  const motionCss = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.css'), 'utf8');
-  const motionJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.js'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const todoViewJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'todo-view.js'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const tokens = readProjectFile('src', 'renderer', 'motion-tokens.css');
+  const motionCss = readProjectFile('src', 'renderer', 'motion-system.css');
+  const motionJs = readProjectFile('src', 'renderer', 'motion-system.js');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const todoViewJs = readProjectFile('src', 'renderer', 'todo-view.js');
   const auxiliaryPages = ['sticky.html', 'deadline.html', 'capture.html', 'schedule-widget.html']
-    .map((file) => fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', file), 'utf8'));
+    .map((file) => readProjectFile('src', 'renderer', file));
   assert.match(indexHtml, /motion-tokens\.css/);
   assert.match(indexHtml, /motion-system\.css/);
   assert.match(indexHtml, /motion-system\.js/);
@@ -666,10 +648,10 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
 });
 
 test('note editor restores inspector state and wires Word-like Enter and Tab handling', () => {
-  const noteEditorJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'note-editor.js'), 'utf8');
-  const listEditingJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'list-editing.js'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  const noteEditorJs = readProjectFile('src', 'renderer', 'note-editor.js');
+  const listEditingJs = readProjectFile('src', 'renderer', 'list-editing.js');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const css = readProjectFile('src', 'renderer', 'v11-layout.css');
   assert.match(noteEditorJs, /yanji\.noteInspectorOpen\.v1/);
   assert.match(noteEditorJs, /localStorage\.setItem\(INSPECTOR_STATE_KEY/);
   assert.match(workbenchJs, /YanjiNoteEditor\?\.restoreInspector\(\)/);
@@ -684,7 +666,7 @@ test('note editor restores inspector state and wires Word-like Enter and Tab han
 });
 
 test('quick capture note submission imports and calls the daily-note append helper from workbench core', () => {
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const mainJs = readProjectFile('src', 'main.js');
   const storageImport = mainJs.match(/const\s*\{([\s\S]*?)\}\s*=\s*require\('\.\/storage-core'\)/)?.[1] || '';
   const workbenchImport = mainJs.match(/const\s*\{([\s\S]*?)\}\s*=\s*require\('\.\/workbench-core'\)/)?.[1] || '';
   assert.doesNotMatch(storageImport, /appendDailyNoteContent/);
@@ -694,7 +676,7 @@ test('quick capture note submission imports and calls the daily-note append help
 });
 
 test('quick capture Tab cycles between item and note modes', () => {
-  const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
+  const captureJs = readProjectFile('src', 'renderer', 'capture.js');
   const tabBranch = captureJs.indexOf("if (event.key === 'Tab')");
   const listEditingBranch = captureJs.indexOf("window.YanjiListEditing?.applyListEditing(editor, event)");
   assert.ok(tabBranch >= 0 && listEditingBranch > tabBranch);
@@ -702,7 +684,7 @@ test('quick capture Tab cycles between item and note modes', () => {
 });
 
 test('quick capture recognizes numbered Enter continuation before normal submission', () => {
-  const captureJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'capture.js'), 'utf8');
+  const captureJs = readProjectFile('src', 'renderer', 'capture.js');
   const continuationBranch = captureJs.indexOf("event.key === 'Enter' && !event.shiftKey && window.YanjiListEditing?.applyListEditing(editor, event)");
   const submitBranch = captureJs.indexOf("event.key === 'Enter' && mode === 'item' && !event.shiftKey");
   assert.ok(continuationBranch >= 0 && continuationBranch < submitBranch);
@@ -710,16 +692,16 @@ test('quick capture recognizes numbered Enter continuation before normal submiss
 });
 
 test('home page common workspace exposes the global gradient between matrices', () => {
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  const css = readProjectFile('src', 'renderer', 'v11-layout.css');
   assert.match(css, /\.workspace:has\(> \.home-page:not\(\[hidden\]\)\)[\s\S]*background:\s*transparent\s*!important/);
   assert.match(css, /\.workspace\s*>\s*\.home-page:not\(\[hidden\]\)[\s\S]*box-shadow:\s*none/);
 });
 
 test('v1.4.3 schedule, note, settings and attendance regressions stay wired', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const motionJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'motion-system.js'), 'utf8');
-  const css = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'v11-layout.css'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const motionJs = readProjectFile('src', 'renderer', 'motion-system.js');
+  const css = readProjectFile('src', 'renderer', 'v11-layout.css');
   assert.match(indexHtml, /id="scheduleRepeatDailyInput"/);
   assert.match(workbenchJs, /schedule\.repeat !== 'daily'/);
   assert.match(workbenchJs, /repeat:\s*document\.getElementById\('scheduleRepeatDailyInput'\)\.checked \? 'daily' : null/);
@@ -736,9 +718,9 @@ test('v1.4.3 schedule, note, settings and attendance regressions stay wired', ()
 });
 
 test('v1.4.9 job table and portable export use the simplified columns without losing import data', () => {
-  const indexHtml = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), 'utf8');
-  const workbenchJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'renderer', 'workbench.js'), 'utf8');
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
+  const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
+  const mainJs = readProjectFile('src', 'main.js');
   assert.match(indexHtml, /id="jobStatusFilter"[\s\S]*状态：不限[\s\S]*进行中[\s\S]*已结束/);
   assert.doesNotMatch(indexHtml.match(/id="jobStatusFilter"[\s\S]*?<\/select>/)?.[0] || '', /准备中|暂停/);
   assert.match(indexHtml, /优先级：不限/);
@@ -760,9 +742,9 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
 });
 
 test('release verification executes the packaged executable and inspects app.asar', () => {
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
-  const smokeJs = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'packaged-smoke.js'), 'utf8');
-  const verifyJs = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'verify-package.js'), 'utf8');
+  const mainJs = readProjectFile('src', 'main.js');
+  const smokeJs = readProjectFile('scripts', 'packaged-smoke.js');
+  const verifyJs = readProjectFile('scripts', 'verify-package.js');
   assert.match(mainJs, /--smoke-test/);
   assert.match(mainJs, /YANJI_SMOKE_OK/);
   assert.match(smokeJs, /win-unpacked/);
@@ -775,7 +757,7 @@ test('release verification executes the packaged executable and inspects app.asa
 });
 
 test('non-critical startup services degrade without aborting core startup', () => {
-  const mainJs = fs.readFileSync(path.join(__dirname, '..', 'src', 'main.js'), 'utf8');
+  const mainJs = readProjectFile('src', 'main.js');
   assert.match(mainJs, /async function runNonCriticalStartup/);
   assert.match(mainJs, /createWindow\(\);[\s\S]*runNonCriticalStartup\('系统托盘'/);
   assert.match(mainJs, /runNonCriticalStartup\('自动更新', initializeUpdater\)/);

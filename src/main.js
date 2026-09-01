@@ -71,7 +71,6 @@ const {
   saveAttendance,
   saveFocusSession,
   saveNote,
-  saveSchedule,
   scheduleOccurrenceForDate
 } = require('./workbench-core');
 const {
@@ -908,25 +907,11 @@ function getPlanningService() {
 }
 
 function saveWorkspaceSchedule(input) {
-  if (planningService) return getPlanningService().saveSchedule(input);
-  const schedules = saveSchedule(
-    store.listSchedules(),
-    input,
-    new Date().toISOString(),
-    () => crypto.randomUUID()
-  );
-  store.setSchedules(schedules);
-  broadcastWorkspace();
-  return schedules.find((item) => item.id === String(input?.id || '')) || schedules[0];
+  return getPlanningService().saveSchedule(input);
 }
 
 function deleteWorkspaceSchedule(id) {
-  if (planningService) return getPlanningService().deleteSchedule(id);
-  const schedules = store.listSchedules();
-  if (!schedules.some((item) => item.id === id)) throw new Error('找不到这条日程。');
-  store.setSchedules(schedules.filter((item) => item.id !== id));
-  broadcastWorkspace();
-  return true;
+  return getPlanningService().deleteSchedule(id);
 }
 
 function setWorkspaceScheduleCompleted(id, completed) {
@@ -1199,10 +1184,6 @@ function saveMetadataFields(input) {
 
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function saveWorkspaceTodo(input) {
-  return getPlanningService().saveTodo(input);
 }
 
 function reconcileStaleAttendance(now = new Date()) {

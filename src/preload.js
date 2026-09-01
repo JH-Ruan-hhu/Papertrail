@@ -2,6 +2,12 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+const on = (channel) => (callback) => {
+  const listener = (_event, ...args) => callback(...args);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+};
+
 contextBridge.exposeInMainWorld('paperTrail', {
   getWorkspace: () => ipcRenderer.invoke('workspace:get'),
   getTodayWidgetData: () => ipcRenderer.invoke('today-widget:get-data'),
@@ -91,61 +97,17 @@ contextBridge.exposeInMainWorld('paperTrail', {
   openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
   restartApp: () => ipcRenderer.invoke('system:restart-app'),
   setModalWindowState: (active) => ipcRenderer.invoke('window:set-modal-state', Boolean(active)),
-  onPapersChanged: (callback) => {
-    const listener = (_event, papers) => callback(papers);
-    ipcRenderer.on('papers:changed', listener);
-    return () => ipcRenderer.removeListener('papers:changed', listener);
-  },
-  onRefreshState: (callback) => {
-    const listener = (_event, state) => callback(state);
-    ipcRenderer.on('refresh:state', listener);
-    return () => ipcRenderer.removeListener('refresh:state', listener);
-  },
-  onUpdateState: (callback) => {
-    const listener = (_event, state) => callback(state);
-    ipcRenderer.on('updates:state', listener);
-    return () => ipcRenderer.removeListener('updates:state', listener);
-  },
-  onWorkspaceChanged: (callback) => {
-    const listener = (_event, workspace) => callback(workspace);
-    ipcRenderer.on('workspace:changed', listener);
-    return () => ipcRenderer.removeListener('workspace:changed', listener);
-  },
-  onTodayWidgetChanged: (callback) => {
-    const listener = (_event, data) => callback(data);
-    ipcRenderer.on('today-widget:changed', listener);
-    return () => ipcRenderer.removeListener('today-widget:changed', listener);
-  },
-  onSettingsChanged: (callback) => {
-    const listener = (_event, settings) => callback(settings);
-    ipcRenderer.on('settings:changed', listener);
-    return () => ipcRenderer.removeListener('settings:changed', listener);
-  },
-  onWorkspaceNavigate: (callback) => {
-    const listener = (_event, page) => callback(page);
-    ipcRenderer.on('workspace:navigate', listener);
-    return () => ipcRenderer.removeListener('workspace:navigate', listener);
-  },
-  onFocusChanged: (callback) => {
-    const listener = (_event, sessions) => callback(sessions);
-    ipcRenderer.on('focus:changed', listener);
-    return () => ipcRenderer.removeListener('focus:changed', listener);
-  },
-  onCaptureFocus: (callback) => {
-    const listener = () => callback();
-    ipcRenderer.on('capture:focus', listener);
-    return () => ipcRenderer.removeListener('capture:focus', listener);
-  },
-  onStickyFocus: (callback) => {
-    const listener = () => callback();
-    ipcRenderer.on('sticky:focus', listener);
-    return () => ipcRenderer.removeListener('sticky:focus', listener);
-  },
-  onDeadlineShow: (callback) => {
-    const listener = (_event, schedule) => callback(schedule);
-    ipcRenderer.on('deadline:show', listener);
-    return () => ipcRenderer.removeListener('deadline:show', listener);
-  },
+  onPapersChanged: on('papers:changed'),
+  onRefreshState: on('refresh:state'),
+  onUpdateState: on('updates:state'),
+  onWorkspaceChanged: on('workspace:changed'),
+  onTodayWidgetChanged: on('today-widget:changed'),
+  onSettingsChanged: on('settings:changed'),
+  onWorkspaceNavigate: on('workspace:navigate'),
+  onFocusChanged: on('focus:changed'),
+  onCaptureFocus: on('capture:focus'),
+  onStickyFocus: on('sticky:focus'),
+  onDeadlineShow: on('deadline:show'),
   // Namespaced aliases mirror the v1.1 contract while the flat methods above
   // preserve the existing PaperTrail renderer API.
   todos: {
