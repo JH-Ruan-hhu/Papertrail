@@ -7,8 +7,7 @@ const { normalizeJobApplication } = require('./job-core');
 const SCHEMA_8_VERSION = 8;
 const SCHEMA_9_VERSION = 9;
 const SCHEMA_10_VERSION = 10;
-const SCHEMA_11_VERSION = 11;
-const DATA_VERSION = 12;
+const DATA_VERSION = 11;
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : null;
@@ -239,34 +238,14 @@ function migrateSchema9To10(parsed, { fallbackAt = new Date(0).toISOString() } =
 function migrateSchema10To11(parsed, { fallbackAt = new Date(0).toISOString() } = {}) {
   if (!asObject(parsed)) throw new Error('数据文件根节点必须是对象。');
   if (parsed.version != null && (!Number.isInteger(parsed.version) || parsed.version < 1)) throw new Error('数据文件版本号无效。');
-  if (Number(parsed.version || SCHEMA_10_VERSION) > SCHEMA_11_VERSION) throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
+  if (Number(parsed.version || SCHEMA_10_VERSION) > DATA_VERSION) throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
   if (parsed.notes != null && !Array.isArray(parsed.notes)) throw new Error('笔记列表格式无效。');
   const notes = mergeDailyNotes((parsed.notes || []).map((note, index) => {
     if (note?.kind !== 'daily') return normalizeNote(note, index, fallbackAt);
     const merged = mergeLegacyDailyEntries(note.entries, note.content, note.attachments, note.createdAt || fallbackAt);
     return normalizeNote({ ...note, content: merged.content, attachments: merged.attachments, entries: [] }, index, fallbackAt);
   }));
-  const data = { ...clone(parsed), version: SCHEMA_11_VERSION, notes };
-  return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) };
-}
-
-function migrateSchema11To12(parsed) {
-  if (!asObject(parsed)) throw new Error('数据文件根节点必须是对象。');
-  if (parsed.version != null && (!Number.isInteger(parsed.version) || parsed.version < 1)) throw new Error('数据文件版本号无效。');
-  if (Number(parsed.version || SCHEMA_11_VERSION) > DATA_VERSION) throw new Error(`数据文件来自更高版本（v${parsed.version}），当前研迹无法安全打开。`);
-  if (parsed.jobApplications != null && !Array.isArray(parsed.jobApplications)) throw new Error('求职记录列表格式无效。');
-  if (parsed.jobRadar != null && !asObject(parsed.jobRadar)) throw new Error('求职雷达数据格式无效。');
-  const current = asObject(parsed.jobRadar) || {};
-  const jobRadar = {
-    profile: asObject(current.profile) || {},
-    preferences: asObject(current.preferences) || {},
-    followedCompanies: Array.isArray(current.followedCompanies) ? current.followedCompanies : [],
-    sources: Array.isArray(current.sources) ? current.sources : [],
-    savedApplications: Array.isArray(current.savedApplications) ? current.savedApplications : [],
-    hiddenFingerprints: Array.isArray(current.hiddenFingerprints) ? current.hiddenFingerprints : [],
-    lastRefreshAt: isoDate(current.lastRefreshAt)
-  };
-  const data = { ...clone(parsed), version: DATA_VERSION, jobRadar };
+  const data = { ...clone(parsed), version: DATA_VERSION, notes };
   return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) };
 }
 
@@ -275,11 +254,9 @@ module.exports = {
   SCHEMA_8_VERSION,
   SCHEMA_9_VERSION,
   SCHEMA_10_VERSION,
-  SCHEMA_11_VERSION,
   migrateSchema7To8,
   migrateSchema8To9,
   migrateSchema9To10,
   migrateSchema10To11,
-  migrateSchema11To12,
   normalizeSettings
 };

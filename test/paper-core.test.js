@@ -69,7 +69,7 @@ test('migrates 0.4.x data without treating a failed attempt as a success', () =>
   });
   const { data, changed } = migrateData({ version: 1, settings: {}, papers: [legacy] }, DEFAULT_SETTINGS);
   assert.equal(changed, true);
-  assert.equal(data.version, 12);
+  assert.equal(data.version, 11);
   assert.deepEqual(data.attendance, []);
   assert.deepEqual(data.focusSessions, []);
   assert.deepEqual(data.jobApplications, []);

@@ -8,7 +8,7 @@ const {
 } = require('./workbench-core');
 const { normalizeJobApplication } = require('./job-core');
 const { normalizeCountdown } = require('./countdown-core');
-const { DATA_VERSION, migrateSchema7To8, migrateSchema8To9, migrateSchema9To10, migrateSchema10To11, migrateSchema11To12 } = require('./migration-core');
+const { DATA_VERSION, migrateSchema7To8, migrateSchema8To9, migrateSchema9To10, migrateSchema10To11 } = require('./migration-core');
 
 const RETRY_DELAYS_MS = Object.freeze([15 * 60_000, 60 * 60_000]);
 const TASK_REMINDER_LEAD_MS = 48 * 60 * 60_000;
@@ -227,12 +227,9 @@ function migrateData(parsed, defaultSettings) {
     // that record instead of rewriting the entire job collection on startup.
     v10 = { data: v9.data, changed: false };
   }
-  const v11 = Number(v10.data.version || 10) <= 10
+  const migrated = Number(v10.data.version || 10) <= 10
     ? migrateSchema10To11(v10.data)
     : v10;
-  const migrated = Number(v11.data.version || 11) <= 11
-    ? migrateSchema11To12(v11.data)
-    : v11;
   const source = migrated.data;
   if (source.countdowns != null && !Array.isArray(source.countdowns)) throw new Error('倒计时列表格式无效。');
   const settings = source.settings;
@@ -260,8 +257,7 @@ function migrateData(parsed, defaultSettings) {
     metadataFields,
     attendance,
     focusSessions,
-    jobApplications,
-    jobRadar: source.jobRadar
+    jobApplications
   };
   return { data, changed: JSON.stringify(data) !== JSON.stringify(parsed) || v8.changed || v9.changed || migrated.changed };
 }

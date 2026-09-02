@@ -78,7 +78,7 @@ test('creates, updates and deletes workflow stages while keeping the current sta
   let jobs = saveJobApplication([], { company: '水务集团', role: '环境工程师', status: 'preparing' }, now, () => 'job-1');
   assert.equal(jobs[0].id, 'job-1');
   assert.equal(jobs[0].status, 'preparing');
-  assert.equal(jobs[0].appliedAt, null);
+  assert.equal(jobs[0].appliedAt, now);
   const custom = {
     stages: [{ id: 'phone', name: '电话沟通' }, { id: 'case', name: '案例题' }, { id: 'offer', name: 'Offer' }],
     currentStageId: 'case',
@@ -86,7 +86,6 @@ test('creates, updates and deletes workflow stages while keeping the current sta
   };
   jobs = saveJobApplication(jobs, { ...jobs[0], status: 'active', workflow: custom }, '2026-08-25T08:00:00.000Z');
   assert.equal(jobs[0].status, 'active');
-  assert.equal(jobs[0].appliedAt, '2026-08-25T08:00:00.000Z');
   assert.equal(jobs[0].workflow.currentStageId, 'case');
   assert.equal(jobs[0].revision, 2);
   jobs = saveJobApplication(jobs, { ...jobs[0], pinned: true }, '2026-08-25T09:00:00.000Z');
@@ -191,15 +190,4 @@ test('updates only newer imported jobs and keeps newer local edits', () => {
   assert.equal(newer.jobs[0].role, '异地更新岗位');
   assert.equal(newer.updated, 1);
   assert.equal(newer.jobs[0].id, 'shared-id');
-});
-
-test('marks appliedAt only when a preparing application becomes active', () => {
-  const createdAt = '2026-09-02T01:00:00.000Z';
-  const preparing = saveJobApplication([], { company: '环境科技', role: '工程师', status: 'preparing', appliedAt: null }, createdAt, () => 'job-radar')[0];
-  assert.equal(preparing.status, 'preparing');
-  assert.equal(preparing.appliedAt, null);
-  const appliedAt = '2026-09-03T02:00:00.000Z';
-  const active = saveJobApplication([preparing], { ...preparing, status: 'active', appliedAt: null }, appliedAt)[0];
-  assert.equal(active.status, 'active');
-  assert.equal(active.appliedAt, appliedAt);
 });

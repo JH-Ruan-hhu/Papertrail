@@ -735,7 +735,7 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
   assert.match(indexHtml, /class="job-table-head"[\s\S]*预估年薪/);
   assert.match(indexHtml, /class="job-table-head"[\s\S]*截止日期/);
   assert.match(indexHtml, /id="jobDeadline"/);
-  assert.match(indexHtml, /id="jobSettingsButton"[^>]*aria-label="打开求职设置"/);
+  assert.match(indexHtml, /id="jobSettingsButton"[\s\S]*<circle cx="12" cy="12" r="3"/);
   assert.match(workbenchJs, /class="job-salary-cell"/);
   assert.match(workbenchJs, /jobs\.filter\(\(job\) => job\.status !== 'closed'\)/);
   assert.match(mainJs, /<span>预估年薪<\/span><span>截止日期<\/span><span>状态<\/span>/);
@@ -746,26 +746,6 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
   assert.match(mainJs, /annualSalaryWan/);
   assert.match(mainJs, /document\.body\.scrollHeight/);
   assert.match(mainJs, /setContentSize\(1400, captureHeight/);
-});
-
-test('v1.5.0 Job Radar keeps applications separate and exposes the complete preload contract', () => {
-  const indexHtml = readProjectFile('src', 'renderer', 'index.html');
-  const radarJs = readProjectFile('src', 'renderer', 'job-radar.js');
-  const radarCss = readProjectFile('src', 'renderer', 'job-radar.css');
-  const preloadJs = readProjectFile('src', 'preload.js');
-  const mainJs = readProjectFile('src', 'main.js');
-  for (const label of ['岗位推荐', '我的投递', '关注企业', '岗位源', '发现适合你的机会']) assert.match(indexHtml, new RegExp(label));
-  assert.match(indexHtml, /data-radar-panel="applications"[\s\S]*id="jobBoard"/);
-  assert.match(indexHtml, /id="radarPreferenceDrawer"[\s\S]*最低匹配度/);
-  assert.match(indexHtml, /connect-src 'none'/);
-  assert.match(radarCss, /grid-template-columns:\s*minmax\(0,58fr\) minmax\(340px,42fr\)/);
-  assert.match(radarCss, /@media \(max-width: 1180px\)/);
-  assert.match(radarCss, /prefers-reduced-motion/);
-  assert.match(radarJs, /addToApplications/);
-  for (const channel of ['get-summary', 'list', 'get', 'refresh', 'import-url', 'get-profile', 'save-profile', 'save-source', 'delete-source', 'follow-company', 'unfollow-company', 'mark-seen', 'set-hidden', 'add-to-applications', 'open-source']) {
-    assert.match(preloadJs, new RegExp(`job-radar:${channel}`));
-    assert.match(mainJs, new RegExp(`job-radar:${channel}`));
-  }
 });
 
 test('release verification executes the packaged executable and inspects app.asar', () => {

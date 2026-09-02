@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="motion-tokens.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="v11-layout.css">
-    <link rel="stylesheet" href="job-radar.css">
     <link rel="stylesheet" href="themes/liquid-glass.css">
     <link rel="stylesheet" href="motion-system.css">
   </head>
@@ -198,36 +197,40 @@
           <div id="notesGrid" class="notes-grid"></div>
         </section>
 
-        <section class="workbench-page job-page radar-page" data-page="jobs" hidden>
-          <header class="radar-page-head">
-            <div><p class="eyebrow">JOB RADAR</p><h1>求职</h1><p>发现适合你的机会</p></div>
-            <div class="radar-head-actions"><button class="button secondary" id="radarRefreshButton" type="button">刷新岗位</button><button class="button secondary" id="radarAddUrlButton" type="button">添加岗位</button><button class="button primary" id="radarPreferenceButton" type="button">求职偏好</button></div>
+        <section class="workbench-page job-page" data-page="jobs" hidden>
+          <header class="job-console-head">
+            <div class="job-console-title"><p id="jobTodayLabel">— · Offer 职来</p><h1>投递中控台</h1></div>
+            <label class="job-console-search" for="jobSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="jobSearch" type="search" placeholder="搜索公司、岗位、行业、城市、备注..." autocomplete="off"></label>
           </header>
-          <nav class="radar-tabs" aria-label="求职功能"><button class="active" data-radar-tab="recommendations" type="button">岗位推荐</button><button data-radar-tab="applications" type="button">我的投递</button><button data-radar-tab="companies" type="button">关注企业</button><button data-radar-tab="sources" type="button">岗位源</button></nav>
-
-          <section class="radar-tab-panel" data-radar-panel="recommendations">
-            <div class="radar-kpi-strip" aria-label="岗位推荐指标"><button data-radar-kpi="today" type="button"><strong id="radarTodayNew">0</strong><span>今日新增</span></button><button data-radar-kpi="high" type="button"><strong id="radarHighMatch">0</strong><span>高匹配岗位</span></button><button data-radar-kpi="due" type="button"><strong id="radarDueSoon">0</strong><span>3 天内截止</span></button><button data-radar-tab="companies" type="button"><strong id="radarTrackedCompanies">0</strong><span>追踪企业</span></button></div>
-            <div id="radarStaleNotice" class="radar-notice" hidden></div>
-            <div class="radar-filter-bar">
-              <label class="radar-keyword"><span>关键词搜索</span><input id="radarQuery" type="search" placeholder="岗位、公司或城市"></label>
-              <label><span>岗位方向</span><select id="radarCategory"><option value="">不限</option></select></label><label><span>城市</span><select id="radarCity"><option value="">不限</option></select></label><label><span>学历</span><select id="radarEducation"><option value="">不限</option><option>本科</option><option>硕士</option><option>博士</option></select></label><label><span>英语要求</span><select id="radarEnglish"><option value="">不限</option><option value="required">必须</option><option value="preferred">优先</option><option value="not-mentioned">未提及</option></select></label><label><span>来源</span><select id="radarSource"><option value="">不限</option></select></label><label><span>招聘批次</span><select id="radarBatch"><option value="">不限</option></select></label><label><span>排序</span><select id="radarSort"><option value="recommended">推荐优先</option><option value="match">匹配度</option><option value="latest">最新发布</option><option value="deadline">截止时间</option></select></label>
-            </div>
-            <div id="radarLoading" class="radar-loading" hidden><i></i><i></i><i></i></div>
-            <div class="radar-split-view">
-              <section class="radar-list-pane"><div id="radarJobList" class="radar-job-list" aria-live="polite"></div></section>
-              <aside id="radarDetail" class="radar-detail-pane" aria-live="polite"><div class="radar-detail-empty"><strong>选择一个岗位</strong><p>查看匹配分析、岗位要求与岗位动态。</p></div></aside>
-            </div>
+          <section class="job-summary-grid" aria-label="求职关键指标">
+            <article><strong id="jobTotalJobs">0</strong><span>全部岗位</span></article>
+            <article><strong id="jobTodayApplied">0</strong><span>今日投递</span><small>今日新增 <b id="jobTodayAdded">0</b></small></article>
+            <article><strong id="jobAwaitingReview">0</strong><span>待评估</span></article>
+            <article><strong id="jobDueSoon">0</strong><span>7 天内截止</span></article>
+            <article><strong id="jobInProgress">0</strong><span>流程进行中</span></article>
           </section>
-
-          <section class="radar-tab-panel" data-radar-panel="applications" hidden>
-            <header class="job-console-head"><div class="job-console-title"><p id="jobTodayLabel">— · 我的投递</p><h1>投递中控台</h1></div><label class="job-console-search" for="jobSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="jobSearch" type="search" placeholder="搜索公司、岗位、行业、城市、备注..." autocomplete="off"></label></header>
-            <section class="job-summary-grid" aria-label="求职关键指标"><article><strong id="jobTotalJobs">0</strong><span>全部岗位</span></article><article><strong id="jobTodayApplied">0</strong><span>今日投递</span><small>今日新增 <b id="jobTodayAdded">0</b></small></article><article><strong id="jobAwaitingReview">0</strong><span>待评估</span></article><article><strong id="jobDueSoon">0</strong><span>7 天内截止</span></article><article><strong id="jobInProgress">0</strong><span>流程进行中</span></article></section>
-            <nav id="jobQuickFilters" class="job-filter-chips" aria-label="求职快捷筛选"></nav>
-            <section class="job-table-shell" aria-label="岗位列表"><div class="job-table-toolbar"><div class="job-compact-filters"><label for="jobStatusFilter"><span class="sr-only">状态</span><select id="jobStatusFilter"><option value="all">状态：不限</option><option value="active">进行中</option><option value="closed">已结束</option></select></label><label for="jobPriorityFilter"><span class="sr-only">优先级</span><select id="jobPriorityFilter"><option value="all">优先级：不限</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label><label for="jobCityFilter"><span class="sr-only">城市</span><select id="jobCityFilter"><option value="all">城市：不限</option></select></label><label for="jobSortFilter"><span class="sr-only">排序</span><select id="jobSortFilter"><option value="priorityProgress">优先级 / 进度</option><option value="updatedAt">最近更新</option><option value="createdAt">创建时间</option><option value="annualSalaryWan">预估年薪</option><option value="nextFollowUpAt">下次跟进</option><option value="company">公司名称</option></select></label><button class="job-sort-direction" id="jobSortDirectionButton" type="button">↓ 降序</button><span class="job-result-summary" id="jobResultSummary">0 / 0 个岗位</span></div><div class="job-table-actions"><button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 新增岗位</button><button class="button secondary" id="importJobsButton" type="button">导入岗位</button><button class="button text-button job-export-button" id="exportJobsButton" type="button">导出数据</button><button class="button text-button job-export-button" id="exportJobsImageButton" type="button">导出图片</button><button class="button icon-button" id="jobSettingsButton" type="button" aria-label="打开求职设置">⚙</button></div></div><div class="job-table-head" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>截止日期</span><span>状态</span><span>优先级</span><span>备注</span><span>操作</span></div><div id="jobBoard" class="job-table-body" aria-live="polite"></div></section>
+          <nav id="jobQuickFilters" class="job-filter-chips" aria-label="求职快捷筛选"></nav>
+          <section class="job-table-shell" aria-label="岗位列表">
+            <div class="job-table-toolbar">
+              <div class="job-compact-filters">
+                <label for="jobStatusFilter"><span class="sr-only">状态</span><select id="jobStatusFilter" aria-label="按岗位状态筛选"><option value="all">状态：不限</option><option value="active">进行中</option><option value="closed">已结束</option></select></label>
+                <label for="jobPriorityFilter"><span class="sr-only">优先级</span><select id="jobPriorityFilter" aria-label="按优先级筛选"><option value="all">优先级：不限</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
+                <label for="jobCityFilter"><span class="sr-only">城市</span><select id="jobCityFilter" aria-label="按城市筛选"><option value="all">城市：不限</option></select></label>
+                <label for="jobSortFilter"><span class="sr-only">排序</span><select id="jobSortFilter" aria-label="岗位排序"><option value="priorityProgress">优先级 / 进度</option><option value="updatedAt">最近更新</option><option value="createdAt">创建时间</option><option value="annualSalaryWan">预估年薪</option><option value="nextFollowUpAt">下次跟进</option><option value="company">公司名称</option></select></label>
+                <button class="job-sort-direction" id="jobSortDirectionButton" type="button">↓ 降序</button>
+                <span class="job-result-summary" id="jobResultSummary">0 / 0 个岗位</span>
+              </div>
+              <div class="job-table-actions">
+                <button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 新增岗位</button>
+                <button class="button secondary" id="importJobsButton" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4M5 14v5h14v-5"/></svg> 导入岗位</button>
+                <button class="button text-button job-export-button" id="exportJobsButton" type="button">导出数据</button>
+                <button class="button text-button job-export-button" id="exportJobsImageButton" type="button">导出图片</button>
+                <button class="button icon-button" id="jobSettingsButton" type="button" aria-label="打开求职设置"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/></svg></button>
+              </div>
+            </div>
+            <div class="job-table-head" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>截止日期</span><span>状态</span><span>优先级</span><span>备注</span><span>操作</span></div>
+            <div id="jobBoard" class="job-table-body" aria-live="polite"></div>
           </section>
-
-          <section class="radar-tab-panel" data-radar-panel="companies" hidden><div class="radar-section-head"><div><h2>关注企业</h2><p>追踪企业公开招聘官网，不使用公司 Logo。</p></div><button class="button primary" id="radarAddCompanyButton" type="button">添加企业</button></div><div id="radarCompanies" class="radar-management-list"></div></section>
-          <section class="radar-tab-panel" data-radar-panel="sources" hidden><div class="radar-section-head"><div><h2>岗位源</h2><p>支持企业官网、公开校招页和可扩展 Provider Adapter。</p></div><button class="button primary" id="radarAddSourceButton" type="button">添加岗位源</button></div><div id="radarSources" class="radar-management-list"></div></section>
         </section>
 
         <section class="workbench-page submissions-page" data-page="submissions" hidden>
@@ -267,7 +270,7 @@
           </div>
         </section>
 
-        <footer><span>投稿管理 <b id="footerVersion">1.5.0</b> · 非 Elsevier 官方产品</span></footer>
+        <footer><span>投稿管理 <b id="footerVersion">1.4.11</b> · 非 Elsevier 官方产品</span></footer>
         </section>
       </main>
     </div>
@@ -409,7 +412,7 @@
                   <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button primary" id="updateActionButton" type="button">检查更新</button></div>
                 </div>
                 <div class="update-version-overview" aria-label="版本信息">
-                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.5.0</span></strong><small>正在使用</small></div>
+                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.4.11</span></strong><small>正在使用</small></div>
                   <span class="update-version-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
                   <div class="update-version-card target"><span>可用版本</span><strong id="updateTargetVersion">等待检查</strong><small>来自 GitHub Release</small></div>
                 </div>
@@ -441,7 +444,7 @@
           <button class="close-button update-prompt-close" id="closeUpdatePromptButton" type="button" aria-label="稍后处理更新">关闭</button>
         </div>
         <div class="update-prompt-version" aria-label="更新版本">
-          <div><small>当前版本</small><strong>v<span id="updatePromptCurrentVersion">1.5.0</span></strong></div>
+          <div><small>当前版本</small><strong>v<span id="updatePromptCurrentVersion">1.4.11</span></strong></div>
           <span aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
           <div class="target"><small>可用版本</small><strong id="updatePromptLatestVersion">等待检查</strong></div>
         </div>
@@ -684,18 +687,6 @@
       </div>
     </dialog>
 
-    <div id="radarDrawerBackdrop" class="radar-drawer-backdrop" hidden></div>
-    <aside id="radarPreferenceDrawer" class="radar-preference-drawer" aria-labelledby="radarPreferenceTitle" hidden>
-      <form id="radarPreferenceForm">
-        <header><div><p class="eyebrow">LOCAL MATCHING</p><h2 id="radarPreferenceTitle">求职偏好</h2><p>匹配只在本地完成，不向招聘网站发送你的背景。</p></div><button class="radar-close" data-close-radar-drawer type="button" aria-label="关闭">×</button></header>
-        <div class="radar-preference-fields"><label><span>最高学历</span><select id="radarProfileEducation"><option value="">未设置</option><option>本科</option><option>硕士</option><option>博士</option></select></label><label><span>专业</span><input id="radarProfileMajor" type="text" placeholder="例如：环境工程"></label><div class="radar-check-row"><label><input id="radarProfileCet4" type="checkbox"> 已通过 CET-4</label><label><input id="radarProfileCet6" type="checkbox"> 已通过 CET-6</label></div><label><span>目标岗位方向</span><textarea id="radarPreferenceDirections" rows="3" placeholder="环境工程、环境科学、环保、水务、销售工程师、ToB 销售、技术销售、售前、应用工程师、技术支持"></textarea></label><label><span>目标城市</span><input id="radarPreferenceCities" type="text" placeholder="南京、上海"></label><label><span>目标行业</span><input id="radarPreferenceIndustries" type="text" placeholder="环保、水务、仪器分析"></label><label><span>企业偏好</span><input id="radarPreferenceCompanies" type="text" placeholder="企业名称，用顿号分隔"></label><label><span>最低匹配度 <b id="radarMinimumValue">70</b></span><input id="radarPreferenceMinimum" type="range" min="0" max="100" step="5" value="70"></label></div>
-        <footer><button class="button secondary" data-close-radar-drawer type="button">取消</button><button class="button primary" type="submit">保存偏好</button></footer>
-      </form>
-    </aside>
-
-    <dialog id="radarSourceDialog" class="modal radar-small-dialog"><form id="radarSourceForm"><div class="modal-head"><div><p class="eyebrow">PUBLIC SOURCE</p><h2>添加岗位源</h2><p>只访问公开 http/https 页面，不绕过登录或访问控制。</p></div></div><div class="form-grid"><label><span>来源名称</span><input id="radarSourceName" type="text" placeholder="企业招聘官网"></label><label><span>来源类型</span><select id="radarSourceType"><option value="official">企业官网</option><option value="campus">公开校招页</option><option value="manual">手动链接</option></select></label><label class="full-span"><span>URL</span><input id="radarSourceUrl" type="url" required placeholder="https://career.example.com/jobs"></label></div><p id="radarSourceError" class="form-error"></p><div class="modal-actions"><button class="button secondary" data-close-radar-dialog="radarSourceDialog" type="button">取消</button><button class="button primary" type="submit">保存并刷新</button></div></form></dialog>
-    <dialog id="radarCompanyDialog" class="modal radar-small-dialog"><form id="radarCompanyForm"><div class="modal-head"><div><p class="eyebrow">FOLLOW COMPANY</p><h2>添加关注企业</h2><p>保存企业公开招聘入口，便于持续检查。</p></div></div><div class="form-grid"><label><span>企业名称</span><input id="radarCompanyName" type="text" required></label><label><span>行业</span><input id="radarCompanyIndustry" type="text"></label><label class="full-span"><span>招聘官网</span><input id="radarCompanyUrl" type="url" placeholder="https://career.example.com"></label></div><p id="radarCompanyError" class="form-error"></p><div class="modal-actions"><button class="button secondary" data-close-radar-dialog="radarCompanyDialog" type="button">取消</button><button class="button primary" type="submit">添加企业</button></div></form></dialog>
-
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script src="theme-runtime.js"></script>
     <script src="shared-ui.js"></script>
@@ -706,6 +697,5 @@
     <script src="app.js"></script>
     <script src="todo-view.js"></script>
     <script src="workbench.js"></script>
-    <script src="job-radar.js"></script>
   </body>
 </html>

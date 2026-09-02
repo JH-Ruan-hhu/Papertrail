@@ -199,7 +199,7 @@ test('backs up the source schema before the first current-schema write and keeps
   store.load();
   const migrated = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   const backups = fs.readdirSync(directory).filter((name) => name.startsWith('papertrail-data.pre-v7.') && name.endsWith('.json'));
-  assert.equal(migrated.version, 12);
+  assert.equal(migrated.version, 11);
   assert.deepEqual(migrated.jobApplications, []);
   assert.deepEqual(migrated.unknownRoot, original.unknownRoot);
   assert.equal(backups.length, 1);

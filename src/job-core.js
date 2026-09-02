@@ -209,7 +209,6 @@ function saveJobApplication(list, input, now = new Date().toISOString(), makeId 
   const existing = source.id ? list.find((item) => item.id === String(source.id)) : null;
   if (source.id && !existing) throw new Error('找不到这条求职记录。');
   const rawStatus = cleanText(source.status || existing?.status, 80).toLowerCase();
-  const becomingActive = rawStatus === 'active' && existing?.status !== 'active';
   const candidate = normalizeJobApplication({
     ...existing,
     ...source,
@@ -217,9 +216,7 @@ function saveJobApplication(list, input, now = new Date().toISOString(), makeId 
     role,
     status: rawStatus || 'preparing',
     id: existing?.id || makeId(),
-    appliedAt: hasOwn(source, 'appliedAt')
-      ? (source.appliedAt || (becomingActive ? now : null))
-      : (existing?.appliedAt || (becomingActive ? now : null)),
+    appliedAt: hasOwn(source, 'appliedAt') ? (source.appliedAt || null) : (existing?.appliedAt || now),
     createdAt: existing?.createdAt || source.createdAt || now,
     updatedAt: now,
     revision: Math.max(0, Number(existing?.revision) || 0) + 1
