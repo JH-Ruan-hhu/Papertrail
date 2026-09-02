@@ -248,25 +248,33 @@
             <button class="filter-chip" id="archivedNavButton" type="button">已归档 <b id="archivedCount">0</b></button>
           </div>
 
-        <section class="stats" aria-label="稿件统计">
-          <article><div><small>正在追踪</small><strong id="paperCount">0</strong></div></article>
-          <article><div><small>未读重要更新</small><strong id="updateCount">0</strong></div></article>
-          <article><div><small>最近成功同步</small><strong id="lastCheck">尚未成功同步</strong></div></article>
+        <section class="stats submission-stats" aria-label="稿件统计">
+          <article><div><small>正在追踪</small><strong id="paperCount">0</strong><span>当前活跃稿件</span></div></article>
+          <article><div><small>审稿中</small><strong id="reviewPaperCount">0</strong><span>等待编辑或审稿意见</span></div></article>
+          <article><div><small>出版中</small><strong id="productionPaperCount">0</strong><span>已接收并进入生产</span></div></article>
+          <article class="attention-stat"><div><small>需要关注</small><strong id="updateCount">0</strong><span>未读更新或待办</span></div></article>
         </section>
 
-        <section class="content-section">
+        <section class="content-section submission-content-section">
           <div class="section-heading">
-            <div><h2>稿件列表</h2><p id="listDescription">按待办与最近变化排序</p></div>
+            <div><h2>常规进行中</h2><p id="listDescription">按待办与最近变化排序</p></div>
             <div class="section-tools">
               <span class="live-indicator" id="monitoringStatus"><i></i><span>正在读取监测状态</span></span>
+              <span class="submission-last-sync">最近成功同步 <b id="lastCheck">尚未成功同步</b></span>
               <label class="search-box" for="paperSearch"><input id="paperSearch" type="search" autocomplete="off" placeholder="搜索标题、期刊或生产编号"><kbd>Ctrl K</kbd></label>
             </div>
           </div>
-          <div id="paperList" class="paper-list" aria-live="polite"></div>
-          <div id="emptyState" class="empty-state">
-            <h3>暂无稿件</h3>
-            <p>目前没有正在追踪的稿件。可通过 Author Hub 链接添加审稿记录，或使用生产稿件编号添加已接收文章。</p>
-            <button class="button primary" id="emptyAddButton" type="button">添加稿件</button>
+          <div class="submission-desk-grid">
+            <section class="submission-list-panel" aria-label="稿件列表">
+              <div class="submission-table-head" aria-hidden="true"><span>稿件</span><span>当前状态</span><span>停留时间</span></div>
+              <div id="paperList" class="paper-list" aria-live="polite"></div>
+              <div id="emptyState" class="empty-state">
+                <h3>暂无稿件</h3>
+                <p>目前没有正在追踪的稿件。可通过 Author Hub 链接添加审稿记录，或使用生产稿件编号添加已接收文章。</p>
+                <button class="button primary" id="emptyAddButton" type="button">添加稿件</button>
+              </div>
+            </section>
+            <aside id="paperDetail" class="submission-detail-panel" aria-live="polite" aria-label="当前稿件详情"></aside>
           </div>
         </section>
 

@@ -132,6 +132,47 @@
   transition: transform var(--motion-duration-progress) var(--motion-ease-enter);
 }
 
+/* Chromium customizable selects: settle into place instead of growing from
+   a point. Older engines keep their native select picker unchanged. */
+@supports (appearance: base-select) {
+  select,
+  ::picker(select) { appearance: base-select; }
+
+  select::picker-icon {
+    color: currentColor;
+    transition: transform var(--motion-duration-fast) var(--motion-ease-enter);
+  }
+  select:open::picker-icon { transform: rotate(180deg); }
+
+  ::picker(select) {
+    max-height: min(320px, calc(100vh - 32px));
+    padding: 6px;
+    overflow-y: auto;
+    color: var(--ink, #263248);
+    background: rgba(255,255,255,.98);
+    border: 1px solid var(--line, #dfe4ec);
+    border-radius: 11px;
+    box-shadow: 0 16px 42px rgba(24,35,54,.16);
+    opacity: 0;
+    transform: translate3d(0, 6px, 0) scale(.97);
+    transform-origin: top center;
+    transition:
+      opacity var(--motion-duration-fast) var(--motion-ease-enter),
+      transform var(--motion-duration-fast) var(--motion-ease-enter),
+      display var(--motion-duration-fast) allow-discrete,
+      overlay var(--motion-duration-fast) allow-discrete;
+  }
+  ::picker(select):popover-open { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
+  @starting-style {
+    ::picker(select):popover-open { opacity: 0; transform: translate3d(0, 6px, 0) scale(.97); }
+  }
+
+  select option { min-height: 34px; padding: 8px 10px; border-radius: 7px; }
+  select option:hover { background: rgba(66,102,199,.08); }
+  select option:checked { color: #244fae; background: rgba(66,102,199,.12); font-weight: 680; }
+  select option::checkmark { order: 1; margin-left: auto; }
+}
+
 @media (hover: hover) and (pointer: fine) {
   :is(.button, .text-button, .close-button, .note-inspector-toggle):hover { transition-duration: var(--motion-duration-fast); }
 }
@@ -161,6 +202,12 @@
   .modal[open] { opacity: 1; }
   @starting-style { .modal[open] { opacity: 0; } }
   .home-progress-rate-track i, .home-todo-progress i::after, .update-progress span { transition-duration: var(--motion-duration-reduced); }
+  @supports (appearance: base-select) {
+    select::picker-icon { transition: none; }
+    ::picker(select) { transform: none; transition: opacity var(--motion-duration-reduced) linear, display var(--motion-duration-reduced) allow-discrete, overlay var(--motion-duration-reduced) allow-discrete; }
+    ::picker(select):popover-open { transform: none; }
+    @starting-style { ::picker(select):popover-open { opacity: 0; transform: none; } }
+  }
   @keyframes motion-reduced-fade { from { opacity: .72; } to { opacity: 1; } }
   @keyframes motion-reduced-fade-out { to { opacity: 0; } }
 }

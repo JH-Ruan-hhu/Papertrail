@@ -210,6 +210,31 @@ test('pointer sidebar navigation settles gently while keyboard navigation stays 
   assert.match(workbenchJs, /force: page === 'home'/);
 });
 
+test('select pickers settle into place and respect reduced motion', () => {
+  const css = readProjectFile('src', 'renderer', 'motion-system.css');
+  assert.match(css, /::picker\(select\):popover-open/);
+  assert.match(css, /translate3d\(0, 6px, 0\) scale\(\.97\)/);
+  assert.match(css, /opacity var\(--motion-duration-fast\) var\(--motion-ease-enter\)/);
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)[\s\S]*::picker\(select\) \{ transform: none/);
+  assert.doesNotMatch(css, /::picker\(select\)[\s\S]{0,500}scale\(0\)/);
+});
+
+test('submission desk exposes overview, selectable rows and a persistent detail panel', () => {
+  const html = readProjectFile('src', 'renderer', 'index.html');
+  const appJs = readProjectFile('src', 'renderer', 'app.js');
+  const css = readProjectFile('src', 'renderer', 'v11-layout.css');
+  assert.match(html, /class="stats submission-stats"/);
+  assert.match(html, /id="reviewPaperCount"/);
+  assert.match(html, /id="productionPaperCount"/);
+  assert.match(html, /class="submission-desk-grid"/);
+  assert.match(html, /id="paperDetail"/);
+  assert.match(appJs, /function renderPaperRow\(/);
+  assert.match(appJs, /data-paper-select tabindex="0" role="option"/);
+  assert.match(appJs, /elements\.paperDetail\.addEventListener\('click', handlePaperAction\)/);
+  assert.match(css, /\.submission-desk-grid \{ display: grid;/);
+  assert.match(css, /\.submission-detail-panel \{ position: sticky;/);
+});
+
 test('installer uses the stock electron-builder wizard while retaining upgrade safety', () => {
   const packageJson = JSON.parse(readProjectFile('package.json'));
   const installer = readProjectFile('build', 'installer.nsh');
