@@ -47,7 +47,11 @@ class JsonStore {
       metadataFields: [],
       attendance: [],
       focusSessions: [],
-      jobApplications: []
+      jobApplications: [],
+      jobRadar: {
+        profile: {}, preferences: {}, followedCompanies: [], sources: [],
+        savedApplications: [], hiddenFingerprints: [], lastRefreshAt: null
+      }
     };
   }
 
@@ -267,6 +271,16 @@ class JsonStore {
     this.data.jobApplications = jobApplications;
     this.save();
     return this.data.jobApplications;
+  }
+
+  getJobRadar() {
+    return this.data.jobRadar;
+  }
+
+  setJobRadar(jobRadar) {
+    this.data.jobRadar = jobRadar;
+    this.save();
+    return this.data.jobRadar;
   }
 }
 

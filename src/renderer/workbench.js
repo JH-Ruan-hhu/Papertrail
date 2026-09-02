@@ -59,6 +59,7 @@ const DAILY_PLAN_KEY = 'yanji.dailyPlanShown.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
 const jobPriorityRanks = Object.freeze({ high: 0, medium: 1, low: 2 });
 const JOB_LIFECYCLE_OPTIONS = Object.freeze([
+  ['preparing', '准备中'],
   ['active', '进行中'],
   ['closed', '已结束']
 ]);
@@ -676,6 +677,7 @@ function sortJobs(jobs) {
 function renderHomeJobs() {
   const container = document.getElementById('homeJobSummary');
   if (!container) return;
+  if (window.YanjiJobRadar?.renderHome) return window.YanjiJobRadar.renderHome();
   const jobs = wb.workspace.jobApplications || [];
   if (!jobs.length) {
     container.innerHTML = '<div class="home-job-empty"><p>还没有求职记录</p><button class="button compact secondary" data-add-job="active" type="button">添加第一个岗位</button></div>';
@@ -717,7 +719,7 @@ function jobWorkflowTrackHtml(job) {
 }
 
 function jobStatusOptions(selected) {
-  const visibleStatus = selected === 'closed' ? 'closed' : 'active';
+  const visibleStatus = selected === 'preparing' ? 'preparing' : selected === 'closed' ? 'closed' : 'active';
   return JOB_LIFECYCLE_OPTIONS.map(([status, label]) => `<option value="${status}"${visibleStatus === status ? ' selected' : ''}>${label}</option>`).join('');
 }
 
@@ -832,7 +834,7 @@ function openJobEditor(job = null, initialStatus = 'active') {
   document.getElementById('jobRole').value = job?.role || '';
   document.getElementById('jobCompanyType').value = job?.companyType || '';
   document.getElementById('jobCity').value = job?.city || job?.location || '';
-  dialog.dataset.initialStatus = initialStatus === 'closed' ? 'closed' : 'active';
+  dialog.dataset.initialStatus = job?.status === 'preparing' ? 'preparing' : (job?.status === 'closed' || initialStatus === 'closed' ? 'closed' : 'active');
   document.getElementById('jobPriority').value = job?.priority || 'medium';
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobDeadline').value = localDateInputValue(job?.deadline);

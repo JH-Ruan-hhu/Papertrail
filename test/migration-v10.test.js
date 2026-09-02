@@ -62,7 +62,7 @@ test('schema 11 note migration keeps legacy job record values untouched', () => 
   };
   const result = migrateData(source, source.settings);
   assert.equal(result.changed, true);
-  assert.equal(result.data.version, 11);
+  assert.equal(result.data.version, 12);
   assert.deepEqual(result.data.jobApplications[0], legacyJob);
   assert.deepEqual(result.data.unknownRoot, source.unknownRoot);
 });

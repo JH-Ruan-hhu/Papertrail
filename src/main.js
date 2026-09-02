@@ -44,6 +44,7 @@ const { collectReminderCandidates, normalizeReminderPayload, reminderPresentatio
 const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
 const { deleteJobApplication, jobDeadlineReminderDue, mergeImportedJobApplications, normalizeJobApplication, saveJobApplication } = require('./job-core');
+const { JobRadarService, validateSourceUrl } = require('./job-radar-service');
 const { resolveStableUserDataPath } = require('./user-data-path');
 const {
   parseTrackingInput,
@@ -166,6 +167,7 @@ let mainWindowReleaseTimer;
 let tray;
 let store;
 let planningService;
+let jobRadarService;
 let scheduler;
 let isQuitting = false;
 let coldStartRefreshStarted = false;
@@ -782,6 +784,7 @@ async function chooseDataDirectory(request = {}) {
   const nextBackups = normalizeBackupFiles([...knownBackupFiles(), createdBackup], targetFile);
   writeStoragePointer(selectedDirectory, nextBackups, targetFile);
   store = nextStore;
+  jobRadarService = null;
   planningService = createPlanningService({
     store,
     makeId: () => crypto.randomUUID(),
@@ -904,6 +907,44 @@ function broadcastSettings() {
 function getPlanningService() {
   if (!planningService) throw new Error('规划服务尚未准备好，请稍后重试。');
   return planningService;
+}
+
+async function fetchJobRadarText(value, redirects = 0) {
+  const url = validateSourceUrl(value);
+  if (redirects > 3) throw new Error('岗位源重定向次数过多。');
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  let response;
+  try {
+    response = await net.fetch(url, { method: 'GET', redirect: 'manual', signal: controller.signal, headers: { Accept: 'text/html,application/xhtml+xml,application/ld+json,application/json;q=0.9' } });
+  } catch (error) {
+    throw new Error(error?.name === 'AbortError' ? '岗位源访问超时。' : `岗位源访问失败：${error.message}`);
+  } finally {
+    clearTimeout(timer);
+  }
+  if (response.status >= 300 && response.status < 400) {
+    const location = response.headers.get('location');
+    if (!location) throw new Error(`岗位源返回重定向状态 ${response.status}，但没有目标地址。`);
+    return fetchJobRadarText(new URL(location, url).toString(), redirects + 1);
+  }
+  if (!response.ok) throw new Error(`岗位源返回 HTTP ${response.status}。`);
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > 5 * 1024 * 1024) throw new Error('岗位源响应超过 5 MB 限制。');
+  const body = await response.arrayBuffer();
+  if (body.byteLength > 5 * 1024 * 1024) throw new Error('岗位源响应超过 5 MB 限制。');
+  return new TextDecoder('utf-8').decode(body);
+}
+
+function getJobRadarService() {
+  if (!jobRadarService) {
+    jobRadarService = new JobRadarService({
+      store,
+      fetchText: fetchJobRadarText,
+      openExternal: async (url) => { await shell.openExternal(url); return true; },
+      addApplication: (input) => saveWorkspaceJobApplication(input)
+    });
+  }
+  return jobRadarService;
 }
 
 function saveWorkspaceSchedule(input) {
@@ -3013,6 +3054,21 @@ function registerIpc() {
   ipcMain.handle('jobs:import', () => importWorkspaceJobApplications());
   ipcMain.handle('jobs:export', () => exportWorkspaceJobApplicationData());
   ipcMain.handle('jobs:export-image', () => exportWorkspaceJobApplicationImages());
+  ipcMain.handle('job-radar:get-summary', () => getJobRadarService().getSummary());
+  ipcMain.handle('job-radar:list', (_event, filters) => getJobRadarService().list(filters || {}));
+  ipcMain.handle('job-radar:get', (_event, id) => getJobRadarService().get(String(id)));
+  ipcMain.handle('job-radar:refresh', (_event, request) => getJobRadarService().refresh(request || {}));
+  ipcMain.handle('job-radar:import-url', (_event, input) => getJobRadarService().importUrl(input));
+  ipcMain.handle('job-radar:get-profile', () => getJobRadarService().getProfile());
+  ipcMain.handle('job-radar:save-profile', (_event, input) => getJobRadarService().saveProfile(input || {}));
+  ipcMain.handle('job-radar:save-source', (_event, input) => getJobRadarService().saveSource(input || {}));
+  ipcMain.handle('job-radar:delete-source', (_event, id) => getJobRadarService().deleteSource(String(id)));
+  ipcMain.handle('job-radar:follow-company', (_event, input) => getJobRadarService().followCompany(input || {}));
+  ipcMain.handle('job-radar:unfollow-company', (_event, id) => getJobRadarService().unfollowCompany(String(id)));
+  ipcMain.handle('job-radar:mark-seen', (_event, id) => getJobRadarService().markSeen(String(id)));
+  ipcMain.handle('job-radar:set-hidden', (_event, fingerprint, hidden) => getJobRadarService().setHidden(String(fingerprint), Boolean(hidden)));
+  ipcMain.handle('job-radar:add-to-applications', (_event, id) => getJobRadarService().addToApplications(String(id)));
+  ipcMain.handle('job-radar:open-source', (_event, id) => getJobRadarService().openSource(String(id)));
   ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
   ipcMain.handle('attendance:clock', (_event, action) => clockWorkspaceAttendance(String(action || '')));
   ipcMain.handle('attendance:save', (_event, input) => saveWorkspaceAttendance(input));
