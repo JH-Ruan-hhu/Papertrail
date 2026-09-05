@@ -31,7 +31,7 @@ header, footer {
 }
 header { border-bottom: 1px solid var(--sticky-line); -webkit-app-region: drag; }
 .sticky-brand { display: flex; align-items: center; gap: 7px; color: #28415d; }
-.sticky-brand > span { width: 22px; height: 22px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #397af0, #8b6be8); border-radius: 8px; box-shadow: 0 5px 13px rgba(67,92,186,.2); }
+.sticky-brand > span { width: 22px; height: 22px; display: grid; place-items: center; color: #fff; background: linear-gradient(145deg, #397af0, #8b6be8); border-radius: var(--radius-control); box-shadow: var(--shadow-sm); }
 .sticky-brand strong { font-size: 12px; font-weight: 760; letter-spacing: .04em; }
 header > div { display: flex; align-items: center; gap: 5px; }
 header button {
@@ -40,7 +40,7 @@ header button {
   color: #526a82;
   background: rgba(255,255,255,.42);
   border: 1px solid rgba(255,255,255,.58);
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   font: inherit;
   font-size: 10px;
   cursor: pointer;
@@ -59,16 +59,16 @@ main {
   grid-template-rows: auto auto minmax(0, 1fr);
   background: rgba(255,255,255,.58);
   border: 1px solid rgba(255,255,255,.72);
-  border-radius: 15px;
-  box-shadow: 0 14px 34px rgba(43, 65, 99, .09), inset 0 1px rgba(255,255,255,.78);
+  border-radius: var(--radius-modal);
+  box-shadow: var(--shadow-sm);
   backdrop-filter: blur(24px) saturate(145%);
   -webkit-backdrop-filter: blur(24px) saturate(145%);
 }
 input { width: 100%; min-width: 0; border: 0; outline: 0; color: inherit; background: transparent; font: inherit; }
 input { padding: 0 0 11px; border-bottom: 1px solid var(--sticky-line); font-size: 18px; font-weight: 700; letter-spacing: -.02em; }
 .sticky-toolbar { display: flex; align-items: center; gap: 4px; padding: 8px 0 6px; border-bottom: 1px solid rgba(72,103,130,.1); }
-.sticky-toolbar button { width: 28px; height: 27px; display: grid; place-items: center; padding: 0; color: #536a83; background: rgba(255,255,255,.42); border: 1px solid rgba(255,255,255,.65); border-radius: 8px; font: inherit; font-size: 11px; cursor: pointer; }
-.sticky-toolbar button:hover, .sticky-toolbar button:focus-visible { color: #2356b7; background: rgba(255,255,255,.8); outline: 0; box-shadow: 0 0 0 2px rgba(57,120,223,.14); }
+.sticky-toolbar button { width: 28px; height: 27px; display: grid; place-items: center; padding: 0; color: #536a83; background: rgba(255,255,255,.42); border: 1px solid rgba(255,255,255,.65); border-radius: var(--radius-control); font: inherit; font-size: 11px; cursor: pointer; }
+.sticky-toolbar button:hover, .sticky-toolbar button:focus-visible { color: #2356b7; background: rgba(255,255,255,.8); outline: 0; box-shadow: var(--shadow-sm); }
 .sticky-editor { min-height: 0; padding-top: 11px; overflow: auto; outline: 0; font-size: 14px; line-height: 1.75; white-space: pre-wrap; overflow-wrap: anywhere; caret-color: var(--sticky-accent); }
 .sticky-editor:empty::before { content: attr(data-placeholder); color: #8797a9; pointer-events: none; }
 .sticky-editor :is(p,div) { margin: 0 0 .5em; }

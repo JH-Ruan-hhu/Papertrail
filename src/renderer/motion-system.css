@@ -12,9 +12,9 @@
   inset: 0 0 auto;
   height: var(--motion-nav-height, 43px);
   border: 1px solid rgba(31, 120, 152, .18);
-  border-radius: 8px;
+  border-radius: var(--radius-control);
   background: rgba(255, 255, 255, .72);
-  box-shadow: 0 5px 15px rgba(47, 82, 104, .07), inset 3px 0 rgba(31, 120, 152, .55);
+  box-shadow: var(--shadow-sm);
   opacity: 1;
   pointer-events: none;
   transform: translate3d(0, var(--motion-nav-y, 0), 0);
@@ -111,9 +111,9 @@
   width: var(--motion-tab-width, 80px);
   height: var(--motion-tab-height, 46px);
   border: 1px solid rgba(255, 255, 255, .82);
-  border-radius: 12px;
+  border-radius: var(--radius-card);
   background: rgba(255, 255, 255, .64);
-  box-shadow: 0 8px 24px rgba(43, 70, 133, .1), inset 0 1px rgba(255,255,255,.88);
+  box-shadow: var(--shadow-sm);
   pointer-events: none;
   transform: translate3d(var(--motion-tab-x, 0), 0, 0);
   transition: transform 280ms var(--motion-ease-move);
@@ -122,7 +122,7 @@
   content: '';
   position: absolute;
   inset: 3px;
-  border-radius: 9px;
+  border-radius: var(--radius-control);
   background: linear-gradient(115deg, rgba(255,255,255,.74), rgba(195,219,255,.28));
   filter: url(#settings-liquid-warp);
 }
@@ -152,8 +152,8 @@
     color: var(--ink, #263248);
     background: rgba(255,255,255,.98);
     border: 1px solid var(--line, #dfe4ec);
-    border-radius: 11px;
-    box-shadow: 0 16px 42px rgba(24,35,54,.16);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-sm);
     opacity: 0;
     transform: translate3d(0, 6px, 0) scale(.97);
     transform-origin: top center;
@@ -168,7 +168,7 @@
     ::picker(select):popover-open { opacity: 0; transform: translate3d(0, 6px, 0) scale(.97); }
   }
 
-  select option { min-height: 34px; padding: 8px 10px; border-radius: 7px; }
+  select option { min-height: 34px; padding: 8px 10px; border-radius: var(--radius-control); }
   select option:hover { background: rgba(66,102,199,.08); }
   select option:checked { color: #244fae; background: rgba(66,102,199,.12); font-weight: 680; }
   select option::checkmark { order: 1; margin-left: auto; }
