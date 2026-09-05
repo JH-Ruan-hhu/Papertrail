@@ -28,7 +28,6 @@ const DEFAULT_SETTINGS = Object.freeze({
   defaultEventReminderMinutes: 10,
   defaultTodoReminderMode: 'at-due',
   quickCaptureShortcut: 'CommandOrControl+Shift+Space',
-  stickyNoteShortcut: 'CommandOrControl+Alt+N'
 });
 
 class JsonStore {

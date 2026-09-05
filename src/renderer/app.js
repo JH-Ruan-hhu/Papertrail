@@ -928,7 +928,6 @@ function populateSettings() {
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
   document.getElementById('quickCaptureShortcut').value = settings.quickCaptureShortcut || 'CommandOrControl+Shift+Space';
-  document.getElementById('stickyNoteShortcut').value = settings.stickyNoteShortcut || 'CommandOrControl+Alt+N';
   syncReminderSettings();
   syncTodayWidgetSettings();
   syncHomeBannerSettings();
@@ -1147,12 +1146,10 @@ async function saveSettings() {
       startAtLogin: document.getElementById('startAtLogin').checked,
       autoCheckUpdates: document.getElementById('autoCheckUpdates').checked,
       quickCaptureShortcut: document.getElementById('quickCaptureShortcut').value,
-      stickyNoteShortcut: document.getElementById('stickyNoteShortcut').value
     });
     window.yanjiTheme?.apply(state.settings);
     const formatShortcut = (value) => String(value || '').replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
     document.getElementById('shortcutTip').textContent = formatShortcut(state.settings.quickCaptureShortcut);
-    document.getElementById('stickyShortcutTip').textContent = formatShortcut(state.settings.stickyNoteShortcut);
     render();
     showToast('设置已保存。');
   } catch (error) {

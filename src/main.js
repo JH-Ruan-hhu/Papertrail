@@ -157,7 +157,6 @@ const MAX_NOTE_ATTACHMENTS_TOTAL = 50 * 1024 * 1024;
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
 const DEFAULT_QUICK_CAPTURE_SHORTCUT = 'CommandOrControl+Shift+Space';
-const DEFAULT_STICKY_NOTE_SHORTCUT = 'CommandOrControl+Alt+N';
 const TITLE_BAR_NORMAL = Object.freeze({ color: '#eaf5fb', symbolColor: '#35566b', height: 38 });
 const TITLE_BAR_MODAL = Object.freeze({ color: '#9dabb6', symbolColor: '#f5fbfe', height: 38 });
 
@@ -186,7 +185,6 @@ let attendanceUsageLive = {};
 let attendanceLastPersistAt = 0;
 let lastBackupCleanupAt = 0;
 let systemRecoveryWarning = null;
-const stickyWindows = new Map();
 const deadlineWindows = new Map();
 const refreshingIds = new Set();
 
@@ -942,7 +940,7 @@ function broadcastWorkspace() {
 
 function broadcastSettings() {
   const settings = settingsForRenderer();
-  for (const window of [mainWindow, quickCaptureWindow, scheduleWidgetWindow, ...stickyWindows.values()]) {
+  for (const window of [mainWindow, quickCaptureWindow, scheduleWidgetWindow]) {
     if (window && !window.isDestroyed()) window.webContents.send('settings:changed', settings);
   }
   return settings;
@@ -976,7 +974,7 @@ function saveWorkspaceNote(input) {
   const notes = store.listNotes();
   const existing = requested.id ? notes.find((item) => item.id === String(requested.id)) : null;
   if (requested.id && !existing) throw new Error('找不到这条笔记。');
-  // A new editor or sticky window reuses today's one daily document. Content
+  // A new editor reuses today's one daily document. Content
   // capture uses appendWorkspaceDailyNote below so it never replaces a stale
   // renderer snapshot.
   if (!existing && requested.kind !== 'standalone') {
@@ -1044,9 +1042,6 @@ function deleteWorkspaceNote(id) {
   for (const item of staged) {
     try { fs.unlinkSync(item.temporary); } catch { /* orphaned delete staging remains recoverable */ }
   }
-  const sticky = stickyWindows.get(id);
-  if (sticky && !sticky.isDestroyed()) sticky.close();
-  stickyWindows.delete(id);
   broadcastWorkspace();
   return true;
 }
@@ -1814,7 +1809,6 @@ function registerWorkbenchShortcuts(settings = store?.getSettings(), { allowFall
   globalShortcut.unregisterAll();
   const registrations = [
     ['quickCaptureShortcut', DEFAULT_QUICK_CAPTURE_SHORTCUT, toggleQuickCapture],
-    ['stickyNoteShortcut', DEFAULT_STICKY_NOTE_SHORTCUT, createNewStickyNote]
   ];
   const registered = {};
   for (const [key, fallback, handler] of registrations) {
@@ -1830,58 +1824,6 @@ function registerWorkbenchShortcuts(settings = store?.getSettings(), { allowFall
     registered[key] = shortcut;
   }
   return registered;
-}
-
-async function focusStickyWindow(window) {
-  if (!window || window.isDestroyed()) return;
-  window.show();
-  window.focus();
-  if (typeof window.webContents.focus === 'function') window.webContents.focus();
-  if (!window.webContents.isLoading()) window.webContents.send('sticky:focus');
-}
-
-async function openStickyNote(noteId) {
-  const id = String(noteId || '');
-  const note = store.listNotes().find((item) => item.id === id);
-  if (!note) throw new Error('找不到这条笔记。');
-  const existing = stickyWindows.get(id);
-  if (existing && !existing.isDestroyed()) {
-    await focusStickyWindow(existing);
-    return true;
-  }
-  const window = new BrowserWindow({
-    width: 380,
-    height: 440,
-    minWidth: 300,
-    minHeight: 260,
-    frame: false,
-    alwaysOnTop: true,
-    skipTaskbar: false,
-    backgroundColor: '#f5fbff',
-    icon: createAppWindowIcon(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      devTools: !app.isPackaged
-    }
-  });
-  stickyWindows.set(id, window);
-  await window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id } });
-  await focusStickyWindow(window);
-  window.on('closed', () => {
-    stickyWindows.delete(id);
-    try { deleteWorkspaceNoteIfEmpty(id); } catch (error) { console.warn(`[研迹] 空便笺清理失败: ${error.message}`); }
-  });
-  return true;
-}
-
-async function createNewStickyNote() {
-  const now = new Date();
-  const note = saveWorkspaceNote({ kind: 'daily', dateKey: localDateKey(now), content: '' });
-  await openStickyNote(note.id);
-  return note;
 }
 
 function nativeWindowHandleValue(window) {
@@ -2303,19 +2245,6 @@ function showTodoNotification(todo, level = 'reminder') {
   notification.show();
 }
 
-function stickyNoteForRenderer(noteId) {
-  const id = String(noteId || '');
-  const note = store.listNotes().find((item) => item.id === id);
-  if (!note) return null;
-  return {
-    id: note.id,
-    title: note.title,
-    content: note.content,
-    revision: note.revision || 0,
-    kind: note.kind
-  };
-}
-
 function runWorkspaceReminders(now = new Date()) {
   const candidates = collectReminderCandidates({
     schedules: store.listSchedules().map((schedule) => scheduleOccurrenceForDate(schedule, now)).filter(Boolean),
@@ -2630,7 +2559,7 @@ function validateSettings(patch) {
     allowed.eventNotifications = false;
     allowed.todoNotifications = false;
   }
-  for (const key of ['quickCaptureShortcut', 'stickyNoteShortcut']) {
+  for (const key of ['quickCaptureShortcut']) {
     if (!(key in patch)) continue;
     const shortcut = String(patch[key] || '').trim();
     if (!shortcut || shortcut.length > 100) throw new Error('快捷键格式不正确。');
@@ -3048,9 +2977,6 @@ function registerIpc() {
   ipcMain.handle('notes:add-attachment', (_event, id) => addNoteAttachment(String(id)));
   ipcMain.handle('notes:get-attachment', (_event, id, attachmentId) => getNoteAttachment(String(id), String(attachmentId)));
   ipcMain.handle('notes:delete-attachment', (_event, id, attachmentId) => deleteNoteAttachment(String(id), String(attachmentId)));
-  ipcMain.handle('notes:open-sticky', (_event, id) => openStickyNote(String(id)));
-  ipcMain.handle('notes:get-sticky', (_event, id) => stickyNoteForRenderer(String(id)));
-  ipcMain.handle('notes:create-sticky', () => createNewStickyNote());
   ipcMain.handle('jobs:save', (_event, input) => saveWorkspaceJobApplication(input));
   ipcMain.handle('jobs:delete', (_event, id) => deleteWorkspaceJobApplication(String(id)));
   ipcMain.handle('jobs:import', () => importWorkspaceJobApplications());
@@ -3117,14 +3043,6 @@ function registerIpc() {
       schedule
     }));
     return { mode: 'schedule', item: items[0], items };
-  });
-  ipcMain.handle('sticky:close', (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.close();
-    return true;
-  });
-  ipcMain.handle('sticky:set-always-on-top', (event, enabled) => {
-    BrowserWindow.fromWebContents(event.sender)?.setAlwaysOnTop(Boolean(enabled), 'floating');
-    return true;
   });
   ipcMain.handle('deadline:dismiss', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -3202,7 +3120,7 @@ function registerIpc() {
   ipcMain.handle('settings:update', async (_event, patch) => {
     const validated = validateSettings(patch);
     const previousSettings = store.getSettings();
-    if ('quickCaptureShortcut' in validated || 'stickyNoteShortcut' in validated) {
+    if ('quickCaptureShortcut' in validated) {
       const registered = registerWorkbenchShortcuts({ ...previousSettings, ...validated });
       if (!registered) {
         registerWorkbenchShortcuts(previousSettings, { allowFallback: true });

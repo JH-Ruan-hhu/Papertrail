@@ -1582,18 +1582,6 @@ app.whenReady().then(async () => {
   }
   if (process.env.WORKBENCH_STICKY_OUTPUT) {
     window.setSize(380, 440);
-    await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'sticky.html'), { query: { id: 'note-1', appearance: 'liquid-glass' } });
-    await new Promise((resolve) => setTimeout(resolve, 160));
-    const stickyResult = await window.webContents.executeJavaScript(`
-      (() => ({
-        titleLoaded: document.getElementById('noteTitle').value === 'PFAS 方法学想法',
-        contentLoaded: document.getElementById('noteContent').textContent.includes('回收率与基质效应'),
-        closeButtonNamed: document.getElementById('closeButton').getAttribute('aria-label') === '关闭便笺',
-          && getComputedStyle(document.body).backgroundImage.includes('radial-gradient')
-      }))()
-    `);
-    if (!Object.values(stickyResult).every(Boolean)) throw new Error(`Workbench sticky smoke failed: ${JSON.stringify(stickyResult)}`);
-    console.log(`WORKBENCH_STICKY_OK ${JSON.stringify(stickyResult)}`);
     await captureStablePage(process.env.WORKBENCH_STICKY_OUTPUT);
   }
   const captureWasRequested = Object.entries(process.env).some(([key, value]) => (

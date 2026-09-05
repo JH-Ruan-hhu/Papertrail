@@ -342,9 +342,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /id="focusUsageList"/);
   assert.match(indexHtml, /data-focus-minutes="50"/);
   assert.match(indexHtml, /id="quickNoteButton"/);
-  assert.match(indexHtml, /id="createStickyNoteButton"/);
   assert.match(indexHtml, /id="openScheduleWidgetButton"/);
-  assert.match(indexHtml, /id="stickyNoteShortcut"/);
   assert.match(indexHtml, /class="home-content-grid"/);
   assert.match(indexHtml, /id="notesGrid"/);
   assert.match(indexHtml, /id="noteMetadataPanel"/);
@@ -400,7 +398,6 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /closeStaleAttendanceRecords/);
   assert.match(mainJs, /reconcileStaleAttendance/);
   assert.match(preloadJs, /showCapture/);
-  assert.match(preloadJs, /createStickyNote/);
   assert.match(preloadJs, /showScheduleWidget/);
   assert.match(scheduleWidgetHtml, /id="widgetScheduleList"/);
   assert.match(scheduleWidgetHtml, /id="closeWidgetButton"/);
@@ -652,7 +649,7 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
   const motionJs = readProjectFile('src', 'renderer', 'motion-system.js');
   const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
   const todoViewJs = readProjectFile('src', 'renderer', 'todo-view.js');
-  const auxiliaryPages = ['sticky.html', 'deadline.html', 'schedule-widget.html']
+  const auxiliaryPages = ['deadline.html', 'schedule-widget.html']
     .map((file) => readProjectFile('src', 'renderer', file));
   const captureHtml = readProjectFile('src', 'renderer', 'capture.html');
   assert.match(indexHtml, /motion-tokens\.css/);

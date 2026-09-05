@@ -1860,7 +1860,7 @@ function renderNotes() {
   document.getElementById('notesGrid').innerHTML = notes.length ? notes.map((note) => {
     const metadata = wb.workspace.metadataFields.filter((field) => note.metadata?.[field.id] !== undefined && note.metadata[field.id] !== '' && note.metadata[field.id] !== false).slice(0, 6);
     const words = window.YanjiNoteEditor?.wordCount(note.content) || 0;
-    return `<article class="note-card note-document-card" data-edit-note="${wbEscape(note.id)}"><header><span>${formatUpdated(note.updatedAt)}</span><button data-sticky-note="${wbEscape(note.id)}" type="button">便笺</button></header><h3>${wbEscape(note.title)}</h3><p>${wbEscape(notePlainText(note.content).slice(0, 260) || '空白文档')}</p><footer><span>${words} 字</span><div class="note-metadata-tiles">${metadata.map((field, index) => `<span class="note-metadata-tile tone-${(index % 6) + 1}"><small>${wbEscape(field.name)}</small><b>${wbEscape(note.metadata[field.id] === true ? '是' : note.metadata[field.id])}</b></span>`).join('')}</div></footer></article>`;
+    return `<article class="note-card note-document-card" data-edit-note="${wbEscape(note.id)}"><header><span>${formatUpdated(note.updatedAt)}</span></header><h3>${wbEscape(note.title)}</h3><p>${wbEscape(notePlainText(note.content).slice(0, 260) || '空白文档')}</p><footer><span>${words} 字</span><div class="note-metadata-tiles">${metadata.map((field, index) => `<span class="note-metadata-tile tone-${(index % 6) + 1}"><small>${wbEscape(field.name)}</small><b>${wbEscape(note.metadata[field.id] === true ? '是' : note.metadata[field.id])}</b></span>`).join('')}</div></footer></article>`;
   }).join('') : '<div class="workbench-empty notes-empty"><span>✎</span><h3>还没有笔记</h3><p>新建一条笔记，或用全局快捷键随手记录。</p></div>';
   const today = localDateKey(new Date());
   document.getElementById('addNoteButton').textContent = wb.workspace.notes.some((note) => note.kind === 'daily' && note.dateKey === today) ? '继续写今天' : '新建笔记';
@@ -2068,7 +2068,6 @@ async function flushNoteEditor({ silent = false } = {}) {
       document.getElementById('noteId').value = note.id;
       wb.noteConflict = false;
       document.getElementById('deleteNoteButton').hidden = false;
-      document.getElementById('openStickyFromEditorButton').hidden = false;
       document.getElementById('addNoteImageButton').disabled = false;
       if (generation === wb.noteEditGeneration) {
         wb.noteDirty = false;
@@ -2120,7 +2119,6 @@ async function openNoteEditor(note = null, sourceCard = null) {
   document.getElementById('noteContent').innerHTML = noteContentToEditorHtml(draft?.content ?? targetNote.content ?? '', targetNote.attachments || []);
   document.getElementById('noteDialogTitle').textContent = targetNote.kind === 'daily' ? '今日文档' : '编辑笔记';
   document.getElementById('deleteNoteButton').hidden = false;
-  document.getElementById('openStickyFromEditorButton').hidden = false;
   document.getElementById('addNoteImageButton').disabled = false;
   window.YanjiNoteEditor?.restoreInspector();
   document.getElementById('noteError').textContent = '';
@@ -2709,17 +2707,6 @@ function bindWorkbenchEvents() {
     event.preventDefault();
     setNoteImagePreviewZoom(wb.noteImageZoom + (event.deltaY < 0 ? .25 : -.25));
   }, { passive: false });
-  document.getElementById('openStickyFromEditorButton').addEventListener('click', async () => {
-    try {
-      if (wb.noteDirty) {
-        showWorkbenchToast('请先保存当前修改，再打开便笺。');
-        return;
-      }
-      await workbenchApi.openStickyNote(document.getElementById('noteId').value);
-    } catch (error) {
-      document.getElementById('noteError').textContent = error.message || '无法打开悬浮便笺';
-    }
-  });
   document.getElementById('cancelNoteButton').addEventListener('click', async () => {
     await closeNoteEditorSafely(document.getElementById('noteDialog'));
   });
@@ -2888,8 +2875,6 @@ function bindWorkbenchEvents() {
       }
       return;
     }
-    const stickyTarget = event.target.closest('[data-sticky-note]');
-    if (stickyTarget) { event.stopPropagation(); return workbenchApi.openStickyNote(stickyTarget.dataset.stickyNote); }
     const noteTarget = event.target.closest('[data-edit-note]');
     if (noteTarget) return openNoteEditor(wb.workspace.notes.find((item) => item.id === noteTarget.dataset.editNote), noteTarget);
   });
@@ -2912,7 +2897,6 @@ function bindWorkbenchEvents() {
   activityHeatmap.addEventListener('focusin', (event) => showActivityTooltip(event.target));
   activityHeatmap.addEventListener('focusout', () => { activityTooltip.hidden = true; });
   document.getElementById('openQuickCaptureButton').addEventListener('click', () => workbenchApi.showCapture());
-  document.getElementById('createStickyNoteButton').addEventListener('click', () => workbenchApi.createStickyNote());
   document.getElementById('openScheduleWidgetButton').addEventListener('click', async () => {
     try {
       const result = await workbenchApi.showScheduleWidget();
@@ -2937,7 +2921,6 @@ async function initializeWorkbench() {
   wb.settings = settings || {};
   applyHomeBannerSettings(wb.settings);
   if (settings?.quickCaptureShortcut) document.getElementById('shortcutTip').textContent = settings.quickCaptureShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
-  if (settings?.stickyNoteShortcut) document.getElementById('stickyShortcutTip').textContent = settings.stickyNoteShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
   await refreshWorkspace();
   workbenchApi.onWorkspaceChanged(refreshWorkspace);
   workbenchApi.onSettingsChanged((settings) => {

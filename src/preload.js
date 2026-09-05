@@ -40,9 +40,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   addNoteAttachment: (id) => ipcRenderer.invoke('notes:add-attachment', id),
   getNoteAttachment: (id, attachmentId) => ipcRenderer.invoke('notes:get-attachment', id, attachmentId),
   deleteNoteAttachment: (id, attachmentId) => ipcRenderer.invoke('notes:delete-attachment', id, attachmentId),
-  openStickyNote: (id) => ipcRenderer.invoke('notes:open-sticky', id),
-  getStickyNote: (id) => ipcRenderer.invoke('notes:get-sticky', id),
-  createStickyNote: () => ipcRenderer.invoke('notes:create-sticky'),
   saveJobApplication: (input) => ipcRenderer.invoke('jobs:save', input),
   deleteJobApplication: (id) => ipcRenderer.invoke('jobs:delete', id),
   importJobApplications: () => ipcRenderer.invoke('jobs:import'),
@@ -59,8 +56,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   hideCapture: () => ipcRenderer.invoke('capture:hide'),
   setCaptureContentState: (hasContent) => ipcRenderer.send('capture:content-state', Boolean(hasContent)),
   submitCapture: (input) => ipcRenderer.invoke('capture:submit', input),
-  closeSticky: () => ipcRenderer.invoke('sticky:close'),
-  setStickyAlwaysOnTop: (enabled) => ipcRenderer.invoke('sticky:set-always-on-top', enabled),
   dismissDeadline: () => ipcRenderer.invoke('deadline:dismiss'),
   snoozeDeadline: (until) => ipcRenderer.invoke('deadline:snooze', until),
   listPapers: () => ipcRenderer.invoke('papers:list'),
@@ -106,7 +101,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   onWorkspaceNavigate: on('workspace:navigate'),
   onFocusChanged: on('focus:changed'),
   onCaptureFocus: on('capture:focus'),
-  onStickyFocus: on('sticky:focus'),
   onDeadlineShow: on('deadline:show'),
   // Namespaced aliases mirror the v1.1 contract while the flat methods above
   // preserve the existing PaperTrail renderer API.
