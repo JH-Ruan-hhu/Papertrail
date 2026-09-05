@@ -47,7 +47,6 @@ app.whenReady().then(async () => {
     console.error(`RENDERER_GONE ${JSON.stringify(details)}`);
   });
   await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), { query: { dailyPrompt: 'force' } });
-  await window.webContents.executeJavaScript(`document.documentElement.dataset.appearance = ${JSON.stringify(process.env.PAPERTRAIL_SMOKE_APPEARANCE || 'liquid-glass')}`);
   await new Promise((resolve) => setTimeout(resolve, 700));
   const captureStablePage = async (output) => {
     const wasVisible = window.isVisible();
@@ -1584,14 +1583,12 @@ app.whenReady().then(async () => {
   if (process.env.WORKBENCH_STICKY_OUTPUT) {
     window.setSize(380, 440);
     await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'sticky.html'), { query: { id: 'note-1', appearance: 'liquid-glass' } });
-    await window.webContents.executeJavaScript(`document.documentElement.dataset.appearance = 'liquid-glass'`);
     await new Promise((resolve) => setTimeout(resolve, 160));
     const stickyResult = await window.webContents.executeJavaScript(`
       (() => ({
         titleLoaded: document.getElementById('noteTitle').value === 'PFAS 方法学想法',
         contentLoaded: document.getElementById('noteContent').textContent.includes('回收率与基质效应'),
         closeButtonNamed: document.getElementById('closeButton').getAttribute('aria-label') === '关闭便笺',
-        liquidGlass: document.documentElement.dataset.appearance === 'liquid-glass'
           && getComputedStyle(document.body).backgroundImage.includes('radial-gradient')
       }))()
     `);

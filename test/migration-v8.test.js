@@ -65,7 +65,7 @@ test('rejects future versions and invalid collection shapes before writing', () 
 test('normalizes theme, widget, event and todo reminder defaults', () => {
   const settings = normalizeSettings({ scheduleWidgetEnabled: true, appearanceTheme: 'unknown', widgetShowTodos: false }, { defaultEventReminderMinutes: 5 });
   assert.equal(settings.todayWidgetEnabled, true);
-  assert.equal(settings.appearanceTheme, 'liquid-glass');
+  assert.equal(settings.appearanceTheme, undefined);
   assert.equal(settings.widgetShowTodos, false);
   assert.equal(settings.defaultEventReminderMinutes, 5);
   assert.equal(settings.defaultTodoReminderMode, 'at-due');

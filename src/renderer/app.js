@@ -923,7 +923,6 @@ function populateSettings() {
   document.getElementById('todayWidgetEnabled').checked = settings.todayWidgetEnabled ?? settings.scheduleWidgetEnabled;
   document.getElementById('widgetShowSchedules').checked = settings.widgetShowSchedules !== false;
   document.getElementById('widgetShowTodos').checked = settings.widgetShowTodos !== false;
-  document.querySelectorAll('input[name="appearanceTheme"]').forEach((input) => { input.checked = input.value === (settings.appearanceTheme || 'liquid-glass'); });
   document.querySelectorAll('input[name="homeBannerImageMode"]').forEach((input) => { input.checked = input.value === (settings.homeBannerImageMode || 'bing'); });
   document.getElementById('closeToTray').checked = settings.closeToTray;
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
@@ -1001,7 +1000,7 @@ function syncTodayWidgetSettings() {
 
 const SETTINGS_SECTION_COPY = Object.freeze({
   general: ['通用', 'Windows 行为与全局快捷操作'],
-  appearance: ['外观', '选择液态玻璃或经典工作台，并配置桌面概览'],
+  appearance: ['外观', '工作台显示设置'],
   notifications: ['提醒', '管理日程、任务和投稿进展的 Windows 通知'],
   tracking: ['投稿追踪', '设置稿件状态的后台检查频率'],
   storage: ['数据与备份', '管理整个科研工作台的数据位置和迁移备份'],
@@ -1140,7 +1139,6 @@ async function saveSettings() {
       todoNotifications: document.getElementById('todoNotifications').checked,
       defaultEventReminderMinutes: document.getElementById('defaultEventReminderMinutes').value === 'null' ? null : Number(document.getElementById('defaultEventReminderMinutes').value),
       defaultTodoReminderMode: document.getElementById('defaultTodoReminderMode').value,
-      appearanceTheme: document.querySelector('input[name="appearanceTheme"]:checked')?.value || 'liquid-glass',
       homeBannerImageMode: document.querySelector('input[name="homeBannerImageMode"]:checked')?.value || 'bing',
       todayWidgetEnabled: document.getElementById('todayWidgetEnabled').checked,
       widgetShowSchedules: document.getElementById('widgetShowSchedules').checked,

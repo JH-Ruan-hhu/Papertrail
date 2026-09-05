@@ -264,7 +264,6 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
   const css = readProjectFile('src', 'renderer', 'styles.css');
   const layoutCss = readProjectFile('src', 'renderer', 'v11-layout.css');
-  const liquidCss = readProjectFile('src', 'renderer', 'themes', 'liquid-glass.css');
   const storeJs = readProjectFile('src', 'store.js');
   const scheduleWidgetHtml = readProjectFile('src', 'renderer', 'schedule-widget.html');
   const scheduleWidgetJs = readProjectFile('src', 'renderer', 'schedule-widget.js');
@@ -435,12 +434,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.doesNotMatch(workbenchJs, /title: '删除日程'.*无法撤销。/);
   assert.doesNotMatch(workbenchJs, /title: '删除打卡记录'.*无法撤销。/);
   assert.doesNotMatch(workbenchJs, /title: '删除笔记'.*无法撤销。/);
-  assert.match(liquidCss, /backdrop-filter: blur\(var\(--glass-blur\)\)/);
-  assert.match(liquidCss, /prefers-reduced-transparency/);
-  assert.match(liquidCss, /prefers-contrast: more/);
-  assert.match(liquidCss, /Primary glass surfaces/);
   assert.match(indexHtml, /class="brand-mark"/);
-  assert.match(liquidCss, /--glass-panel:/);
   assert.match(preloadJs, /saveJobApplication/);
   assert.match(mainJs, /jobs:save/);
   assert.match(mainJs, /deleteWorkspaceNoteIfEmpty/);

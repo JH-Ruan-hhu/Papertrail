@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
     <title>研迹 · 科研工作台</title>
-    <script src="theme-bootstrap.js"></script>
     <link rel="stylesheet" href="motion-tokens.css">
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="v11-layout.css">
-    <link rel="stylesheet" href="themes/liquid-glass.css">
     <link rel="stylesheet" href="motion-system.css">
   </head>
   <body>
@@ -357,11 +355,7 @@
 
             <section class="settings-panel" data-settings-panel="appearance" role="tabpanel" hidden>
               <h2>外观</h2>
-              <h3>界面材质</h3>
-              <div class="appearance-choice-grid" role="radiogroup" aria-label="界面主题">
-                <label class="appearance-choice"><input type="radio" name="appearanceTheme" value="liquid-glass"><span class="appearance-preview liquid-preview"><i></i><b></b></span><strong>液态玻璃</strong><small>半透明层次、柔和光晕与流畅过渡</small></label>
-                <label class="appearance-choice"><input type="radio" name="appearanceTheme" value="classic"><span class="appearance-preview classic-preview"><i></i><b></b></span><strong>经典</strong><small>保留 v1.0.5 的不透明工作台风格</small></label>
-              </div>
+              <h3>工作台显示</h3>
               <h3>首页进度横幅</h3>
               <div class="settings-group home-banner-settings">
                 <div class="setting-row stacked"><div><strong>横幅背景</strong><small>必应每日壁纸会每天自动下载并缓存；断网时继续使用上一次图片。本地图片也会复制到研迹的私有缓存。</small></div><div class="home-banner-mode" role="radiogroup" aria-label="首页横幅背景"><label><input type="radio" name="homeBannerImageMode" value="default"><span>柔和背景</span></label><label><input type="radio" name="homeBannerImageMode" value="local"><span>本地图片</span></label><label><input type="radio" name="homeBannerImageMode" value="bing"><span>必应每日壁纸</span></label></div></div>
@@ -688,7 +682,6 @@
     </dialog>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <script src="theme-runtime.js"></script>
     <script src="shared-ui.js"></script>
     <script src="../job-core.js"></script>
     <script src="list-editing.js"></script>

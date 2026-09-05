@@ -19,7 +19,6 @@ const DEFAULT_SETTINGS = Object.freeze({
   widgetShowSchedules: true,
   widgetShowTodos: true,
   widgetShowCompletedTodos: false,
-  appearanceTheme: 'liquid-glass',
   homeBannerImageMode: 'bing',
   homeBannerBingInitialized: true,
   homeBannerFetchedOn: '',

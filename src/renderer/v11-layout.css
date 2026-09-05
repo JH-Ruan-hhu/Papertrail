@@ -15,14 +15,7 @@
   --yanji-surface: rgba(255, 255, 255, .68);
 }
 
-html[data-appearance="classic"] {
-  --yanji-text: #1a2a34;
-  --yanji-muted: #66747c;
-  --yanji-line: rgba(41, 60, 70, .16);
-  --yanji-accent: #2d728c;
-  --yanji-accent-strong: #1e536a;
-  --yanji-surface: #ffffff;
-}
+
 
 body { color: var(--yanji-text); }
 .workspace { min-width: 0; }
@@ -726,8 +719,7 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
 /* Settings is a page-level flow, not another glass card. Keep groups readable
    with separators while removing the large enclosing border/background. */
 .settings-page .settings-shell,
-html[data-appearance="liquid-glass"] .settings-page .settings-shell,
-html[data-appearance="classic"] .settings-page .settings-shell { background: transparent; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; }
+
 .settings-page .settings-pane, .settings-page .settings-scroll { background: transparent; }
 .settings-page .settings-sidebar { background: transparent; border: 0; }
 .settings-page .settings-scroll { padding-left: 12px; }

@@ -47,7 +47,7 @@ function normalizeSettings(source, defaults) {
   settings.widgetShowSchedules = input.widgetShowSchedules !== false;
   settings.widgetShowTodos = input.widgetShowTodos !== false;
   settings.widgetShowCompletedTodos = input.widgetShowCompletedTodos === true;
-  settings.appearanceTheme = input.appearanceTheme === 'classic' ? 'classic' : (input.appearanceTheme === 'liquid-glass' ? 'liquid-glass' : (safeDefaults.appearanceTheme || 'liquid-glass'));
+  delete settings.appearanceTheme; // Ignore the retired setting in legacy JSON.
   settings.homeBannerImageMode = ['default', 'local', 'bing'].includes(input.homeBannerImageMode) ? input.homeBannerImageMode : (safeDefaults.homeBannerImageMode || 'bing');
   settings.homeBannerBingInitialized = input.homeBannerBingInitialized === true;
   settings.homeBannerFetchedOn = /^\d{8}$/.test(String(input.homeBannerFetchedOn || '')) ? String(input.homeBannerFetchedOn) : '';

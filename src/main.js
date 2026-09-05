@@ -1786,7 +1786,7 @@ function createQuickCaptureWindow() {
       backgroundThrottling: true
     }
   });
-  quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+  quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'));
   quickCaptureWindow.on('blur', () => {
     setTimeout(() => {
       if (quickCaptureWindow && !quickCaptureWindow.isDestroyed() && quickCaptureWindow.isVisible() && !quickCaptureHasContent) {
@@ -1868,7 +1868,7 @@ async function openStickyNote(noteId) {
     }
   });
   stickyWindows.set(id, window);
-  await window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id, appearance: store.getSettings().appearanceTheme } });
+  await window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id } });
   await focusStickyWindow(window);
   window.on('closed', () => {
     stickyWindows.delete(id);
@@ -2178,7 +2178,7 @@ async function showScheduleWidget() {
     restoreDesktopIcons().catch(() => {});
     if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
   });
-  await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+  await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'));
   const targetSize = {
     width: Math.round(width * scaleFactor),
     height: Math.round(height * scaleFactor)
@@ -2261,7 +2261,7 @@ function showDeadlineWindow(item, kind = 'todo', level = 'reminder') {
     window.yanjiDeadlineId = payload.id;
     window.yanjiDeadlineKind = kind;
     windows.add(window);
-    window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+    window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'));
     window.webContents.once('did-finish-load', () => {
       window.webContents.send('deadline:show', payload);
       window.setAlwaysOnTop(true, 'screen-saver');
@@ -2643,11 +2643,6 @@ function validateSettings(patch) {
     }
     allowed.refreshMinutes = minutes;
   }
-  if ('appearanceTheme' in patch) {
-    const theme = String(patch.appearanceTheme || '').trim();
-    if (!['liquid-glass', 'classic'].includes(theme)) throw new Error('外观主题不受支持。');
-    allowed.appearanceTheme = theme;
-  }
   if ('homeBannerImageMode' in patch) {
     const mode = String(patch.homeBannerImageMode || 'default');
     if (!['default', 'local', 'bing'].includes(mode)) throw new Error('首页横幅背景模式不受支持。');
@@ -2710,7 +2705,7 @@ function createWindow() {
       console.error(`YANJI_SMOKE_LOAD_FAILED ${JSON.stringify({ code, description, url, isMainFrame })}`);
     });
   }
-  mainWindow.yanjiLoadPromise = mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+  mainWindow.yanjiLoadPromise = mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('show', () => applyWindowsTaskbarIdentity(mainWindow));
   mainWindow.on('restore', () => applyWindowsTaskbarIdentity(mainWindow));
   mainWindow.webContents.once('did-finish-load', () => {
