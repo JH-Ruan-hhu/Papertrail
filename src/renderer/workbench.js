@@ -1107,7 +1107,7 @@ function renderTimeline() {
       const linkedButton = linkedTodo ? `<button class="schedule-card-linked-todo" data-open-linked-todo="${wbEscape(linkedTodo.id)}" type="button">${wbEscape(linkedLabel)}</button>` : '';
       const positionData = position ? ` data-schedule-top="${position.top}" data-schedule-height="${position.height}"` : '';
       const densityClass = position ? (position.durationMinutes <= 30 ? ' is-brief' : position.durationMinutes <= 60 ? ' is-compact-block' : ' is-expanded-block') : '';
-      return `<article class="schedule-board-card tone-${item.priority}${item.completedAt ? ' is-completed' : ''}${compact || item.allDay ? ' is-all-day' : ' is-timed'}${densityClass}" data-schedule-card="${wbEscape(item.id)}" data-schedule-start="${wbEscape(item.startAt)}"${positionData} draggable="true" title="拖动可调整日期和时间"><button class="schedule-card-main" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${item.allDay ? '全天' : timing.label}</time><strong>${wbEscape(item.title)}</strong></button><div class="schedule-card-meta"><span>${priorityLabels[item.priority]}${item.repeat === 'daily' ? ' · 每天' : ''}${timing.spansDay ? ' · 跨日' : ''}${item.completedAt ? ' · 已完成' : ''}</span>${linkedButton}</div></article>`;
+      return `<article class="schedule-board-card tone-${item.priority}${item.completedAt ? ' is-completed' : ''}${compact || item.allDay ? ' is-all-day' : ' is-timed'}${densityClass}" data-schedule-card="${wbEscape(item.id)}" data-schedule-start="${wbEscape(item.startAt)}"${positionData} draggable="true" title="${wbEscape(item.title)} · 拖动可调整日期和时间"><button class="schedule-card-main" data-edit-schedule="${wbEscape(item.id)}" type="button"><time>${item.allDay ? '全天' : timing.label}</time><strong>${wbEscape(item.title)}</strong></button><div class="schedule-card-meta"><span>${priorityLabels[item.priority]}${item.repeat === 'daily' ? ' · 每天' : ''}${timing.spansDay ? ' · 跨日' : ''}${item.completedAt ? ' · 已完成' : ''}</span>${linkedButton}</div></article>`;
     };
     const eventEndsBeforeTimeline = (item) => !item.allDay && Date.parse(item.endAt) <= new Date(date.getFullYear(), date.getMonth(), date.getDate(), 8).getTime();
     const allDayCards = events.filter((item) => item.allDay || eventEndsBeforeTimeline(item)).map((item) => cardHtml(item, null, true)).join('');
@@ -1128,7 +1128,7 @@ function renderTimeline() {
         durationMinutes: visibleEnd - visibleStart
       });
     }).join('');
-    return `<section class="schedule-board-column ${sameDay(date, new Date()) ? 'today' : ''} ${sameDay(date, selected) ? 'selected' : ''}" data-board-date="${dateKey}"><button class="schedule-board-heading" data-select-schedule-date="${dateKey}" type="button"><span>${new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date)}</span><strong>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}</strong><b>${events.length}</b></button><div class="schedule-all-day-lane">${allDayCards || '<span>—</span>'}</div><div class="schedule-time-track">${timedCards}<button class="schedule-board-add" data-add-schedule-date="${dateKey}" type="button" aria-label="在这一天新建日程">＋</button></div></section>`;
+    return `<section class="schedule-board-column ${sameDay(date, new Date()) ? 'today' : ''} ${sameDay(date, selected) ? 'selected' : ''}" data-board-date="${dateKey}"><button class="schedule-board-heading" data-select-schedule-date="${dateKey}" type="button"><span>${new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date)}</span><strong>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}</strong><b>${events.length}</b></button><div class="schedule-all-day-lane">${allDayCards || '<span>—</span>'}</div><div class="schedule-time-track">${timedCards}</div></section>`;
   }).join('');
   document.getElementById('scheduleBoard').innerHTML = `${timeAxis}${dayColumns}`;
   applyScheduleZoom();
@@ -1163,7 +1163,10 @@ function changeScheduleDate(nextDate) {
 }
 
 function applyScheduleZoom(nextHourHeight = wb.scheduleHourHeight) {
-  wb.scheduleHourHeight = Math.max(32, Math.min(96, Math.round(Number(nextHourHeight) / 8) * 8 || 48));
+  const shell = document.querySelector('.schedule-board-shell');
+  const track = document.querySelector('.schedule-time-track');
+  const chrome = track && shell ? Math.max(0, track.getBoundingClientRect().top - shell.getBoundingClientRect().top + shell.scrollTop) : 98;
+  wb.scheduleHourHeight = window.YanjiScheduleLayout.hourHeight(nextHourHeight, shell?.clientHeight || 0, chrome);
   const board = document.getElementById('scheduleBoard');
   if (!board) return;
   board.style.setProperty('--schedule-hour-height', `${wb.scheduleHourHeight}px`);
@@ -2393,20 +2396,18 @@ function bindWorkbenchEvents() {
     if (!event.ctrlKey) return;
     event.preventDefault();
     const shell = event.currentTarget;
-    const previousHeight = wb.scheduleHourHeight * 16;
-    const shellRect = shell.getBoundingClientRect();
-    const pointerOffset = event.clientY - shellRect.top;
-    const anchorRatio = Math.max(0, Math.min(1, (shell.scrollTop + pointerOffset - 98) / Math.max(1, previousHeight)));
+    const bottomGap = shell.scrollHeight - shell.scrollTop - shell.clientHeight;
     const next = wb.scheduleHourHeight + (event.deltaY < 0 ? 8 : -8);
     applyScheduleZoom(next);
     requestAnimationFrame(() => {
-      shell.scrollTop = Math.max(0, 98 + anchorRatio * wb.scheduleHourHeight * 16 - pointerOffset);
+      shell.scrollTop = window.YanjiScheduleLayout.bottomScroll(shell.scrollHeight, shell.clientHeight, bottomGap);
     });
   }, { passive: false });
+  new ResizeObserver(() => applyScheduleZoom()).observe(document.querySelector('.schedule-board-shell'));
   scheduleBoard.addEventListener('dragstart', (event) => {
     const card = event.target.closest('[data-schedule-card]');
     if (!card) return;
-    wb.draggedSchedule = { id: card.dataset.scheduleCard, startAt: card.dataset.scheduleStart };
+    wb.draggedSchedule = { id: card.dataset.scheduleCard, startAt: card.dataset.scheduleStart, pointerOffsetY: event.clientY - card.getBoundingClientRect().top };
     card.classList.add('is-dragging');
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', card.dataset.scheduleCard);
@@ -2433,8 +2434,7 @@ function bindWorkbenchEvents() {
       let targetMinutes = null;
       if (track && !schedule?.allDay) {
         const rect = track.getBoundingClientRect();
-        const ratio = Math.max(0, Math.min(1, (event.clientY - rect.top) / Math.max(1, rect.height)));
-        targetMinutes = Math.min(23 * 60 + 45, Math.round((8 * 60 + ratio * 16 * 60) / 15) * 15);
+        targetMinutes = window.YanjiScheduleLayout.snapMinutes(event.clientY, rect.top, rect.height, dragged.pointerOffsetY);
       }
       await moveScheduleToDate(dragged.id, dragged.startAt, column.dataset.boardDate, targetMinutes);
     } catch (error) {
@@ -2817,11 +2817,6 @@ function bindWorkbenchEvents() {
     const selectedDateTarget = event.target.closest('[data-select-schedule-date]');
     if (selectedDateTarget) {
       return changeScheduleDate(dateFromKey(selectedDateTarget.dataset.selectScheduleDate));
-    }
-    const addForDateTarget = event.target.closest('[data-add-schedule-date]');
-    if (addForDateTarget) {
-      wb.selectedDate = dateFromKey(addForDateTarget.dataset.addScheduleDate);
-      return openScheduleEditor();
     }
     const attendanceTarget = event.target.closest('[data-edit-attendance]');
     if (attendanceTarget?.dataset.editAttendance) return openAttendanceEditor(wb.workspace.attendance.find((item) => item.id === attendanceTarget.dataset.editAttendance));

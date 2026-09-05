@@ -519,8 +519,8 @@
           <div class="field full"><label for="scheduleTitle" id="scheduleTitleLabel">任务内容</label><input id="scheduleTitle" maxlength="500" placeholder="例如：明天下午四点修改论文"><small id="scheduleRecognition" class="schedule-recognition" hidden></small></div>
           <div class="field full schedule-all-day-row"><label class="checkbox-field"><input id="scheduleAllDayInput" type="checkbox"><span>全天日程</span></label><label class="checkbox-field"><input id="scheduleRepeatDailyInput" type="checkbox"><span>每天重复</span></label></div>
           <div class="field"><label for="scheduleDate">日期</label><input id="scheduleDate" type="date"></div>
-          <div class="field schedule-time-field"><label for="scheduleStartTime">开始时间</label><input id="scheduleStartTime" type="time"></div>
-          <div class="field schedule-time-field"><label for="scheduleEndTime">结束时间</label><input id="scheduleEndTime" type="time"></div>
+          <div class="field schedule-time-field"><label for="scheduleStartTime">开始时间</label><input id="scheduleStartTime" type="time" step="1800"></div>
+          <div class="field schedule-time-field"><label for="scheduleEndTime">结束时间</label><input id="scheduleEndTime" type="time" step="1800"></div>
           <div class="field"><label for="scheduleReminderSelect">提醒</label><select id="scheduleReminderSelect"><option value="null">不提醒</option><option value="0">到点</option><option value="5">提前 5 分钟</option><option value="10">提前 10 分钟</option><option value="15">提前 15 分钟</option><option value="30">提前 30 分钟</option><option value="60">提前 1 小时</option><option value="1440">提前 1 天</option></select></div>
           <div class="field full"><label>优先级</label><div class="priority-picker" role="radiogroup"><label class="priority-option high"><input type="radio" name="schedulePriority" value="high"><span></span><b>最高</b><small>#1 · 多屏星空提醒</small></label><label class="priority-option medium"><input type="radio" name="schedulePriority" value="medium"><span></span><b>重要</b><small>#2 · 置顶暖黄提醒</small></label><label class="priority-option low"><input type="radio" name="schedulePriority" value="low" checked><span></span><b>普通</b><small>#3 · Windows 通知</small></label></div></div>
           <div class="linked-todo-editor full" id="scheduleLinkedTodoPanel" hidden><strong>关联待办</strong><span id="scheduleLinkedTodoTitle"></span><button class="text-button" id="scheduleDetachTodoButton" type="button">解除关联</button></div>
@@ -679,6 +679,7 @@
     <script src="motion-system.js"></script>
     <script src="app.js"></script>
     <script src="todo-view.js"></script>
+    <script src="schedule-layout.js"></script>
     <script src="workbench.js"></script>
   </body>
 </html>

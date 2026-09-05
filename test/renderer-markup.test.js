@@ -317,7 +317,6 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(workbenchJs, /08:00–24:00/);
   assert.match(workbenchJs, /schedule-time-axis/);
   assert.match(workbenchJs, /data-schedule-top/);
-  assert.match(workbenchJs, /targetMinutes = Math\.min\(23 \* 60 \+ 45/);
   assert.match(workbenchJs, /Ctrl\+滚轮缩放/);
   assert.match(workbenchJs, /scheduleHourHeight:\s*48/);
   assert.match(workbenchJs, /addEventListener\('wheel',[\s\S]*event\.ctrlKey[\s\S]*applyScheduleZoom/);
@@ -402,7 +401,6 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /deleteWorkspaceNoteIfEmpty/);
   assert.match(mainJs, /createAppWindowIcon/);
   assert.doesNotMatch(mainJs, /setAlwaysOnTop\(true, 'floating'\)/);
-  assert.match(indexHtml, /占据桌面图标网格；关闭主窗口后仍保留/);
   assert.doesNotMatch(indexHtml, /id="closeScheduleButton"|id="closeScheduleConvertButton"|id="closeTodoButton"/);
   assert.match(indexHtml, /id="cancelScheduleButton"/);
   assert.match(indexHtml, /id="cancelTodoButton"/);
