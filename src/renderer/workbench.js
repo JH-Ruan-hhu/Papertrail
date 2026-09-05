@@ -84,10 +84,10 @@ const JOB_QUICK_FILTER_OPTIONS = Object.freeze([
   ['closed', '已结束']
 ]);
 const HOME_JOB_FUNNEL_OPTIONS = Object.freeze([
-  ['submitted', '已投递'],
-  ['assessment', '测评'],
+  ['offer', 'Offer'],
   ['interview', '面试'],
-  ['offer', 'Offer']
+  ['assessment', '测评'],
+  ['submitted', '已投递']
 ]);
 const UI_ICON_PATHS = Object.freeze({
   check: '<path d="m6 12 4 4 8-9"/>',

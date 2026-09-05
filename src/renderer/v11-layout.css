@@ -2196,12 +2196,12 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   border-radius: var(--radius-control);
 }
 .schedule-board-card .schedule-card-main { min-width: 0; padding: 5px 7px 3px; gap: 1px; }
-.schedule-board-card .schedule-card-main time { font-size: 9px; line-height: 1.2; }
+.schedule-board-card .schedule-card-main time { font-size: clamp(10px, .7vw, 13px); line-height: 1.2; }
 .schedule-board-card .schedule-card-main strong {
   min-height: 0;
   overflow: hidden;
   color: #243954;
-  font-size: 13px;
+  font-size: clamp(12px, calc(11px + (var(--schedule-hour-height) - 36px) * .08), 17px);
   font-weight: 760;
   line-height: 1.18;
   text-overflow: ellipsis;
@@ -2219,38 +2219,22 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
 .schedule-board-card .schedule-card-linked-todo { flex: 1 1 auto; padding: 1px 3px; font-size: 8px; }
 .schedule-board-card.is-brief .schedule-card-main {
   height: 100%;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   gap: 4px;
   padding: 2px 5px;
 }
-.schedule-board-card.is-brief .schedule-card-main time { font-size: 7px; }
-.schedule-board-card.is-brief .schedule-card-main strong { font-size: 10px; }
+.schedule-board-card.is-brief .schedule-card-main time { display: none; }
+
 .schedule-board-card.is-brief .schedule-card-meta,
 .schedule-board-card.is-compact-block .schedule-card-meta { display: none; }
 .schedule-board-card.is-compact-block .schedule-card-main { height: 100%; align-content: center; padding-block: 3px; }
-.schedule-board-card.is-compact-block .schedule-card-main strong { font-size: 12px; }
+
 .schedule-board-card.is-expanded-block .schedule-card-main strong { white-space: normal; }
 .schedule-board-card.is-all-day .schedule-card-main { grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 5px; padding: 4px 6px; }
 .schedule-board-card.is-all-day .schedule-card-meta { display: none; }
-.schedule-board-add {
-  position: absolute;
-  right: 6px;
-  bottom: 6px;
-  z-index: 1;
-  width: 24px;
-  min-height: 24px;
-  padding: 0;
-  display: grid;
-  place-items: center;
-  color: #6178af;
-  background: rgba(248,251,255,.82);
-  border: 1px solid rgba(91,116,176,.18);
-  border-radius: var(--radius-control);
-  opacity: .3;
-}
-.schedule-board-column:hover .schedule-board-add,
-.schedule-board-add:focus-visible { opacity: 1; }
+
+.schedule-board-column:hover 
 .schedule-board-empty { display: none; }
 @media (max-width: 1180px) {
   .schedule-board { min-width: 880px; grid-template-columns: 50px repeat(7, minmax(118px, 1fr)); }
