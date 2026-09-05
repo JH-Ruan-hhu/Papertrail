@@ -46,7 +46,7 @@ app.whenReady().then(async () => {
   window.webContents.on('render-process-gone', (_event, details) => {
     console.error(`RENDERER_GONE ${JSON.stringify(details)}`);
   });
-  await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), { query: { dailyPrompt: process.env.WORKBENCH_DAILY_OUTPUT ? 'force' : '0' } });
+  await window.loadFile(path.join(__dirname, '..', 'src', 'renderer', 'index.html'), { query: { dailyPrompt: 'force' } });
   await window.webContents.executeJavaScript(`document.documentElement.dataset.appearance = ${JSON.stringify(process.env.PAPERTRAIL_SMOKE_APPEARANCE || 'liquid-glass')}`);
   await new Promise((resolve) => setTimeout(resolve, 700));
   const captureStablePage = async (output) => {
@@ -102,7 +102,11 @@ app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 90));
         document.getElementById('addCountdownButton').click();
         document.getElementById('countdownTitle').value = '自定义项目截止';
-        document.getElementById('countdownTargetAt').value = '2026-12-31T18:00';
+        const countdownTarget = new Date(Date.now() + 86_400_000);
+        countdownTarget.setHours(18, 0, 0, 0);
+        document.getElementById('countdownTargetAt').value = countdownTarget.getFullYear() + '-'
+          + String(countdownTarget.getMonth() + 1).padStart(2, '0') + '-'
+          + String(countdownTarget.getDate()).padStart(2, '0') + 'T18:00';
         document.getElementById('saveCountdownButton').click();
         await new Promise((resolve) => setTimeout(resolve, 90));
         const completed = document.querySelector('#homeDayOverview .day-mini-item.is-completed');
@@ -111,6 +115,16 @@ app.whenReady().then(async () => {
         const progressBottom = document.querySelector('.home-today-items-card').getBoundingClientRect().bottom;
         const clockBottom = document.querySelector('.home-attendance-card').getBoundingClientRect().bottom;
         const cardBottoms = [...document.querySelectorAll('.home-command-grid > article')].map((card) => Math.round(card.getBoundingClientRect().bottom));
+        const bottomTextEdges = [
+          document.getElementById('homeNextEventMeta'),
+          document.querySelector('.home-countdown'),
+          document.getElementById('homeAttendanceMeta')
+        ].map((element) => Math.round(element.getBoundingClientRect().bottom));
+        const bottomTextSpread = Math.max(...bottomTextEdges) - Math.min(...bottomTextEdges);
+        const focusCard = document.querySelector('.home-focus-timer').getBoundingClientRect();
+        const focusNotification = document.querySelector('.home-focus-timer .focus-notification-option span');
+        const focusButton = document.getElementById('startFocusButton').getBoundingClientRect();
+        const banner = document.querySelector('.home-progress-strip');
         return {
           completedVisible: Boolean(completed),
           taskCheckVisible: document.querySelector('[data-home-todo-action="reopen"]')?.textContent.trim() === '✓',
@@ -120,11 +134,15 @@ app.whenReady().then(async () => {
           textFaded: Number(completedStyle?.opacity) < 1,
           progressBottomAligned: Math.abs(progressBottom - clockBottom) <= 12,
           cardsBottomAligned: new Set(cardBottoms).size === 1,
+          bottomTextSpread,
+          focusNotificationSingleLine: focusNotification.scrollWidth <= focusNotification.clientWidth + 1,
+          focusButtonVisible: focusButton.width >= 80 && focusButton.right <= focusCard.right,
+          bannerImageApplied: !${JSON.stringify(Boolean(process.env.WORKBENCH_HOME_BANNER_PATH))} || (banner.classList.contains('has-banner-image') && banner.dataset.bannerMode === 'bing'),
           horizontalOverflow: document.documentElement.scrollWidth > innerWidth
         };
       })()
     `);
-    if (!Object.entries(homeInteraction).every(([key, value]) => key === 'horizontalOverflow' ? value === false : value === true)) throw new Error(`Home interaction smoke failed: ${JSON.stringify(homeInteraction)}`);
+    if (!Object.entries(homeInteraction).every(([key, value]) => key === 'horizontalOverflow' ? value === false : key === 'bottomTextSpread' ? value <= 2 : value === true)) throw new Error(`Home interaction smoke failed: ${JSON.stringify(homeInteraction)}`);
     console.log(`WORKBENCH_HOME_INTERACTION_OK ${JSON.stringify(homeInteraction)}`);
     await captureStablePage(process.env.WORKBENCH_HOME_FAST_OUTPUT);
     window.destroy();
@@ -140,7 +158,7 @@ app.whenReady().then(async () => {
     const behavior = await window.webContents.executeJavaScript(`
       (async () => {
         const waitForAnimation = async (dialog, duration) => {
-          for (let attempt = 0; attempt < 15; attempt += 1) {
+          for (let attempt = 0; attempt < 40; attempt += 1) {
             if (dialog.getAnimations().some((animation) => animation.effect?.getTiming().duration === duration)) return true;
             await new Promise((resolve) => setTimeout(resolve, 10));
           }
@@ -205,10 +223,14 @@ app.whenReady().then(async () => {
         scroll.dispatchEvent(new WheelEvent('wheel', { deltaY: -100, ctrlKey: true, bubbles: true, cancelable: true }));
         const zoomLabel = document.getElementById('noteZoomLabel').textContent;
         const pageDuration = getComputedStyle(document.documentElement).getPropertyValue('--motion-duration-page').trim();
-        return { homeMorphsFromCard, homeMorphsBackToCard, morphsFromCard, morphsBackToCard, openingDuration: openingMorph?.effect?.getTiming().duration || null, openingTransforms: openingKeyframes.map((frame) => frame.transform), closedBeforeReopen, closedAfterReopen, infiniteDocumentScrolls, continued, indented, outdented, smallHeaderClear, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, zoomLabel, pageDuration };
+        editor.innerHTML += '<p>Ctrl Enter 保存验证</p>';
+        dialog.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', ctrlKey: true, bubbles: true, cancelable: true }));
+        for (let attempt = 0; attempt < 20 && dialog.open; attempt += 1) await new Promise((resolve) => setTimeout(resolve, 50));
+        const ctrlEnterSaved = !dialog.open && document.querySelector('#notesGrid .note-card')?.innerText.includes('Ctrl Enter 保存验证');
+        return { homeMorphsFromCard, homeMorphsBackToCard, morphsFromCard, morphsBackToCard, openingDuration: openingMorph?.effect?.getTiming().duration || null, openingTransforms: openingKeyframes.map((frame) => frame.transform), closedBeforeReopen, closedAfterReopen, infiniteDocumentScrolls, continued, indented, outdented, ctrlEnterSaved, smallHeaderClear, enterHtml, indentHtml, outdentHtml, indentSelection, paperRadius, zoomLabel, pageDuration };
       })()
     `);
-    if (!behavior.homeMorphsFromCard || !behavior.homeMorphsBackToCard || !behavior.morphsFromCard || !behavior.morphsBackToCard || !behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.infiniteDocumentScrolls || !behavior.continued || !behavior.indented || !behavior.outdented || !behavior.smallHeaderClear || behavior.paperRadius !== '0px' || behavior.zoomLabel !== '110%' || behavior.pageDuration !== '360ms') {
+    if (!behavior.homeMorphsFromCard || !behavior.homeMorphsBackToCard || !behavior.morphsFromCard || !behavior.closedBeforeReopen || !behavior.closedAfterReopen || !behavior.infiniteDocumentScrolls || !behavior.continued || !behavior.indented || !behavior.outdented || !behavior.ctrlEnterSaved || !behavior.smallHeaderClear || behavior.paperRadius !== '0px' || behavior.zoomLabel !== '110%' || behavior.pageDuration !== '360ms') {
       throw new Error(`Note behavior smoke failed: ${JSON.stringify(behavior)}`);
     }
     console.log(`WORKBENCH_NOTE_BEHAVIOR_OK ${JSON.stringify(behavior)}`);
@@ -375,7 +397,7 @@ app.whenReady().then(async () => {
       activate('schedule');
       activate('home');
       await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      const selector = '.home-progress-strip, .home-next-event-card, .home-today-items-card, .home-attendance-card, .home-schedule-panel, .home-focus-timer, .latest-notes-panel, .home-job-panel';
+      const selector = '.home-progress-strip, .home-next-event-card, .home-today-items-card, .home-countdown-card, .home-attendance-card, .home-schedule-panel, .home-focus-timer, .latest-notes-panel, .home-job-panel';
       const cards = [...document.querySelectorAll(selector)];
       const firstWaves = cards.map((card) => Number(card.style.getPropertyValue('--home-enter-wave')));
       const firstReplay = document.querySelector('[data-page="home"]').classList.contains('home-entering');
@@ -399,7 +421,7 @@ app.whenReady().then(async () => {
       };
     })()
   `);
-  if (homeMotionResult.cardCount !== 8 || !homeMotionResult.firstReplay || !homeMotionResult.repeatedReplay || !homeMotionResult.scheduleRestoresOpacity || !homeMotionResult.diagonalWaves || !homeMotionResult.waveCoordinatesMatch) {
+  if (homeMotionResult.cardCount !== 9 || !homeMotionResult.firstReplay || !homeMotionResult.repeatedReplay || !homeMotionResult.scheduleRestoresOpacity || !homeMotionResult.diagonalWaves || !homeMotionResult.waveCoordinatesMatch) {
     throw new Error(`Home motion smoke failed: ${JSON.stringify(homeMotionResult)}`);
   }
   console.log(`HOME_MOTION_SMOKE_OK ${JSON.stringify(homeMotionResult)}`);
@@ -408,6 +430,7 @@ app.whenReady().then(async () => {
       const addButton = document.getElementById('addButton');
       const dialog = document.getElementById('addDialog');
       const minimizeRemoved = document.getElementById('hideButton') === null;
+      const dailyPromptSuppressed = !document.getElementById('dailyPlanDialog').open;
 
       addButton.click();
       const openedForCancel = dialog.open;
@@ -425,7 +448,7 @@ app.whenReady().then(async () => {
       const settingsIsNotDialog = settingsPage.tagName === 'SECTION' && !settingsPage.matches('dialog');
       document.querySelector('[data-workbench-page="home"]').click();
 
-      return { minimizeRemoved, openedForCancel, closedByCancel, openedForClose, closedByClose, settingsPageVisible, settingsIsNotDialog };
+      return { minimizeRemoved, dailyPromptSuppressed, openedForCancel, closedByCancel, openedForClose, closedByClose, settingsPageVisible, settingsIsNotDialog };
     })()
   `);
   if (!Object.values(dialogResult).every(Boolean)) {
@@ -741,8 +764,9 @@ app.whenReady().then(async () => {
         window.scrollTo(0, 0);
         const localKey = (date) => [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'), String(date.getDate()).padStart(2, '0')].join('-');
         const today = new Date();
-        const twoDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 2);
-        const fiveDaysLater = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 5);
+        const monday = new Date(today);
+        monday.setDate(today.getDate() - ((today.getDay() || 7) - 1));
+        const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
         const boardDates = [...document.querySelectorAll('#scheduleBoard .schedule-board-column')].map((column) => column.dataset.boardDate);
         const firstDateBeforeMove = boardDates[0];
         document.getElementById('nextDayButton').click();
@@ -756,6 +780,16 @@ app.whenReady().then(async () => {
           && document.querySelector('#scheduleBoard .schedule-board-column')?.dataset.boardDate === firstDateBeforeMove;
         const shellRect = document.querySelector('.schedule-board-shell').getBoundingClientRect();
         const cards = [...document.querySelectorAll('#scheduleBoard .schedule-board-card')];
+        const scheduleShell = document.querySelector('.schedule-board-shell');
+        const initialTrackHeight = document.querySelector('.schedule-time-track').getBoundingClientRect().height;
+        scheduleShell.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, ctrlKey: true, deltaY: -100, clientY: shellRect.top + 300 }));
+        await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+        const zoomedTrackHeight = document.querySelector('.schedule-time-track').getBoundingClientRect().height;
+        const halfHourScaleVisible = getComputedStyle(document.querySelector('.schedule-time-axis .is-half-hour')).display !== 'none';
+        const adaptiveCardDensity = [...document.querySelectorAll('.schedule-board-card.is-timed')].every((card) => card.matches('.is-brief, .is-compact-block, .is-expanded-block'));
+        const scheduleScrollbarHidden = getComputedStyle(scheduleShell).scrollbarWidth === 'none';
+        scheduleShell.scrollTop = 120;
+        const scheduleStillScrollable = scheduleShell.scrollHeight > scheduleShell.clientHeight && scheduleShell.scrollTop > 0;
         const intersectsBoard = cards.some((card) => {
           const rect = card.getBoundingClientRect();
           const style = getComputedStyle(card);
@@ -765,7 +799,7 @@ app.whenReady().then(async () => {
         document.getElementById('addScheduleButton').click();
         const scheduleDialog = document.getElementById('scheduleDialog');
         const taskKindDefault = document.querySelector('input[name="scheduleEntryKind"][value="task"]').checked;
-        const kindChoicesVisible = !document.getElementById('scheduleEntryKindField').hidden;
+        const kindChoicesHidden = document.getElementById('scheduleEntryKindField').hidden;
         const draftTitle = document.getElementById('scheduleTitle');
         draftTitle.value = '后天上午十点整理草稿';
       scheduleDialog.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -798,10 +832,6 @@ app.whenReady().then(async () => {
           && Math.abs(startTimeRect.height - endTimeRect.height) <= 1
           && parseFloat(getComputedStyle(scheduleStartTime).borderRadius) >= 12
           && getComputedStyle(scheduleStartTime).fontVariantNumeric.includes('tabular-nums');
-        const eventKind = document.querySelector('input[name="scheduleEntryKind"][value="event"]');
-        eventKind.checked = true;
-        eventKind.dispatchEvent(new Event('change', { bubbles: true }));
-        document.getElementById('scheduleRepeatDailyInput').checked = true;
         scheduleTitle.value = '明天上午八点去采样，下午五点去洗澡';
         scheduleTitle.dispatchEvent(new Event('input', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 360));
@@ -812,25 +842,53 @@ app.whenReady().then(async () => {
         const allDayCompact = allDayInputRect.width <= 20 && allDayInputRect.height <= 20 && allDayRowRect.height <= 48;
         document.getElementById('saveScheduleButton').click();
         await new Promise((resolve) => setTimeout(resolve, 80));
+        const multiSaved = document.body.dataset.savedScheduleCount === '2';
+        const dragCard = document.querySelector('#scheduleBoard .schedule-board-card[data-schedule-start]');
+        const sourceColumn = dragCard?.closest('[data-board-date]');
+        const boardColumns = [...document.querySelectorAll('#scheduleBoard [data-board-date]')];
+        const dragBoardDates = boardColumns.map((column) => column.dataset.boardDate);
+        const sourceIndex = boardColumns.indexOf(sourceColumn);
+        const targetColumn = sourceIndex > 0 ? boardColumns[sourceIndex - 1] : boardColumns[sourceIndex + 1];
+        let dragMovesSchedule = false;
+        let dragKeepsVisibleDateRange = false;
+        if (dragCard && targetColumn) {
+          const transfer = new DataTransfer();
+          dragCard.dispatchEvent(new DragEvent('dragstart', { bubbles: true, dataTransfer: transfer }));
+          targetColumn.dispatchEvent(new DragEvent('dragover', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+          targetColumn.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: transfer }));
+          await new Promise((resolve) => setTimeout(resolve, 80));
+          const moved = JSON.parse(document.body.dataset.lastSavedSchedule || '{}');
+          dragMovesSchedule = localKey(new Date(moved.startAt)) === targetColumn.dataset.boardDate
+            && Date.parse(moved.endAt) > Date.parse(moved.startAt);
+          dragKeepsVisibleDateRange = [...document.querySelectorAll('#scheduleBoard [data-board-date]')].map((column) => column.dataset.boardDate).join('|') === dragBoardDates.join('|');
+        }
         const result = {
           pageVisible: !document.querySelector('[data-page="schedule"]').hidden,
           todayPanelRemoved: !document.querySelector('.schedule-today-panel'),
           dayColumns: document.querySelectorAll('#scheduleBoard .schedule-board-column').length,
-          centeredEightDays: boardDates[0] === localKey(twoDaysAgo) && boardDates[2] === localKey(today) && boardDates[7] === localKey(fiveDaysLater),
+          fixedCalendarWeek: boardDates[0] === localKey(monday) && boardDates[6] === localKey(sunday),
           directionalAnimationRunning,
           directionalDateChange,
           scheduleCards: cards.length,
           intersectsBoard,
+          ctrlWheelZooms: zoomedTrackHeight > initialTrackHeight,
+          halfHourScaleVisible,
+          adaptiveCardDensity,
+          scheduleScrollbarHidden,
+          scheduleStillScrollable,
           closePreserved,
           closeRestored,
           backdropPreserved,
           backdropRestored,
           cancelDiscarded,
           taskKindDefault,
-          kindChoicesVisible,
+          kindChoicesHidden,
           multiPreview,
-          multiSaved: document.body.dataset.savedScheduleCount === '2',
-          dailyRepeatSaved: JSON.parse(document.body.dataset.lastSavedSchedule || '{}').repeat === 'daily',
+          multiSaved,
+          autoLinkedTodos: [...document.querySelectorAll('#scheduleBoard .schedule-card-linked-todo')].length >= 1,
+          draggableCards: [...document.querySelectorAll('#scheduleBoard .schedule-board-card')].every((card) => card.draggable && Boolean(card.dataset.scheduleStart)),
+          dragMovesSchedule,
+          dragKeepsVisibleDateRange,
           endFollowsStart,
           endWrapsMidnight,
           timeFieldsPolished,
@@ -846,7 +904,7 @@ app.whenReady().then(async () => {
         return result;
       })()
     `);
-    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 8 || !scheduleResult.centeredEightDays || !scheduleResult.directionalAnimationRunning || !scheduleResult.directionalDateChange || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.taskKindDefault || !scheduleResult.kindChoicesVisible || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.dailyRepeatSaved || !scheduleResult.endFollowsStart || !scheduleResult.endWrapsMidnight || !scheduleResult.timeFieldsPolished || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
+    if (!scheduleResult.pageVisible || !scheduleResult.todayPanelRemoved || scheduleResult.dayColumns !== 7 || !scheduleResult.fixedCalendarWeek || !scheduleResult.directionalAnimationRunning || !scheduleResult.directionalDateChange || scheduleResult.scheduleCards < 2 || !scheduleResult.intersectsBoard || !scheduleResult.ctrlWheelZooms || !scheduleResult.halfHourScaleVisible || !scheduleResult.adaptiveCardDensity || !scheduleResult.scheduleScrollbarHidden || !scheduleResult.scheduleStillScrollable || !scheduleResult.closePreserved || !scheduleResult.closeRestored || !scheduleResult.backdropPreserved || !scheduleResult.backdropRestored || !scheduleResult.cancelDiscarded || !scheduleResult.taskKindDefault || !scheduleResult.kindChoicesHidden || !scheduleResult.multiPreview || !scheduleResult.multiSaved || !scheduleResult.autoLinkedTodos || !scheduleResult.draggableCards || !scheduleResult.dragMovesSchedule || !scheduleResult.dragKeepsVisibleDateRange || !scheduleResult.endFollowsStart || !scheduleResult.endWrapsMidnight || !scheduleResult.timeFieldsPolished || !scheduleResult.draftClearedAfterSave || !scheduleResult.modalScrollbarHidden || !scheduleResult.allDayCompact || scheduleResult.horizontalOverflow) {
       throw new Error(`Workbench schedule smoke failed: ${JSON.stringify(scheduleResult)}`);
     }
     console.log(`WORKBENCH_SCHEDULE_OK ${JSON.stringify(scheduleResult)}`);
@@ -944,8 +1002,11 @@ app.whenReady().then(async () => {
             const card = document.querySelector('.home-attendance-card').getBoundingClientRect();
             return button.left > status.left && button.right <= card.right && button.top >= card.top && button.bottom <= card.bottom;
           })(),
-          todoCardLarger: (document.querySelector('.home-today-items-card')?.getBoundingClientRect().width || 0)
-            > (document.querySelector('.home-next-event-card')?.getBoundingClientRect().width || 0),
+          countdownCardProminent: (() => {
+            const countdownWidth = document.querySelector('.home-countdown-card')?.getBoundingClientRect().width || 0;
+            const referenceWidth = document.querySelector('.home-next-event-card')?.getBoundingClientRect().width || 1;
+            return countdownWidth / referenceWidth >= .57 && countdownWidth / referenceWidth <= .65;
+          })(),
           commandCardsTopAligned: commandCards.every((card) => Math.abs(card.top - commandCards[0].top) <= 1),
           commandRowCompact: command.bottom - command.top <= (innerHeight > 900 ? 156 : innerHeight > 760 ? 138 : 126),
           allHomeMatricesHaveNoOuterShadow: [
@@ -993,7 +1054,7 @@ app.whenReady().then(async () => {
             && content.top - focus.bottom >= 10,
           homeColumnsAligned: Math.abs(focus.left - content.left) <= 1
             && Math.abs(focus.right - content.right) <= 1,
-          commandCardsAligned: commandCards.length === 3
+          commandCardsAligned: commandCards.length === 4
             && commandCards.every((card) => Math.abs(card.top - commandCards[0].top) <= 1),
           fourDayMatrix: (() => {
             const cards = [...document.querySelectorAll('#homeDayOverview .day-card')];
@@ -1065,6 +1126,16 @@ app.whenReady().then(async () => {
         });
         const midnightBar = [...document.querySelectorAll('#attendanceGanttRows .attendance-bar')]
           .find((bar) => bar.textContent.includes('18:00–24:00'));
+        const attendanceBars = [...document.querySelectorAll('#attendanceGanttRows .attendance-bar')];
+        const weekdayToneClasses = attendanceBars.every((bar) => [...bar.classList].some((name) => /^attendance-day-tone-[0-6]$/.test(name)));
+        const toneProbe = document.createElement('div');
+        toneProbe.className = 'attendance-page';
+        toneProbe.style.cssText = 'position:fixed;left:-9999px;top:-9999px';
+        toneProbe.innerHTML = Array.from({ length: 7 }, (_, index) => '<i class="attendance-bar attendance-day-tone-' + index + '"></i>').join('');
+        document.body.append(toneProbe);
+        const weekdayToneColors = [...toneProbe.children].map((bar) => getComputedStyle(bar).backgroundImage);
+        const weekdayTonesDistinct = new Set(weekdayToneColors).size === 7;
+        toneProbe.remove();
         const midnightReachesDayEnd = Boolean(midnightBar) && (() => {
           const track = midnightBar.parentElement.getBoundingClientRect();
           const rect = midnightBar.getBoundingClientRect();
@@ -1077,6 +1148,9 @@ app.whenReady().then(async () => {
           usageGrowRunning,
           ganttRows: document.querySelectorAll('#attendanceGanttRows .attendance-gantt-row').length,
           ganttBars: document.querySelectorAll('#attendanceGanttRows .attendance-bar').length,
+          weekdayToneClasses,
+          weekdayTonesDistinct,
+          weekdayToneColors,
           ganttScaleAccurate,
           midnightReachesDayEnd,
           appRows: document.querySelectorAll('#focusUsageList .focus-usage-row').length,
@@ -1090,7 +1164,7 @@ app.whenReady().then(async () => {
     const usageWidthsAreProportional = usagePixelWidths.length < 2
       || Math.max(...usagePixelWidths) - Math.min(...usagePixelWidths) >= 8;
     const usageColorsAreDistinct = attendanceResult.usageColors.length < 2 || new Set(attendanceResult.usageColors).size > 1;
-    if (!attendanceResult.pageVisible || !attendanceResult.attendanceEntering || !attendanceResult.ganttGrowRunning || !attendanceResult.usageGrowRunning || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 3 || !attendanceResult.ganttScaleAccurate || !attendanceResult.midnightReachesDayEnd || attendanceResult.appRows < 1 || !usageWidthsAreProportional || !usageColorsAreDistinct || attendanceResult.horizontalOverflow) {
+    if (!attendanceResult.pageVisible || !attendanceResult.attendanceEntering || !attendanceResult.ganttGrowRunning || !attendanceResult.usageGrowRunning || attendanceResult.ganttRows !== 7 || attendanceResult.ganttBars < 3 || !attendanceResult.weekdayToneClasses || !attendanceResult.weekdayTonesDistinct || !attendanceResult.ganttScaleAccurate || !attendanceResult.midnightReachesDayEnd || attendanceResult.appRows < 1 || !usageWidthsAreProportional || !usageColorsAreDistinct || attendanceResult.horizontalOverflow) {
       throw new Error(`Workbench attendance smoke failed: ${JSON.stringify(attendanceResult)}`);
     }
     console.log(`WORKBENCH_ATTENDANCE_OK ${JSON.stringify(attendanceResult)}`);
@@ -1256,6 +1330,11 @@ app.whenReady().then(async () => {
         const labeledFilters = document.querySelector('#jobStatusFilter option[value="all"]')?.textContent === '状态：不限'
           && document.querySelector('#jobPriorityFilter option[value="all"]')?.textContent === '优先级：不限'
           && document.querySelector('#jobCityFilter option[value="all"]')?.textContent === '城市：不限';
+        const filterControls = [...document.querySelector('.job-compact-filters').children].slice(0, 5);
+        const filterTops = filterControls.map((control) => Math.round(control.getBoundingClientRect().top));
+        const filtersStaySingleLine = filterControls.every((control) => control.getBoundingClientRect().height <= 34)
+          && Math.max(...filterTops) - Math.min(...filterTops) <= 1
+          && document.getElementById('jobSortFilter').getBoundingClientRect().width >= 136;
         const gearIcon = (document.querySelector('#jobSettingsButton path')?.getAttribute('d') || '').includes('12.2 2h-.4');
         const separateExportButtons = document.getElementById('exportJobsButton')?.textContent.trim() === '导出数据'
           && document.getElementById('exportJobsImageButton')?.textContent.trim() === '导出图片';
@@ -1278,6 +1357,18 @@ app.whenReady().then(async () => {
         inlineStatus.dispatchEvent(new Event('change', { bubbles: true }));
         await new Promise((resolve) => setTimeout(resolve, 100));
         const inlineSaved = document.querySelector('[data-job-id="job-submitted-1"][data-job-field="status"]')?.value === 'closed';
+        const orderedRowsAfterClose = [...document.querySelectorAll('#jobBoard .job-position')];
+        const orderedStatusesAfterClose = orderedRowsAfterClose.map((row) => row.querySelector('[data-job-field="status"]')?.value);
+        const firstClosedIndex = orderedStatusesAfterClose.indexOf('closed');
+        const closedJobsAtBottom = firstClosedIndex >= 0
+          && orderedStatusesAfterClose.slice(0, firstClosedIndex).every((status) => status !== 'closed')
+          && orderedStatusesAfterClose.slice(firstClosedIndex).every((status) => status === 'closed');
+        const closedDivider = document.querySelector('.job-closed-divider');
+        const closedDividerVisible = Boolean(closedDivider) && closedDivider.getBoundingClientRect().height >= 28;
+        const closedRow = document.querySelector('.job-position.job-row-status-closed');
+        const closedStatusSelect = closedRow?.querySelector('.job-status-cell select');
+        const closedStatusBackground = closedStatusSelect ? getComputedStyle(closedStatusSelect).backgroundColor : '';
+        const closedRowStyled = Boolean(closedRow) && closedStatusBackground !== getComputedStyle(document.querySelector('.job-row-status-active .job-status-cell select')).backgroundColor;
         const statusFilter = document.getElementById('jobStatusFilter');
         statusFilter.value = 'closed';
         statusFilter.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1323,7 +1414,7 @@ app.whenReady().then(async () => {
         const savedStageNames = [...document.querySelector('[data-job-id="job-written-1"]')?.querySelectorAll('.job-flow-name') || []].map((node) => node.textContent);
         const savedWorkflow = savedStageNames.includes('测评') && savedStageNames.includes('三面');
         const pinRowsBefore = [...document.querySelectorAll('#jobBoard .job-position')];
-        const pinTarget = pinRowsBefore.at(-1);
+        const pinTarget = pinRowsBefore.find((row) => row.querySelector('[data-job-field="status"]')?.value !== 'closed' && !row.classList.contains('is-pinned'));
         const pinTargetId = pinTarget?.dataset.jobId;
         pinTarget?.querySelector('[data-toggle-job-pin]')?.click();
         await new Promise((resolve) => setTimeout(resolve, 100));
@@ -1362,6 +1453,7 @@ app.whenReady().then(async () => {
           metricsCompact,
           headerColumns,
           labeledFilters,
+          filtersStaySingleLine,
           gearIcon,
           separateExportButtons,
           quickFiltersRendered,
@@ -1370,6 +1462,10 @@ app.whenReady().then(async () => {
           editorStageCount,
           added,
           inlineSaved,
+          closedJobsAtBottom,
+          closedDividerVisible,
+          closedRowStyled,
+          closedStatusBackground,
           filterWorks,
           combinedFilterWorks,
           standardStageOptions,
@@ -1384,10 +1480,11 @@ app.whenReady().then(async () => {
         };
       })()
     `);
-    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.identicalBroadcastKeepsRows || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.labeledFilters || !jobsResult.gearIcon || !jobsResult.separateExportButtons || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.pinnedFirst || !jobsResult.pinPersisted || !jobsResult.pinDividerVisible || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
+    if (!jobsResult.pageVisible || jobsResult.initialRows < 6 || !jobsResult.identicalBroadcastKeepsRows || !jobsResult.deferredPending || !jobsResult.deferredRevealed || !jobsResult.dynamicWorkflow || !jobsResult.railHasCurrent || !jobsResult.emptyWorkflowNodes || !jobsResult.alignedEndpoints || !jobsResult.rowAnatomy || !jobsResult.priorityDots || !jobsResult.compactInlineControls || !jobsResult.readableTypography || !jobsResult.tableShellNoOuterShadow || !jobsResult.noLegacyStatusOptions || !jobsResult.metricsRendered || !jobsResult.metricsCompact || !jobsResult.headerColumns || !jobsResult.labeledFilters || !jobsResult.filtersStaySingleLine || !jobsResult.gearIcon || !jobsResult.separateExportButtons || !jobsResult.quickFiltersRendered || !jobsResult.headerCreateOnly || !jobsResult.detailEditorOpens || jobsResult.editorStageCount < 7 || !jobsResult.added || !jobsResult.inlineSaved || !jobsResult.closedJobsAtBottom || !jobsResult.closedDividerVisible || !jobsResult.closedRowStyled || !jobsResult.filterWorks || !jobsResult.combinedFilterWorks || jobsResult.standardStageOptions !== 7 || !jobsResult.selectableStagesWork || !jobsResult.editableStageOrder || !jobsResult.savedWorkflow || !jobsResult.pinnedFirst || !jobsResult.pinPersisted || !jobsResult.pinDividerVisible || !jobsResult.homeSummary || jobsResult.horizontalOverflow) {
       throw new Error(`Workbench jobs smoke failed: ${JSON.stringify(jobsResult)}`);
     }
     console.log(`WORKBENCH_JOBS_OK ${JSON.stringify(jobsResult)}`);
+    await window.webContents.executeJavaScript(`document.querySelector('#jobBoard .job-position:last-of-type')?.scrollIntoView({ block: 'center' })`);
     await new Promise((resolve) => setTimeout(resolve, 180));
     await captureStablePage(process.env.WORKBENCH_JOBS_OUTPUT);
   }
@@ -1410,6 +1507,10 @@ app.whenReady().then(async () => {
         const priorityRendered = document.getElementById('parseResult').textContent.includes('最高优先级');
         const dailyRepeatRendered = document.getElementById('parseResult').textContent.includes('每天重复');
         const highlighted = document.querySelectorAll('#captureHighlights mark').length >= 2;
+        editor.value = '今天下午一点去找赵博';
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+        await new Promise((resolve) => setTimeout(resolve, 180));
+        const completeChineseTimeHighlight = [...document.querySelectorAll('#captureHighlights mark')].some((mark) => mark.textContent === '今天下午一点');
         document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Tab' }));
         const switchedToNote = document.querySelector('[data-mode="note"]').classList.contains('active');
         document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Tab' }));
@@ -1446,7 +1547,7 @@ app.whenReady().then(async () => {
         const singleSurface = card.left === 0 && card.top === 0 && card.right === innerWidth && card.bottom === innerHeight;
         const transparentRoot = getComputedStyle(document.body).backgroundColor === 'rgba(0, 0, 0, 0)'
           && getComputedStyle(document.body).backgroundImage === 'none';
-        return { compositionPreserved, priorityRendered, dailyRepeatRendered, highlighted, switchedToNote, switchedBackToItem, numberedEnterContinues, dailyRepeatSubmitted, escapeCleared, escapeClosed, emptyBlurClosed, singleSurface, transparentRoot };
+        return { compositionPreserved, priorityRendered, dailyRepeatRendered, highlighted, completeChineseTimeHighlight, switchedToNote, switchedBackToItem, numberedEnterContinues, dailyRepeatSubmitted, escapeCleared, escapeClosed, emptyBlurClosed, singleSurface, transparentRoot };
       })()
     `);
     if (!Object.values(captureResult).every(Boolean)) throw new Error(`Workbench capture smoke failed: ${JSON.stringify(captureResult)}`);

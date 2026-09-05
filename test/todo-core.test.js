@@ -6,9 +6,11 @@ const {
   completeTodo,
   filterTodos,
   isOverdue,
+  needsOverdueNotification,
   normalizeTodo,
   parseNaturalLanguageTodo,
   saveTodo,
+  snoozeTodo,
   sortTodos
 } = require('../src/todo-core');
 
@@ -49,7 +51,7 @@ test('parses a bare day-of-month followed by an evening day part', () => {
   assert.ok(parsed.matches.some((match) => match.text === '晚上'));
 });
 
-test('natural language without a date becomes an inbox todo without a reminder', () => {
+test('natural language without a date stays untimed for today without a reminder', () => {
   const parsed = parseNaturalLanguageTodo('整理实验记录', base);
   assert.equal(parsed.valid, true);
   assert.equal(parsed.title, '整理实验记录');
@@ -90,7 +92,7 @@ test('saves and completes todos while preserving the stable id', () => {
   assert.equal(completed.completedAt, '2026-08-22T04:00:00.000Z');
 });
 
-test('filters today, inbox, upcoming and completed views', () => {
+test('filters untimed todos into today and keeps the legacy inbox view compatible', () => {
   const todos = [
     normalizeTodo({ id: 'overdue', title: '逾期', status: 'open', dueAt: '2026-08-21T09:00:00.000Z', priority: 'high' }),
     normalizeTodo({ id: 'today', title: '今天', status: 'open', dueAt: '2026-08-22T07:00:00.000Z' }),
@@ -98,8 +100,8 @@ test('filters today, inbox, upcoming and completed views', () => {
     normalizeTodo({ id: 'future', title: '未来', status: 'open', dueAt: '2026-08-25T16:00:00.000Z' }),
     normalizeTodo({ id: 'done', title: '完成', status: 'completed', completedAt: '2026-08-22T08:00:00.000Z' })
   ];
-  assert.deepEqual(filterTodos(todos, { view: 'today', now: base }).map((todo) => todo.id), ['overdue', 'today']);
-  assert.deepEqual(filterTodos(todos, { view: 'inbox', now: base }).map((todo) => todo.id), ['inbox']);
+  assert.deepEqual(filterTodos(todos, { view: 'today', now: base }).map((todo) => todo.id), ['overdue', 'today', 'inbox']);
+  assert.deepEqual(filterTodos(todos, { view: 'inbox', now: base }).map((todo) => todo.id), ['overdue', 'today', 'inbox']);
   assert.deepEqual(filterTodos(todos, { view: 'upcoming', now: base }).map((todo) => todo.id), ['future']);
   assert.deepEqual(filterTodos(todos, { view: 'completed', now: base, showAllCompleted: true }).map((todo) => todo.id), ['done']);
 });
@@ -112,4 +114,18 @@ test('sorts overdue items before priority and due date ties', () => {
   ];
   assert.deepEqual(sortTodos(todos, base).map((todo) => todo.id), ['overdue', 'high', 'low']);
   assert.equal(isOverdue(todos[2], base), true);
+});
+
+test('snoozes an overdue todo and allows one new overdue notification afterward', () => {
+  const todo = normalizeTodo({
+    id: 'overdue-snooze',
+    title: '提交修改稿',
+    status: 'open',
+    dueAt: '2026-08-22T09:00:00.000Z',
+    overdueNotifiedAt: '2026-08-22T09:01:00.000Z'
+  });
+  const snoozed = snoozeTodo(todo, 10 * 60_000, '2026-08-22T10:00:00.000Z');
+  assert.equal(snoozed.overdueNotifiedAt, null);
+  assert.equal(needsOverdueNotification(snoozed, '2026-08-22T10:05:00.000Z'), false);
+  assert.equal(needsOverdueNotification(snoozed, '2026-08-22T10:10:00.000Z'), true);
 });

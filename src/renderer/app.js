@@ -13,7 +13,6 @@ const state = {
   addMode: 'link',
   viewMode: 'all',
   searchQuery: '',
-  selectedPaperId: null,
   expandedIds: new Set(),
   settingsSection: 'general',
   lastInputWasKeyboard: false,
@@ -22,13 +21,10 @@ const state = {
 
 const elements = {
   paperList: document.getElementById('paperList'),
-  paperDetail: document.getElementById('paperDetail'),
   emptyState: document.getElementById('emptyState'),
   emptyTitle: document.querySelector('#emptyState h3'),
   emptyDescription: document.querySelector('#emptyState p'),
   paperCount: document.getElementById('paperCount'),
-  reviewPaperCount: document.getElementById('reviewPaperCount'),
-  productionPaperCount: document.getElementById('productionPaperCount'),
   navPaperCount: document.getElementById('navPaperCount'),
   updateCount: document.getElementById('updateCount'),
   notificationCount: document.getElementById('notificationCount'),
@@ -193,14 +189,10 @@ function renderStats() {
   const active = state.papers.filter((paper) => !paper.archivedAt);
   const archived = state.papers.filter((paper) => paper.archivedAt);
   const unread = state.papers.reduce((sum, paper) => sum + (Number(paper.unreadCount) || 0), 0);
-  const production = active.filter((paper) => paper.kind === 'production' || paper.source === 'elsevier-production');
-  const attention = active.filter((paper) => (Number(paper.unreadCount) || 0) > 0 || paper.needsAction || paper.urgentTask).length;
   elements.paperCount.textContent = String(active.length);
-  elements.reviewPaperCount.textContent = String(active.length - production.length);
-  elements.productionPaperCount.textContent = String(production.length);
   elements.navPaperCount.textContent = String(active.length);
   elements.archivedCount.textContent = String(archived.length);
-  elements.updateCount.textContent = String(attention);
+  elements.updateCount.textContent = String(unread);
   elements.notificationCount.textContent = String(unread);
   elements.notificationCount.title = `${unread} 条未读重要更新`;
   const successes = state.papers.map((paper) => paper.lastSuccessfulAt).filter(Boolean).sort().reverse();
@@ -423,22 +415,6 @@ function renderPaper(paper) {
   </article>`;
 }
 
-function renderPaperRow(paper) {
-  const production = paper.kind === 'production' || paper.source === 'elsevier-production';
-  const selected = paper.id === state.selectedPaperId;
-  const unread = Number(paper.unreadCount) || 0;
-  const reference = paper.details?.manuscriptId || paper.articleReference || (production ? '出版追踪' : `Revision ${paper.latestRevision || 1}`);
-  return `<article class="submission-row${selected ? ' is-selected' : ''}${unread ? ' has-update' : ''}" data-paper-id="${escapeHtml(paper.id)}" data-paper-select tabindex="0" role="option" aria-selected="${selected}">
-    <div class="submission-row-paper"><span class="source-icon">${production ? 'P' : 'E'}</span><div><strong>${escapeHtml(paper.title)}</strong><small>${escapeHtml(paper.journal || '期刊未记录')} · ${escapeHtml(reference)}</small></div></div>
-    <div class="submission-row-status"><span class="status-badge tone-${escapeHtml(paper.status.tone)}">${escapeHtml(paper.status.label)}</span>${unread ? `<small>${unread} 条新更新</small>` : ''}</div>
-    <time>${daysSince(paper.observedStageStartedAt)} 天</time>
-  </article>`;
-}
-
-function renderPaperDetailEmpty() {
-  return '<div class="submission-detail-empty"><span>稿</span><strong>选择一篇稿件</strong><p>在左侧列表中选择稿件后，这里会显示状态、资料、时间线与操作。</p></div>';
-}
-
 function matchesSearch(paper) {
   const query = state.searchQuery.trim().toLocaleLowerCase('zh-CN');
   if (!query) return true;
@@ -471,14 +447,8 @@ function render() {
   renderStats();
   renderMonitoringStatus();
   const visiblePapers = getVisiblePapers();
-  if (!visiblePapers.some((paper) => paper.id === state.selectedPaperId)) {
-    state.selectedPaperId = visiblePapers[0]?.id || null;
-  }
-  const selectedPaper = visiblePapers.find((paper) => paper.id === state.selectedPaperId) || null;
   elements.paperList.hidden = visiblePapers.length === 0;
-  elements.paperList.innerHTML = visiblePapers.map(renderPaperRow).join('');
-  elements.paperDetail.innerHTML = selectedPaper ? renderPaper(selectedPaper) : renderPaperDetailEmpty();
-  elements.paperDetail.classList.toggle('is-empty', !selectedPaper);
+  elements.paperList.innerHTML = visiblePapers.map(renderPaper).join('');
   elements.emptyState.hidden = visiblePapers.length > 0;
   elements.emptyAddButton.hidden = state.viewMode !== 'all';
   elements.markAllReadButton.hidden = state.viewMode !== 'important' || !visiblePapers.length;
@@ -954,7 +924,7 @@ function populateSettings() {
   document.getElementById('widgetShowSchedules').checked = settings.widgetShowSchedules !== false;
   document.getElementById('widgetShowTodos').checked = settings.widgetShowTodos !== false;
   document.querySelectorAll('input[name="appearanceTheme"]').forEach((input) => { input.checked = input.value === (settings.appearanceTheme || 'liquid-glass'); });
-  document.querySelectorAll('input[name="homeBannerImageMode"]').forEach((input) => { input.checked = input.value === (settings.homeBannerImageMode || 'default'); });
+  document.querySelectorAll('input[name="homeBannerImageMode"]').forEach((input) => { input.checked = input.value === (settings.homeBannerImageMode || 'bing'); });
   document.getElementById('closeToTray').checked = settings.closeToTray;
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
@@ -967,13 +937,13 @@ function populateSettings() {
 }
 
 function syncHomeBannerSettings() {
-  const mode = document.querySelector('input[name="homeBannerImageMode"]:checked')?.value || 'default';
+  const mode = document.querySelector('input[name="homeBannerImageMode"]:checked')?.value || 'bing';
   const hasImage = Boolean(state.settings?.homeBannerImageDataUrl);
   elements.chooseHomeBannerButton.hidden = mode !== 'local';
   elements.refreshBingBannerButton.hidden = mode !== 'bing';
   const status = document.getElementById('homeBannerImageStatus');
   const credit = document.getElementById('homeBannerImageCredit');
-  status.textContent = mode === 'bing' ? (hasImage ? '已缓存必应每日图片' : '尚未获取必应图片') : mode === 'local' ? (hasImage ? '已选择本地图片' : '尚未选择本地图片') : '使用默认柔和背景';
+  status.textContent = mode === 'bing' ? (hasImage ? '已缓存今日必应壁纸' : '等待获取今日必应壁纸') : mode === 'local' ? (hasImage ? '已选择本地图片' : '尚未选择本地图片') : '使用默认柔和背景';
   credit.textContent = mode === 'bing' && state.settings?.homeBannerImageCredit
     ? state.settings.homeBannerImageCredit
     : mode === 'default' ? '不联网，也不读取本地图片' : '图片会保存在研迹的私有缓存中';
@@ -1171,7 +1141,7 @@ async function saveSettings() {
       defaultEventReminderMinutes: document.getElementById('defaultEventReminderMinutes').value === 'null' ? null : Number(document.getElementById('defaultEventReminderMinutes').value),
       defaultTodoReminderMode: document.getElementById('defaultTodoReminderMode').value,
       appearanceTheme: document.querySelector('input[name="appearanceTheme"]:checked')?.value || 'liquid-glass',
-      homeBannerImageMode: document.querySelector('input[name="homeBannerImageMode"]:checked')?.value || 'default',
+      homeBannerImageMode: document.querySelector('input[name="homeBannerImageMode"]:checked')?.value || 'bing',
       todayWidgetEnabled: document.getElementById('todayWidgetEnabled').checked,
       widgetShowSchedules: document.getElementById('widgetShowSchedules').checked,
       widgetShowTodos: document.getElementById('widgetShowTodos').checked,
@@ -1196,18 +1166,11 @@ async function saveSettings() {
 
 async function handlePaperAction(event) {
   const button = event.target.closest('[data-action]');
-  const card = event.target.closest('[data-paper-id]');
+  if (!button) return;
+  const card = button.closest('[data-paper-id]');
   const id = card?.dataset.paperId;
   const paper = state.papers.find((item) => item.id === id);
   if (!paper) return;
-  if (!button) {
-    if (card.matches('[data-paper-select]') && state.selectedPaperId !== id) {
-      state.selectedPaperId = id;
-      render();
-    }
-    return;
-  }
-
   if (button.dataset.action === 'copy-doi') {
     try {
       await api.copyText(button.dataset.copyText);
@@ -1355,16 +1318,6 @@ function bindEvents() {
   elements.refreshAllButton.addEventListener('click', refreshAll);
   elements.markAllReadButton.addEventListener('click', markAllRead);
   elements.paperList.addEventListener('click', handlePaperAction);
-  elements.paperDetail.addEventListener('click', handlePaperAction);
-  elements.paperList.addEventListener('keydown', (event) => {
-    if (!['Enter', ' '].includes(event.key)) return;
-    const row = event.target.closest('[data-paper-select]');
-    if (!row) return;
-    event.preventDefault();
-    state.selectedPaperId = row.dataset.paperId;
-    render();
-    elements.paperList.querySelector(`[data-paper-id="${CSS.escape(state.selectedPaperId)}"]`)?.focus();
-  });
   elements.allNavButton.addEventListener('click', () => { state.viewMode = 'all'; render(); });
   elements.importantNavButton.addEventListener('click', () => { state.viewMode = 'important'; render(); });
   elements.archivedNavButton.addEventListener('click', () => { state.viewMode = 'archived'; render(); });

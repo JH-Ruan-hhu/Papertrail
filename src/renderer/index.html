@@ -76,18 +76,18 @@
               <div class="next-event-content"><strong id="homeNextEventTitle">今天还没有安排</strong><span id="homeNextEventMeta">添加一条日程，让今天有下一步</span></div>
             </article>
             <article class="home-today-card home-today-items-card home-insight-card">
-              <div class="home-insight-grid">
-                <section class="home-activity-section" aria-labelledby="homeActivityTitle">
-                  <div class="home-insight-heading"><div><p class="eyebrow">DOCUMENT ACTIVITY</p><h2 id="homeActivityTitle">近一年文件新增</h2></div><span id="homeActivityTotal">0 篇</span></div>
-                  <div class="home-activity-scroll"><div class="home-activity-heatmap" id="homeActivityHeatmap" role="img" aria-label="近一年笔记文件新增热力图"></div></div>
-                  <div class="home-activity-legend"><span>少</span><i class="level-0"></i><i class="level-1"></i><i class="level-2"></i><i class="level-3"></i><i class="level-4"></i><span>多</span></div>
-                  <div class="home-activity-tooltip" id="homeActivityTooltip" role="status" hidden></div>
-                </section>
-                <section class="home-deadline-section" aria-labelledby="homeDeadlineTitle">
-                  <div class="home-insight-heading"><div><p class="eyebrow">COUNTDOWN</p><h2 id="homeDeadlineTitle">DDL 倒计时</h2></div><button class="home-insight-add" id="addCountdownButton" type="button" aria-label="添加倒计时" title="添加倒计时">＋</button></div>
-                  <div class="home-deadline-matrix" id="homeDeadlineMatrix"></div>
-                </section>
-              </div>
+              <section class="home-activity-section" aria-labelledby="homeActivityTitle">
+                <div class="home-insight-heading"><div><p class="eyebrow">DOCUMENT ACTIVITY</p><h2 id="homeActivityTitle">近一年文件新增</h2></div><span id="homeActivityTotal">0 篇</span></div>
+                <div class="home-activity-scroll"><div class="home-activity-heatmap" id="homeActivityHeatmap" role="img" aria-label="近一年笔记文件新增热力图"></div></div>
+                <div class="home-activity-legend"><span>少</span><i class="level-0"></i><i class="level-1"></i><i class="level-2"></i><i class="level-3"></i><i class="level-4"></i><span>多</span></div>
+                <div class="home-activity-tooltip" id="homeActivityTooltip" role="status" hidden></div>
+              </section>
+            </article>
+            <article class="home-today-card home-countdown-card">
+              <section class="home-deadline-section" aria-labelledby="homeDeadlineTitle">
+                <div class="home-insight-heading"><h2 id="homeDeadlineTitle">倒计时</h2><button class="home-insight-add" id="addCountdownButton" type="button" aria-label="设置倒计时" title="设置倒计时">＋</button></div>
+                <div class="home-deadline-matrix" id="homeDeadlineMatrix"></div>
+              </section>
             </article>
             <article class="home-attendance-card" aria-label="今日打卡">
               <div class="panel-heading"><div><p class="eyebrow">WORK SESSION</p><h2>今日打卡</h2></div><span class="status-dot" aria-hidden="true"></span></div>
@@ -167,7 +167,7 @@
             <div class="page-actions"><button class="button secondary" id="todoQuickCaptureButton" type="button">快速记录</button><button class="button primary" id="addTodoButton" type="button"><span class="plus">＋</span> 新建待办</button></div>
           </header>
           <section class="todo-toolbar" aria-label="待办筛选">
-            <div class="todo-view-tabs" role="tablist"><button class="todo-view-tab active" data-todo-view="today" type="button">今天 <b data-todo-count="today">0</b></button><button class="todo-view-tab" data-todo-view="inbox" type="button">收件箱 <b data-todo-count="inbox">0</b></button><button class="todo-view-tab" data-todo-view="upcoming" type="button">即将到来 <b data-todo-count="upcoming">0</b></button><button class="todo-view-tab" data-todo-view="completed" type="button">已完成 <b data-todo-count="completed">0</b></button><button class="todo-view-tab" data-todo-view="cancelled" type="button">已取消 <b data-todo-count="cancelled">0</b></button></div>
+            <div class="todo-view-tabs" role="tablist"><button class="todo-view-tab active" data-todo-view="today" type="button">今天 <b data-todo-count="today">0</b></button><button class="todo-view-tab" data-todo-view="completed" type="button">已完成 <b data-todo-count="completed">0</b></button><button class="todo-view-tab" data-todo-view="cancelled" type="button">已取消 <b data-todo-count="cancelled">0</b></button></div>
             <label class="search-box todo-search" for="todoSearch"><input id="todoSearch" type="search" placeholder="搜索待办标题或备注" autocomplete="off"><kbd>Ctrl F</kbd></label>
           </section>
           <div id="todoList" class="todo-list" aria-live="polite"></div>
@@ -179,11 +179,11 @@
             <div class="page-actions"><button class="button secondary" id="openScheduleWidgetButton" type="button" title="以 3×4 桌面组件显示当日日程">放到桌面</button><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
           </header>
           <div class="timeline-datebar schedule-weekbar">
-            <button id="previousDayButton" type="button" aria-label="前一天">‹</button>
+            <button id="previousDayButton" type="button" aria-label="上一周">‹</button>
             <div><strong id="timelineDate"></strong><span id="timelineDateSubtitle"></span></div>
-            <button id="nextDayButton" type="button" aria-label="后一天">›</button>
+            <button id="nextDayButton" type="button" aria-label="下一周">›</button>
           </div>
-          <section class="schedule-board-shell" aria-label="八日日程看板">
+          <section class="schedule-board-shell" aria-label="七日日程看板">
             <div class="schedule-board" id="scheduleBoard"></div>
           </section>
         </section>
@@ -248,33 +248,25 @@
             <button class="filter-chip" id="archivedNavButton" type="button">已归档 <b id="archivedCount">0</b></button>
           </div>
 
-        <section class="stats submission-stats" aria-label="稿件统计">
-          <article><div><small>正在追踪</small><strong id="paperCount">0</strong><span>当前活跃稿件</span></div></article>
-          <article><div><small>审稿中</small><strong id="reviewPaperCount">0</strong><span>等待编辑或审稿意见</span></div></article>
-          <article><div><small>出版中</small><strong id="productionPaperCount">0</strong><span>已接收并进入生产</span></div></article>
-          <article class="attention-stat"><div><small>需要关注</small><strong id="updateCount">0</strong><span>未读更新或待办</span></div></article>
+        <section class="stats" aria-label="稿件统计">
+          <article><div><small>正在追踪</small><strong id="paperCount">0</strong></div></article>
+          <article><div><small>未读重要更新</small><strong id="updateCount">0</strong></div></article>
+          <article><div><small>最近成功同步</small><strong id="lastCheck">尚未成功同步</strong></div></article>
         </section>
 
-        <section class="content-section submission-content-section">
+        <section class="content-section">
           <div class="section-heading">
-            <div><h2>常规进行中</h2><p id="listDescription">按待办与最近变化排序</p></div>
+            <div><h2>稿件列表</h2><p id="listDescription">按待办与最近变化排序</p></div>
             <div class="section-tools">
               <span class="live-indicator" id="monitoringStatus"><i></i><span>正在读取监测状态</span></span>
-              <span class="submission-last-sync">最近成功同步 <b id="lastCheck">尚未成功同步</b></span>
               <label class="search-box" for="paperSearch"><input id="paperSearch" type="search" autocomplete="off" placeholder="搜索标题、期刊或生产编号"><kbd>Ctrl K</kbd></label>
             </div>
           </div>
-          <div class="submission-desk-grid">
-            <section class="submission-list-panel" aria-label="稿件列表">
-              <div class="submission-table-head" aria-hidden="true"><span>稿件</span><span>当前状态</span><span>停留时间</span></div>
-              <div id="paperList" class="paper-list" aria-live="polite"></div>
-              <div id="emptyState" class="empty-state">
-                <h3>暂无稿件</h3>
-                <p>目前没有正在追踪的稿件。可通过 Author Hub 链接添加审稿记录，或使用生产稿件编号添加已接收文章。</p>
-                <button class="button primary" id="emptyAddButton" type="button">添加稿件</button>
-              </div>
-            </section>
-            <aside id="paperDetail" class="submission-detail-panel" aria-live="polite" aria-label="当前稿件详情"></aside>
+          <div id="paperList" class="paper-list" aria-live="polite"></div>
+          <div id="emptyState" class="empty-state">
+            <h3>暂无稿件</h3>
+            <p>目前没有正在追踪的稿件。可通过 Author Hub 链接添加审稿记录，或使用生产稿件编号添加已接收文章。</p>
+            <button class="button primary" id="emptyAddButton" type="button">添加稿件</button>
           </div>
         </section>
 
@@ -372,7 +364,7 @@
               </div>
               <h3>首页进度横幅</h3>
               <div class="settings-group home-banner-settings">
-                <div class="setting-row stacked"><div><strong>横幅背景</strong><small>本地图片会复制到研迹的私有缓存；必应图片会下载后缓存，离线时继续使用上一次图片。</small></div><div class="home-banner-mode" role="radiogroup" aria-label="首页横幅背景"><label><input type="radio" name="homeBannerImageMode" value="default"><span>默认</span></label><label><input type="radio" name="homeBannerImageMode" value="local"><span>本地图片</span></label><label><input type="radio" name="homeBannerImageMode" value="bing"><span>必应每日图片</span></label></div></div>
+                <div class="setting-row stacked"><div><strong>横幅背景</strong><small>必应每日壁纸会每天自动下载并缓存；断网时继续使用上一次图片。本地图片也会复制到研迹的私有缓存。</small></div><div class="home-banner-mode" role="radiogroup" aria-label="首页横幅背景"><label><input type="radio" name="homeBannerImageMode" value="default"><span>柔和背景</span></label><label><input type="radio" name="homeBannerImageMode" value="local"><span>本地图片</span></label><label><input type="radio" name="homeBannerImageMode" value="bing"><span>必应每日壁纸</span></label></div></div>
                 <div class="setting-row home-banner-actions"><div><strong id="homeBannerImageStatus">使用默认柔和背景</strong><small id="homeBannerImageCredit">不联网，也不读取本地图片</small></div><div><button class="button tertiary" id="chooseHomeBannerButton" type="button">选择图片</button><button class="button tertiary" id="refreshBingBannerButton" type="button">获取今日图片</button></div></div>
               </div>
             </section>
@@ -539,7 +531,7 @@
         <div class="modal-head"><div class="modal-title-with-icon"><span class="modal-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M8 3v5M16 3v5M4 10h16"/></svg></span><div><p class="eyebrow">SCHEDULE</p><h2 id="scheduleDialogTitle">新建日程</h2><p id="scheduleDialogDescription">安排时间范围，并决定何时提醒你</p></div></div></div>
         <input id="scheduleId" type="hidden">
         <div class="form-grid schedule-form-grid">
-          <fieldset class="schedule-entry-kind full" id="scheduleEntryKindField"><legend>事项类型</legend><label><input type="radio" name="scheduleEntryKind" value="task" checked><span><strong>要完成的任务</strong><small>同时建立待办和关联时间块</small></span></label><label><input type="radio" name="scheduleEntryKind" value="event"><span><strong>仅日程事件</strong><small>会议、预约、出行等时间占用</small></span></label></fieldset>
+          <fieldset class="schedule-entry-kind full" id="scheduleEntryKindField" hidden><legend>事项类型</legend><label><input type="radio" name="scheduleEntryKind" value="task" checked><span><strong>同步到待办</strong><small>带具体时间的日程自动建立关联待办</small></span></label><label><input type="radio" name="scheduleEntryKind" value="event"><span><strong>仅日程事件</strong><small>全天日程不自动建立待办</small></span></label></fieldset>
           <div class="field full"><label for="scheduleTitle" id="scheduleTitleLabel">任务内容</label><input id="scheduleTitle" maxlength="500" placeholder="例如：明天下午四点修改论文"><small id="scheduleRecognition" class="schedule-recognition" hidden></small></div>
           <div class="field full schedule-all-day-row"><label class="checkbox-field"><input id="scheduleAllDayInput" type="checkbox"><span>全天日程</span></label><label class="checkbox-field"><input id="scheduleRepeatDailyInput" type="checkbox"><span>每天重复</span></label></div>
           <div class="field"><label for="scheduleDate">日期</label><input id="scheduleDate" type="date"></div>
@@ -590,7 +582,7 @@
         <div class="form-grid todo-form-grid">
           <div class="field full"><label for="todoTitle">待办内容</label><input id="todoTitle" maxlength="200" placeholder="例如：周五前提交论文修改稿"><small id="todoRecognition" class="todo-recognition" hidden></small></div>
           <div class="field full"><label for="todoNotes">备注</label><textarea id="todoNotes" rows="3" maxlength="10000" placeholder="补充背景、交付标准或下一步"></textarea></div>
-          <div class="field"><label for="todoDueAt">截止时间</label><input id="todoDueAt" type="datetime-local"><small>留空时进入收件箱，不会提醒</small></div>
+          <div class="field"><label for="todoDueAt">截止时间</label><input id="todoDueAt" type="datetime-local"><small>留空时默认放到今天，不会提醒</small></div>
           <div class="field"><label for="todoReminderMode">提醒</label><select id="todoReminderMode"><option value="none">不提醒</option><option value="at-due">到期时</option><option value="15m-before">提前 15 分钟</option><option value="1h-before">提前 1 小时</option><option value="1d-before">提前 1 天</option><option value="custom">自定义时间</option></select></div>
           <div class="field full" id="todoReminderAtField" hidden><label for="todoReminderAt">自定义提醒时间</label><input id="todoReminderAt" type="datetime-local"><small>必须早于或等于截止时间</small></div>
           <div class="field full"><label>优先级</label><div class="priority-picker" role="radiogroup"><label class="priority-option high"><input type="radio" name="todoPriority" value="high"><span></span><b>最高</b><small>#1</small></label><label class="priority-option medium"><input type="radio" name="todoPriority" value="medium" checked><span></span><b>重要</b><small>#2</small></label><label class="priority-option low"><input type="radio" name="todoPriority" value="low"><span></span><b>普通</b><small>#3</small></label></div></div>

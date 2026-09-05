@@ -6,6 +6,7 @@
     '.home-progress-strip',
     '.home-next-event-card',
     '.home-today-items-card',
+    '.home-countdown-card',
     '.home-attendance-card',
     '.home-schedule-panel',
     '.home-focus-timer',

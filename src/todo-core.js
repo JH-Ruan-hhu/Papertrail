@@ -423,8 +423,7 @@ function matchesTodoSearch(todo, query) {
 
 function filterTodos(list, { view = 'today', query = '', now = new Date(), showAllCompleted = false } = {}) {
   const todos = (list || []).filter((todo) => matchesTodoSearch(todo, query));
-  if (view === 'inbox') return sortTodos(todos.filter((todo) => todo.status === 'open' && !todo.dueAt), now);
-  if (view === 'today') return sortTodos(todos.filter((todo) => todo.status === 'open' && (isDueToday(todo, now) || isOverdue(todo, now))), now);
+  if (view === 'inbox' || view === 'today') return sortTodos(todos.filter((todo) => todo.status === 'open' && (!todo.dueAt || isDueToday(todo, now) || isOverdue(todo, now))), now);
   if (view === 'upcoming') return sortTodos(todos.filter((todo) => isUpcoming(todo, now)), now);
   if (view === 'completed') {
     const completed = todos.filter((todo) => todo.status === 'completed').sort((a, b) => Date.parse(b.completedAt || 0) - Date.parse(a.completedAt || 0));
@@ -439,7 +438,7 @@ function groupTodos(list, { view = 'today', now = new Date() } = {}) {
   const groups = new Map();
   for (const todo of filterTodos(list, { view, now })) {
     let label = '未来';
-    if (view === 'inbox' || !todo.dueAt) label = '无日期';
+    if (!todo.dueAt) label = '今天';
     else if (isOverdue(todo, now)) label = '逾期';
     else if (isDueToday(todo, now)) label = '今天';
     else if (view === 'upcoming') {
@@ -463,6 +462,9 @@ function needsReminder(todo, now = new Date()) {
 }
 
 function needsOverdueNotification(todo, now = new Date()) {
+  const current = now instanceof Date ? now.getTime() : Date.parse(now);
+  const snoozedUntil = Date.parse(todo?.snoozedUntil || '');
+  if (Number.isFinite(snoozedUntil) && current < snoozedUntil) return false;
   return isOverdue(todo, now) && !todo.overdueNotifiedAt;
 }
 
@@ -480,7 +482,8 @@ function snoozeTodo(todo, until, now = new Date().toISOString()) {
     ? new Date((Number.isFinite(nowMs) ? nowMs : Date.now()) + until).toISOString()
     : isoDate(until);
   if (!snoozedUntil) throw new Error('稍后提醒时间无效。');
-  return normalizeTodo({ ...todo, snoozedUntil, reminderSentAt: null, updatedAt: now }, 0, now);
+  const overdue = todo?.dueAt && Date.parse(todo.dueAt) < nowMs;
+  return normalizeTodo({ ...todo, snoozedUntil, reminderSentAt: null, overdueNotifiedAt: overdue ? null : todo.overdueNotifiedAt, updatedAt: now }, 0, now);
 }
 
 module.exports = {

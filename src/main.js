@@ -565,6 +565,22 @@ function homeBannerImagePath() {
   return path.join(app.getPath('userData'), 'home-banner.jpg');
 }
 
+function localDateStamp(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
+}
+
+function initializeBingHomeBanner() {
+  const settings = store.getSettings();
+  if (settings.homeBannerBingInitialized === true) return settings;
+  return store.updateSettings({
+    homeBannerBingInitialized: true,
+    homeBannerImageMode: settings.homeBannerImageMode === 'default' ? 'bing' : settings.homeBannerImageMode
+  });
+}
+
 function readHomeBannerImageDataUrl() {
   try {
     const filePath = homeBannerImagePath();
@@ -594,23 +610,54 @@ async function chooseHomeBannerImage() {
   return { canceled: false, settings: settingsForRenderer() };
 }
 
-async function refreshBingHomeBanner() {
-  const archiveResponse = await net.fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN');
-  if (!archiveResponse.ok) throw new Error('暂时无法获取必应每日图片。');
-  const archive = await archiveResponse.json();
-  const item = archive?.images?.[0];
-  if (!item?.url || !String(item.url).startsWith('/')) throw new Error('必应每日图片信息无效。');
-  const imageResponse = await net.fetch(`https://www.bing.com${item.url}`);
-  if (!imageResponse.ok) throw new Error('必应每日图片下载失败。');
-  const buffer = Buffer.from(await imageResponse.arrayBuffer());
-  if (!buffer.length || buffer.length > 25 * 1024 * 1024) throw new Error('必应每日图片大小异常。');
-  cacheHomeBannerImage(nativeImage.createFromBuffer(buffer));
-  store.updateSettings({
-    homeBannerImageMode: 'bing',
-    homeBannerImageCredit: String(item.copyright || '必应每日图片').slice(0, 300)
-  });
-  broadcastSettings();
-  return settingsForRenderer();
+let bingHomeBannerRefreshPromise = null;
+let bingHomeBannerRetryAfter = 0;
+
+async function downloadBingHomeBanner({ activate = false } = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15_000);
+  try {
+    const archiveResponse = await net.fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN', { signal: controller.signal });
+    if (!archiveResponse.ok) throw new Error('暂时无法获取必应每日图片。');
+    const archive = await archiveResponse.json();
+    const item = archive?.images?.[0];
+    if (!item?.url || !String(item.url).startsWith('/')) throw new Error('必应每日图片信息无效。');
+    const imageResponse = await net.fetch(`https://www.bing.com${item.url}`, { signal: controller.signal });
+    if (!imageResponse.ok) throw new Error('必应每日图片下载失败。');
+    const contentType = String(imageResponse.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.startsWith('image/')) throw new Error('必应每日图片响应格式无效。');
+    const buffer = Buffer.from(await imageResponse.arrayBuffer());
+    if (!buffer.length || buffer.length > 25 * 1024 * 1024) throw new Error('必应每日图片大小异常。');
+    cacheHomeBannerImage(nativeImage.createFromBuffer(buffer));
+    const currentMode = store.getSettings().homeBannerImageMode;
+    store.updateSettings({
+      ...(activate || currentMode === 'bing' ? { homeBannerImageMode: 'bing' } : {}),
+      homeBannerBingInitialized: true,
+      homeBannerFetchedOn: localDateStamp(),
+      homeBannerImageCredit: String(item.copyright || '必应每日图片').slice(0, 300)
+    });
+    bingHomeBannerRetryAfter = 0;
+    broadcastSettings();
+    return settingsForRenderer();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function refreshBingHomeBanner({ force = false } = {}) {
+  const settings = store.getSettings();
+  if (!force && settings.homeBannerImageMode !== 'bing') return Promise.resolve(settingsForRenderer());
+  const cachedToday = settings.homeBannerFetchedOn === localDateStamp() && fs.existsSync(homeBannerImagePath());
+  if (!force && cachedToday) return Promise.resolve(settingsForRenderer());
+  if (!force && Date.now() < bingHomeBannerRetryAfter) return Promise.resolve(settingsForRenderer());
+  if (bingHomeBannerRefreshPromise) return bingHomeBannerRefreshPromise;
+  bingHomeBannerRefreshPromise = downloadBingHomeBanner({ activate: force })
+    .catch((error) => {
+      bingHomeBannerRetryAfter = Date.now() + 60 * 60_000;
+      throw error;
+    })
+    .finally(() => { bingHomeBannerRefreshPromise = null; });
+  return bingHomeBannerRefreshPromise;
 }
 
 function setModalTitleBar(active) {
@@ -2284,7 +2331,7 @@ function runWorkspaceReminders(now = new Date()) {
       else showScheduleNotification(candidate.item);
       store.updateWorkspace((workspace) => {
         workspace.schedules = workspace.schedules.map((item) => item.id === candidate.item.id
-          ? { ...item, reminderSentAt: now.toISOString(), reminderOccurrence: candidate.item.occurrenceKey || null, updatedAt: now.toISOString() }
+          ? { ...item, reminderSentAt: now.toISOString(), reminderOccurrence: candidate.item.occurrenceKey || null, snoozedUntil: null, updatedAt: now.toISOString() }
           : item);
         return workspace;
       });
@@ -2857,6 +2904,7 @@ async function runScheduledWork() {
   runWorkspaceReminders();
   runJobDeadlineReminders();
   if (Date.now() - lastBackupCleanupAt >= 24 * 60 * 60_000) cleanupExpiredBackups();
+  await refreshBingHomeBanner().catch((error) => console.warn(`[bing-banner] ${error?.message || error}`));
   await runScheduledRefresh();
 }
 
@@ -2971,7 +3019,7 @@ function registerIpc() {
   ipcMain.handle('schedules:convert-to-todo', (_event, id, input) => getPlanningService().convertScheduleToTodo(String(id), input || {}));
   ipcMain.handle('schedules:detach', (_event, id) => getPlanningService().detachSchedule(String(id)));
   ipcMain.handle('todos:parse', (_event, input) => parseNaturalLanguageTodo(input, new Date()));
-  ipcMain.handle('todos:save', (_event, input) => getPlanningService().saveTodo(input));
+  ipcMain.handle('todos:save', (_event, input) => getPlanningService().saveTodoWithSchedule(input));
   ipcMain.handle('todos:delete', (_event, id) => getPlanningService().deleteTodo(String(id)));
   ipcMain.handle('todos:complete', (_event, id) => getPlanningService().completeTodo(String(id)));
   ipcMain.handle('todos:reopen', (_event, id) => getPlanningService().reopenTodo(String(id)));
@@ -3042,7 +3090,10 @@ function registerIpc() {
       if (input?.itemKind === 'event') {
         const parsed = parseNaturalLanguageSchedules(capture.content, new Date());
         if (!parsed.valid) throw new Error('没有识别到可创建的日程事件。');
-        const items = parsed.schedules.map((schedule) => saveWorkspaceSchedule({ ...schedule, repeat: capture.repeat }));
+        const items = parsed.schedules.map((schedule) => getPlanningService().createScheduledTodo({
+          todo: { title: schedule.title, dueAt: schedule.endAt, priority: schedule.priority, reminderMode: 'none' },
+          schedule: { ...schedule, repeat: capture.repeat }
+        }));
         return { mode: 'item', itemKind: 'event', item: items[0], items };
       }
       const parsedTodo = parseNaturalLanguageTodo(capture.content, new Date());
@@ -3056,17 +3107,20 @@ function registerIpc() {
         return { mode: 'item', itemKind: 'task', item: items[0], items };
       }
       if (capture.repeat === 'daily') throw new Error('每日重复任务需要写明具体时间，以便安排每天的时间块。');
-      return { mode: 'item', itemKind: 'task', item: getPlanningService().saveTodo(parsedTodo) };
+      return { mode: 'item', itemKind: 'task', item: getPlanningService().saveTodoWithSchedule(parsedTodo) };
     }
     if (input?.mode === 'todo') {
       const parsed = parseNaturalLanguageTodo(input?.content, new Date());
       if (!parsed.valid) throw new Error(parsed.warning || '没有识别到可创建的待办。');
-      const item = getPlanningService().saveTodo(parsed);
+      const item = getPlanningService().saveTodoWithSchedule(parsed);
       return { mode: 'todo', item };
     }
     const parsed = parseNaturalLanguageSchedules(input?.content, new Date());
     if (!parsed.valid) throw new Error('没有识别到可创建的日程。');
-    const items = parsed.schedules.map((schedule) => saveWorkspaceSchedule(schedule));
+    const items = parsed.schedules.map((schedule) => getPlanningService().createScheduledTodo({
+      todo: { title: schedule.title, dueAt: schedule.endAt, priority: schedule.priority, reminderMode: 'none' },
+      schedule
+    }));
     return { mode: 'schedule', item: items[0], items };
   });
   ipcMain.handle('sticky:close', (event) => {
@@ -3089,6 +3143,19 @@ function registerIpc() {
       const result = getPlanningService().snoozeTodo(window.yanjiDeadlineId, until);
       dismissDeadlineWindows(window.yanjiDeadlineId);
       return result;
+    }
+    if (window?.yanjiDeadlineKind === 'schedule' && window.yanjiDeadlineId) {
+      const delay = Number(until);
+      const snoozedUntil = new Date(Date.now() + (Number.isFinite(delay) && delay > 0 ? delay : 10 * 60_000)).toISOString();
+      store.updateWorkspace((workspace) => {
+        workspace.schedules = workspace.schedules.map((item) => item.id === window.yanjiDeadlineId
+          ? { ...item, reminderSentAt: null, snoozedUntil, updatedAt: new Date().toISOString() }
+          : item);
+        return workspace;
+      });
+      broadcastWorkspace();
+      dismissDeadlineWindows(window.yanjiDeadlineId);
+      return { id: window.yanjiDeadlineId, snoozedUntil };
     }
     if (window?.yanjiDeadlineId) dismissDeadlineWindows(window.yanjiDeadlineId);
     else window?.close();
@@ -3158,12 +3225,15 @@ function registerIpc() {
     }
     updateLoginItemSetting(updated.startAtLogin);
     broadcastSettings();
+    if (updated.homeBannerImageMode === 'bing') {
+      setTimeout(() => refreshBingHomeBanner().catch((error) => console.warn(`[bing-banner] ${error?.message || error}`)), 0);
+    }
     if (Object.keys(validated).some((key) => ['todayWidgetEnabled', 'scheduleWidgetEnabled', 'widgetShowSchedules', 'widgetShowTodos', 'widgetShowCompletedTodos'].includes(key))) broadcastWorkspace();
     return settingsForRenderer();
   });
   ipcMain.handle('settings:choose-data-directory', (_event, request) => chooseDataDirectory(request));
   ipcMain.handle('settings:choose-home-banner', () => chooseHomeBannerImage());
-  ipcMain.handle('settings:refresh-bing-banner', () => refreshBingHomeBanner());
+  ipcMain.handle('settings:refresh-bing-banner', () => refreshBingHomeBanner({ force: true }));
   ipcMain.handle('settings:delete-data-backups', (_event, confirmed) => deleteDataBackups(Boolean(confirmed)));
   ipcMain.handle('updates:get-state', () => updateStateForRenderer());
   ipcMain.handle('updates:check', () => checkForAppUpdate());
@@ -3230,6 +3300,7 @@ if (!gotLock) {
       }
       store = new JsonStore(resolvedStorage.filePath);
       store.load();
+      initializeBingHomeBanner();
       await runNonCriticalStartup('Windows Focus 恢复', recoverInterruptedFocusSessionOnStartup);
       planningService = createPlanningService({
         store,
@@ -3243,6 +3314,7 @@ if (!gotLock) {
         return;
       }
       createWindow();
+      setTimeout(() => refreshBingHomeBanner().catch((error) => console.warn(`[bing-banner] ${error?.message || error}`)), 700);
       await runNonCriticalStartup('考勤恢复', () => reconcileStaleAttendance());
       await runNonCriticalStartup('备份清理', cleanupExpiredBackups);
       await runNonCriticalStartup('系统托盘', createTray);

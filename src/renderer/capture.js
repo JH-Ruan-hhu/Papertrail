@@ -54,8 +54,8 @@ function formatWhen(schedule) {
 }
 
 function formatTodo(todo) {
-  if (!todo?.valid) return todo?.warning || '输入内容后自动识别截止日期；没有日期会进入收件箱';
-  if (!todo.dueAt) return `收件箱 · ${todo.title}`;
+  if (!todo?.valid) return todo?.warning || '输入内容后自动识别截止日期；没有具体时间会放到今天';
+  if (!todo.dueAt) return `今天 · 无具体时间 · ${todo.title}`;
   const due = new Date(todo.dueAt);
   const date = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(due);
   const time = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(due);
@@ -68,10 +68,18 @@ function placeCaretAtEnd() {
 }
 
 function renderHighlights(text, matches = []) {
+  const ranges = matches
+    .filter((match) => Number.isInteger(match.start) && Number.isInteger(match.end) && match.end > match.start)
+    .sort((left, right) => left.start - right.start || right.end - left.end)
+    .reduce((merged, match) => {
+      const previous = merged.at(-1);
+      if (previous && match.start <= previous.end) previous.end = Math.max(previous.end, match.end);
+      else merged.push({ start: match.start, end: match.end });
+      return merged;
+    }, []);
   let cursor = 0;
   let html = '';
-  for (const match of matches) {
-    if (match.start < cursor) continue;
+  for (const match of ranges) {
     html += escapeHtml(text.slice(cursor, match.start));
     html += `<mark>${escapeHtml(text.slice(match.start, match.end))}</mark>`;
     cursor = match.end;

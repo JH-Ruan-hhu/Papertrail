@@ -51,6 +51,42 @@ test('saves a todo, schedules linked work and deletes the todo without deleting 
   assert.equal(store.data.schedules[0].sourceRef, null);
 });
 
+test('saving a todo for the UI creates and maintains one linked schedule', () => {
+  const store = makeStore();
+  let id = 0;
+  const service = createPlanningService({
+    store,
+    makeId: (kind) => `${kind}-${++id}`,
+    now: () => new Date('2026-08-22T10:00:00.000Z')
+  });
+  const todo = service.saveTodoWithSchedule({ title: '整理实验数据', dueAt: '2026-08-22T11:00:00.000Z', priority: 'high' });
+  assert.equal(store.data.todos.length, 1);
+  assert.equal(store.data.schedules.length, 1);
+  assert.deepEqual(store.data.schedules[0].sourceRef, { type: 'todo', id: todo.id });
+  assert.equal(store.data.schedules[0].startAt, todo.dueAt);
+  assert.equal(store.data.schedules[0].legacy.managedByTodo, true);
+  service.saveTodoWithSchedule({ ...todo, title: '整理全部实验数据', dueAt: '2026-08-23T09:00:00.000Z' });
+  assert.equal(store.data.schedules.length, 1);
+  assert.equal(store.data.schedules[0].title, '整理全部实验数据');
+  assert.equal(store.data.schedules[0].startAt, '2026-08-23T09:00:00.000Z');
+  service.completeTodo(todo.id);
+  assert.ok(store.data.schedules[0].completedAt);
+});
+
+test('an untimed UI todo becomes an all-day schedule for today', () => {
+  const store = makeStore();
+  let id = 0;
+  const service = createPlanningService({
+    store,
+    makeId: (kind) => `${kind}-${++id}`,
+    now: () => new Date('2026-08-22T10:00:00.000Z')
+  });
+  service.saveTodoWithSchedule({ title: '今天复盘', dueAt: null });
+  assert.equal(store.data.schedules.length, 1);
+  assert.equal(store.data.schedules[0].allDay, true);
+  assert.equal(new Date(store.data.schedules[0].startAt).getDate(), new Date('2026-08-22T10:00:00.000Z').getDate());
+});
+
 test('creates a task and its execution block in one atomic workspace write', () => {
   const store = makeStore();
   let id = 0;
@@ -74,6 +110,21 @@ test('creates a task and its execution block in one atomic workspace write', () 
   assert.equal(store.data.schedules.length, 1);
   assert.deepEqual(result.schedule.sourceRef, { type: 'todo', id: result.todo.id });
   assert.equal(result.todo.reminderMode, 'none');
+  assert.equal(result.todo.priority, 'high');
+  assert.equal(result.todo.legacy.managedBySchedule, true);
+  const moved = service.saveSchedule({
+    ...result.schedule,
+    title: '修改论文终稿',
+    priority: 'medium',
+    startAt: '2026-09-04T07:00:00.000Z',
+    endAt: '2026-09-04T09:00:00.000Z'
+  });
+  const syncedTodo = store.data.todos.find((item) => item.id === result.todo.id);
+  assert.equal(moved.startAt, '2026-09-04T07:00:00.000Z');
+  assert.equal(syncedTodo.title, '修改论文终稿');
+  assert.equal(syncedTodo.priority, 'medium');
+  assert.equal(syncedTodo.dueAt, '2026-09-04T09:00:00.000Z');
+  assert.equal(syncedTodo.reminderMode, 'none');
 });
 
 test('converts a normal schedule to a linked todo and supports removing the source block', () => {

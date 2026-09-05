@@ -219,20 +219,14 @@ test('select pickers settle into place and respect reduced motion', () => {
   assert.doesNotMatch(css, /::picker\(select\)[\s\S]{0,500}scale\(0\)/);
 });
 
-test('submission desk exposes overview, selectable rows and a persistent detail panel', () => {
+test('submission tracker keeps the original full-width manuscript card layout', () => {
   const html = readProjectFile('src', 'renderer', 'index.html');
   const appJs = readProjectFile('src', 'renderer', 'app.js');
-  const css = readProjectFile('src', 'renderer', 'v11-layout.css');
-  assert.match(html, /class="stats submission-stats"/);
-  assert.match(html, /id="reviewPaperCount"/);
-  assert.match(html, /id="productionPaperCount"/);
-  assert.match(html, /class="submission-desk-grid"/);
-  assert.match(html, /id="paperDetail"/);
-  assert.match(appJs, /function renderPaperRow\(/);
-  assert.match(appJs, /data-paper-select tabindex="0" role="option"/);
-  assert.match(appJs, /elements\.paperDetail\.addEventListener\('click', handlePaperAction\)/);
-  assert.match(css, /\.submission-desk-grid \{ display: grid;/);
-  assert.match(css, /\.submission-detail-panel \{ position: sticky;/);
+  assert.match(html, /<section class="stats" aria-label="稿件统计">/);
+  assert.match(html, /<div id="paperList" class="paper-list"/);
+  assert.doesNotMatch(html, /submission-desk-grid|id="paperDetail"|id="reviewPaperCount"|id="productionPaperCount"/);
+  assert.match(appJs, /elements\.paperList\.innerHTML = visiblePapers\.map\(renderPaper\)\.join\(''\)/);
+  assert.doesNotMatch(appJs, /renderPaperRow|selectedPaperId|elements\.paperDetail/);
 });
 
 test('installer uses the stock electron-builder wizard while retaining upgrade safety', () => {
@@ -286,6 +280,20 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /id="homeProgressRateBar"/);
   assert.doesNotMatch(indexHtml, /快速开始|data-home-quick-action/);
   assert.match(indexHtml, /id="homeActivityHeatmap"[\s\S]*id="homeDeadlineMatrix"/);
+  assert.match(indexHtml, /class="home-today-card home-countdown-card"/);
+  assert.doesNotMatch(indexHtml, /home-insight-grid[\s\S]*home-deadline-section/);
+  assert.match(workbenchJs, /home-countdown-primary/);
+  assert.doesNotMatch(workbenchJs, /home-countdown-secondary/);
+  assert.match(workbenchJs, /function currentCountdown\(\)[\s\S]*sort\(\(a, b\) => Date\.parse\(a\.targetAt\) - Date\.parse\(b\.targetAt\)\)\[0\]/);
+  assert.match(workbenchJs, /addCountdownButton[^\n]*openCountdownEditor\(currentCountdown\(\)\)/);
+  assert.match(layoutCss, /\.home-deadline-title\s*\{[^}]*background:\s*linear-gradient[^}]*font-size:\s*15px[^}]*font-weight:\s*820/s);
+  assert.match(layoutCss, /\.home-countdown\s*\{[^}]*flex-direction:\s*column[^}]*align-items:\s*center[^}]*justify-content:\s*center[^}]*font-variant-numeric:\s*tabular-nums/s);
+  assert.match(layoutCss, /\.home-countdown-primary b\s*\{[^}]*font-size:\s*clamp\(52px, 5\.4vw, 68px\)[^}]*font-weight:\s*850/s);
+  assert.match(layoutCss, /home-command-grid\s*\{[^}]*minmax\(126px, \.6fr\)[^}]*minmax\(0, 1\.4fr\)/s);
+  assert.match(layoutCss, /home-countdown-card \.home-deadline-title\s*\{[^}]*padding-inline:\s*5px 30px[^}]*font-size:\s*13px/);
+  assert.match(workbenchJs, /目标日 · [^<]*Intl\.DateTimeFormat\('zh-CN', \{ year: 'numeric', month: 'numeric', day: 'numeric', weekday: 'long' \}\)/);
+  assert.match(layoutCss, /\.home-next-event-card \.next-event-content > span\s*\{[^}]*align-self:\s*end/s);
+  assert.match(layoutCss, /\.home-attendance-content > span\s*\{[^}]*grid-row:\s*2[^}]*align-self:\s*end/s);
   assert.match(indexHtml, /id="addCountdownButton"[\s\S]*id="countdownDialog"[\s\S]*id="countdownTargetAt"/);
   assert.match(preloadJs, /countdowns:save/);
   assert.match(mainJs, /countdowns:save/);
@@ -294,15 +302,41 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /name="homeBannerImageMode" value="default"[\s\S]*value="local"[\s\S]*value="bing"/);
   assert.match(preloadJs, /settings:choose-home-banner/);
   assert.match(mainJs, /HPImageArchive\.aspx/);
+  assert.match(mainJs, /initializeBingHomeBanner\(\)[\s\S]*homeBannerImageMode:\s*settings\.homeBannerImageMode === 'default' \? 'bing'/);
+  assert.match(mainJs, /homeBannerFetchedOn === localDateStamp\(\)[\s\S]*bingHomeBannerRetryAfter/);
+  assert.match(mainJs, /updated\.homeBannerImageMode === 'bing'[\s\S]*refreshBingHomeBanner\(\)/);
+  assert.match(layoutCss, /\.home-progress-strip\.has-banner-image\s*\{[^}]*rgba\(249,251,255,\.92\)[^}]*rgba\(246,249,253,\.82\)[^}]*rgba\(240,244,252,\.72\)/s);
+  assert.match(layoutCss, /\.home-focus-timer \.focus-notification-option span\s*\{[^}]*white-space:\s*nowrap/s);
+  assert.match(layoutCss, /\.home-top-grid\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1\.9fr\) minmax\(350px, 1\.1fr\)/s);
+  assert.match(layoutCss, /@media \(min-width: 1041px\) and \(max-height: 900px\)[\s\S]*\.home-focus-timer \.focus-notification-copy > p\s*\{[^}]*display:\s*block/s);
   assert.match(indexHtml, /未来四天[\s\S]*任务与日程按日期统一排列/);
   assert.doesNotMatch(indexHtml, /id="homeToday(?:Schedule|Todo)List"/);
   assert.match(indexHtml, /id="homeDayOverview"/);
   assert.match(indexHtml, /id="scheduleBoard"/);
+  assert.doesNotMatch(indexHtml, /data-todo-view="inbox"|>收件箱\s*</);
+  assert.doesNotMatch(indexHtml, /data-todo-view="upcoming"|>即将到来\s*</);
+  assert.match(workbenchJs, /Number\(Boolean\(a\.completedAt\)\) - Number\(Boolean\(b\.completedAt\)\)/);
   assert.doesNotMatch(indexHtml, /class="schedule-today-panel"|id="todayScheduleList"/);
   assert.doesNotMatch(indexHtml, /id="agendaList"/);
   assert.match(indexHtml, /id="scheduleRecognition"/);
   assert.match(indexHtml, /name="scheduleEntryKind" value="task"[\s\S]*name="scheduleEntryKind" value="event"/);
   assert.match(preloadJs, /createScheduledTodo:.*todos:create-scheduled/);
+  assert.match(workbenchJs, /const creatingTask = !scheduleId[^;]*&& !allDay;/);
+  assert.match(workbenchJs, /data-schedule-start="\$\{wbEscape\(item\.startAt\)\}"[^>]*draggable="true"/);
+  assert.match(workbenchJs, /scheduleBoard\.addEventListener\('drop',[\s\S]*moveScheduleToDate/);
+  assert.doesNotMatch(workbenchJs, /moveScheduleToDate[\s\S]{0,1200}wb\.selectedDate\s*=\s*targetDate/);
+  assert.match(workbenchJs, /class="schedule-card-meta"[^`]*\$\{linkedButton\}/);
+  assert.match(workbenchJs, /08:00–24:00/);
+  assert.match(workbenchJs, /schedule-time-axis/);
+  assert.match(workbenchJs, /data-schedule-top/);
+  assert.match(workbenchJs, /targetMinutes = Math\.min\(23 \* 60 \+ 45/);
+  assert.match(workbenchJs, /Ctrl\+滚轮缩放/);
+  assert.match(workbenchJs, /scheduleHourHeight:\s*48/);
+  assert.match(workbenchJs, /addEventListener\('wheel',[\s\S]*event\.ctrlKey[\s\S]*applyScheduleZoom/);
+  assert.match(workbenchJs, /is-brief[\s\S]*is-compact-block[\s\S]*is-expanded-block/);
+  assert.match(layoutCss, /grid-template-columns:\s*54px repeat\(7, minmax\(118px, 1fr\)\)/);
+  assert.match(layoutCss, /grid-template-rows:\s*54px 44px var\(--schedule-track-height\)/);
+  assert.match(layoutCss, /is-detailed-scale[^}]*time\.is-half-hour\s*\{[^}]*display:\s*block/);
   assert.match(mainJs, /todos:create-scheduled/);
   assert.match(indexHtml, /id="attendanceGanttRows"/);
   assert.match(indexHtml, /id="startFocusButton"/);
@@ -379,12 +413,12 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(preloadJs, /startFocus/);
   assert.match(preloadJs, /onFocusChanged/);
   assert.match(workbenchJs, /schedule-board-column/);
-  assert.match(workbenchJs, /const rangeStart = addDays\(selected, -2\)/);
-  assert.match(workbenchJs, /const rangeEnd = addDays\(selected, 5\)/);
-  assert.match(workbenchJs, /Array\.from\(\{ length: 8 \}/);
-  assert.match(workbenchJs, /addDays\(wb\.selectedDate, -1\)/);
-  assert.match(workbenchJs, /addDays\(wb\.selectedDate, 1\)/);
-  assert.doesNotMatch(workbenchJs, /addDays\(wb\.selectedDate, [-]?7\)/);
+  assert.match(workbenchJs, /const rangeStart = startOfWeek\(selected\)/);
+  assert.match(workbenchJs, /const rangeEnd = addDays\(rangeStart, 6\)/);
+  assert.match(workbenchJs, /Array\.from\(\{ length: 7 \}/);
+  assert.match(workbenchJs, /addDays\(wb\.selectedDate, -7\)/);
+  assert.match(workbenchJs, /addDays\(wb\.selectedDate, 7\)/);
+  assert.match(indexHtml, /aria-label="上一周"[\s\S]*aria-label="下一周"/);
   assert.match(workbenchJs, /recognizeScheduleEditorInput/);
   assert.match(workbenchJs, /workbenchApi\.parseSchedule/);
   assert.match(workbenchJs, /recognizedSchedules\.length > 1/);
@@ -449,6 +483,7 @@ test('quick capture preserves Chinese IME composition and closes empty on blur',
   assert.match(captureHtml, /name="captureItemKind" value="task"[\s\S]*name="captureItemKind" value="event"/);
   assert.match(captureJs, /#1 红、#2 黄、#3 绿/);
   assert.match(captureJs, /dataset\.captureState = state/);
+  assert.match(captureJs, /match\.start <= previous\.end[\s\S]*Math\.max\(previous\.end, match\.end\)/);
   assert.match(captureJs, /event\.key === 'Escape'[\s\S]*clearTimeout\(parseTimer\)[\s\S]*editor\.value = ''[\s\S]*api\.hideCapture\(\)/);
   assert.doesNotMatch(captureJs, /内容尚未保存；清空后再按 Esc 关闭/);
   assert.match(captureJs, /\[~～\][\s\S]*repeat: prefix \? 'daily' : null/);
@@ -501,6 +536,7 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(preloadJs, /exportJobApplicationImages/);
   assert.match(indexHtml, /id="dailyPlanDialog"/);
   assert.match(workbenchJs, /function maybeShowDailyPlan\(\)/);
+  assert.match(workbenchJs, /const todayTodos = \(wb\.workspace\.todos \|\| \[\]\)\.filter[\s\S]*if \(todayTodos\.length\) return;[\s\S]*localStorage\.setItem\(DAILY_PLAN_KEY, todayKey\)/);
   assert.match(workbenchJs, /localStorage\.setItem\(DAILY_PLAN_KEY, todayKey\)/);
   assert.match(workbenchJs, /openCreateDialog\(\{ dueAt: dueAt\.toISOString\(\), priority: 'medium' \}\)/);
 });
@@ -516,6 +552,7 @@ test('note editor autosaves a full daily document and opens from its card', () =
   assert.match(workbenchJs, /function closeNoteDialogToCard[\s\S]*duration:\s*220/);
   assert.match(noteEditorJs, /duration:\s*260/);
   assert.match(workbenchJs, /noteDialog\.addEventListener\('pointerdown'[\s\S]*event\.target === event\.currentTarget[\s\S]*noteDialog\.addEventListener\('click'[\s\S]*notePointerStartedOnBackdrop && event\.target === event\.currentTarget[\s\S]*closeNoteEditorSafely\(event\.currentTarget\)/);
+  assert.match(workbenchJs, /noteDialog'\)\.addEventListener\('keydown'[\s\S]*event\.ctrlKey \|\| event\.metaKey[\s\S]*event\.key !== 'Enter'[\s\S]*saveNoteFromEditor\(\)/);
   assert.match(indexHtml, /class="note-paper"/);
   assert.match(indexHtml, /id="noteDocumentTitle"/);
   assert.match(indexHtml, /id="noteWordCount"/);
@@ -679,6 +716,17 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
   assert.match(motionCss, /focus-usage-row i[^\n]*motion-bar-grow 420ms/);
 });
 
+test('deadline window offers a ten-minute same-item snooze without relabeling an exact reminder as overdue', () => {
+  const deadlineHtml = readProjectFile('src', 'renderer', 'deadline.html');
+  const deadlineJs = readProjectFile('src', 'renderer', 'deadline.js');
+  const reminderCore = readProjectFile('src', 'reminder-core.js');
+  const mainJs = readProjectFile('src', 'main.js');
+  assert.match(deadlineHtml, /10 分钟后提醒/);
+  assert.match(deadlineJs, /10 \* 60_000/);
+  assert.match(reminderCore, /const overdue = level === 'overdue'/);
+  assert.match(mainJs, /yanjiDeadlineKind === 'schedule'[\s\S]*snoozedUntil/);
+});
+
 test('note editor restores inspector state and wires Word-like Enter and Tab handling', () => {
   const noteEditorJs = readProjectFile('src', 'renderer', 'note-editor.js');
   const listEditingJs = readProjectFile('src', 'renderer', 'list-editing.js');
@@ -729,6 +777,14 @@ test('home page common workspace exposes the global gradient between matrices', 
   assert.match(css, /\.workspace\s*>\s*\.home-page:not\(\[hidden\]\)[\s\S]*box-shadow:\s*none/);
 });
 
+test('home job pipeline uses four visually distinct stage colors', () => {
+  const css = readProjectFile('src', 'renderer', 'v11-layout.css');
+  assert.match(css, /home-job-summary \.home-job-row:nth-child\(1\)[^}]*#4f8df5[^}]*#2f68d8/);
+  assert.match(css, /home-job-summary \.home-job-row:nth-child\(2\)[^}]*#f2b24d[^}]*#d97a28/);
+  assert.match(css, /home-job-summary \.home-job-row:nth-child\(3\)[^}]*#b06adf[^}]*#7b4bc1/);
+  assert.match(css, /home-job-summary \.home-job-row:nth-child\(4\)[^}]*#42b99a[^}]*#23836f/);
+});
+
 test('v1.4.3 schedule, note, settings and attendance regressions stay wired', () => {
   const indexHtml = readProjectFile('src', 'renderer', 'index.html');
   const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
@@ -744,6 +800,13 @@ test('v1.4.3 schedule, note, settings and attendance regressions stay wired', ()
   assert.match(css, /\.note-paper-scroll\s*\{[^}]*height:\s*100%[^}]*overflow-y:\s*auto/);
   assert.match(css, /grid-template-columns:\s*repeat\(6, minmax\(0, 1fr\)\)/);
   assert.match(css, /\.settings-page \.settings-liquid-filters\s*\{[^}]*position:\s*absolute/);
+  assert.match(css, /\.job-compact-filters\s*\{[^}]*flex-wrap:\s*nowrap[^}]*overflow-x:\s*auto/);
+  assert.match(css, /\.job-compact-filters label:nth-child\(4\) select\s*\{[^}]*width:\s*138px/);
+  assert.match(css, /\.job-compact-filters select\s*\{[^}]*white-space:\s*nowrap/);
+  assert.match(css, /\.schedule-board-shell\s*\{[^}]*overflow:\s*auto[^}]*scrollbar-width:\s*none/);
+  assert.match(css, /\.schedule-board-shell::\-webkit-scrollbar\s*\{[^}]*width:\s*0[^}]*height:\s*0/);
+  assert.match(workbenchJs, /attendance-bar attendance-day-tone-\$\{index\}/);
+  assert.equal((css.match(/\.attendance-page \.attendance-bar\.attendance-day-tone-\d/g) || []).length, 7);
   assert.match(workbenchJs, /bar\.style\.left = `\$\{Number\(bar\.dataset\.attendanceLeft\)\}%`/);
   assert.doesNotMatch(workbenchJs, /class="attendance-bar[^`]*style="left:/);
   assert.match(workbenchJs, /endTimestamp >= rowDayEnd\.getTime\(\) \? 1440/);
@@ -763,6 +826,9 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
   assert.match(indexHtml, /id="jobSettingsButton"[\s\S]*<circle cx="12" cy="12" r="3"/);
   assert.match(workbenchJs, /class="job-salary-cell"/);
   assert.match(workbenchJs, /jobs\.filter\(\(job\) => job\.status !== 'closed'\)/);
+  assert.match(workbenchJs, /const closedDifference = Number\(left\.status === 'closed'\) - Number\(right\.status === 'closed'\);[\s\S]*if \(closedDifference\) return closedDifference;/);
+  assert.match(workbenchJs, /class="job-closed-divider"[^>]*><span>已结束 · 保留记录<\/span>/);
+  assert.match(readProjectFile('src', 'renderer', 'v11-layout.css'), /\.job-position\.job-row-status-closed[\s\S]*background:\s*#fafafa/);
   assert.match(mainJs, /<span>预估年薪<\/span><span>截止日期<\/span><span>状态<\/span>/);
   assert.match(mainJs, /JPG 图片/);
   assert.match(mainJs, /image\.toJPEG\(92\)/);

@@ -174,21 +174,24 @@ function defaultHour(dayPart) {
 }
 
 function resolveDate(text, baseDate) {
+  const withDeadlineSuffix = (token) => text.slice(text.indexOf(token), text.indexOf(token) + token.length + 1).endsWith(`${token}前`)
+    ? `${token}前`
+    : token;
   const relative = [
     ['大后天', 3],
     ['后天', 2],
     ['明天', 1],
     ['今天', 0]
   ].find(([token]) => text.includes(token));
-  if (relative) return { date: addLocalDays(baseDate, relative[1]), token: relative[0] };
+  if (relative) return { date: addLocalDays(baseDate, relative[1]), token: withDeadlineSuffix(relative[0]) };
 
-  const isoMatch = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
+  const isoMatch = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})(?:前)?(?=$|[^\d])/);
   if (isoMatch) {
     const candidate = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]), 12);
     if (candidate.getMonth() === Number(isoMatch[2]) - 1) return { date: candidate, token: isoMatch[0] };
   }
 
-  const monthDay = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?/);
+  const monthDay = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?(?:前)?/);
   if (monthDay) {
     let year = baseDate.getFullYear();
     let candidate = new Date(year, Number(monthDay[1]) - 1, Number(monthDay[2]), 12);
@@ -196,7 +199,7 @@ function resolveDate(text, baseDate) {
     return { date: candidate, token: monthDay[0] };
   }
 
-  const slashDate = text.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+  const slashDate = text.match(/\b(\d{1,2})\/(\d{1,2})(?:前)?(?=$|[^\d])/);
   if (slashDate) {
     let candidate = new Date(baseDate.getFullYear(), Number(slashDate[1]) - 1, Number(slashDate[2]), 12);
     if (candidate < addLocalDays(baseDate, -1)) candidate.setFullYear(candidate.getFullYear() + 1);
@@ -384,7 +387,7 @@ function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOStrin
   const legacy = asObject(value.legacy) ? { ...value.legacy } : {};
   const knownKeys = new Set([
     'id', 'title', 'startAt', 'endAt', 'allDay', 'priority', 'reminderMinutesBefore',
-    'reminderSentAt', 'reminderOccurrence', 'repeat', 'sourceRef', 'createdAt', 'updatedAt', 'legacy',
+    'reminderSentAt', 'reminderOccurrence', 'snoozedUntil', 'repeat', 'sourceRef', 'createdAt', 'updatedAt', 'legacy',
     'deadline', 'completedAt', 'remindedAt'
   ]);
   for (const [key, item] of Object.entries(value)) {
@@ -414,6 +417,7 @@ function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOStrin
     reminderMinutesBefore,
     reminderSentAt,
     reminderOccurrence: /^\d{4}-\d{2}-\d{2}$/.test(String(value.reminderOccurrence || '')) ? String(value.reminderOccurrence) : null,
+    snoozedUntil: isoDate(value.snoozedUntil),
     repeat: value.repeat === 'daily' ? 'daily' : null,
     sourceRef,
     completedAt: isoDate(value.completedAt || legacy.completedAt),
@@ -585,6 +589,7 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
     && existing.repeat === (nextRepeat === 'daily' ? 'daily' : null)
     && existing.reminderMinutesBefore === nextReminderMinutes);
   const requestedReminder = input?.reminderSentAt ?? null;
+  const snoozedUntil = sameReminderIdentity ? (input?.snoozedUntil ?? existing?.snoozedUntil ?? null) : null;
   const candidate = normalizeSchedule({
     ...existing,
     ...input,
@@ -593,7 +598,8 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
     id: existing?.id || makeId(),
     createdAt: existing?.createdAt || now,
     updatedAt: now,
-    reminderSentAt: sameReminderIdentity ? (existing.reminderSentAt || requestedReminder) : requestedReminder
+    reminderSentAt: sameReminderIdentity ? (existing.reminderSentAt || requestedReminder) : requestedReminder,
+    snoozedUntil
   }, 0, now);
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
@@ -618,7 +624,8 @@ function scheduleOccurrenceForDate(schedule, date = new Date()) {
     startAt: occurrenceStart.toISOString(),
     endAt: occurrenceEnd.toISOString(),
     occurrenceKey,
-    reminderSentAt: schedule.reminderOccurrence === occurrenceKey ? schedule.reminderSentAt : null
+    reminderSentAt: schedule.reminderOccurrence === occurrenceKey ? schedule.reminderSentAt : null,
+    snoozedUntil: schedule.reminderOccurrence === occurrenceKey ? schedule.snoozedUntil : null
   };
 }
 

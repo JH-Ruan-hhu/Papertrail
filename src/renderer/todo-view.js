@@ -12,7 +12,7 @@
   function isToday(todo, now = new Date()) { return todo.dueAt && sameDay(todo.dueAt, now); }
   function isUpcoming(todo, now = new Date()) { return todo.status === 'open' && todo.dueAt && !isToday(todo, now) && Date.parse(todo.dueAt) >= now.getTime() && Date.parse(todo.dueAt) < now.getTime() + 8 * 86_400_000; }
   function formatDue(todo) {
-    if (!todo.dueAt) return '收件箱 · 无截止时间';
+    if (!todo.dueAt) return '今天 · 无具体时间';
     const due = new Date(todo.dueAt);
     const date = sameDay(due, new Date()) ? '今天' : new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(due);
     const time = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(due);
@@ -23,8 +23,7 @@
     const now = new Date();
     const query = state.query.trim().toLocaleLowerCase('zh-CN');
     const all = (state.workspace.todos || []).filter((todo) => !query || `${todo.title}\n${todo.notes || ''}`.toLocaleLowerCase('zh-CN').includes(query));
-    if (state.view === 'today') return all.filter((todo) => todo.status === 'open' && (isToday(todo, now) || isOverdue(todo, now)));
-    if (state.view === 'inbox') return all.filter((todo) => todo.status === 'open' && !todo.dueAt);
+    if (state.view === 'today') return all.filter((todo) => todo.status === 'open' && (!todo.dueAt || isToday(todo, now)));
     if (state.view === 'upcoming') return all.filter((todo) => isUpcoming(todo, now));
     if (state.view === 'completed') return all.filter((todo) => todo.status === 'completed').sort((a, b) => Date.parse(b.completedAt || 0) - Date.parse(a.completedAt || 0));
     if (state.view === 'cancelled') return all.filter((todo) => todo.status === 'cancelled').sort((a, b) => Date.parse(b.updatedAt || 0) - Date.parse(a.updatedAt || 0));
@@ -40,7 +39,7 @@
     });
   }
   function groupLabel(todo) {
-    if (!todo.dueAt) return '无日期';
+    if (!todo.dueAt) return '今天';
     if (isOverdue(todo)) return '逾期';
     if (isToday(todo)) return '今天';
     return '即将到来';
@@ -59,8 +58,7 @@
     const now = new Date();
     const todos = state.workspace.todos || [];
     const counts = {
-      today: todos.filter((todo) => todo.status === 'open' && (isToday(todo, now) || isOverdue(todo, now))).length,
-      inbox: todos.filter((todo) => todo.status === 'open' && !todo.dueAt).length,
+      today: todos.filter((todo) => todo.status === 'open' && (!todo.dueAt || isToday(todo, now))).length,
       upcoming: todos.filter((todo) => isUpcoming(todo, now)).length,
       completed: todos.filter((todo) => todo.status === 'completed').length,
       cancelled: todos.filter((todo) => todo.status === 'cancelled').length
@@ -138,7 +136,7 @@
       const parsed = await api.parseTodo(input);
       if (request !== state.parseRequest) return null;
       if (!parsed?.valid) { recognition.textContent = parsed?.warning || '日期无法识别'; recognition.hidden = false; return null; }
-      recognition.textContent = parsed.dueAt ? `已识别：${new Date(parsed.dueAt).toLocaleString('zh-CN')} · 保存时将使用“${parsed.title}”` : '没有日期 · 保存到收件箱，不会提醒';
+      recognition.textContent = parsed.dueAt ? `已识别：${new Date(parsed.dueAt).toLocaleString('zh-CN')} · 保存时将使用“${parsed.title}”` : '未填写具体时间 · 默认放到今天，不会提醒';
       recognition.hidden = false;
       if (parsed.dueAt) setDateInput(parsed.dueAt);
       document.getElementById('todoReminderMode').value = parsed.reminderMode || 'none';

@@ -34,6 +34,8 @@ test('persists settings and papers atomically', (t) => {
   const store = new JsonStore(filePath);
   store.load();
   assert.equal(store.getSettings().refreshOnStartup, true);
+  assert.equal(store.getSettings().homeBannerImageMode, 'bing');
+  assert.equal(store.getSettings().homeBannerBingInitialized, true);
   assert.equal(store.getSettings().stickyNoteShortcut, 'CommandOrControl+Alt+N');
   assert.equal(store.getSettings().scheduleWidgetEnabled, false);
   store.updateSettings({ refreshMinutes: 720, stickyNoteShortcut: 'CommandOrControl+Alt+B', scheduleWidgetEnabled: true });

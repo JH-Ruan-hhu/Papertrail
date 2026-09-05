@@ -29,6 +29,8 @@ test('calculates event reminders and applies the missed-event grace window', () 
   assert.equal(eventReminderAt(schedule), Date.parse('2026-08-22T09:55:00.000Z'));
   assert.equal(eventReminderDue(schedule, now), true);
   assert.equal(eventReminderDue({ ...schedule, startAt: '2026-08-22T08:00:00.000Z', endAt: '2026-08-22T09:00:00.000Z' }, now), false);
+  assert.equal(eventReminderDue({ ...schedule, snoozedUntil: '2026-08-22T10:05:00.000Z' }, now), false);
+  assert.equal(eventReminderDue({ ...schedule, snoozedUntil: '2026-08-22T09:59:00.000Z' }, now), true);
 });
 
 test('does not remind an all-day event unless its reminder is at the start of the day', () => {
@@ -37,14 +39,14 @@ test('does not remind an all-day event unless its reminder is at the start of th
   assert.equal(eventReminderDue({ ...schedule, reminderMinutesBefore: 0 }, now), false);
 });
 
-test('collects event, todo reminder and overdue candidates with separate stable keys', () => {
+test('collects an event and only the highest-urgency todo candidate', () => {
   const candidates = collectReminderCandidates({
     now,
     schedules: [{ id: 'event', startAt: '2026-08-22T10:05:00.000Z', endAt: '2026-08-22T11:00:00.000Z', reminderMinutesBefore: 10 }],
     todos: [{ id: 'todo', status: 'open', dueAt: '2026-08-22T09:00:00.000Z', reminderMode: 'at-due', reminderAt: '2026-08-22T09:00:00.000Z' }]
   });
-  assert.deepEqual(candidates.map((item) => item.type), ['event', 'todo', 'todo']);
-  assert.notEqual(candidates[1].key, candidates[2].key);
+  assert.deepEqual(candidates.map((item) => item.type), ['event', 'todo']);
+  assert.equal(candidates[1].level, 'overdue');
   const seen = new Set();
   assert.equal(suppressDuplicate(seen, candidates[0].key), false);
   assert.equal(suppressDuplicate(seen, candidates[0].key), true);

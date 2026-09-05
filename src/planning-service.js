@@ -18,7 +18,7 @@ const TODO_INPUT_KEYS = Object.freeze([
 ]);
 const SCHEDULE_INPUT_KEYS = Object.freeze([
   'id', 'title', 'startAt', 'endAt', 'allDay', 'priority', 'reminderMinutesBefore',
-  'reminderSentAt', 'repeat', 'sourceRef', 'createdAt', 'updatedAt', 'legacy'
+  'reminderSentAt', 'snoozedUntil', 'repeat', 'sourceRef', 'completedAt', 'createdAt', 'updatedAt', 'legacy'
 ]);
 
 function clone(value) {
@@ -118,6 +118,65 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
     return clone(saved);
   }
 
+  function scheduleWindowForTodo(todo, timestamp, existingSchedule = null) {
+    const anchor = new Date(todo.dueAt || timestamp);
+    if (!Number.isFinite(anchor.getTime())) throw new Error('待办日期无效。');
+    if (!todo.dueAt) {
+      const start = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+      return { startAt: start.toISOString(), endAt: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1).toISOString(), allDay: true };
+    }
+    const previousDuration = existingSchedule
+      ? Date.parse(existingSchedule.endAt) - Date.parse(existingSchedule.startAt)
+      : 60 * 60_000;
+    const duration = Number.isFinite(previousDuration) && previousDuration > 0 ? previousDuration : 60 * 60_000;
+    return { startAt: anchor.toISOString(), endAt: new Date(anchor.getTime() + duration).toISOString(), allDay: false };
+  }
+
+  function saveTodoWithSchedule(input) {
+    const requested = pick(input, TODO_INPUT_KEYS);
+    const id = requested.id ? safeId(requested.id, '待办') : null;
+    const timestamp = getNow();
+    let saved;
+    commit(store, (workspace) => {
+      ensureCollections(workspace);
+      const existing = id ? findById(workspace.todos, id, '待办') : null;
+      const next = saveTodo(workspace.todos, {
+        ...requested,
+        id: existing?.id || id || undefined,
+        createdAt: existing?.createdAt,
+        updatedAt: timestamp
+      }, timestamp, makeTodoId);
+      saved = next.find((todo) => todo.id === (existing?.id || id || next[0].id));
+      workspace.todos = next;
+      const linked = workspace.schedules.filter((schedule) => schedule.sourceRef?.type === 'todo' && schedule.sourceRef.id === saved.id);
+      const automatic = linked.find((schedule) => schedule.legacy?.managedByTodo);
+      if (!existing || automatic || linked.length === 0) {
+        const window = scheduleWindowForTodo(saved, timestamp, automatic);
+        const schedule = normalizeSchedule({
+          ...automatic,
+          ...window,
+          id: automatic?.id || makeScheduleId(),
+          title: saved.title,
+          priority: saved.priority,
+          reminderMinutesBefore: null,
+          reminderSentAt: null,
+          snoozedUntil: null,
+          sourceRef: { type: 'todo', id: saved.id },
+          completedAt: saved.status === 'completed' ? saved.completedAt : null,
+          createdAt: automatic?.createdAt || timestamp,
+          updatedAt: timestamp,
+          legacy: { ...(automatic?.legacy || {}), managedByTodo: true }
+        }, 0, timestamp);
+        workspace.schedules = automatic
+          ? workspace.schedules.map((item) => item.id === automatic.id ? schedule : item)
+          : [schedule, ...workspace.schedules];
+      }
+      return workspace;
+    });
+    notify(saved.createdAt === saved.updatedAt ? 'created' : 'updated', saved.id, [...Object.keys(requested), 'sourceRef']);
+    return clone(saved);
+  }
+
   function deleteTodoItem(idValue) {
     const id = safeId(idValue, '待办');
     commit(store, (workspace) => {
@@ -150,6 +209,11 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
           ? reopenTodo(current, timestamp)
           : cancelTodo(current, timestamp);
       workspace.todos = workspace.todos.map((todo) => todo.id === id ? updated : todo);
+      workspace.schedules = workspace.schedules.map((schedule) => (
+        schedule.sourceRef?.type === 'todo' && schedule.sourceRef.id === id && schedule.legacy?.managedByTodo
+          ? { ...schedule, completedAt: action === 'reopen' ? null : timestamp, updatedAt: timestamp }
+          : schedule
+      ));
       saved = updated;
       return workspace;
     });
@@ -206,6 +270,23 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
       const next = saveSchedule(workspace.schedules, prepared, timestamp, makeScheduleId);
       saved = next.find((schedule) => schedule.id === (existing?.id || id || next[0].id));
       workspace.schedules = next;
+      const linkedTodo = saved.sourceRef?.type === 'todo'
+        ? workspace.todos.find((todo) => todo.id === saved.sourceRef.id)
+        : null;
+      if (linkedTodo?.legacy?.managedBySchedule || saved.legacy?.managedByTodo) {
+        const managedByTodo = Boolean(saved.legacy?.managedByTodo);
+        workspace.todos = saveTodo(workspace.todos, {
+          id: linkedTodo.id,
+          title: saved.title,
+          priority: saved.priority,
+          dueAt: managedByTodo ? saved.startAt : saved.endAt,
+          reminderMode: 'none',
+          reminderAt: null,
+          status: saved.completedAt ? 'completed' : linkedTodo.status === 'cancelled' ? 'cancelled' : 'open',
+          completedAt: saved.completedAt,
+          legacy: linkedTodo.legacy
+        }, timestamp, makeTodoId);
+      }
       return workspace;
     });
     notify(saved.createdAt === saved.updatedAt ? 'created' : 'updated', saved.id, Object.keys(requested));
@@ -274,6 +355,7 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
         priority: requestedTodo.priority || requestedSchedule.priority,
         dueAt: requestedTodo.dueAt || requestedSchedule.endAt,
         reminderMode: requestedTodo.reminderMode || 'none',
+        legacy: { ...(requestedTodo.legacy || {}), managedBySchedule: true },
         createdAt: timestamp,
         updatedAt: timestamp
       }, 0, timestamp);
@@ -387,6 +469,7 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
     reopenTodo: (id) => updateTodoStatus(id, 'reopen'),
     saveSchedule: saveScheduleItem,
     saveTodo: saveTodoItem,
+    saveTodoWithSchedule,
     scheduleTodo,
     snoozeTodo: snoozeTodoItem
   };

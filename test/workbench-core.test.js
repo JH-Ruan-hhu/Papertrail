@@ -40,6 +40,9 @@ test('daily schedules keep their local time and generate one occurrence for each
   const reminded = { ...schedules[0], reminderSentAt: new Date(2026, 7, 30, 9, 20).toISOString(), reminderOccurrence: '2026-08-30' };
   assert.ok(scheduleOccurrenceForDate(reminded, new Date(2026, 7, 30, 12)).reminderSentAt);
   assert.equal(scheduleOccurrenceForDate(reminded, new Date(2026, 7, 31, 12)).reminderSentAt, null);
+  const snoozed = { ...schedules[0], snoozedUntil: new Date(2026, 7, 30, 9, 40).toISOString(), reminderOccurrence: '2026-08-30' };
+  assert.ok(scheduleOccurrenceForDate(snoozed, new Date(2026, 7, 30, 12)).snoozedUntil);
+  assert.equal(scheduleOccurrenceForDate(snoozed, new Date(2026, 7, 31, 12)).snoozedUntil, null);
 });
 
 test('parses Chinese relative date, day part and a multi-hour range', () => {
@@ -75,6 +78,17 @@ test('parses a bare day-of-month and removes the full deadline token from the ti
   assert.equal(new Date(deadline.startAt).getDate(), 28);
   assert.equal(deadline.title, '完成基恩士测评');
   assert.equal(deadline.deadline, true);
+});
+
+test('consumes the deadline suffix after relative and month-day schedule dates', () => {
+  const now = new Date(2026, 8, 2, 10, 0);
+  const relative = parseNaturalLanguageSchedule('明天前交材料', now);
+  const monthDay = parseNaturalLanguageSchedule('9月5号前提交论文', now);
+  assert.equal(relative.title, '交材料');
+  assert.equal(relative.deadline, true);
+  assert.equal(monthDay.title, '提交论文');
+  assert.equal(monthDay.deadline, true);
+  assert.equal(new Date(monthDay.startAt).getDate(), 5);
 });
 
 test('splits multiple explicitly timed clauses and inherits their date', () => {

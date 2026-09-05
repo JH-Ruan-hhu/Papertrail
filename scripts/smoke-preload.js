@@ -1,6 +1,12 @@
 'use strict';
 
+const fs = require('node:fs');
 const { contextBridge } = require('electron');
+
+const smokeBannerPath = process.env.WORKBENCH_HOME_BANNER_PATH;
+const smokeBannerDataUrl = smokeBannerPath && fs.existsSync(smokeBannerPath)
+  ? `data:image/jpeg;base64,${fs.readFileSync(smokeBannerPath).toString('base64')}`
+  : '';
 
 const now = Date.now();
 const todayAt = (hour, minute = 0) => new Date(new Date().setHours(hour, minute, 0, 0)).toISOString();
@@ -253,6 +259,12 @@ contextBridge.exposeInMainWorld('paperTrail', {
   },
   parseSchedule: async (input) => {
     const text = String(input || '');
+    if (text.includes('今天下午一点')) {
+      const tokens = ['今天', '下午', '下午一点'];
+      const matches = tokens.map((token) => ({ start: text.indexOf(token), end: text.indexOf(token) + token.length, text: token }));
+      const parsed = { valid: true, title: '点去找赵博', startAt: new Date(now).toISOString(), endAt: new Date(now + 3_600_000).toISOString(), priority: 'low', deadline: false, matches, meta: { explicitTime: true } };
+      return { ...parsed, schedules: [parsed] };
+    }
     if (text.includes('，')) {
       const schedules = [
         { valid: true, title: '去采样', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: 'low', deadline: false, matches: [] },
@@ -275,6 +287,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
     const schedule = { ...input.schedule, id: `schedule-linked-${Date.now()}`, sourceRef: { type: 'todo', id: todo.id } };
     smokeWorkspace.todos = [todo, ...(smokeWorkspace.todos || [])];
     smokeWorkspace.schedules = [schedule, ...(smokeWorkspace.schedules || [])];
+    document.body.dataset.savedScheduleCount = String(Number(document.body.dataset.savedScheduleCount || 0) + 1);
+    document.body.dataset.lastSavedSchedule = JSON.stringify(schedule);
     document.body.dataset.createdScheduledTodo = JSON.stringify({ todo, schedule });
     return { todo, schedule };
   },
@@ -323,6 +337,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
   },
   parseTodo: async (input) => {
     const text = String(input || '');
+    if (text.includes('今天下午一点')) {
+      return { valid: true, title: '点去找赵博', dueAt: new Date(now).toISOString(), reminderMode: 'at-time', priority: 'medium', matches: [{ start: 0, end: 2, text: '今天' }, { start: 2, end: 4, text: '下午' }], meta: { explicitTime: true } };
+    }
     const matches = ['明天', '下午 3 点到 5 点', '#1'].map((token) => ({ start: text.indexOf(token), end: text.indexOf(token) + token.length, text: token })).filter((match) => match.start >= 0);
     return { valid: true, title: text.replace(/明天.*?点半?/u, '').trim(), dueAt: new Date(now + 86_400_000).toISOString(), reminderMode: 'at-time', priority: /#1/.test(text) ? 'high' : 'medium', matches, meta: { explicitTime: /点/.test(text) } };
   },
@@ -414,9 +431,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
     autoCheckUpdates: true,
     quickCaptureShortcut: 'CommandOrControl+Shift+Space',
     stickyNoteShortcut: 'CommandOrControl+Alt+N',
-    homeBannerImageMode: 'default',
-    homeBannerImageCredit: '',
-    homeBannerImageDataUrl: '',
+    homeBannerImageMode: smokeBannerDataUrl ? 'bing' : 'default',
+    homeBannerImageCredit: smokeBannerDataUrl ? '必应每日壁纸视觉检查' : '',
+    homeBannerImageDataUrl: smokeBannerDataUrl,
     appVersion: '1.0.0',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\Yanji Data',
     backupCount: 1,
