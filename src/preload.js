@@ -10,7 +10,6 @@ const on = (channel) => (callback) => {
 
 contextBridge.exposeInMainWorld('paperTrail', {
   getWorkspace: () => ipcRenderer.invoke('workspace:get'),
-  getTodayWidgetData: () => ipcRenderer.invoke('today-widget:get-data'),
   parseSchedule: (input) => ipcRenderer.invoke('schedules:parse', input),
   saveSchedule: (input) => ipcRenderer.invoke('schedules:save', input),
   deleteSchedule: (id) => ipcRenderer.invoke('schedules:delete', id),
@@ -30,9 +29,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   scheduleTodo: (id, input) => ipcRenderer.invoke('todos:schedule', id, input),
   createScheduledTodo: (input) => ipcRenderer.invoke('todos:create-scheduled', input),
   convertTodoToSchedule: (id, input) => ipcRenderer.invoke('todos:convert-to-schedule', id, input),
-  showScheduleWidget: () => ipcRenderer.invoke('schedule-widget:show'),
-  closeScheduleWidget: () => ipcRenderer.invoke('schedule-widget:close'),
-  openScheduleWidgetMain: () => ipcRenderer.invoke('schedule-widget:open-main'),
   saveNote: (input) => ipcRenderer.invoke('notes:save', input),
   appendDailyNote: (input) => ipcRenderer.invoke('notes:append-daily', input),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
@@ -96,7 +92,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   onRefreshState: on('refresh:state'),
   onUpdateState: on('updates:state'),
   onWorkspaceChanged: on('workspace:changed'),
-  onTodayWidgetChanged: on('today-widget:changed'),
   onSettingsChanged: on('settings:changed'),
   onWorkspaceNavigate: on('workspace:navigate'),
   onFocusChanged: on('focus:changed'),

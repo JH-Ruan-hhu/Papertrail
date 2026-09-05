@@ -38,8 +38,6 @@ test('migrates legacy deadline schedules to stable todos and leaves ordinary eve
   assert.equal(result.data.todos[0].legacy.sourceType, 'schedule-deadline');
   assert.equal(result.data.schedules.length, 1);
   assert.equal(result.data.schedules[0].id, 'event-1');
-  assert.equal(result.data.settings.todayWidgetEnabled, true);
-  assert.equal('scheduleWidgetEnabled' in result.data.settings, false);
   assert.deepEqual(result.data.futureMetadata, { keep: true });
   assert.equal(result.changed, true);
 });
@@ -64,9 +62,7 @@ test('rejects future versions and invalid collection shapes before writing', () 
 
 test('normalizes theme, widget, event and todo reminder defaults', () => {
   const settings = normalizeSettings({ scheduleWidgetEnabled: true, appearanceTheme: 'unknown', widgetShowTodos: false }, { defaultEventReminderMinutes: 5 });
-  assert.equal(settings.todayWidgetEnabled, true);
   assert.equal(settings.appearanceTheme, undefined);
-  assert.equal(settings.widgetShowTodos, false);
   assert.equal(settings.defaultEventReminderMinutes, 5);
   assert.equal(settings.defaultTodoReminderMode, 'at-due');
 });

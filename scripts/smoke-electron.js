@@ -530,11 +530,6 @@ app.whenReady().then(async () => {
       const updatePromptDismissed = !updatePrompt.open;
       document.querySelector('[data-settings-section="general"]').click();
       const generalVisible = !document.querySelector('[data-settings-panel="general"]').hidden;
-      const todayOverviewSwitchVisible = document.getElementById('todayWidgetEnabled').getBoundingClientRect().height > 0;
-      const widgetMaster = document.getElementById('todayWidgetEnabled');
-      widgetMaster.checked = false;
-      widgetMaster.dispatchEvent(new Event('change', { bubbles: true }));
-      const widgetChildrenDisabled = [...document.querySelectorAll('[data-widget-dependent] input')].every((control) => control.disabled);
       const startAtLogin = document.getElementById('startAtLogin');
       startAtLogin.checked = true;
       document.querySelector('[data-settings-section="storage"]').click();
@@ -542,10 +537,10 @@ app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 180));
       const draftPreserved = startAtLogin.checked;
       document.querySelector('[data-workbench-page="home"]').click();
-      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, appearanceVisible, localBannerActionVisible, bingBannerActionVisible, trackingVisible, storageVisible, storageSelectedExactly, settingsTabsEqualWidth, settingsTabsSingleRow, settingsTabWidths, settingsTabTops, updatesVisible, updateIdle, updateAvailable, updatePromptAvailable, updateDownloaded, updatePromptDownloaded, updatePromptDismissed, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, todayOverviewSwitchVisible, widgetChildrenDisabled, draftPreserved };
+      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, appearanceVisible, localBannerActionVisible, bingBannerActionVisible, trackingVisible, storageVisible, storageSelectedExactly, settingsTabsEqualWidth, settingsTabsSingleRow, settingsTabWidths, settingsTabTops, updatesVisible, updateIdle, updateAvailable, updatePromptAvailable, updateDownloaded, updatePromptDownloaded, updatePromptDismissed, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, draftPreserved };
     })()
   `);
-  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.appearanceVisible || !settingsDraftResult.localBannerActionVisible || !settingsDraftResult.bingBannerActionVisible || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.settingsTabsEqualWidth || !settingsDraftResult.settingsTabsSingleRow || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updatePromptAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.updatePromptDownloaded || !settingsDraftResult.updatePromptDismissed || !settingsDraftResult.generalVisible || !settingsDraftResult.todayOverviewSwitchVisible || !settingsDraftResult.widgetChildrenDisabled || !settingsDraftResult.draftPreserved) {
+  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.appearanceVisible || !settingsDraftResult.localBannerActionVisible || !settingsDraftResult.bingBannerActionVisible || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.settingsTabsEqualWidth || !settingsDraftResult.settingsTabsSingleRow || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updatePromptAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.updatePromptDownloaded || !settingsDraftResult.updatePromptDismissed || !settingsDraftResult.generalVisible || !settingsDraftResult.draftPreserved) {
     throw new Error(`Settings draft smoke test failed: ${JSON.stringify(settingsDraftResult)}`);
   }
   console.log(`SETTINGS_DRAFT_SMOKE_OK ${JSON.stringify(settingsDraftResult)}`);

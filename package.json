@@ -31,7 +31,6 @@
     "productName": "研迹",
     "asar": true,
     "asarUnpack": [
-      "src/windows-desktop-icons.ps1",
       "build/icon.ico",
       "build/icon.png"
     ],

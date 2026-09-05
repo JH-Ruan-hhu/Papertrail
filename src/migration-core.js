@@ -43,10 +43,6 @@ function normalizeSettings(source, defaults) {
   const input = asObject(source) || {};
   const safeDefaults = asObject(defaults) || {};
   const settings = { ...safeDefaults, ...input };
-  settings.todayWidgetEnabled = input.todayWidgetEnabled ?? input.scheduleWidgetEnabled ?? safeDefaults.todayWidgetEnabled ?? false;
-  settings.widgetShowSchedules = input.widgetShowSchedules !== false;
-  settings.widgetShowTodos = input.widgetShowTodos !== false;
-  settings.widgetShowCompletedTodos = input.widgetShowCompletedTodos === true;
   delete settings.appearanceTheme; // Ignore the retired setting in legacy JSON.
   settings.homeBannerImageMode = ['default', 'local', 'bing'].includes(input.homeBannerImageMode) ? input.homeBannerImageMode : (safeDefaults.homeBannerImageMode || 'bing');
   settings.homeBannerBingInitialized = input.homeBannerBingInitialized === true;
@@ -62,7 +58,6 @@ function normalizeSettings(source, defaults) {
   settings.defaultTodoReminderMode = allowedTodoModes.has(input.defaultTodoReminderMode)
     ? input.defaultTodoReminderMode
     : safeDefaults.defaultTodoReminderMode ?? 'at-due';
-  delete settings.scheduleWidgetEnabled;
   return settings;
 }
 

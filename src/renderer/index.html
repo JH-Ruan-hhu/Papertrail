@@ -175,7 +175,7 @@
         <section class="workbench-page schedule-page" data-page="schedule" hidden>
           <header class="page-head-row">
             <div><p class="eyebrow">WEEKLY SCHEDULE</p><h1>日程</h1><p>按日期浏览完整安排，也可把当日清单放到桌面</p></div>
-            <div class="page-actions"><button class="button secondary" id="openScheduleWidgetButton" type="button" title="以 3×4 桌面组件显示当日日程">放到桌面</button><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
+            <div class="page-actions"><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
           </header>
           <div class="timeline-datebar schedule-weekbar">
             <button id="previousDayButton" type="button" aria-label="上一周">‹</button>
@@ -338,14 +338,8 @@
               <h2>通用</h2>
               <h3>Windows 行为</h3>
               <div class="settings-group">
-                <div class="setting-row"><div><strong>关闭时驻留托盘</strong><small>关闭主窗口后继续运行日程提醒、便笺和投稿检查</small></div><label class="switch"><input id="closeToTray" type="checkbox"><span></span></label></div>
+                <div class="setting-row"><div><strong>关闭时驻留托盘</strong><small>关闭主窗口后继续运行日程提醒和投稿检查</small></div><label class="switch"><input id="closeToTray" type="checkbox"><span></span></label></div>
                 <div class="setting-row"><div><strong>登录 Windows 后启动</strong><small>自动启动研迹工作台并驻留系统托盘</small></div><label class="switch"><input id="startAtLogin" type="checkbox"><span></span></label></div>
-              </div>
-              <h3>今日概览</h3>
-              <div class="settings-group" id="todayWidgetSettingsGroup">
-                <div class="setting-row"><div><strong>打开今日概览</strong><small>占据桌面图标网格；关闭主窗口后仍保留</small></div><label class="switch"><input id="todayWidgetEnabled" type="checkbox"><span></span></label></div>
-                <div class="setting-row" data-widget-dependent><div><strong>显示日程</strong></div><label class="switch"><input id="widgetShowSchedules" type="checkbox"><span></span></label></div>
-                <div class="setting-row" data-widget-dependent><div><strong>显示待办</strong></div><label class="switch"><input id="widgetShowTodos" type="checkbox"><span></span></label></div>
               </div>
               <h3>快捷操作</h3>
               <div class="settings-group">

@@ -920,16 +920,12 @@ function populateSettings() {
   document.getElementById('todoNotifications').checked = settings.todoNotifications !== false;
   document.getElementById('defaultEventReminderMinutes').value = String(settings.defaultEventReminderMinutes == null ? 'null' : settings.defaultEventReminderMinutes);
   document.getElementById('defaultTodoReminderMode').value = settings.defaultTodoReminderMode || 'at-due';
-  document.getElementById('todayWidgetEnabled').checked = settings.todayWidgetEnabled ?? settings.scheduleWidgetEnabled;
-  document.getElementById('widgetShowSchedules').checked = settings.widgetShowSchedules !== false;
-  document.getElementById('widgetShowTodos').checked = settings.widgetShowTodos !== false;
   document.querySelectorAll('input[name="homeBannerImageMode"]').forEach((input) => { input.checked = input.value === (settings.homeBannerImageMode || 'bing'); });
   document.getElementById('closeToTray').checked = settings.closeToTray;
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
   document.getElementById('quickCaptureShortcut').value = settings.quickCaptureShortcut || 'CommandOrControl+Shift+Space';
   syncReminderSettings();
-  syncTodayWidgetSettings();
   syncHomeBannerSettings();
   populateSettingsMetadata();
 }
@@ -986,14 +982,6 @@ function syncReminderSettings() {
       if (!enabled && control.type === 'checkbox') control.checked = false;
       control.disabled = !enabled;
     });
-  });
-}
-
-function syncTodayWidgetSettings() {
-  const enabled = document.getElementById('todayWidgetEnabled').checked;
-  document.querySelectorAll('[data-widget-dependent]').forEach((row) => {
-    row.classList.toggle('is-setting-disabled', !enabled);
-    row.querySelectorAll('input, select, button').forEach((control) => { control.disabled = !enabled; });
   });
 }
 
@@ -1139,9 +1127,6 @@ async function saveSettings() {
       defaultEventReminderMinutes: document.getElementById('defaultEventReminderMinutes').value === 'null' ? null : Number(document.getElementById('defaultEventReminderMinutes').value),
       defaultTodoReminderMode: document.getElementById('defaultTodoReminderMode').value,
       homeBannerImageMode: document.querySelector('input[name="homeBannerImageMode"]:checked')?.value || 'bing',
-      todayWidgetEnabled: document.getElementById('todayWidgetEnabled').checked,
-      widgetShowSchedules: document.getElementById('widgetShowSchedules').checked,
-      widgetShowTodos: document.getElementById('widgetShowTodos').checked,
       closeToTray: document.getElementById('closeToTray').checked,
       startAtLogin: document.getElementById('startAtLogin').checked,
       autoCheckUpdates: document.getElementById('autoCheckUpdates').checked,
@@ -1350,7 +1335,6 @@ function bindEvents() {
   elements.dismissUpdatePromptButton.addEventListener('click', dismissUpdatePrompt);
   elements.closeUpdatePromptButton.addEventListener('click', dismissUpdatePrompt);
   document.getElementById('notifications').addEventListener('change', syncReminderSettings);
-  document.getElementById('todayWidgetEnabled').addEventListener('change', syncTodayWidgetSettings);
   elements.addDialog.addEventListener('click', closeOnBackdrop);
   elements.journeyDialog.addEventListener('click', closeOnBackdrop);
   elements.workflowDialog.addEventListener('click', closeOnBackdrop);

@@ -41,7 +41,6 @@ const { createPlanningService } = require('./planning-service');
 const { normalizeCaptureInput } = require('./capture-core');
 const { deleteCountdown, saveCountdown } = require('./countdown-core');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
-const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
 const { deleteJobApplication, jobDeadlineReminderDue, mergeImportedJobApplications, normalizeJobApplication, saveJobApplication } = require('./job-core');
 const { resolveStableUserDataPath } = require('./user-data-path');
@@ -171,8 +170,6 @@ let coldStartRefreshStarted = false;
 let updateState;
 let updaterInitialized = false;
 let quickCaptureWindow;
-let scheduleWidgetWindow;
-let desktopIconReservation;
 let quickCaptureHasContent = false;
 let focusTimer;
 let focusSampler;
@@ -874,41 +871,6 @@ function broadcastPapers() {
   }
 }
 
-function todayWidgetForRenderer() {
-  const now = new Date();
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  const settings = store.getSettings();
-  const schedules = store.listSchedules()
-    .filter((item) => {
-      const start = Date.parse(item.startAt);
-      const end = Date.parse(item.endAt || item.startAt);
-      return Number.isFinite(start) && Number.isFinite(end) && start < dayEnd.getTime() && end > dayStart.getTime();
-    })
-    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
-    .map((item) => ({
-      id: item.id,
-      title: item.title,
-      startAt: item.startAt,
-      endAt: item.endAt,
-      allDay: Boolean(item.allDay),
-      priority: item.priority,
-      sourceRef: item.sourceRef || null
-    }));
-  const todos = store.listTodos()
-    .filter((item) => item.status === 'open' && (!item.dueAt || localDateKey(new Date(item.dueAt)) === localDateKey(now)))
-    .sort((a, b) => (a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY) - (b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY))
-    .slice(0, 12)
-    .map((item) => ({ id: item.id, title: item.title, dueAt: item.dueAt, priority: item.priority, status: item.status }));
-  return {
-    date: localDateKey(now),
-    schedules: settings.widgetShowSchedules !== false ? schedules : [],
-    todos: settings.widgetShowTodos !== false ? todos : [],
-    showCompletedTodos: settings.widgetShowCompletedTodos === true
-  };
-}
-
 function workspaceForRenderer() {
   const activeAttendance = activeAttendanceRecord();
   return {
@@ -932,15 +894,12 @@ function broadcastWorkspace() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('workspace:changed', workspace);
   }
-  if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
-    scheduleWidgetWindow.webContents.send('today-widget:changed', todayWidgetForRenderer());
-  }
   return workspace;
 }
 
 function broadcastSettings() {
   const settings = settingsForRenderer();
-  for (const window of [mainWindow, quickCaptureWindow, scheduleWidgetWindow]) {
+  for (const window of [mainWindow, quickCaptureWindow]) {
     if (window && !window.isDestroyed()) window.webContents.send('settings:changed', settings);
   }
   return settings;
@@ -1826,335 +1785,6 @@ function registerWorkbenchShortcuts(settings = store?.getSettings(), { allowFall
   return registered;
 }
 
-function nativeWindowHandleValue(window) {
-  const handle = window.getNativeWindowHandle();
-  if (handle.length >= 8) return handle.readBigUInt64LE(0).toString();
-  return BigInt(handle.readUInt32LE(0)).toString();
-}
-
-async function attachWindowToDesktop(window, targetSize) {
-  if (process.platform !== 'win32') return false;
-  const script = String.raw`
-$ChildHandle = [UInt64]::Parse($env:YANJI_DESKTOP_CHILD_HANDLE)
-$TargetWidth = [Int32]::Parse($env:YANJI_DESKTOP_CHILD_WIDTH)
-$TargetHeight = [Int32]::Parse($env:YANJI_DESKTOP_CHILD_HEIGHT)
-$source = @'
-using System;
-using System.Runtime.InteropServices;
-
-public static class YanjiDesktopHost {
-  private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
-  [StructLayout(LayoutKind.Sequential)]
-  private struct RECT { public int Left, Top, Right, Bottom; }
-
-  [StructLayout(LayoutKind.Sequential)]
-  private struct POINT { public int X, Y; }
-
-  [DllImport("user32.dll")]
-  private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
-
-  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-  private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr childAfter, string className, string title);
-
-  [DllImport("user32.dll")]
-  private static extern IntPtr GetShellWindow();
-
-  [DllImport("user32.dll", SetLastError = true)]
-  private static extern IntPtr SetParent(IntPtr child, IntPtr parent);
-
-  [DllImport("user32.dll")]
-  private static extern IntPtr GetParent(IntPtr child);
-
-  [DllImport("user32.dll")]
-  private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-
-  [DllImport("user32.dll")]
-  private static extern bool ScreenToClient(IntPtr hWnd, ref POINT point);
-
-  [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
-  private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int index);
-
-  [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
-  private static extern IntPtr GetWindowLong32(IntPtr hWnd, int index);
-
-  [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
-  private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int index, IntPtr value);
-
-  [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
-  private static extern IntPtr SetWindowLong32(IntPtr hWnd, int index, IntPtr value);
-
-  [DllImport("user32.dll", SetLastError = true)]
-  private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
-
-  [DllImport("gdi32.dll", SetLastError = true)]
-  private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
-
-  [DllImport("user32.dll", SetLastError = true)]
-  private static extern int SetWindowRgn(IntPtr hWnd, IntPtr region, bool redraw);
-
-  [DllImport("gdi32.dll")]
-  private static extern bool DeleteObject(IntPtr value);
-
-  private static IntPtr GetStyle(IntPtr hWnd) {
-    return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, -16) : GetWindowLong32(hWnd, -16);
-  }
-
-  private static void SetStyle(IntPtr hWnd, IntPtr value) {
-    if (IntPtr.Size == 8) SetWindowLongPtr64(hWnd, -16, value);
-    else SetWindowLong32(hWnd, -16, value);
-  }
-
-  private static IntPtr GetExtendedStyle(IntPtr hWnd) {
-    return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, -20) : GetWindowLong32(hWnd, -20);
-  }
-
-  private static void SetExtendedStyle(IntPtr hWnd, IntPtr value) {
-    if (IntPtr.Size == 8) SetWindowLongPtr64(hWnd, -20, value);
-    else SetWindowLong32(hWnd, -20, value);
-  }
-
-  private static IntPtr FindIconHost() {
-    IntPtr host = IntPtr.Zero;
-    EnumWindows(delegate(IntPtr candidate, IntPtr state) {
-      if (FindWindowEx(candidate, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero) {
-        host = candidate;
-        return false;
-      }
-      return true;
-    }, IntPtr.Zero);
-    return host != IntPtr.Zero ? host : GetShellWindow();
-  }
-
-  public static int Attach(UInt64 childValue, int targetWidth, int targetHeight) {
-    IntPtr child = new IntPtr(unchecked((long)childValue));
-    IntPtr host = FindIconHost();
-    if (child == IntPtr.Zero) return 11;
-    if (host == IntPtr.Zero) return 12;
-    if (targetWidth <= 0 || targetHeight <= 0) return 13;
-
-    RECT rect;
-    if (!GetWindowRect(child, out rect)) return 2;
-    POINT origin = new POINT { X = rect.Left, Y = rect.Top };
-    ScreenToClient(host, ref origin);
-
-    long style = GetStyle(child).ToInt64();
-    const long nativeFrame = 0x00C00000L | 0x00040000L | 0x00080000L | 0x00020000L | 0x00010000L;
-    style = (style & ~0x80000000L & ~nativeFrame) | 0x40000000L;
-    SetStyle(child, new IntPtr(style));
-    long extendedStyle = GetExtendedStyle(child).ToInt64();
-    const long extendedFrame = 0x00000100L | 0x00000200L | 0x00020000L;
-    SetExtendedStyle(child, new IntPtr(extendedStyle & ~extendedFrame));
-    SetParent(child, host);
-    if (GetParent(child) != host) return 3;
-
-    const uint flags = 0x0010 | 0x0020 | 0x0040;
-    if (!SetWindowPos(child, IntPtr.Zero, origin.X, origin.Y, targetWidth, targetHeight, flags)) return 4;
-    IntPtr region = CreateRoundRectRgn(0, 0, targetWidth + 1, targetHeight + 1, 40, 40);
-    if (region == IntPtr.Zero) return 5;
-    if (SetWindowRgn(child, region, true) == 0) {
-      DeleteObject(region);
-      return 6;
-    }
-    return 0;
-  }
-}
-'@
-Add-Type -TypeDefinition $source
-$attachResult = [YanjiDesktopHost]::Attach($ChildHandle, $TargetWidth, $TargetHeight)
-Write-Output "YANJI_DESKTOP_RESULT=$attachResult"
-if ($attachResult -eq 0) { Write-Output 'YANJI_DESKTOP_ATTACHED'; exit 0 }
-exit 1
-`;
-  const result = await new Promise((resolve) => {
-    const child = spawn('powershell.exe', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-WindowStyle',
-      'Hidden',
-      '-Command',
-      script
-    ], {
-      windowsHide: true,
-      env: {
-        ...process.env,
-        YANJI_DESKTOP_CHILD_HANDLE: nativeWindowHandleValue(window),
-        YANJI_DESKTOP_CHILD_WIDTH: String(targetSize.width),
-        YANJI_DESKTOP_CHILD_HEIGHT: String(targetSize.height)
-      },
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      resolve(value);
-    };
-    const timeout = setTimeout(() => {
-      child.kill();
-      finish({ status: null, signal: 'TIMEOUT', stdout, stderr, error: new Error('desktop attach timed out') });
-    }, 8_000);
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    child.on('error', (error) => finish({ status: null, signal: null, stdout, stderr, error }));
-    child.on('close', (status, signal) => finish({ status, signal, stdout, stderr }));
-  });
-  const attached = result.status === 0 && result.stdout.includes('YANJI_DESKTOP_ATTACHED');
-  if (!attached && process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-    console.warn(`DESKTOP_WIDGET_NATIVE_DIAGNOSTIC ${JSON.stringify({ handle: nativeWindowHandleValue(window), status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr, error: result.error?.message })}`);
-  }
-  return attached;
-}
-
-function desktopIconHelperPath() {
-  if (app.isPackaged) return path.join(process.resourcesPath, 'app.asar.unpacked', 'src', 'windows-desktop-icons.ps1');
-  return path.join(__dirname, 'windows-desktop-icons.ps1');
-}
-
-function runDesktopIconHelper(operation, extraEnv = {}, { synchronous = false } = {}) {
-  const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', desktopIconHelperPath()];
-  const options = {
-    windowsHide: true,
-    env: { ...process.env, YANJI_DESKTOP_ICON_OPERATION: operation, ...extraEnv },
-    encoding: 'utf8'
-  };
-  if (synchronous) return spawnSync('powershell.exe', args, { ...options, timeout: 8_000 });
-  return new Promise((resolve) => {
-    const child = spawn('powershell.exe', args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      resolve(value);
-    };
-    const timeout = setTimeout(() => {
-      child.kill();
-      finish({ status: null, signal: 'TIMEOUT', stdout, stderr, error: new Error(`desktop icon ${operation} timed out`) });
-    }, 8_000);
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    child.on('error', (error) => finish({ status: null, signal: null, stdout, stderr, error }));
-    child.on('close', (status, signal) => finish({ status, signal, stdout, stderr }));
-  });
-}
-
-async function reserveDesktopIcons(window) {
-  if (process.platform !== 'win32' || process.env.YANJI_DESKTOP_WIDGET_NO_ICON_REFLOW || process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) return { reserved: true, movedIcons: 0, snapshot: null };
-  const result = await runDesktopIconHelper('reserve', { YANJI_DESKTOP_CHILD_HANDLE: nativeWindowHandleValue(window) });
-  const match = String(result.stdout || '').match(/YANJI_DESKTOP_RESERVATION=([^\r\n]+)/);
-  if (result.status !== 0 || !match) {
-    console.warn(`[研迹] 桌面图标占位失败: ${String(result.stderr || result.error?.message || 'unknown').trim()}`);
-    return { reserved: false, movedIcons: 0, snapshot: null };
-  }
-  const decoded = Buffer.from(match[1], 'base64').toString('utf8');
-  const movedIcons = decoded.includes('|') && decoded.split('|')[1] ? decoded.split('|')[1].split(';').filter(Boolean).length : 0;
-  return { reserved: true, movedIcons, snapshot: match[1] };
-}
-
-async function restoreDesktopIcons() {
-  const snapshot = desktopIconReservation;
-  desktopIconReservation = null;
-  if (!snapshot || process.platform !== 'win32') return true;
-  const result = await runDesktopIconHelper('restore', { YANJI_DESKTOP_ICON_SNAPSHOT: snapshot });
-  if (result.status !== 0) console.warn(`[研迹] 桌面图标位置恢复失败: ${String(result.stderr || result.error?.message || result.status).trim()}`);
-  return result.status === 0;
-}
-
-function restoreDesktopIconsSync() {
-  const snapshot = desktopIconReservation;
-  desktopIconReservation = null;
-  if (!snapshot || process.platform !== 'win32') return true;
-  const result = runDesktopIconHelper('restore', { YANJI_DESKTOP_ICON_SNAPSHOT: snapshot }, { synchronous: true });
-  return result.status === 0;
-}
-
-async function showScheduleWidget() {
-  if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
-    if (!scheduleWidgetWindow.isVisible()) scheduleWidgetWindow.showInactive();
-    return desktopWidgetPresentation({
-      attached: Boolean(scheduleWidgetWindow.yanjiDesktopAttached),
-      reserved: Boolean(scheduleWidgetWindow.yanjiDesktopReserved),
-      movedIcons: Number(scheduleWidgetWindow.yanjiMovedDesktopIcons) || 0,
-      attempts: scheduleWidgetWindow.yanjiDesktopDiagnostic?.attempts || 0,
-      supported: process.platform === 'win32'
-    });
-  }
-  const display = screen.getPrimaryDisplay();
-  const { workArea, scaleFactor } = display;
-  const width = 360;
-  const height = 480;
-  const window = new BrowserWindow({
-    width,
-    height,
-    x: workArea.x + workArea.width - width - 24,
-    y: workArea.y + 24,
-    show: false,
-    frame: false,
-    thickFrame: false,
-    transparent: true,
-    resizable: false,
-    maximizable: false,
-    minimizable: false,
-    fullscreenable: false,
-    alwaysOnTop: false,
-    skipTaskbar: true,
-    hasShadow: false,
-    backgroundColor: '#00000000',
-    icon: createAppWindowIcon(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      devTools: !app.isPackaged
-    }
-  });
-  scheduleWidgetWindow = window;
-  window.on('closed', () => {
-    restoreDesktopIcons().catch(() => {});
-    if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
-  });
-  await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'));
-  const targetSize = {
-    width: Math.round(width * scaleFactor),
-    height: Math.round(height * scaleFactor)
-  };
-  let attached = false;
-  const diagnostics = [];
-  for (let attempt = 1; attempt <= 3 && !attached; attempt += 1) {
-    attached = await attachWindowToDesktop(window, targetSize);
-    if (!attached) {
-      diagnostics.push(`attempt-${attempt}-failed`);
-      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
-    }
-  }
-  window.yanjiDesktopAttached = attached;
-  const reservation = attached ? await reserveDesktopIcons(window) : { reserved: false, movedIcons: 0, snapshot: null };
-  desktopIconReservation = reservation.snapshot;
-  window.yanjiDesktopReserved = reservation.reserved;
-  window.yanjiMovedDesktopIcons = reservation.movedIcons;
-  const widgetPresentation = desktopWidgetPresentation({ attached, reserved: reservation.reserved, movedIcons: reservation.movedIcons, attempts: diagnostics.length, supported: process.platform === 'win32' });
-  window.yanjiDesktopDiagnostic = widgetPresentation.diagnostic;
-  if (attached) {
-    window.webContents.setZoomFactor(scaleFactor);
-    await new Promise((resolve) => setTimeout(resolve, 80));
-  } else {
-    if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-      console.warn(`DESKTOP_WIDGET_STATE ${JSON.stringify(window.yanjiDesktopDiagnostic)}`);
-    }
-    window.close();
-    return widgetPresentation;
-  }
-  window.showInactive();
-  return widgetPresentation;
-}
-
 function showScheduleNotification(schedule) {
   if (!store.getSettings().notifications || !Notification.isSupported()) return;
   const notification = new Notification({
@@ -2550,8 +2180,7 @@ function validateSettings(patch) {
   const allowed = {};
   for (const key of [
     'autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin', 'autoCheckUpdates',
-    'todayWidgetEnabled', 'scheduleWidgetEnabled', 'widgetShowSchedules', 'widgetShowTodos',
-    'widgetShowCompletedTodos', 'eventNotifications', 'todoNotifications'
+    'eventNotifications', 'todoNotifications'
   ]) {
     if (key in patch) allowed[key] = Boolean(patch[key]);
   }
@@ -2656,8 +2285,7 @@ function createWindow() {
     }
   });
   mainWindow.on('close', (event) => {
-    const widgetKeepsHostAlive = Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) || store.getSettings().todayWidgetEnabled === true;
-    if (!isQuitting && tray && (store.getSettings().closeToTray || widgetKeepsHostAlive)) {
+    if (!isQuitting && tray && (store.getSettings().closeToTray)) {
       event.preventDefault();
       mainWindow.hide();
       mainWindow.webContents.setAudioMuted(true);
@@ -2933,7 +2561,6 @@ function registerIpc() {
     reconcileStaleAttendance();
     return workspaceForRenderer();
   });
-  ipcMain.handle('today-widget:get-data', () => todayWidgetForRenderer());
   ipcMain.handle('schedules:parse', (_event, input) => parseNaturalLanguageSchedules(input, new Date()));
   ipcMain.handle('schedules:save', (_event, input) => getPlanningService().saveSchedule(input));
   ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
@@ -2953,23 +2580,6 @@ function registerIpc() {
   ipcMain.handle('todos:schedule', (_event, id, input) => getPlanningService().scheduleTodo(String(id), input || {}));
   ipcMain.handle('todos:create-scheduled', (_event, input) => getPlanningService().createScheduledTodo(input || {}));
   ipcMain.handle('todos:convert-to-schedule', (_event, id, input) => getPlanningService().convertTodoToSchedule(String(id), input || {}));
-  ipcMain.handle('schedule-widget:show', async () => {
-    const result = await showScheduleWidget();
-    store.updateSettings({ todayWidgetEnabled: result.attached, scheduleWidgetEnabled: result.attached });
-    broadcastSettings();
-    return result;
-  });
-  ipcMain.handle('schedule-widget:close', (event) => {
-    store.updateSettings({ todayWidgetEnabled: false, scheduleWidgetEnabled: false });
-    broadcastSettings();
-    BrowserWindow.fromWebContents(event.sender)?.close();
-    return true;
-  });
-  ipcMain.handle('schedule-widget:open-main', () => {
-    showMainWindow();
-    mainWindow?.webContents.send('workspace:navigate', 'schedule');
-    return true;
-  });
   ipcMain.handle('notes:save', (_event, input) => saveWorkspaceNote(input));
   ipcMain.handle('notes:append-daily', (_event, input) => appendWorkspaceDailyNote(input));
   ipcMain.handle('notes:delete', (_event, id) => deleteWorkspaceNote(String(id)));
@@ -3128,20 +2738,11 @@ function registerIpc() {
       }
     }
     let updated = store.updateSettings(validated);
-    const widgetSettingChanged = 'todayWidgetEnabled' in validated
-      && Boolean(previousSettings.todayWidgetEnabled) !== Boolean(validated.todayWidgetEnabled);
-    if (widgetSettingChanged && validated.todayWidgetEnabled) {
-      const result = await showScheduleWidget();
-      if (!result.attached) updated = store.updateSettings({ todayWidgetEnabled: false, scheduleWidgetEnabled: false });
-    } else if (widgetSettingChanged && scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
-      scheduleWidgetWindow.close();
-    }
     updateLoginItemSetting(updated.startAtLogin);
     broadcastSettings();
     if (updated.homeBannerImageMode === 'bing') {
       setTimeout(() => refreshBingHomeBanner().catch((error) => console.warn(`[bing-banner] ${error?.message || error}`)), 0);
     }
-    if (Object.keys(validated).some((key) => ['todayWidgetEnabled', 'scheduleWidgetEnabled', 'widgetShowSchedules', 'widgetShowTodos', 'widgetShowCompletedTodos'].includes(key))) broadcastWorkspace();
     return settingsForRenderer();
   });
   ipcMain.handle('settings:choose-data-directory', (_event, request) => chooseDataDirectory(request));
@@ -3248,42 +2849,9 @@ if (!gotLock) {
       if (store.getSettings().autoCheckUpdates) {
         setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
       }
-      if ((store.getSettings().todayWidgetEnabled || store.getSettings().scheduleWidgetEnabled) && !process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-        setTimeout(() => showScheduleWidget().catch(() => {}), 900);
-      }
-      if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-        const result = await showScheduleWidget();
-        mainWindow.close();
-        await new Promise((resolve) => setTimeout(resolve, 120));
-        const persistsWithoutMainWindow = !mainWindow.isVisible() && Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed() && scheduleWidgetWindow.isVisible());
-        const bounds = scheduleWidgetWindow.getBounds();
-        const [contentWidth, contentHeight] = scheduleWidgetWindow.getContentSize();
-        const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
-        const layout = await scheduleWidgetWindow.webContents.executeJavaScript(`(() => { const close = document.getElementById('closeWidgetButton').getBoundingClientRect(); const footer = document.querySelector('footer').getBoundingClientRect(); return { innerWidth, innerHeight, closeRight: close.right, footerBottom: footer.bottom }; })()`);
-        const expectedWidth = Math.round(360 * scaleFactor);
-        const expectedHeight = Math.round(480 * scaleFactor);
-        console.log(`DESKTOP_WIDGET_ATTACH_OK ${JSON.stringify({ attached: result.attached, reserved: result.reserved, movedIcons: result.movedIcons, persistsWithoutMainWindow, scaleFactor, contentWidth, contentHeight, outerWidth: bounds.width, outerHeight: bounds.height, layout, alwaysOnTop: scheduleWidgetWindow.isAlwaysOnTop(), skipTaskbar: true })}`);
-        if (!result.attached || !result.reserved || !persistsWithoutMainWindow || contentWidth !== expectedWidth || contentHeight !== expectedHeight || Math.abs(layout.innerWidth - 360) > 1 || Math.abs(layout.innerHeight - 480) > 1 || layout.closeRight > layout.innerWidth || layout.footerBottom > layout.innerHeight || scheduleWidgetWindow.isAlwaysOnTop()) {
-          throw new Error('桌面日程组件没有按 3:4 非置顶桌面层模式打开。');
-        }
-        try {
-          const image = await scheduleWidgetWindow.webContents.capturePage();
-          fs.writeFileSync(path.resolve(process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT), image.toPNG());
-        } catch (error) {
-          console.warn(`DESKTOP_WIDGET_CAPTURE_SKIPPED ${error?.message || error}`);
-        }
-        isQuitting = true;
-        setTimeout(() => app.quit(), 120);
-      }
     } catch (error) {
       if (isPackagedSmokeTest()) {
         console.error(`YANJI_PACKAGED_SMOKE_STARTUP_FAILED ${error?.stack || error}`);
-        isQuitting = true;
-        app.exit(1);
-        return;
-      }
-      if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-        console.error(`DESKTOP_WIDGET_ATTACH_FAILED ${error?.stack || error}`);
         isQuitting = true;
         app.exit(1);
         return;
@@ -3298,7 +2866,6 @@ if (!gotLock) {
 app.on('activate', showMainWindow);
 app.on('before-quit', () => {
   isQuitting = true;
-  restoreDesktopIconsSync();
   if (scheduler) clearInterval(scheduler);
   const active = store && activeFocusSession();
   if (active) {
@@ -3319,8 +2886,7 @@ app.on('before-quit', () => {
   globalShortcut.unregisterAll();
 });
 app.on('window-all-closed', () => {
-  const widgetKeepsHostAlive = Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) || store?.getSettings().todayWidgetEnabled === true;
-  if (process.platform !== 'darwin' && (isQuitting || (!store?.getSettings().closeToTray && !widgetKeepsHostAlive) || !tray)) {
+  if (process.platform !== 'darwin' && (isQuitting || (!store?.getSettings().closeToTray) || !tray)) {
     isQuitting = true;
     app.quit();
   }

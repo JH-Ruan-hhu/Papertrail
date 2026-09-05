@@ -34,7 +34,6 @@ test('uses a sidebar layout with settings at the bottom and two add modes', () =
   assert.match(html, /id="productionReference"/);
   assert.match(html, /id="authorLastName"/);
   assert.match(html, /允许工作台提醒/);
-  assert.match(html, /id="todayWidgetEnabled"/);
   assert.match(html, /data-reminder-dependent/);
   assert.match(html, /id="changeDataDirectoryButton"/);
   assert.match(html, /id="dataDirectory"/);
@@ -265,9 +264,6 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   const css = readProjectFile('src', 'renderer', 'styles.css');
   const layoutCss = readProjectFile('src', 'renderer', 'v11-layout.css');
   const storeJs = readProjectFile('src', 'store.js');
-  const scheduleWidgetHtml = readProjectFile('src', 'renderer', 'schedule-widget.html');
-  const scheduleWidgetJs = readProjectFile('src', 'renderer', 'schedule-widget.js');
-  const scheduleWidgetCss = readProjectFile('src', 'renderer', 'schedule-widget.css');
   assert.match(indexHtml, /data-workbench-page="home"/);
   assert.match(indexHtml, /data-workbench-page="schedule"/);
   assert.match(indexHtml, /data-workbench-page="attendance"/);
@@ -342,7 +338,6 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /id="focusUsageList"/);
   assert.match(indexHtml, /data-focus-minutes="50"/);
   assert.match(indexHtml, /id="quickNoteButton"/);
-  assert.match(indexHtml, /id="openScheduleWidgetButton"/);
   assert.match(indexHtml, /class="home-content-grid"/);
   assert.match(indexHtml, /id="notesGrid"/);
   assert.match(indexHtml, /id="noteMetadataPanel"/);
@@ -382,10 +377,6 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /Math\.round\(width \* scaleFactor\)/);
   assert.match(mainJs, /Math\.round\(height \* scaleFactor\)/);
   assert.match(mainJs, /webContents\.setZoomFactor\(scaleFactor\)/);
-  assert.match(mainJs, /scheduleWidgetEnabled: result\.attached/);
-  assert.match(mainJs, /scheduleWidgetEnabled: false/);
-  assert.match(mainJs, /getSettings\(\)\.scheduleWidgetEnabled/);
-  assert.match(storeJs, /scheduleWidgetEnabled: false/);
   assert.doesNotMatch(mainJs, /scheduleWidgetWindow[\s\S]*setResizable\(true\)/);
   assert.match(mainJs, /showDeadlineWindow/);
   assert.match(mainJs, /new Notification/);
@@ -398,14 +389,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /closeStaleAttendanceRecords/);
   assert.match(mainJs, /reconcileStaleAttendance/);
   assert.match(preloadJs, /showCapture/);
-  assert.match(preloadJs, /showScheduleWidget/);
-  assert.match(scheduleWidgetHtml, /id="widgetScheduleList"/);
-  assert.match(scheduleWidgetHtml, /id="closeWidgetButton"/);
-  assert.match(scheduleWidgetJs, /schedulesForToday/);
   assert.match(preloadJs, /completeSchedule/);
-  assert.doesNotMatch(scheduleWidgetJs, /completeSchedule/);
-  assert.match(scheduleWidgetCss, /:root[\s\S]*background: transparent/);
-  assert.match(scheduleWidgetCss, /-webkit-line-clamp: 2/);
   assert.match(preloadJs, /startFocus/);
   assert.match(preloadJs, /onFocusChanged/);
   assert.match(workbenchJs, /schedule-board-column/);
@@ -436,8 +420,6 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /jobs:save/);
   assert.match(mainJs, /deleteWorkspaceNoteIfEmpty/);
   assert.match(mainJs, /createAppWindowIcon/);
-  assert.match(mainJs, /reserveDesktopIcons/);
-  assert.match(mainJs, /restoreDesktopIconsSync/);
   assert.doesNotMatch(mainJs, /setAlwaysOnTop\(true, 'floating'\)/);
   assert.match(indexHtml, /占据桌面图标网格；关闭主窗口后仍保留/);
   assert.doesNotMatch(indexHtml, /id="closeScheduleButton"|id="closeScheduleConvertButton"|id="closeTodoButton"/);
@@ -649,7 +631,7 @@ test('global motion tokens cover routes, dialogs, tabs and reduced motion withou
   const motionJs = readProjectFile('src', 'renderer', 'motion-system.js');
   const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
   const todoViewJs = readProjectFile('src', 'renderer', 'todo-view.js');
-  const auxiliaryPages = ['deadline.html', 'schedule-widget.html']
+  const auxiliaryPages = ['deadline.html']
     .map((file) => readProjectFile('src', 'renderer', file));
   const captureHtml = readProjectFile('src', 'renderer', 'capture.html');
   assert.match(indexHtml, /motion-tokens\.css/);

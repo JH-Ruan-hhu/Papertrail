@@ -2897,14 +2897,6 @@ function bindWorkbenchEvents() {
   activityHeatmap.addEventListener('focusin', (event) => showActivityTooltip(event.target));
   activityHeatmap.addEventListener('focusout', () => { activityTooltip.hidden = true; });
   document.getElementById('openQuickCaptureButton').addEventListener('click', () => workbenchApi.showCapture());
-  document.getElementById('openScheduleWidgetButton').addEventListener('click', async () => {
-    try {
-      const result = await workbenchApi.showScheduleWidget();
-      showWorkbenchToast(result?.attached ? '当日日程已放到桌面图标层。' : '桌面层连接失败，已打开普通桌面卡片。', result?.attached ? 'success' : 'error');
-    } catch (error) {
-      showWorkbenchToast(error?.message || '无法打开桌面日程。', 'error');
-    }
-  });
 }
 
 async function initializeWorkbench() {

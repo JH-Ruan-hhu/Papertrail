@@ -12,13 +12,6 @@ const DEFAULT_SETTINGS = Object.freeze({
   closeToTray: true,
   startAtLogin: false,
   autoCheckUpdates: true,
-  // Kept in the defaults as a read-compatibility marker; Schema 9 stores
-  // todayWidgetEnabled and getSettings exposes the old name as an alias.
-  scheduleWidgetEnabled: false,
-  todayWidgetEnabled: false,
-  widgetShowSchedules: true,
-  widgetShowTodos: true,
-  widgetShowCompletedTodos: false,
   homeBannerImageMode: 'bing',
   homeBannerBingInitialized: true,
   homeBannerFetchedOn: '',
@@ -35,7 +28,6 @@ class JsonStore {
     this.filePath = filePath;
     this.attachmentsDirectory = path.join(path.dirname(filePath), 'attachments');
     const initialSettings = { ...DEFAULT_SETTINGS };
-    delete initialSettings.scheduleWidgetEnabled;
     this.data = {
       version: DATA_VERSION,
       settings: initialSettings,
@@ -130,14 +122,11 @@ class JsonStore {
   getSettings() {
     return {
       ...this.data.settings,
-      scheduleWidgetEnabled: this.data.settings.todayWidgetEnabled ?? this.data.settings.scheduleWidgetEnabled ?? false
     };
   }
 
   updateSettings(patch) {
     const next = { ...this.data.settings, ...patch };
-    if ('scheduleWidgetEnabled' in patch && !('todayWidgetEnabled' in patch)) next.todayWidgetEnabled = Boolean(patch.scheduleWidgetEnabled);
-    delete next.scheduleWidgetEnabled;
     this.data.settings = next;
     this.save();
     return this.getSettings();
