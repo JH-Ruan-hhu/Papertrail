@@ -291,17 +291,6 @@ function renderClock() {
   renderFocus();
 }
 
-function applyHomeBannerSettings(settings = wb.settings || {}) {
-  const strip = document.querySelector('.home-progress-strip');
-  if (!strip) return;
-  const mode = settings.homeBannerImageMode || 'default';
-  const image = mode === 'default' ? '' : settings.homeBannerImageDataUrl;
-  strip.classList.toggle('has-banner-image', Boolean(image));
-  strip.style.setProperty('--home-banner-image', image ? `url("${String(image).replaceAll('"', '%22')}")` : 'none');
-  strip.dataset.bannerMode = image ? mode : 'default';
-  strip.title = mode === 'bing' && settings.homeBannerImageCredit ? settings.homeBannerImageCredit : '';
-}
-
 function schedulesForDay(date) {
   const dayStart = new Date(date);
   dayStart.setHours(0, 0, 0, 0);
@@ -2911,13 +2900,11 @@ async function initializeWorkbench() {
   });
   const settings = await workbenchApi.getSettings().catch(() => null);
   wb.settings = settings || {};
-  applyHomeBannerSettings(wb.settings);
   if (settings?.quickCaptureShortcut) document.getElementById('shortcutTip').textContent = settings.quickCaptureShortcut.replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
   await refreshWorkspace();
   workbenchApi.onWorkspaceChanged(refreshWorkspace);
   workbenchApi.onSettingsChanged((settings) => {
     wb.settings = settings || wb.settings;
-    applyHomeBannerSettings(wb.settings);
   });
   workbenchApi.onWorkspaceNavigate((target) => {
     const page = typeof target === 'string' ? target : target?.page;

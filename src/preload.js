@@ -75,8 +75,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   openTrackingPage: (id) => ipcRenderer.invoke('papers:open-tracking', id),
   getSettings: () => ipcRenderer.invoke('settings:get'),
   updateSettings: (patch) => ipcRenderer.invoke('settings:update', patch),
-  chooseHomeBannerImage: () => ipcRenderer.invoke('settings:choose-home-banner'),
-  refreshBingHomeBanner: () => ipcRenderer.invoke('settings:refresh-bing-banner'),
   chooseDataDirectory: (request) => ipcRenderer.invoke('settings:choose-data-directory', request),
   deleteDataBackups: (confirmed = false) => ipcRenderer.invoke('settings:delete-data-backups', Boolean(confirmed)),
   getUpdateState: () => ipcRenderer.invoke('updates:get-state'),

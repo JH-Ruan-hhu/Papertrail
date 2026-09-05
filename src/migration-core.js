@@ -44,10 +44,6 @@ function normalizeSettings(source, defaults) {
   const safeDefaults = asObject(defaults) || {};
   const settings = { ...safeDefaults, ...input };
   delete settings.appearanceTheme; // Ignore the retired setting in legacy JSON.
-  settings.homeBannerImageMode = ['default', 'local', 'bing'].includes(input.homeBannerImageMode) ? input.homeBannerImageMode : (safeDefaults.homeBannerImageMode || 'bing');
-  settings.homeBannerBingInitialized = input.homeBannerBingInitialized === true;
-  settings.homeBannerFetchedOn = /^\d{8}$/.test(String(input.homeBannerFetchedOn || '')) ? String(input.homeBannerFetchedOn) : '';
-  settings.homeBannerImageCredit = String(input.homeBannerImageCredit || '').slice(0, 300);
   settings.eventNotifications = input.eventNotifications !== false;
   settings.todoNotifications = input.todoNotifications !== false;
   const allowedEventReminders = new Set([null, 0, 5, 10, 15, 30, 60, 1440]);

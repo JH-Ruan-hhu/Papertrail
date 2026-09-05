@@ -487,16 +487,6 @@ app.whenReady().then(async () => {
         && !document.getElementById('todoNotifications').checked;
       document.querySelector('[data-settings-section="appearance"]').click();
       const appearanceVisible = !document.querySelector('[data-settings-panel="appearance"]').hidden;
-      const localBannerMode = document.querySelector('input[name="homeBannerImageMode"][value="local"]');
-      localBannerMode.checked = true;
-      localBannerMode.dispatchEvent(new Event('change', { bubbles: true }));
-      const localBannerActionVisible = !document.getElementById('chooseHomeBannerButton').hidden
-        && document.getElementById('refreshBingBannerButton').hidden;
-      const bingBannerMode = document.querySelector('input[name="homeBannerImageMode"][value="bing"]');
-      bingBannerMode.checked = true;
-      bingBannerMode.dispatchEvent(new Event('change', { bubbles: true }));
-      const bingBannerActionVisible = document.getElementById('chooseHomeBannerButton').hidden
-        && !document.getElementById('refreshBingBannerButton').hidden;
       document.querySelector('[data-settings-section="tracking"]').click();
       const trackingVisible = !document.querySelector('[data-settings-panel="tracking"]').hidden;
       document.querySelector('[data-settings-section="storage"]').click();
@@ -537,10 +527,10 @@ app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 180));
       const draftPreserved = startAtLogin.checked;
       document.querySelector('[data-workbench-page="home"]').click();
-      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, appearanceVisible, localBannerActionVisible, bingBannerActionVisible, trackingVisible, storageVisible, storageSelectedExactly, settingsTabsEqualWidth, settingsTabsSingleRow, settingsTabWidths, settingsTabTops, updatesVisible, updateIdle, updateAvailable, updatePromptAvailable, updateDownloaded, updatePromptDownloaded, updatePromptDismissed, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, draftPreserved };
+      return { notificationsVisible, remindersClosedTogether, remindersStayOffWhenReenabled, appearanceVisible, trackingVisible, storageVisible, storageSelectedExactly, settingsTabsEqualWidth, settingsTabsSingleRow, settingsTabWidths, settingsTabTops, updatesVisible, updateIdle, updateAvailable, updatePromptAvailable, updateDownloaded, updatePromptDownloaded, updatePromptDismissed, updateButtonText: updateButton.textContent, updateBadge: document.getElementById('updateVersionBadge').textContent, updateError: document.getElementById('settingsError').textContent, generalVisible, draftPreserved };
     })()
   `);
-  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.appearanceVisible || !settingsDraftResult.localBannerActionVisible || !settingsDraftResult.bingBannerActionVisible || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.settingsTabsEqualWidth || !settingsDraftResult.settingsTabsSingleRow || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updatePromptAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.updatePromptDownloaded || !settingsDraftResult.updatePromptDismissed || !settingsDraftResult.generalVisible || !settingsDraftResult.draftPreserved) {
+  if (!settingsDraftResult.notificationsVisible || !settingsDraftResult.remindersClosedTogether || !settingsDraftResult.remindersStayOffWhenReenabled || !settingsDraftResult.appearanceVisible || !settingsDraftResult.trackingVisible || !settingsDraftResult.storageVisible || !settingsDraftResult.storageSelectedExactly || !settingsDraftResult.settingsTabsEqualWidth || !settingsDraftResult.settingsTabsSingleRow || !settingsDraftResult.updatesVisible || !settingsDraftResult.updateIdle || !settingsDraftResult.updateAvailable || !settingsDraftResult.updatePromptAvailable || !settingsDraftResult.updateDownloaded || !settingsDraftResult.updatePromptDownloaded || !settingsDraftResult.updatePromptDismissed || !settingsDraftResult.generalVisible || !settingsDraftResult.draftPreserved) {
     throw new Error(`Settings draft smoke test failed: ${JSON.stringify(settingsDraftResult)}`);
   }
   console.log(`SETTINGS_DRAFT_SMOKE_OK ${JSON.stringify(settingsDraftResult)}`);

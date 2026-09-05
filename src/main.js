@@ -542,7 +542,6 @@ function settingsForRenderer() {
   const pointer = storagePointerValue();
   return {
     ...store.getSettings(),
-    homeBannerImageDataUrl: readHomeBannerImageDataUrl(),
     appVersion: app.getVersion(),
     dataDirectory,
     backupCount: backupFiles.length,
@@ -554,105 +553,6 @@ function settingsForRenderer() {
     isDefaultDataDirectory: path.resolve(dataDirectory) === path.resolve(path.dirname(defaultDataFilePath())),
     systemRecoveryWarning
   };
-}
-
-function homeBannerImagePath() {
-  return path.join(app.getPath('userData'), 'home-banner.jpg');
-}
-
-function localDateStamp(date = new Date()) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
-}
-
-function initializeBingHomeBanner() {
-  const settings = store.getSettings();
-  if (settings.homeBannerBingInitialized === true) return settings;
-  return store.updateSettings({
-    homeBannerBingInitialized: true,
-    homeBannerImageMode: settings.homeBannerImageMode === 'default' ? 'bing' : settings.homeBannerImageMode
-  });
-}
-
-function readHomeBannerImageDataUrl() {
-  try {
-    const filePath = homeBannerImagePath();
-    if (!fs.existsSync(filePath)) return '';
-    return `data:image/jpeg;base64,${fs.readFileSync(filePath).toString('base64')}`;
-  } catch {
-    return '';
-  }
-}
-
-function cacheHomeBannerImage(image) {
-  if (!image || image.isEmpty()) throw new Error('无法读取这张图片，请选择 JPG、PNG 或 WebP 文件。');
-  fs.mkdirSync(path.dirname(homeBannerImagePath()), { recursive: true });
-  fs.writeFileSync(homeBannerImagePath(), image.toJPEG(88));
-}
-
-async function chooseHomeBannerImage() {
-  const result = await dialog.showOpenDialog(mainWindow, {
-    title: '选择首页横幅图片',
-    properties: ['openFile'],
-    filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp'] }]
-  });
-  if (result.canceled || !result.filePaths[0]) return { canceled: true, settings: settingsForRenderer() };
-  cacheHomeBannerImage(nativeImage.createFromPath(result.filePaths[0]));
-  store.updateSettings({ homeBannerImageMode: 'local', homeBannerImageCredit: '' });
-  broadcastSettings();
-  return { canceled: false, settings: settingsForRenderer() };
-}
-
-let bingHomeBannerRefreshPromise = null;
-let bingHomeBannerRetryAfter = 0;
-
-async function downloadBingHomeBanner({ activate = false } = {}) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15_000);
-  try {
-    const archiveResponse = await net.fetch('https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=1&mkt=zh-CN', { signal: controller.signal });
-    if (!archiveResponse.ok) throw new Error('暂时无法获取必应每日图片。');
-    const archive = await archiveResponse.json();
-    const item = archive?.images?.[0];
-    if (!item?.url || !String(item.url).startsWith('/')) throw new Error('必应每日图片信息无效。');
-    const imageResponse = await net.fetch(`https://www.bing.com${item.url}`, { signal: controller.signal });
-    if (!imageResponse.ok) throw new Error('必应每日图片下载失败。');
-    const contentType = String(imageResponse.headers.get('content-type') || '').toLowerCase();
-    if (!contentType.startsWith('image/')) throw new Error('必应每日图片响应格式无效。');
-    const buffer = Buffer.from(await imageResponse.arrayBuffer());
-    if (!buffer.length || buffer.length > 25 * 1024 * 1024) throw new Error('必应每日图片大小异常。');
-    cacheHomeBannerImage(nativeImage.createFromBuffer(buffer));
-    const currentMode = store.getSettings().homeBannerImageMode;
-    store.updateSettings({
-      ...(activate || currentMode === 'bing' ? { homeBannerImageMode: 'bing' } : {}),
-      homeBannerBingInitialized: true,
-      homeBannerFetchedOn: localDateStamp(),
-      homeBannerImageCredit: String(item.copyright || '必应每日图片').slice(0, 300)
-    });
-    bingHomeBannerRetryAfter = 0;
-    broadcastSettings();
-    return settingsForRenderer();
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
-function refreshBingHomeBanner({ force = false } = {}) {
-  const settings = store.getSettings();
-  if (!force && settings.homeBannerImageMode !== 'bing') return Promise.resolve(settingsForRenderer());
-  const cachedToday = settings.homeBannerFetchedOn === localDateStamp() && fs.existsSync(homeBannerImagePath());
-  if (!force && cachedToday) return Promise.resolve(settingsForRenderer());
-  if (!force && Date.now() < bingHomeBannerRetryAfter) return Promise.resolve(settingsForRenderer());
-  if (bingHomeBannerRefreshPromise) return bingHomeBannerRefreshPromise;
-  bingHomeBannerRefreshPromise = downloadBingHomeBanner({ activate: force })
-    .catch((error) => {
-      bingHomeBannerRetryAfter = Date.now() + 60 * 60_000;
-      throw error;
-    })
-    .finally(() => { bingHomeBannerRefreshPromise = null; });
-  return bingHomeBannerRefreshPromise;
 }
 
 function setModalTitleBar(active) {
@@ -2201,11 +2101,6 @@ function validateSettings(patch) {
     }
     allowed.refreshMinutes = minutes;
   }
-  if ('homeBannerImageMode' in patch) {
-    const mode = String(patch.homeBannerImageMode || 'default');
-    if (!['default', 'local', 'bing'].includes(mode)) throw new Error('首页横幅背景模式不受支持。');
-    allowed.homeBannerImageMode = mode;
-  }
   if ('defaultEventReminderMinutes' in patch) {
     const minutes = patch.defaultEventReminderMinutes == null ? null : Number(patch.defaultEventReminderMinutes);
     if (![null, 0, 5, 10, 15, 30, 60, 1440].includes(minutes)) throw new Error('日程提醒时间不受支持。');
@@ -2456,7 +2351,6 @@ async function runScheduledWork() {
   runWorkspaceReminders();
   runJobDeadlineReminders();
   if (Date.now() - lastBackupCleanupAt >= 24 * 60 * 60_000) cleanupExpiredBackups();
-  await refreshBingHomeBanner().catch((error) => console.warn(`[bing-banner] ${error?.message || error}`));
   await runScheduledRefresh();
 }
 
@@ -2740,14 +2634,9 @@ function registerIpc() {
     let updated = store.updateSettings(validated);
     updateLoginItemSetting(updated.startAtLogin);
     broadcastSettings();
-    if (updated.homeBannerImageMode === 'bing') {
-      setTimeout(() => refreshBingHomeBanner().catch((error) => console.warn(`[bing-banner] ${error?.message || error}`)), 0);
-    }
     return settingsForRenderer();
   });
   ipcMain.handle('settings:choose-data-directory', (_event, request) => chooseDataDirectory(request));
-  ipcMain.handle('settings:choose-home-banner', () => chooseHomeBannerImage());
-  ipcMain.handle('settings:refresh-bing-banner', () => refreshBingHomeBanner({ force: true }));
   ipcMain.handle('settings:delete-data-backups', (_event, confirmed) => deleteDataBackups(Boolean(confirmed)));
   ipcMain.handle('updates:get-state', () => updateStateForRenderer());
   ipcMain.handle('updates:check', () => checkForAppUpdate());
@@ -2814,7 +2703,6 @@ if (!gotLock) {
       }
       store = new JsonStore(resolvedStorage.filePath);
       store.load();
-      initializeBingHomeBanner();
       await runNonCriticalStartup('Windows Focus 恢复', recoverInterruptedFocusSessionOnStartup);
       planningService = createPlanningService({
         store,
@@ -2828,7 +2716,6 @@ if (!gotLock) {
         return;
       }
       createWindow();
-      setTimeout(() => refreshBingHomeBanner().catch((error) => console.warn(`[bing-banner] ${error?.message || error}`)), 700);
       await runNonCriticalStartup('考勤恢复', () => reconcileStaleAttendance());
       await runNonCriticalStartup('备份清理', cleanupExpiredBackups);
       await runNonCriticalStartup('系统托盘', createTray);

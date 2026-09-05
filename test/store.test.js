@@ -34,8 +34,6 @@ test('persists settings and papers atomically', (t) => {
   const store = new JsonStore(filePath);
   store.load();
   assert.equal(store.getSettings().refreshOnStartup, true);
-  assert.equal(store.getSettings().homeBannerImageMode, 'bing');
-  assert.equal(store.getSettings().homeBannerBingInitialized, true);
   store.updateSettings({ refreshMinutes: 720 });
   store.addPaper(validPaper());
 
