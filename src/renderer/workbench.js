@@ -55,7 +55,7 @@ syncViewportDensity();
 window.addEventListener('resize', syncViewportDensity, { passive: true });
 window.visualViewport?.addEventListener('resize', syncViewportDensity, { passive: true });
 
-const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', jobs: '求职', submissions: '投稿', settings: '设置' });
+const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', 'jobs-overview': '求职总览', 'jobs-applications': '我的投递', submissions: '投稿', settings: '设置' });
 const SCHEDULE_DRAFT_KEY = 'yanji.scheduleDraft.v1';
 const DAILY_PLAN_KEY = 'yanji.dailyPlanShown.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
@@ -259,6 +259,7 @@ async function closeNoteDialogToCard(dialog, { morph = true } = {}) {
 }
 
 function switchWorkbenchPage(page, { animate = false } = {}) {
+  if (page === 'jobs') page = 'jobs-applications';
   if (!pageTitles[page]) return;
   const previousPage = wb.page;
   if (wb.page === 'notes' && document.getElementById('noteDialog')?.open) persistNoteDraftLocally();
@@ -275,7 +276,8 @@ function switchWorkbenchPage(page, { animate = false } = {}) {
   if (page === 'todos') window.YanjiTodoView?.render();
   if (page === 'attendance') renderAttendance();
   if (page === 'notes') renderNotes();
-  if (page === 'jobs') renderJobs();
+  if (page === 'jobs-overview') renderCareerOverview();
+  if (page === 'jobs-applications') renderJobs();
   const activeSection = sections.find((section) => section.dataset.page === page);
   if (animate && activeSection && (previousPage !== page || page === 'home')) {
     window.YanjiMotion?.enterPage(activeSection, { force: page === 'home' });
@@ -684,7 +686,7 @@ function renderHomeJobs() {
   }
   const counts = jobFunnelCounts(jobs);
   const maximum = Math.max(1, ...Object.values(counts));
-  container.innerHTML = HOME_JOB_FUNNEL_OPTIONS.map(([stage, label]) => `<button class="home-job-row" data-go-page="jobs" data-job-home-filter="${stage}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[stage], maximum)}"></b></i><strong>${counts[stage]}</strong></button>`).join('');
+  container.innerHTML = HOME_JOB_FUNNEL_OPTIONS.map(([stage, label]) => `<button class="home-job-row" data-go-page="jobs-applications" data-job-home-filter="${stage}" type="button"><span>${label}</span><i><b class="${jobMeterClass(counts[stage], maximum)}"></b></i><strong>${counts[stage]}</strong></button>`).join('');
 }
 
 function renderJobQuickFilters(jobs, now = new Date()) {
@@ -757,10 +759,10 @@ function renderJobs() {
   document.getElementById('jobAwaitingReview').textContent = String(awaitingReview);
   document.getElementById('jobDueSoon').textContent = String(dueSoon);
   document.getElementById('jobInProgress').textContent = String(inProgress);
-  document.getElementById('jobTodayLabel').textContent = `${localDateKey(now)} · Offer 职来`;
+  document.getElementById('jobTodayLabel').textContent = `${localDateKey(now)} · 我的投递`;
 
   const visible = sortJobs(jobs.filter((job) => {
-    const searchable = `${job.company} ${job.role} ${job.companyType || ''} ${job.city || job.location || ''} ${job.contact || ''} ${job.notes || ''} ${jobCurrentStage(job)?.name || ''}`.toLowerCase();
+    const searchable = `${job.company} ${job.role} ${job.companyType || ''} ${job.city || job.location || ''} ${job.contact || ''} ${job.sourceUrl || ''} ${job.notes || ''} ${jobCurrentStage(job)?.name || ''}`.toLowerCase();
     return (statusFilter === 'all' || (statusFilter === 'active' ? job.status !== 'closed' : job.status === 'closed'))
       && (priorityFilter === 'all' || job.priority === priorityFilter)
       && (cityFilter === 'all' || (job.city || job.location || '') === cityFilter)
@@ -780,6 +782,7 @@ function renderJobs() {
       return `${divider}${jobRowHtml(job)}`;
     }).join('')
     : `<div class="job-list-empty"><span>${jobs.length ? '⌕' : '＋'}</span><strong>${jobs.length ? '没有符合条件的岗位' : '还没有岗位记录'}</strong><p>${jobs.length ? '试试清空搜索或调整筛选条件。' : '添加第一条岗位，开始记录每一次机会。'}</p>${jobs.length ? '' : '<button class="button secondary" data-add-job="active" type="button">添加岗位</button>'}</div>`;
+  renderCareerBoard(visible);
   window.YanjiMotion?.animateJobList(document.getElementById('jobBoard'));
 }
 
@@ -888,7 +891,7 @@ async function saveJobFromEditor() {
     wb.editingJobWorkflow = null;
     closeWorkbenchDialog(document.getElementById('jobDialog'));
     renderHome();
-    if (wb.page === 'jobs') renderJobs();
+    if (wb.page === 'jobs-applications') renderJobs();
     showWorkbenchToast('求职记录已保存');
   } catch (exception) {
     error.textContent = exception.message || '求职记录保存失败。';
@@ -944,7 +947,7 @@ async function deleteJobById(id) {
     const dialog = document.getElementById('jobDialog');
     if (dialog.open && document.getElementById('jobId').value === id) closeWorkbenchDialog(dialog);
     renderHome();
-    if (wb.page === 'jobs') renderJobs();
+    if (wb.page === 'jobs-applications') renderJobs();
     showWorkbenchToast('求职记录已删除');
     return true;
   } catch (exception) {
@@ -2279,7 +2282,8 @@ async function refreshWorkspace(workspace = null) {
   if (wb.page === 'todos') window.YanjiTodoView?.render();
   if (wb.page === 'attendance') renderAttendance();
   if (wb.page === 'notes') renderNotes();
-  if (wb.page === 'jobs' && jobsChanged) renderJobs();
+  if (wb.page === 'jobs-applications' && jobsChanged) renderJobs();
+  if (wb.page === 'jobs-overview' && jobsChanged) renderCareerOverview();
 }
 
 function bindWorkbenchEvents() {

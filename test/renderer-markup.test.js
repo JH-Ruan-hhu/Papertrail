@@ -268,7 +268,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(indexHtml, /data-workbench-page="schedule"/);
   assert.match(indexHtml, /data-workbench-page="attendance"/);
   assert.match(indexHtml, /data-workbench-page="notes"/);
-  assert.match(indexHtml, /data-workbench-page="jobs"/);
+  assert.match(indexHtml, /data-workbench-page="jobs-applications"/);
   assert.match(indexHtml, /data-workbench-page="submissions"/);
   assert.doesNotMatch(indexHtml, /id="bingWallpaper"/);
   assert.match(indexHtml, /class="home-progress-strip"[\s\S]*id="homeProgressHeadline"/);
@@ -515,7 +515,7 @@ test('note editor autosaves a full daily document and opens from its card', () =
 test('unchanged workspace broadcasts do not rebuild the visible job table', () => {
   const workbenchJs = readProjectFile('src', 'renderer', 'workbench.js');
   assert.match(workbenchJs, /const jobsChanged = JSON\.stringify\(wb\.workspace\.jobApplications \|\| \[\]\) !== JSON\.stringify\(nextWorkspace\.jobApplications \|\| \[\]\)/);
-  assert.match(workbenchJs, /if \(wb\.page === 'jobs' && jobsChanged\) renderJobs\(\)/);
+  assert.match(workbenchJs, /if \(wb\.page === 'jobs-applications' && jobsChanged\) renderJobs\(\)/);
 });
 
 test('daily document renderer no longer exposes the legacy entry editor', () => {

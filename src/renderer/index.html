@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="motion-system.css">
     <link rel="stylesheet" href="styles/tokens.css">
     <link rel="stylesheet" href="styles/shell.css">
+    <link rel="stylesheet" href="styles/jobs.css">
   </head>
   <body>
     <div class="window-titlebar"><time id="topbarClock" aria-label="当前时间"></time></div>
@@ -39,8 +40,10 @@
           <button class="nav-item" data-workbench-page="submissions" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v12H4zM8 7.5v-3h8v3"/><path d="M8 12h8M8 15.5h5"/></svg><span>投稿</span><b id="navPaperCount">0</b>
           </button>
-          <button class="nav-item" data-workbench-page="jobs" type="button">
-            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3.5 12h17M10 12v2h4v-2"/></svg><span>求职</span><b id="navJobCount">0</b>
+          <button class="nav-item" data-workbench-page="jobs-overview" type="button">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3.5 12h17M10 12v2h4v-2"/></svg><span>求职总览</span>
+          </button><button class="nav-item" data-workbench-page="jobs-applications" type="button">
+            <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3.5 12h17M10 12v2h4v-2"/></svg><span>我的投递</span><b id="navJobCount">0</b>
           </button>
         </nav>
 
@@ -123,7 +126,7 @@
 
           <div class="home-content-grid">
             <section class="home-job-panel">
-              <div class="panel-heading"><div><p class="eyebrow">APPLICATION PIPELINE</p><h2>投递进度</h2><p>按已投递、测评、面试与 Offer 累计统计</p></div><button class="text-button" data-go-page="jobs" type="button">查看全部</button></div>
+              <div class="panel-heading"><div><p class="eyebrow">APPLICATION PIPELINE</p><h2>投递进度</h2><p>按已投递、测评、面试与 Offer 累计统计</p></div><button class="text-button" data-go-page="jobs-applications" type="button">查看全部</button></div>
               <div id="homeJobSummary" class="home-job-summary"></div>
             </section>
           </div>
@@ -174,7 +177,7 @@
 
         <section class="workbench-page schedule-page" data-page="schedule" hidden>
           <header class="page-head-row">
-            <div><p class="eyebrow">WEEKLY SCHEDULE</p><h1>日程</h1><p>按日期浏览完整安排，也可把当日清单放到桌面</p></div>
+            <div><p class="eyebrow">WEEKLY SCHEDULE</p><h1>日程</h1><p>按日期浏览完整安排，拖动卡片调整日期和时间</p></div>
             <div class="page-actions"><button class="button secondary" id="scheduleTodayButton" type="button">今天</button><button class="button primary" id="addScheduleButton" type="button"><span class="plus">＋</span> 新建日程</button></div>
           </header>
           <div class="timeline-datebar schedule-weekbar">
@@ -196,10 +199,16 @@
           <div id="notesGrid" class="notes-grid"></div>
         </section>
 
-        <section class="workbench-page job-page" data-page="jobs" hidden>
+        <section class="workbench-page career-overview-page" data-page="jobs-overview" hidden>
+  <header class="career-hero"><div><p class="eyebrow">研迹 Career</p><h1>求职总览</h1><p>把投递、笔面试、截止日期和 Offer 放在一个工作台</p><small id="careerSyncLabel">本地模式 · 数据保存在本机</small></div><div class="page-actions"><button class="button secondary" data-go-page="jobs-applications" type="button">我的投递</button><button class="button primary" data-add-job="preparing" type="button">＋ 添加岗位</button></div></header>
+  <div id="careerMetrics" class="career-metrics"></div>
+  <div class="career-charts"><section id="careerTrend" class="career-panel"></section><section id="careerDeadlines" class="career-panel"></section></div>
+  <section class="career-panel"><div class="career-panel-head"><div><h2>投递台历</h2><small id="careerMonthStats"></small></div><div class="page-actions"><button type="button" class="button secondary compact" data-career-month="-1" aria-label="上一月">‹</button><strong id="careerMonthLabel"></strong><button type="button" class="button secondary compact" data-career-month="1" aria-label="下一月">›</button></div></div><div class="career-calendar-layout"><div id="careerCalendar" class="career-calendar"></div><aside id="careerDayEvents"></aside></div></section>
+</section>
+<section class="workbench-page job-page" data-page="jobs-applications" hidden>
           <header class="job-console-head">
-            <div class="job-console-title"><p id="jobTodayLabel">— · Offer 职来</p><h1>投递中控台</h1></div>
-            <label class="job-console-search" for="jobSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="jobSearch" type="search" placeholder="搜索公司、岗位、行业、城市、备注..." autocomplete="off"></label>
+            <div class="job-console-title"><p id="jobTodayLabel">把每一次投递进度摊开看</p><h1>我的投递</h1></div>
+            <label class="job-console-search" for="jobSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="jobSearch" type="search" placeholder="搜索公司、岗位、城市、备注或招聘链接" autocomplete="off"></label>
           </header>
           <section class="job-summary-grid" aria-label="求职关键指标">
             <article><strong id="jobTotalJobs">0</strong><span>全部岗位</span></article>
@@ -228,6 +237,7 @@
               </div>
             </div>
             <div class="job-table-head" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>截止日期</span><span>状态</span><span>优先级</span><span>备注</span><span>操作</span></div>
+            <div class="career-view-toggle"><button type="button" data-career-view="cards" aria-pressed="true">卡片视图</button><button type="button" data-career-view="table" aria-pressed="false">表格视图</button></div><div id="careerKanban" class="career-kanban"></div>
             <div id="jobBoard" class="job-table-body" aria-live="polite"></div>
           </section>
         </section>
@@ -680,6 +690,8 @@
     <script src="app.js"></script>
     <script src="todo-view.js"></script>
     <script src="schedule-layout.js"></script>
+    <script src="career-data.js"></script>
+    <script src="career.js"></script>
     <script src="workbench.js"></script>
   </body>
 </html>
