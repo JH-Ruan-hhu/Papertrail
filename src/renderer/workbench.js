@@ -834,7 +834,7 @@ function openJobEditor(job = null, initialStatus = 'active') {
   document.getElementById('jobContact').value = job?.contact || '';
   document.getElementById('jobNotes').value = job?.notes || '';
   for (const [id,key] of [['jobSourceUrl','sourceUrl'],['jobResumeName','resumeName'],['jobJdText','jdText']]) document.getElementById(id).value=job?.[key]??'';
-  document.getElementById('jobTags').value=(job?.tags||[]).join('，');
+  document.getElementById('jobTags').value=(job?.tags||[]).join('；');
   document.getElementById('jobError').textContent = '';
   document.getElementById('deleteJobButton').hidden = !job;
   dialog.dataset.revision = String(job?.revision ?? '');
@@ -871,7 +871,7 @@ async function saveJobFromEditor() {
     sourceUrl: document.getElementById('jobSourceUrl').value,
     resumeName: document.getElementById('jobResumeName').value,
     jdText: document.getElementById('jobJdText').value,
-    tags: document.getElementById('jobTags').value.split(/[,，]/),
+    tags: document.getElementById('jobTags').value.split(/[;；,，]/),
     revision: document.getElementById('jobDialog').dataset.revision || undefined
   };
   try {

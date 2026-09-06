@@ -183,7 +183,7 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
     pinned: input.pinned === true,
     ...(hasOwn(input,'favorite')?{favorite:input.favorite===true}:{}),
     ...(hasOwn(input,'matchScore')?{matchScore:input.matchScore!=null&&input.matchScore!==''&&Number.isFinite(Number(input.matchScore))?Math.max(0,Math.min(100,Number(input.matchScore))):null}:{}),
-    ...(hasOwn(input,'tags')?{tags:[...new Set((Array.isArray(input.tags)?input.tags:[]).map(t=>cleanText(t,40)).filter(Boolean))].slice(0,20)}:{}),
+    ...(hasOwn(input,'tags')?{tags:[...new Set((Array.isArray(input.tags)?input.tags:[]).flatMap(t=>String(t).split(/[;；]/)).map(t=>cleanText(t,40)).filter(Boolean))].slice(0,20)}:{}),
     ...(hasOwn(input,'resumeName')?{resumeName:cleanText(input.resumeName,200)||null}:{}),
     ...(hasOwn(input,'jdText')?{jdText:cleanText(input.jdText,30000)||null}:{}),
     status: lifecycleStatusFor(input, rawStatus),

@@ -29,7 +29,7 @@ function careerScore(job,expanded=false) {
  if(expanded)return `<section class="career-match-panel"><header><span>匹配度</span><strong>${has?score+' 分':'未匹配'}</strong></header>${has?`<progress max="100" value="${score}" aria-label="匹配度 ${score} 分"></progress>`:''}</section>`;
  return `<span class="career-score${has?'':' empty'}">${has?'匹配 '+score+'分':'✧ 未匹配'}</span>`;
 }
-function careerTags(job) {return `<div class="career-tags">${(job.tags||[]).map(tag=>`<span>${wbEscape(tag)}</span>`).join('')}</div>`;}
+function careerTags(job) {return `<div class="career-tags">${(job.tags||[]).flatMap(tag=>String(tag).split(/[;；]/)).map(tag=>tag.trim()).filter(Boolean).map(tag=>`<span>${wbEscape(tag)}</span>`).join('')}</div>`;}
 function careerTime(job) {
  const info=window.YanjiCareerData.time(job),date=info.value?new Date(info.value):null,valid=date&&Number.isFinite(date.getTime());
  const remaining=valid?(date-new Date())/86400000:Infinity;
@@ -76,7 +76,7 @@ function openCareerTime(id) {
  const job=wb.workspace.jobApplications.find(j=>j.id===id);if(!job)return;const info=window.YanjiCareerData.time(job);let dialog=document.getElementById('careerTimeDialog');
  if(!dialog){dialog=document.createElement('dialog');dialog.id='careerTimeDialog';document.body.append(dialog);}
  const date=info.value?new Date(info.value):null,value=date&&Number.isFinite(date.getTime())?new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16):'';
- dialog.innerHTML=`<form class="career-time-form"><h2>${wbEscape(info.label)}</h2><label>${wbEscape(job.company)} · ${wbEscape(job.role)}<input name="time" type="datetime-local" value="${value}" aria-label="阶段时间"></label><footer><button type="button" class="button secondary" data-time-cancel>取消</button><button type="submit" class="button primary">保存</button></footer></form>`;
+ dialog.innerHTML=`<form class="career-time-form"><h2>${wbEscape(info.label)}</h2><label><span>${wbEscape(job.company)} · ${wbEscape(job.role)}</span><input name="time" type="datetime-local" value="${value}" aria-label="阶段时间"></label><footer><button type="button" class="button secondary" data-time-cancel>取消</button><button type="submit" class="button primary">保存</button></footer></form>`;
  dialog.querySelector('[data-time-cancel]').onclick=()=>dialog.close();dialog.querySelector('form').onsubmit=async e=>{e.preventDefault();const input=dialog.querySelector('input').value;const ok=await saveCareerPatch(id,j=>window.YanjiCareerData.withTime(j,input?new Date(input).toISOString():null));if(ok)dialog.close();};dialog.showModal();
 }
 document.addEventListener('click',event=>{
