@@ -245,6 +245,7 @@ let smokeUpdateState = {
 };
 
 contextBridge.exposeInMainWorld('paperTrail', {
+  ...(process.env.YANJI_AUTH_UI_SMOKE ? {getAuthState:async()=>({user:null,configured:false,baseUrl:'',status:'offline',conflicts:[]}),onAuthState:()=>{}} : {}),
   getWorkspace: async () => smokeWorkspace,
   getTodayWidgetData: async () => smokeWorkspace,
   onTodayWidgetChanged: () => {},

@@ -1,341 +1,37 @@
-# 研迹 · Research Workbench
+# 研迹测试版 1.5.0-beta.1
 
-Version 1.4.16 sharpens the single-countdown home card, keeps completed schedules and closed jobs at the bottom, places untimed todos directly in Today, restores Chinese day-of-month deadline parsing and complete Chinese-time highlighting, adds a cached Bing daily wallpaper with a readability overlay, and gives compact focus controls enough room to remain legible. Timed schedules now create one linked todo with synchronized date and priority, share a single notification source, support drag-to-date rescheduling, and use larger titles with one-line metadata. Version 1.4.14 redesigns Quick Capture as an instant, keyboard-first Yanji glass surface with clearer item modes, a focused writing canvas, accessible state feedback, and compact shortcut guidance. Version 1.4.13 reduces duplicated workflow, IPC subscription, number-parsing, renderer test, and stylesheet code while preserving existing behavior and local data compatibility. Version 1.4.12 unifies scheduled tasks and calendar events without migrating existing data, combines linked records in the home-page Today Items view, merges quick-capture schedule and todo entry into Items, and adds safe backdrop closing for the note editor. Version 1.4.11 restores the v1.4.9 job-table rhythm while adding stable differential imports, separate JSON and image exports, selectable PNG/JPG previews, a restored job deadline column, and a one-day-ahead #1 full-screen deadline reminder. It also restores the packaged automatic updater dependency chain.
+基于 v1.4.16 重构的 Windows x64 测试版。采用统一蓝白界面，保留日程、待办、笔记、打卡和投稿记录，新增求职总览、投递台历、看板和账号同步。
 
-Version 1.4.9 treats a next-day midnight clock-out as 24:00, simplifies visible job states to active or closed, replaces the job deadline column with estimated annual salary, keeps JSON export/import complete, updates phone-preview PNGs, labels job filters, uses a clear settings gear, and gives schedule time fields a polished design with an automatic ten-minute end time. Version 1.4.8 removes scrollbars and restores symmetric outer spacing in exported job PNGs, while evening out the visible job-table column spacing. Version 1.4.7 centers the job table's middle columns and exports both importable job JSON and phone-friendly PNG previews. Version 1.4.6 removes the next-follow-up column from the job table and adds 50%–300% zoom controls to note image previews. Version 1.4.5 aligns the attendance timeline's 00:00–24:00 labels with the full time-track width. Version 1.4.4 restores the spatial note-card-to-editor morph and prevents unrelated workspace broadcasts from repeatedly rebuilding the visible job table. Version 1.4.3 reveals job rows only when they enter the viewport, replaces the slow one-by-one home entrance with a faster top-left-to-bottom-right diagonal wave, and fully hides the note property sidebar after it closes. It also restores unlimited note scrolling, equal-width settings tabs, stable schedule navigation opacity, daily repeating schedules, time-scaled attendance bars, small-screen header clearance, and automatic numbered-line continuation in quick capture. Version 1.4.2 completes the staged motion system, fixes quick-capture note saving and two-way mode switching, restores Word-like note indentation, numbering, zoom, and true full-screen editing, aligns job workflow rails, and removes the home page's intermediate gray canvas. Version 1.4.1 introduces a unified, slower motion system across the complete application, including workbench pages, dialogs, drawers, tabs, lists, progress indicators, and auxiliary windows, while preserving immediate keyboard interaction and reduced-motion support. Version 1.4.0 turns each day's notes into one continuous Word-like document, adds a collapsible property sidebar, orders jobs by priority then workflow progress and role name, and fits the complete job editor into one desktop view. Version 1.3.8 forces Windows updates to replace the Yanji installation that initiated them, preventing legacy duplicate installs from reopening an older version, and removes the gray drop shadow below the rounded job table. Version 1.3.7 increases company, position, workflow-stage, and workflow-date typography on the job dashboard while preserving the compact position-row rhythm. Version 1.3.6 gives the Windows tray icon a permanent identity so its notification-area visibility and position survive application updates. Version 1.3.5 enlarged the complete job dashboard typography hierarchy without increasing position-row height and added a calm in-app update prompt with download progress, defer controls, and explicit install-and-restart consent.
+## 与正式版共存
 
-Version 1.3.4 improves the 1080p home dashboard, same-day note continuity, rich-text notes and sticky notes, editable job-stage ordering, cumulative application progress, and job-list readability while preserving local data compatibility.
+- 应用名：研迹测试版；可执行文件：Yanji-Beta.exe。
+- 安装位置：`%LOCALAPPDATA%\Programs\Yanji-Beta`。
+- 应用标识：`io.papertrail.desktop.beta`；数据目录：`%APPDATA%\yanji-beta`。
+- 测试版独立快捷方式、托盘标识、卸载项，不参与正式版自动更新。
+- 即写即走默认快捷键：Ctrl+Alt+Space。
+- 不自动读取正式版数据。账号页的“导入旧版数据副本”只读取所选 JSON 和关联附件，复制到空的测试工作区。
 
-Version 1.3.1 is a stability release that keeps the updater optional at startup, blocks unsafe data-directory fallback, protects user-owned databases from backup cleanup, restores interrupted Focus notification policy changes, and adds packaged application verification.
+## 使用
 
-研迹 is a local-first Windows research workbench that brings daily planning,
-quick capture, attendance, structured notes, and a complete manuscript tracker
-into one desktop app. The manuscript connectors cover Elsevier Author Hub and
-Elsevier accepted-article production pages; local workflow records remain
-publisher-neutral.
+安装后可选择“暂时在本机使用”。邮箱、短信、微信登录与云同步需要部署配套服务，并在账号页配置服务器地址；安装包不包含公共服务器或第三方凭据。微信登录通过浏览器中的微信官方二维码页面完成。
 
-## Release highlights
+登录后切换到独立账号缓存；退出登录回到本机测试工作区。首次迁移需要点击“备份并同步本机测试数据”并确认。冲突保留双方内容，由用户选择本机或云端版本。投稿追踪凭据不上传，其他设备需要重新配置凭据。
 
-Version 1.3.0 introduces Yanji-owned install and update experiences: a compact
-single-page NSIS installer with an editable destination and desktop-shortcut
-choice, and an in-app release center that compares installed and available
-versions before guiding users through checking, safe download, and restart.
-Career summaries now show current-state counts without assuming that written
-tests must precede interviews (or the reverse); the horizontal board shows each
-opportunity once and allows any status to be selected in the editor. The release
-also includes pointer-only page-rise motion, storage-path compatibility
-recovery, packaged taskbar icon correction, note editor improvements, and the
-v1.2 performance work.
-
-Version 1.3.0 unifies the research workbench under a classic information architecture and an optional liquid-glass appearance. The job dashboard now treats written tests and interviews as flexible current states instead of a forced linear funnel.
-Job cards open the editor directly, keep a status-update action in the top-right
-corner, and use larger Company, Role, City, and Notes typography. New records
-start at Submitted, and the page-header action is the single creation entry.
-
-Version 1.2.3 is a storage-path compatibility hotfix. It restores discovery of
-the legacy `papertrail-desktop` user-data directory after the v1.2.2 Windows
-identity change, while preserving data created by genuinely new v1.2.2
-installations. Changing the data location now refreshes every workspace view
-and explicitly offers to restart the app. The All Manuscripts heading also
-uses the same baseline and spacing as the other workbench pages. Packaged
-windows now load their taskbar icon from an unpacked ICO resource, and the six
-job-pipeline stages use distinct low-saturation colors with a consistent
-company, role, location, and notes hierarchy.
-
-Version 1.2.2 reduces background resource use by throttling hidden renderers,
-pausing invisible-page refresh work, and releasing the main window after it
-has remained in the tray. It also adds full-workspace note editing while
-keeping the sidebar visible, Word-like automatic list continuation, durable
-full-row note images, an eight-day schedule, linked reminder controls, and a
-more consistent Liquid Glass layout, corner system, metadata presentation,
-Home dashboard, and application-usage palette.
-
-Version 1.2.1 removes the colored halo outside Quick Capture. The capture card
-now fills its frameless window as one fixed material surface, keeps only its
-own rounded border, and no longer inherits the workspace Liquid Glass
-background.
-
-Version 1.2.0 removes the duplicate upcoming-schedule panel from the Job
-workspace and gives the six-stage application board the full content width.
-Every job record can now store an estimated annual salary in ten-thousands of
-RMB; the dashboard calculates the highest entered amount automatically and
-shows a dash until salary data exists. High-priority `#1` schedules always get
-an at-time reminder and open the existing multi-display full-screen alert;
-`#2` schedules use the pinned overlay, while `#3` schedules keep the standard
-Windows notification.
-
-The desktop Today widget is hosted in the Windows desktop icon layer, reserves
-its icon-grid rectangle, and remains available when the main workbench window
-is closed. Version 1.2.0 also includes the Home spacing, focus-timer, notes,
-eight-day schedule, proportional usage bars, unified corner system, inline
-note-image, Settings-surface, and Windows icon corrections from the 1.1 series.
-
-## Version 1.1 workbench features
-
-Version 1.1.4 rebuilds Home around a consistent spacing rhythm and a calmer
-cool-gray/indigo Liquid Glass palette. Home now starts its four-day schedule at
-today, uses a compact focus timer, shows note excerpts without scrollbars, and
-places the complete six-stage application pipeline across the page. The Job
-workspace is redesigned as a career dashboard with key metrics, a stage board,
-upcoming actions, interview management, and a data overview. Windows windows
-now load the bundled multi-size ICO directly so the taskbar uses the Yanji icon.
-
-Version 1.1.3 adds a local job-application pipeline from 待投递 through Offer,
-an at-a-glance Home summary, an eight-day rolling schedule board, automatic
-cleanup of empty notes, inline note images with full-size preview, and a
-restrained Liquid Glass appearance with solid content surfaces. The Windows
-window icon is now applied explicitly to every BrowserWindow.
-
-Version 1.1.2 adds date-keyed daily notes with timed entries, controlled image
-attachments, autosaved editor drafts, real todo reminder payloads, a responsive
-home command row with independent attendance, and a multi-size Windows ICO.
-
-Version 1.1.1 is the responsive layout patch: the home dashboard detects the
-available viewport, keeps its high-value content in view on short desktop
-windows, and uses shared grid boundaries so adjacent panels align cleanly.
-
-Version 1.1.0 updates the published workbench to the current 研迹 experience.
-Home now leads with today's progress, completed items, project completion rate,
-and focus time. The Schedule page places today's agenda at the top and keeps a
-compact seven-day board below it. The workspace uses an Apple-inspired liquid
-glass material with a solid fallback for systems that do not support blur.
-
-Attendance now closes an unfinished previous-day segment at that day's local
-midnight, so a forgotten clock-out cannot block the next day's clock-in or a
-new record after deletion. The main window opens maximized, and Windows uses a
-regenerated high-contrast ICO for the taskbar, installer, shortcuts, and app
-window. Destructive workbench prompts use concise copy without trailing full
-stops.
-
-## Version 1.0 workbench features
-
-Version 1.0.5 moves the sole Home attendance action into the Focus Timer card
-and removes the separate attendance summary card. The Schedule board now shows
-a rolling seven-day window from two days before the selected date through four
-days after it; navigation shifts by one day instead of one calendar week. New
-schedule dialogs preserve drafts on Close, backdrop click, or Escape while
-Cancel discards them. The desktop schedule widget remembers whether it is
-enabled across cold starts, disables that behavior from its close button, and
-uses DPI-aware native sizing so all 360 x 480 content remains visible. On
-Windows it is hosted in the desktop Shell instead of falling back to an
-always-on-top window, reserves its icon-grid rectangle, moves only overlapping
-icons to the nearest free cells, and restores their positions when the widget
-closes. Closing the main workbench keeps an enabled widget and the tray host
-running; choosing Exit from the tray closes both.
-
-Version 1.0.4 replaces the scroll-linked Settings sections with exact tabs,
-separates manuscript polling from general workbench behavior, and organizes
-preferences around the whole workspace: General, Reminders, Manuscript
-Tracking, Data and Backups, and Updates. Promotional and explanatory cards
-were removed so every visible Settings block is actionable.
-
-Version 1.0.3 adds right-click deletion for note cards, hides visible scrollbars
-throughout modal dialogs while preserving scrolling, and brings Quick Capture
-time recognition into the normal schedule editor. Explicitly timed clauses such
-as `明天上午八点去采样，下午五点去洗澡` are previewed and saved as two
-separate schedules, with the later clause inheriting the date.
-The application icon uses a light ice-blue research-notebook design across the
-executable, installer, shortcuts, windows, taskbar, and tray.
-
-Version 1.0.2 replaces the desktop widget's CSS-only outer corners with a
-transparent Electron surface plus a native Windows rounded window region, so
-the wallpaper shows cleanly outside the card instead of exposing a square
-background behind the curve.
-
-Version 1.0.1 polishes the pale-blue shell by hiding visible root scrollbars,
-removing the selected-navigation edge shadow, and eliminating native black
-frames from the 3:4 desktop schedule widget. Quick Capture also understands
-connectors such as `明天的下午四点去污水厂采样` without leaving `的` in the
-saved schedule title.
-
-- Use an Apple-inspired liquid-glass desktop shell with consistent line icons,
-  compact spacing, a small top-right clock, and responsive narrow-window
-  layouts.
-- Open Settings as a normal workspace page with horizontal categories; scrolling
-  through the page automatically highlights the section currently in view.
-- Clock in and out repeatedly during one day, including lunch breaks, correct
-  each work segment manually, and review the week on a 24-hour Gantt chart.
-  Foreground-app time is recorded only during active work segments and can be
-  summarized for today or the current week.
-- Run a 25, 50, or 90 minute focus session from Home. Yanji can
-  temporarily pause application toast notifications, restore the previous
-  Windows policy afterward, and retain the focus session locally.
-- Review today and the following three days beside compact focus controls and
-  note excerpts. Home also shows the five current job states with proportional
-  distribution bars, without implying a fixed test/interview sequence.
-- Show high-priority deadlines on every connected display with a low-stimulus
-  star-field treatment; reduced-motion preferences disable decorative motion.
-- Add multiple reusable options to note select metadata through a tag editor.
-  Note dialogs close on backdrop click and floating sticky notes use a standard
-  close icon.
-- Keep Chinese IME composition stable in Quick Capture by separating the real
-  textarea from the recognized-time highlight layer. Empty capture windows
-  close automatically when they lose focus.
-- Add `#1`, `#2`, or `#3` in Quick Capture for red, yellow, or green priority;
-  schedules without a tag default to green.
-- Use the app's own confirmation dialog for destructive actions instead of the
-  browser or Windows legacy confirmation box.
-
-## Research workbench features
-
-- Use a unified home, schedule, notes, submission-management, and settings
-  workspace with a focused left navigation and a home focus timer.
-- Review today and the following three days from Home, create a schedule
-  quickly, and see clipped note excerpts without changing pages.
-- See today's schedule at the top of the Schedule page with completion progress,
-  then review a compact seven-day date-column board. Each event card shows its
-  time range, priority, deadline, completion state, and cross-midnight status.
-- Put today's schedule on the Windows desktop as a fixed 360 × 480 (3:4)
-  component. It is attached to the desktop-icon host instead of floating above
-  applications, stays out of the taskbar, and updates when schedules change.
-- Mark an event as a deadline. High-priority deadlines use a full-screen red
-  acknowledgement, medium priority uses a centered always-on-top amber alert
-  plus a Windows notification, and low priority uses a Windows notification.
-- Open the keyboard-first capture bar globally with `Ctrl+Shift+Space`, switch
-  between schedule and note with Tab, and recognize Chinese expressions such as
-  明天、后天、早上、下午 and 3点到5点.
-- Create a new always-on-top sticky note globally with `Ctrl+Alt+N`. Both global
-  shortcuts can be changed independently in Settings.
-- Create local notes with reusable text, select, and checkbox metadata fields.
-  Metadata stays collapsed during normal writing. Any saved note can open as an
-  always-on-top sticky note.
-- Scroll through every settings section continuously while the matching
-  category in the settings navigation highlights automatically.
-- Keep the previous data file for 30 days after changing storage location, then
-  delete only the expired migration copy. Manual early deletion remains
-  available.
-- Optionally check GitHub Releases at startup without automatically downloading
-  or installing an update.
-
-## Version 0.6 features
-
-- Track multiple Elsevier manuscripts in one dashboard.
-- Keep important changes as persistent unread records, mark one paper or all
-  papers as read, and preserve the original timeline after reading.
-- Add a manuscript using an Author Hub tracking link, or add an accepted article
-  using its production reference and corresponding-author surname.
-- Display manuscript, journal, status, revision, and reviewer event counts.
-- Create, edit, complete, reopen, and delete local deadlines for revisions,
-  proofs, copyright/licence paperwork, and suggested follow-up dates.
-- Prioritize overdue and due-soon tasks in the manuscript list and send one
-  Windows reminder within 48 hours of the deadline, plus one overdue reminder.
-- Record R0, R1, R2 and later revision rounds with the decision type, request
-  date, deadline, actual submission date, workflow state, and notes.
-- Store a Manuscript ID, handling editor, current submission contact,
-  rejection/transfer/acceptance note, and free-form local notes.
-- Preserve individual reviewer events, including unknown event types, and show
-  publisher-provided event time separately from Yanji's first local
-  observation time.
-- Display accepted-article production milestones, DOI, author information, and
-  proof/publication events from Elsevier's official Article Tracking page.
-- Reveal the complete DOI link on hover and copy it with one click.
-- Keep a local change history and report stage duration conservatively as the
-  time observed by Yanji, not an invented publisher-side start date.
-- Show a scrollable manuscript timeline from the initial submission date through
-  review records, acceptance, proofing, and publication when those dates are
-  available from Elsevier.
-- Refresh one paper or all papers manually, with conservative scheduled checks.
-- Separate refresh attempts from successful syncs. Failed automatic syncs retry
-  after 15 minutes, then one hour, then return to the configured interval;
-  manual refresh is never blocked by this schedule.
-- Prioritize deadlines before unread or actionable papers; search by title,
-  journal, production reference, Manuscript ID, editor, or contact; and archive
-  completed or paused papers without deleting data.
-- Link local records for the same manuscript across multiple journal
-  submissions and show the chronological cross-journal submission journey.
-- Export a single paper's safe timeline as Markdown or CSV, including local
-  deadlines, revision rounds, supplemental information, notes, and detailed
-  events, without tracking URLs, UUIDs, encrypted secrets, or author-query
-  credentials.
-- Show native Windows notifications for status changes, completed reviews, and
-  production milestones; clicking a notification opens the official page.
-- Store tracking links with Windows DPAPI through Electron `safeStorage`.
-- Run in the system tray and optionally start at sign-in.
-- Optionally refresh all tracked manuscripts once after a cold start.
-- Check the public GitHub Release feed from Settings, download a newer
-  release on demand, show download progress, and restart into the installer.
-  Yanji never checks silently in the background.
-- Move the local data file to a user-selected folder while retaining the old
-  file as a removable backup.
-
-## Version 1.0 data model
-
-Yanji stores `lastAttemptAt`, `lastSuccessfulAt`, `failureStreak`, and
-`nextRetryAt` separately. Important updates contain their own occurrence time,
-content, and read state. Archived papers keep their encrypted credential,
-history, DOI, and production events but are excluded from automatic refresh.
-
-Schema version 10 includes `schedules`, `notes`, reusable `metadataFields`,
-multi-segment `attendance` records with per-application usage totals, and
-`focusSessions`, plus local `jobApplications`, while retaining manuscript
-details, tasks, revision rounds, and observed review events. Older data files
-are migrated locally on first successful load.
-Existing encrypted credentials, history, unread updates, archives, and
-submission journeys are retained. Invalid JSON, unsupported future schema
-versions, and structurally damaged records are rejected without overwriting the
-original file.
-
-## Privacy and security
-
-The complete privacy statement is available in [PRIVACY.md](PRIVACY.md).
-
-Tracking URLs contain a UUID that should be treated like a private access link.
-Yanji never exposes that UUID to the renderer. The full link is encrypted
-in Electron's user-data directory and only decrypted in the main process when a
-refresh is requested. No analytics or cloud sync is included.
-
-The renderer remains sandboxed with `contextIsolation` enabled and a restrictive
-Content Security Policy. Exports are generated in the main process from an
-explicit allow-list of paper metadata and are redacted again before writing.
-Deadlines, revision-round details, contacts, schedules, notes, attendance, and
-application-use totals are never included in publisher requests. There is no
-general article-discovery network request, account system, cloud sync,
-collaboration service, analytics, or telemetry.
-
-## Development
+## 开发与验证
 
 ```powershell
-npm install
+npm ci
+npm ci --prefix server
+npm run test:server
 npm test
-npm start
-```
-
-Build Windows artifacts:
-
-```powershell
+npm run brand:generate
+npm run smoke:v15
+node scripts/smoke-main-v15.js
 npm run dist
+npm run verify:package -- outputs-beta
+node scripts/packaged-smoke.js outputs-beta
 ```
 
-The build produces the x64 NSIS installer only. Portable builds are no longer
-generated.
-For application updates, publish the NSIS installer, its blockmap, and the
-generated `latest.yml` together in the same public GitHub Release.
+首次安装服务端依赖后运行 `npm run db:generate --prefix server`。Windows 中文路径下若打包工具失败，请使用 ASCII 临时目录构建。服务器运行说明见 [server/README.md](server/README.md)。旧版本说明保留在 [CHANGELOG-legacy.md](CHANGELOG-legacy.md)。
 
-## Code signing policy
-
-Yanji is applying for free open-source code signing provided by
-[SignPath.io](https://signpath.io/), certificate by
-[SignPath Foundation](https://signpath.org/). The build, approval, and release
-rules are documented in [SIGNING_POLICY.md](SIGNING_POLICY.md). Releases made
-before onboarding is complete remain unsigned.
-
-## Limitations
-
-- Author-information lookup is only for articles that have been accepted and
-  have entered production. It requires the reference from Elsevier's
-  "Production has begun" email and the corresponding author's surname.
-- Searching by an author name alone cannot reveal private or unpublished
-  submissions. Elsevier's Author Search API searches Scopus author profiles and
-  public indexed records, so Yanji does not present it as manuscript-status
-  tracking.
-- The tracking endpoint or response fields may change without notice.
-- Automatic online tracking currently supports Elsevier only. Other publishers
-  can be represented through local workflow metadata and submission journeys,
-  but do not yet have automatic status connectors.
-- Deadline reminders require Yanji to be running (the window may remain in
-  the system tray) and Windows notifications to be enabled.
-- The app does not bypass login, CAPTCHA, access controls, or publisher policy.
-- A tracking UUID is required; Yanji cannot discover submissions from an
-  Editorial Manager account automatically.
-- `authors.elsevier.com/c/...` article Share Links provide reading access after
-  publication and cannot be used to query manuscript-review status.
+图标源文件为 `build/icon.svg`；生成脚本同步输出窗口、托盘与安装程序使用的 PNG/ICO。应用内品牌图标使用同源 `src/renderer/brand.svg`。

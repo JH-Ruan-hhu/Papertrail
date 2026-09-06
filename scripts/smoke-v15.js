@@ -5,8 +5,9 @@ app.on('window-all-closed',()=>{});
 app.whenReady().then(async()=>{
  let win;
  try{
-  for(const [width,height] of [[1366,768],[1920,1080]]) {
+  for(const [width,height] of [[1366,768],[1920,1080],[2560,1440]]) {
    win=new BrowserWindow({width,height,show:false,webPreferences:{preload:path.join(__dirname,'smoke-preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:false}});
+   win.setSize(width,height);
    await win.loadFile(path.join(__dirname,'../src/renderer/index.html'));
    await new Promise(r=>setTimeout(r,800));
    const result=await win.webContents.executeJavaScript(`(async()=>{
@@ -15,6 +16,9 @@ app.whenReady().then(async()=>{
     check(document.querySelectorAll('#careerMetrics article').length===4,'four metrics');
     check(document.querySelectorAll('[data-career-date]').length===42,'calendar cells');
     check(document.querySelectorAll('#careerTrend circle').length===7,'trend points');
+    const parent=document.querySelector('.nav-item[data-workbench-page="jobs-overview"]'),child=document.querySelector('.nav-item[data-workbench-page="jobs-applications"]');
+    check(child.getBoundingClientRect().left-parent.getBoundingClientRect().left>=20,'child navigation indentation');
+    if(innerWidth>1400)check(document.querySelector('.career-calendar').getBoundingClientRect().bottom<=innerHeight,'calendar fully visible');
     switchWorkbenchPage('jobs-applications');
     check(document.querySelectorAll('.career-column').length>=8,'kanban columns');
     document.querySelector('[data-career-view="table"]').click();check(!document.getElementById('jobBoard').hidden,'table switch');

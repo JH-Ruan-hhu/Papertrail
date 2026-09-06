@@ -120,7 +120,7 @@ function launchStorageRecoverySmoke(exePath, scenario, { appPath = null } = {}) 
 
 async function main() {
   const development = process.argv.includes('--dev');
-  const outputRoot = path.resolve(process.argv[2] || 'outputs');
+  const outputRoot = path.resolve(process.argv[2] || require('../package.json').build.directories.output);
   const appPath = development ? outputRoot : null;
   const exePath = development
     ? path.join(outputRoot, 'node_modules', 'electron', 'dist', 'electron.exe')
