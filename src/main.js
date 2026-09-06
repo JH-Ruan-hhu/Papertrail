@@ -20,6 +20,10 @@ const {
   shell,
   Tray
 } = require('electron');
+const { createCloudClient } = require('./cloud-client');
+let cloudClient;
+let localWorkspacePath;
+const TEST_CHANNEL = require('./test-channel');
 let autoUpdater = null;
 let updaterLoadError = null;
 try {
@@ -102,12 +106,12 @@ const {
   nextUpdateState
 } = require('./update-core');
 
-const APP_NAME = '研迹 · 科研工作台';
-const APP_ID = 'io.papertrail.desktop';
+const APP_NAME = TEST_CHANNEL.name;
+const APP_ID = TEST_CHANNEL.appId;
 // Windows stores notification-area visibility against this identity. Keep it
 // stable across every release so an updater replacement does not look like a
 // brand-new tray icon and move Yanji back into the overflow menu.
-const TRAY_GUID = 'd47b4b95-2cf8-4d84-b2bc-671a0f5161fa';
+const TRAY_GUID = '6024ae13-b73a-48ae-8b20-9fef4dd0190b';
 const BUILD_DIR = app.isPackaged
   ? path.join(process.resourcesPath, 'app.asar.unpacked', 'build')
   : path.join(__dirname, '..', 'build');
@@ -137,7 +141,7 @@ function applyWindowsTaskbarIdentity(window) {
         appIconPath: APP_ICON_PATH,
         appIconIndex: 0,
         relaunchCommand: process.execPath,
-        relaunchDisplayName: '研迹'
+        relaunchDisplayName: TEST_CHANNEL.name
       });
     }
   } catch (error) {
@@ -155,7 +159,7 @@ const MAX_NOTE_ATTACHMENT_SIZE = 12 * 1024 * 1024;
 const MAX_NOTE_ATTACHMENTS_TOTAL = 50 * 1024 * 1024;
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
-const DEFAULT_QUICK_CAPTURE_SHORTCUT = 'CommandOrControl+Shift+Space';
+const DEFAULT_QUICK_CAPTURE_SHORTCUT = TEST_CHANNEL.shortcut;
 const TITLE_BAR_NORMAL = Object.freeze({ color: '#eaf5fb', symbolColor: '#35566b', height: 38 });
 const TITLE_BAR_MODAL = Object.freeze({ color: '#9dabb6', symbolColor: '#f5fbfe', height: 38 });
 
@@ -571,6 +575,7 @@ function isPortableBuild() {
 }
 
 function updateStateForRenderer() {
+  if (!TEST_CHANNEL.updatesEnabled) return { ...createInitialUpdateState({ currentVersion: app.getVersion(), packaged: false }), message: '独立测试版不接收正式版更新，请手动安装后续测试包。' };
   if (!updateState) {
     updateState = createInitialUpdateState({
       currentVersion: app.getVersion(),
@@ -595,6 +600,10 @@ function setUpdateState(event, payload) {
 }
 
 function initializeUpdater() {
+  if (!TEST_CHANNEL.updatesEnabled) {
+    updateState = { ...createInitialUpdateState({currentVersion: app.getVersion(), packaged: false}), message: '独立测试版不接收正式版更新，请手动安装后续测试包。' };
+    return;
+  }
   if (updaterInitialized) return;
   updaterInitialized = true;
   updateState = createInitialUpdateState({
@@ -675,11 +684,13 @@ function installDownloadedUpdate() {
 }
 
 async function openUpdateReleasePage() {
+  if (!TEST_CHANNEL.updatesEnabled) return false;
   await shell.openExternal(RELEASES_URL);
   return true;
 }
 
 async function chooseDataDirectory(request = {}) {
+  if (cloudClient?.state().user) throw new Error('请先退出账号再调整本机测试数据位置');
   let selectedDirectory;
   if (request?.confirmedExisting && request?.selectedDirectory) {
     selectedDirectory = path.resolve(String(request.selectedDirectory));
@@ -696,6 +707,7 @@ async function chooseDataDirectory(request = {}) {
     selectedDirectory = path.resolve(result.filePaths[0]);
   }
   const targetFile = path.join(selectedDirectory, DATA_FILE_NAME);
+  if (!samePath(targetFile, store.filePath) && fs.existsSync(targetFile)) throw new Error('测试版不能直接使用已有数据目录。请在账号页导入数据副本。');
   if (samePath(targetFile, store.filePath)) {
     return { canceled: false, settings: settingsForRenderer() };
   }
@@ -1993,6 +2005,7 @@ async function addPaper(input) {
 }
 
 async function refreshPaper(id, { notify = true } = {}) {
+  if (store.findPaper(id)?.cloudCredentialMissing) throw new Error('这台设备未配置投稿追踪凭证；云端快照和本地任务仍可查看。');
   if (refreshingIds.has(id)) {
     const existing = store.findPaper(id);
     return existing ? serializePaper(existing) : null;
@@ -2062,7 +2075,7 @@ async function refreshPaper(id, { notify = true } = {}) {
 
 async function refreshAll({ notify = true } = {}) {
   const results = [];
-  for (const paper of store.listPapers().filter((item) => !item.archivedAt)) {
+  for (const paper of store.listPapers().filter((item) => !item.archivedAt && !item.cloudCredentialMissing)) {
     try {
       results.push({ id: paper.id, ok: true, paper: await refreshPaper(paper.id, { notify }) });
     } catch (error) {
@@ -2346,6 +2359,7 @@ function runDeadlineReminders() {
 }
 
 async function runScheduledWork() {
+  if (cloudClient?.state().user) await cloudClient.sync().catch(() => {});
   if (reconcileStaleAttendance()) broadcastWorkspace();
   runDeadlineReminders();
   runWorkspaceReminders();
@@ -2450,7 +2464,91 @@ async function exportPaper(id, format) {
   return { canceled: false, filePath: result.filePath };
 }
 
+function initializeCloudClient() {
+  const accountPath = id => path.join(app.getPath('userData'), 'accounts', id, DATA_FILE_NAME);
+  cloudClient = createCloudClient({
+    directory: app.getPath('userData'), safeStorage, getStore: () => store,
+    activateAccount: async id => {
+      if (store && activeFocusSession()) await finishFocusSession();
+      if (store && activeAttendanceRecord()) { persistAttendanceUsage(); clockWorkspaceAttendance('out'); }
+      stopUsageSamplerIfIdle(true);
+      const candidate = new JsonStore(id ? accountPath(id) : localWorkspacePath);
+      candidate.load(); store = candidate;
+      planningService = createPlanningService({ store, makeId: () => crypto.randomUUID(), onWorkspaceChanged: broadcastWorkspace });
+      broadcastWorkspace(); broadcastPapers(); broadcastSettings();
+    },
+    notify: value => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('auth:state', value);
+      broadcastWorkspace(); broadcastPapers();
+    },
+    backupLocal: async () => {
+      const local = new JsonStore(localWorkspacePath); local.load();
+      local.copyTo(path.join(app.getPath('userData'), 'migration-backups', crypto.randomUUID(), DATA_FILE_NAME));
+    },
+    importLocal: async () => {
+      const local = new JsonStore(localWorkspacePath); local.load();
+      const keys = ['schedules','todos','countdowns','notes','metadataFields','attendance','focusSessions','jobApplications','papers'];
+      const next = structuredClone(store.data);
+      for (const key of keys) {
+        const existing = new Map((next[key] || []).map(row => [row.id, row]));
+        for (const row of local.data[key] || []) {
+          if (existing.has(row.id) && JSON.stringify(existing.get(row.id)) !== JSON.stringify(row)) throw new Error('本机与账号存在相同 ID 的不同记录，请先导出并处理冲突');
+          existing.set(row.id, row);
+        }
+        next[key] = [...existing.values()];
+      }
+      for (const note of local.listNotes()) for (const attachment of note.attachments || []) {
+        const name = attachment.storedName;
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$/.test(name)) throw new Error('附件名称无效');
+        const source = path.join(local.attachmentsDirectory, name), target = path.join(store.attachmentsDirectory, name);
+        if (fs.existsSync(target) && !fs.readFileSync(source).equals(fs.readFileSync(target))) throw new Error('附件名称冲突，已保留本机和账号原文件');
+      }
+      fs.cpSync(local.attachmentsDirectory, store.attachmentsDirectory, { recursive: true, force: false });
+      store.save(next);
+    }
+  });
+}
+
+async function importBetaDataCopy() {
+  if (cloudClient.state().user) throw new Error('请先退出账号，导入到本机测试工作区后再选择同步');
+  const keys = ['papers','notes','schedules','todos','jobApplications','attendance','focusSessions','countdowns'];
+  if (keys.some(key => store.data[key]?.length)) throw new Error('为避免覆盖，导入副本需要空的本机测试工作区');
+  const selected = await dialog.showOpenDialog(mainWindow, { title: '选择旧版 JSON 数据副本', filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] });
+  if (selected.canceled) return { canceled: true };
+  const source = selected.filePaths[0];
+  // Parse without JsonStore.load(): migration must never write the source.
+  const { migrateData } = require('./paper-core');
+  const next = migrateData(JSON.parse(fs.readFileSync(source, 'utf8')), DEFAULT_SETTINGS).data;
+  delete next._cloud;
+  next.settings = { ...next.settings, autoCheckUpdates: false, startAtLogin: false, quickCaptureShortcut: TEST_CHANNEL.shortcut };
+  const attachments = path.join(path.dirname(source), 'attachments');
+  const copies = [];
+  for (const note of next.notes || []) for (const attachment of note.attachments || []) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$/.test(attachment.storedName)) throw new Error('附件名称无效');
+    const original = path.join(attachments, attachment.storedName);
+    if (!fs.existsSync(original)) throw new Error('数据副本缺少笔记附件，请将 JSON 和 attachments 文件夹放在一起');
+    copies.push([original, path.join(store.attachmentsDirectory, attachment.storedName)]);
+  }
+  for (const [original, destination] of copies) fs.copyFileSync(original, destination);
+  store.save(next); broadcastWorkspace(); broadcastPapers(); broadcastSettings();
+  return { canceled: false };
+}
+
 function registerIpc() {
+  ipcMain.handle('auth:get-session', () => cloudClient.state());
+  ipcMain.handle('auth:configure', (_e, url) => cloudClient.configure(url));
+  ipcMain.handle('auth:login', async (_e, input) => { const result = await cloudClient.login(input); setTimeout(() => cloudClient.sync().catch(() => {}), 0); return result; });
+  ipcMain.handle('auth:register', (_e, input) => cloudClient.register(input));
+  ipcMain.handle('auth:verification', (_e, input) => cloudClient.sendCode(input));
+  ipcMain.handle('auth:reset-password', (_e, input) => cloudClient.reset(input));
+  ipcMain.handle('auth:logout', () => cloudClient.logout());
+  ipcMain.handle('auth:wechat-start', async () => { const result = await cloudClient.wechatStart(); const url = new URL(result.authorizationUrl); if (url.protocol !== 'https:' || url.hostname !== 'open.weixin.qq.com') throw new Error('微信授权地址无效'); await shell.openExternal(url.href); return { expiresIn: result.expiresIn }; });
+  ipcMain.handle('auth:wechat-poll', () => cloudClient.wechatPoll());
+  ipcMain.handle('sync:run', () => cloudClient.sync());
+  ipcMain.handle('sync:migrate', (_e, confirmed) => cloudClient.migrate(confirmed));
+  ipcMain.handle('sync:resolve', (_e, input) => cloudClient.resolve(input));
+  ipcMain.handle('beta:import-copy', () => importBetaDataCopy());
+
   ipcMain.handle('workspace:get', () => {
     reconcileStaleAttendance();
     return workspaceForRenderer();
@@ -2671,7 +2769,7 @@ function registerIpc() {
 if (process.env.YANJI_QA_USER_DATA) {
   app.setPath('userData', path.resolve(process.env.YANJI_QA_USER_DATA));
 } else {
-  app.setPath('userData', resolveStableUserDataPath(app.getPath('appData')));
+  app.setPath('userData', TEST_CHANNEL.userData(app.getPath('appData')));
 }
 
 if (isPackagedSmokeTest()) {
@@ -2684,7 +2782,7 @@ if (isPackagedSmokeTest()) {
 // Set the Windows identity before the single-instance lock and before any
 // BrowserWindow exists, so taskbar grouping resolves the packaged Yanji icon
 // instead of inheriting Electron's executable identity.
-app.setName('研迹');
+app.setName(TEST_CHANNEL.name);
 app.setAppUserModelId(APP_ID);
 
 const gotLock = isPackagedSmokeTest() || app.requestSingleInstanceLock();
@@ -2709,6 +2807,9 @@ if (!gotLock) {
         makeId: () => crypto.randomUUID(),
         onWorkspaceChanged: () => broadcastWorkspace()
       });
+      localWorkspacePath = store.filePath;
+      initializeCloudClient();
+      await cloudClient.initialize();
       registerIpc();
       if (isPackagedSmokeTest()) {
         await runNonCriticalStartup('自动更新', initializeUpdater);

@@ -1,6 +1,6 @@
 {
-  "name": "papertrail-desktop",
-  "version": "1.4.16",
+  "name": "yanji-beta",
+  "version": "1.5.0-beta.1",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "Yanji contributors",
@@ -14,7 +14,10 @@
     "dist": "electron-builder --win nsis --x64 --publish never",
     "metadata:update": "node scripts/generate-update-metadata.js",
     "smoke:packaged": "node scripts/packaged-smoke.js",
-    "verify:package": "node scripts/verify-package.js"
+    "verify:package": "node scripts/verify-package.js",
+    "test:server": "npm test --prefix server",
+    "smoke:v15": "electron scripts/smoke-v15.js",
+    "brand:generate": "node scripts/generate-icon.js"
   },
   "dependencies": {
     "electron-updater": "6.8.9",
@@ -27,8 +30,8 @@
     "electron-builder": "26.11.1"
   },
   "build": {
-    "appId": "io.papertrail.desktop",
-    "productName": "研迹",
+    "appId": "io.papertrail.desktop.beta",
+    "productName": "研迹测试版",
     "asar": true,
     "asarUnpack": [
       "build/icon.ico",
@@ -36,7 +39,7 @@
     ],
     "compression": "maximum",
     "directories": {
-      "output": "outputs"
+      "output": "outputs-beta"
     },
     "files": [
       "src/**/*",
@@ -59,20 +62,17 @@
       ]
     },
     "nsis": {
-      "artifactName": "Yanji-Setup-${version}-${arch}.${ext}",
+      "artifactName": "Yanji-Beta-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
-      "include": "build/installer.nsh",
-      "allowToChangeInstallationDirectory": true,
+      "include": "build/installer-beta.nsh",
+      "allowToChangeInstallationDirectory": false,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
+      "createStartMenuShortcut": true,
+      "shortcutName": "研迹测试版",
+      "uninstallDisplayName": "研迹测试版",
+      "perMachine": false
     },
-    "publish": [
-      {
-        "provider": "github",
-        "owner": "JH-Ruan-hhu",
-        "repo": "Papertrail",
-        "releaseType": "release"
-      }
-    ]
+    "publish": null,
+    "executableName": "Yanji-Beta"
   }
 }

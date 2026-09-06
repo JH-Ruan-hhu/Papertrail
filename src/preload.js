@@ -9,6 +9,20 @@ const on = (channel) => (callback) => {
 };
 
 contextBridge.exposeInMainWorld('paperTrail', {
+  getAuthState: () => ipcRenderer.invoke('auth:get-session'),
+  configureCloud: url => ipcRenderer.invoke('auth:configure', url),
+  loginAccount: input => ipcRenderer.invoke('auth:login', input),
+  registerAccount: input => ipcRenderer.invoke('auth:register', input),
+  sendVerificationCode: input => ipcRenderer.invoke('auth:verification', input),
+  resetPassword: input => ipcRenderer.invoke('auth:reset-password', input),
+  logoutAccount: () => ipcRenderer.invoke('auth:logout'),
+  startWechatLogin: () => ipcRenderer.invoke('auth:wechat-start'),
+  pollWechatLogin: () => ipcRenderer.invoke('auth:wechat-poll'),
+  syncWorkspace: () => ipcRenderer.invoke('sync:run'),
+  migrateLocalWorkspace: confirmed => ipcRenderer.invoke('sync:migrate', confirmed),
+  resolveSyncConflict: input => ipcRenderer.invoke('sync:resolve', input),
+  importBetaData: () => ipcRenderer.invoke('beta:import-copy'),
+  onAuthState: on('auth:state'),
   getWorkspace: () => ipcRenderer.invoke('workspace:get'),
   parseSchedule: (input) => ipcRenderer.invoke('schedules:parse', input),
   saveSchedule: (input) => ipcRenderer.invoke('schedules:save', input),

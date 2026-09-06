@@ -120,7 +120,7 @@ function migratePaper(paper, index = 0) {
   if (!asObject(paper.snapshot) || !asObject(paper.snapshot.status)) {
     throw new Error(`稿件 ${paper.id} 缺少可识别的状态快照。`);
   }
-  if (typeof paper.trackingSecret !== 'string' || !paper.trackingSecret) {
+  if ((typeof paper.trackingSecret !== 'string' || !paper.trackingSecret) && paper.cloudCredentialMissing !== true) {
     throw new Error(`稿件 ${paper.id} 缺少加密追踪凭证。`);
   }
 

@@ -234,9 +234,9 @@ test('installer uses the stock electron-builder wizard while retaining upgrade s
   const mainJs = readProjectFile('src', 'main.js');
   const indexHtml = readProjectFile('src', 'renderer', 'index.html');
   const appJs = readProjectFile('src', 'renderer', 'app.js');
-  assert.equal(packageJson.build.nsis.include, 'build/installer.nsh');
+  assert.equal(packageJson.build.nsis.include, 'build/installer-beta.nsh');
   assert.equal(packageJson.build.nsis.oneClick, false);
-  assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, true);
+  assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, false);
   assert.match(mainJs, /autoUpdater\.installDirectory = path\.dirname\(process\.execPath\)/);
   assert.doesNotMatch(installer, /Page custom|nsDialogs|BrandingText|MUI_BGCOLOR|立即安装|YanjiInstallPageCreate/);
   assert.match(installer, /papertrail-desktop/);
@@ -577,8 +577,8 @@ test('storage location changes require a restart and legacy user data remains di
   const mainJs = readProjectFile('src', 'main.js');
   const preloadJs = readProjectFile('src', 'preload.js');
   const appJs = readProjectFile('src', 'renderer', 'app.js');
-  assert.ok(mainJs.indexOf("app.setPath('userData'") < mainJs.indexOf("app.setName('研迹')"));
-  assert.match(mainJs, /resolveStableUserDataPath\(app\.getPath\('appData'\)\)/);
+  assert.ok(mainJs.indexOf("app.setPath('userData'") < mainJs.indexOf("app.setName(TEST_CHANNEL.name)"));
+  assert.match(mainJs, /TEST_CHANNEL\.userData\(app\.getPath\('appData'\)\)/);
   assert.match(mainJs, /restartRequired:\s*true/);
   assert.match(mainJs, /system:restart-app/);
   assert.match(preloadJs, /restartApp/);

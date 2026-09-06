@@ -5,9 +5,13 @@ body { background: var(--app-bg); color: var(--text); }
 .workspace { padding: clamp(20px,2.2vw,40px); max-width: var(--yanji-content-max); width: 100%; margin-inline: auto; }
 .brand-mark rect { fill: var(--primary); }
 .brand-mark path { stroke: white; fill: none; stroke-width: 2; }
+.brand-mark { background: transparent; box-shadow: none; }
+.brand-mark img { display: block; width: 40px; height: 40px; }
 .nav-item, .settings-entry { border: 1px solid transparent; border-radius: var(--radius-control); }
 .nav-item.active, .settings-entry.active { color: var(--primary); background: var(--primary-soft); border-color: var(--border-strong); box-shadow: none; }
 .nav-item b { background: var(--surface); color: var(--text-muted); }
+.side-nav .nav-item[data-workbench-page="jobs-applications"] { margin-left: 24px; width: calc(100% - 24px); padding-left: 16px; font-size: 13px; }
+.side-nav .nav-item[data-workbench-page="jobs-applications"] .nav-icon { width: 16px; height: 16px; }
 .button.primary { background: var(--primary); border-color: var(--primary); color: white; }
 .button.primary:hover { background: var(--primary-hover); }
 .button.secondary { background: var(--surface); border: 1px solid var(--border-strong); }

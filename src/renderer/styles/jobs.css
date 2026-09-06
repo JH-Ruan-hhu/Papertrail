@@ -14,3 +14,27 @@
 .job-page .job-console-head { background:var(--surface); border-color:var(--border); }.job-console-search { min-width:300px; }.job-console-search input { font-size:15px; }.job-page .job-table-shell { padding:18px; border:1px solid var(--border); background:var(--surface); border-radius:var(--radius-panel); }
 @media(max-width:1200px) { .career-calendar-layout { grid-template-columns:1fr; }.career-hero { padding:24px; }.career-charts { grid-template-columns:minmax(0,1.5fr) minmax(260px,1fr); }.calendar-day { min-height:75px; } }
 @media(max-width:960px) { .career-charts { grid-template-columns:1fr; }.career-metrics { grid-template-columns:repeat(2,1fr); }.career-hero { align-items:flex-start; flex-direction:column; } }
+/* Keep the entire overview calendar visible on a full HD desktop. */
+[data-page="jobs-overview"], .job-page { max-width:1740px; margin-inline:auto; }
+@media(min-width:1400px) and (min-height:900px) {
+ .career-hero { padding:14px 22px; margin-bottom:14px; }
+ .career-hero h1 { font-size:27px; margin:4px 0; }
+ .career-hero p { margin:8px 0; }
+ .career-metrics { gap:16px; margin-bottom:14px; }
+ .career-metrics article { padding:14px 20px; gap:5px; }
+ .career-metrics strong { font-size:28px; }
+ .career-charts { margin-bottom:14px; gap:16px; }
+ .career-panel { padding:16px 20px; }
+ #careerTrend svg { max-height:120px; }
+ .career-calendar-layout { margin-top:10px; gap:16px; }
+ .calendar-weekday { padding:5px 0; }
+ .calendar-day { min-height:42px; gap:2px; padding:4px 7px; }
+ .calendar-day span:nth-of-type(n+2) { display:none; }
+}
+.career-calendar-layout { align-items:start; }
+#careerDayEvents { max-height:560px; overflow-y:auto; }
+@media(min-width:1400px) and (min-height:900px) {
+ #careerDayEvents { max-height:285px; }
+ #careerDeadlines { max-height:194px; overflow-y:auto; }
+ .calendar-day { height:44px; overflow:hidden; }
+}

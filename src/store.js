@@ -11,12 +11,12 @@ const DEFAULT_SETTINGS = Object.freeze({
   notifications: true,
   closeToTray: true,
   startAtLogin: false,
-  autoCheckUpdates: true,
+  autoCheckUpdates: false,
   eventNotifications: true,
   todoNotifications: true,
   defaultEventReminderMinutes: 10,
   defaultTodoReminderMode: 'at-due',
-  quickCaptureShortcut: 'CommandOrControl+Shift+Space',
+  quickCaptureShortcut: 'CommandOrControl+Alt+Space',
 });
 
 class JsonStore {

@@ -55,7 +55,7 @@ syncViewportDensity();
 window.addEventListener('resize', syncViewportDensity, { passive: true });
 window.visualViewport?.addEventListener('resize', syncViewportDensity, { passive: true });
 
-const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', 'jobs-overview': '求职总览', 'jobs-applications': '我的投递', submissions: '投稿', settings: '设置' });
+const pageTitles = Object.freeze({ home: '首页', todos: '待办', schedule: '日程', attendance: '打卡', notes: '笔记', 'jobs-overview': '求职总览', 'jobs-applications': '我的投递', submissions: '投稿', settings: '设置', account: '账号' });
 const SCHEDULE_DRAFT_KEY = 'yanji.scheduleDraft.v1';
 const DAILY_PLAN_KEY = 'yanji.dailyPlanShown.v1';
 const priorityLabels = Object.freeze({ high: '最高', medium: '重要', low: '普通' });
@@ -70,18 +70,8 @@ const JOB_PRIORITY_OPTIONS = Object.freeze([
   ['low', '低']
 ]);
 const JOB_QUICK_FILTER_OPTIONS = Object.freeze([
-  ['all', '全部岗位'],
-  ['today-added', '今天新增'],
-  ['awaiting-review', '待评估'],
-  ['high-priority', '高优先级'],
-  ['due-soon', '快截止'],
-  ['submitted', '已投递'],
-  ['interviewing', '面试中'],
-  ['follow-up', '待跟进'],
-  ['incomplete', '未完成'],
-  ['imported', '历史导入'],
-  ['has-notes', '有备注'],
-  ['closed', '已结束']
+  ['all', '全部'], ['due-soon', '三天内截止'], ['high-priority', '高优先级'],
+  ['no-time', '未设置时间'], ['incomplete', '进行中'], ['closed', '已关闭']
 ]);
 const HOME_JOB_FUNNEL_OPTIONS = Object.freeze([
   ['offer', 'Offer'],
@@ -617,7 +607,8 @@ function jobMatchesQuickFilter(job, filter, now = new Date()) {
     case 'today-added': return sameDay(job.createdAt, now);
     case 'awaiting-review': return job.status === 'preparing';
     case 'high-priority': return job.priority === 'high';
-    case 'due-soon': return jobDateWithinNextDays(job.deadline, now, 7);
+    case 'due-soon': return job.status !== 'closed' && jobDateWithinNextDays(job.deadline, now, 3);
+    case 'no-time': return job.status !== 'closed' && !job.deadline && !job.nextFollowUpAt && !(job.workflowStages || []).some(stage => stage.date);
     case 'submitted': return jobWorkflowStageIndex(job) === 0;
     case 'interviewing': return /面/.test(currentStage?.name || '');
     case 'follow-up': return job.status !== 'closed' && jobDateWithinNextDays(job.nextFollowUpAt, now, 7);
@@ -835,7 +826,7 @@ function readWorkflowEditor() {
   return workflow;
 }
 
-function openJobEditor(job = null, initialStatus = 'active') {
+function openJobEditor(job = null, initialStatus = 'preparing') {
   const dialog = document.getElementById('jobDialog');
   document.getElementById('jobForm').reset();
   document.getElementById('jobId').value = job?.id || '';
@@ -844,7 +835,7 @@ function openJobEditor(job = null, initialStatus = 'active') {
   document.getElementById('jobRole').value = job?.role || '';
   document.getElementById('jobCompanyType').value = job?.companyType || '';
   document.getElementById('jobCity').value = job?.city || job?.location || '';
-  dialog.dataset.initialStatus = initialStatus === 'closed' ? 'closed' : 'active';
+  dialog.dataset.initialStatus = job?.status || (['preparing', 'active', 'closed'].includes(initialStatus) ? initialStatus : 'preparing');
   document.getElementById('jobPriority').value = job?.priority || 'medium';
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobDeadline').value = localDateInputValue(job?.deadline);

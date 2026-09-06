@@ -1490,7 +1490,7 @@ button.day-mini-time, button.day-mini-title { cursor: pointer; }
 @media (max-width: 560px) { .daily-plan-shell { padding: 28px 22px 24px; }.daily-plan-actions { align-items: stretch; flex-direction: column-reverse; } }
 
 /* v1.3.3 job control room --------------------------------------------------
-   The job page uses the same quiet liquid-glass surfaces as the rest of the
+   The job page uses the same blue and white surfaces as the rest of the
    workbench, but gives each application one compact row and its own workflow
    rail. The rail is intentionally data-driven: no stage width or count is
    coupled to the default workflow. */
