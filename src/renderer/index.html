@@ -13,6 +13,8 @@
     <link rel="stylesheet" href="styles/shell.css">
     <link rel="stylesheet" href="styles/jobs.css">
     <link rel="stylesheet" href="styles/auth.css">
+    <link rel="stylesheet" href="styles/applications.css">
+    <link rel="stylesheet" href="styles/workbench-theme.css">
   </head>
   <body>
     <div class="window-titlebar"><time id="topbarClock" aria-label="当前时间"></time></div>
@@ -41,7 +43,7 @@
           <button class="nav-item" data-workbench-page="submissions" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 7.5h16v12H4zM8 7.5v-3h8v3"/><path d="M8 12h8M8 15.5h5"/></svg><span>投稿</span><b id="navPaperCount">0</b>
           </button>
-          <button class="nav-item" data-workbench-page="jobs-overview" type="button">
+          <div class="nav-career-group" role="group" aria-labelledby="navCareerLabel"><p id="navCareerLabel" class="nav-label">求职</p><button class="nav-item" data-workbench-page="jobs-overview" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3.5 12h17M10 12v2h4v-2"/></svg><span>求职总览</span>
           </button><button class="nav-item" data-workbench-page="jobs-applications" type="button">
             <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="7" width="17" height="12" rx="2.5"/><path d="M8.5 7V5.5A1.5 1.5 0 0 1 10 4h4a1.5 1.5 0 0 1 1.5 1.5V7M3.5 12h17M10 12v2h4v-2"/></svg><span>我的投递</span><b id="navJobCount">0</b>
@@ -208,39 +210,28 @@
 </section>
 <section class="workbench-page job-page" data-page="jobs-applications" hidden>
           <header class="job-console-head">
-            <div class="job-console-title"><p id="jobTodayLabel">把每一次投递进度摊开看</p><h1>我的投递</h1></div>
-            <label class="job-console-search" for="jobSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="jobSearch" type="search" placeholder="搜索公司、岗位、城市、备注或招聘链接" autocomplete="off"></label>
-          </header>
-          <section class="job-summary-grid" aria-label="求职关键指标">
-            <article><strong id="jobTotalJobs">0</strong><span>全部岗位</span></article>
-            <article><strong id="jobTodayApplied">0</strong><span>今日投递</span><small>今日新增 <b id="jobTodayAdded">0</b></small></article>
-            <article><strong id="jobAwaitingReview">0</strong><span>待评估</span></article>
-            <article><strong id="jobDueSoon">0</strong><span>7 天内截止</span></article>
-            <article><strong id="jobInProgress">0</strong><span>流程进行中</span></article>
-          </section>
-          <nav id="jobQuickFilters" class="job-filter-chips" aria-label="求职快捷筛选"></nav>
-          <section class="job-table-shell" aria-label="岗位列表">
-            <div class="job-table-toolbar">
-              <div class="job-compact-filters">
+            <div class="job-console-title"><p id="jobTodayLabel">我的投递</p><h1>把每一次投递进度摊开看</h1><div class="job-page-description">集中管理岗位状态、截止时间、投递记录、笔面试安排和投递总结</div></div>
+            <div class="job-header-actions"><button class="button secondary" id="exportJobsButton" type="button">导出投递记录</button><button class="button primary" id="addJobButton" type="button">＋ 添加岗位</button><details class="job-more"><summary aria-label="更多岗位操作">···</summary><div><details class="job-advanced"><summary>更多筛选与排序</summary><div class="job-compact-filters">
                 <label for="jobStatusFilter"><span class="sr-only">状态</span><select id="jobStatusFilter" aria-label="按岗位状态筛选"><option value="all">状态：不限</option><option value="active">进行中</option><option value="closed">已结束</option></select></label>
                 <label for="jobPriorityFilter"><span class="sr-only">优先级</span><select id="jobPriorityFilter" aria-label="按优先级筛选"><option value="all">优先级：不限</option><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></label>
                 <label for="jobCityFilter"><span class="sr-only">城市</span><select id="jobCityFilter" aria-label="按城市筛选"><option value="all">城市：不限</option></select></label>
                 <label for="jobSortFilter"><span class="sr-only">排序</span><select id="jobSortFilter" aria-label="岗位排序"><option value="priorityProgress">优先级 / 进度</option><option value="updatedAt">最近更新</option><option value="createdAt">创建时间</option><option value="annualSalaryWan">预估年薪</option><option value="nextFollowUpAt">下次跟进</option><option value="company">公司名称</option></select></label>
                 <button class="job-sort-direction" id="jobSortDirectionButton" type="button">↓ 降序</button>
-                <span class="job-result-summary" id="jobResultSummary">0 / 0 个岗位</span>
-              </div>
-              <div class="job-table-actions">
-                <button class="button primary" id="addJobButton" type="button"><span class="plus">＋</span> 新增岗位</button>
-                <button class="button secondary" id="importJobsButton" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4M5 14v5h14v-5"/></svg> 导入岗位</button>
-                <button class="button text-button job-export-button" id="exportJobsButton" type="button">导出数据</button>
+              </div></details><button class="button secondary" id="importJobsButton" type="button"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V4M8 8l4-4 4 4M5 14v5h14v-5"/></svg> 导入岗位</button>
+                
                 <button class="button text-button job-export-button" id="exportJobsImageButton" type="button">导出图片</button>
-                <button class="button icon-button" id="jobSettingsButton" type="button" aria-label="打开求职设置"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/></svg></button>
-              </div>
-            </div>
-            <div class="job-table-head" aria-hidden="true"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>截止日期</span><span>状态</span><span>优先级</span><span>备注</span><span>操作</span></div>
-            <div class="career-view-toggle"><button type="button" data-career-view="cards" aria-pressed="true">卡片视图</button><button type="button" data-career-view="table" aria-pressed="false">表格视图</button></div><div id="careerKanban" class="career-kanban"></div>
-            <div id="jobBoard" class="job-table-body" aria-live="polite"></div>
+                <button class="button icon-button" id="jobSettingsButton" type="button" aria-label="打开求职设置"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12.2 2h-.4a2 2 0 0 0-2 2v.2a2 2 0 0 1-1 1.7l-.4.3a2 2 0 0 1-2 0l-.2-.1a2 2 0 0 0-2.7.7l-.2.4A2 2 0 0 0 4 9.9l.2.1a2 2 0 0 1 1 1.7v.6a2 2 0 0 1-1 1.7l-.2.1a2 2 0 0 0-.7 2.7l.2.4a2 2 0 0 0 2.7.7l.2-.1a2 2 0 0 1 2 0l.4.3a2 2 0 0 1 1 1.7v.2a2 2 0 0 0 2 2h.4a2 2 0 0 0 2-2v-.2a2 2 0 0 1 1-1.7l.4-.3a2 2 0 0 1 2 0l.2.1a2 2 0 0 0 2.7-.7l.2-.4a2 2 0 0 0-.7-2.7l-.2-.1a2 2 0 0 1-1-1.7v-.6a2 2 0 0 1 1-1.7l.2-.1a2 2 0 0 0 .7-2.7l-.2-.4a2 2 0 0 0-2.7-.7l-.2.1a2 2 0 0 1-2 0l-.4-.3a2 2 0 0 1-1-1.7V4a2 2 0 0 0-2-2Z"/></svg></button></div></details></div>
+          </header>
+          <section class="job-search-card" aria-label="搜索与视图">
+            <div class="job-search-top"><label class="job-console-search" for="jobSearch"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="jobSearch" type="search" placeholder="搜索公司、岗位、城市、标签、简历、备注或 JD" autocomplete="off"></label><span class="job-result-summary" id="jobResultSummary">显示 0 / 0</span><button class="job-scroll-button" data-career-scroll="-1" type="button" aria-label="向左查看阶段">‹</button><button class="job-scroll-button" data-career-scroll="1" type="button" aria-label="向右查看阶段">›</button></div>
+            <div class="job-search-bottom"><div class="job-quick-group"><span class="job-filter-label">☷ 快速筛选</span><nav id="jobQuickFilters" class="job-filter-chips" aria-label="求职快捷筛选"></nav></div><div class="career-view-toggle"><button type="button" data-career-view="cards" aria-pressed="true">▦ 卡片视图</button><button type="button" data-career-view="table" aria-pressed="false">▤ 表格视图</button></div></div>
+            
           </section>
+          <section class="job-table-shell" aria-label="岗位列表">
+            <div id="careerKanban" class="career-kanban"></div>
+            <div class="job-table-scroll"><div class="job-table-head"><button type="button" data-career-sort="company" aria-label="按公司 / 岗位排序">公司 / 岗位 <i>↕</i></button><button type="button" data-career-sort="city" aria-label="按城市排序">城市 <i>↕</i></button><button type="button" data-career-sort="jobType" aria-label="按岗位类型排序">岗位类型 <i>↕</i></button><button type="button" data-career-sort="phaseTime" aria-label="按时间（可修改）排序">时间（可修改） <i>↕</i></button><button type="button" data-career-sort="tags" aria-label="按标签排序">标签 <i>↕</i></button><span>操作</span></div><div id="jobBoard" class="job-table-body" aria-live="polite"></div></div>
+          </section>
+
         </section>
 
         <section class="workbench-page submissions-page" data-page="submissions" hidden>
@@ -629,13 +620,16 @@
             <div class="form-grid job-form-grid">
               <div class="field"><label for="jobCompany">单位名称</label><input id="jobCompany" maxlength="200" placeholder="某某环保科技" required></div>
               <div class="field"><label for="jobRole">岗位名称</label><input id="jobRole" maxlength="300" placeholder="环境研发工程师" required></div>
-              <div class="field"><label for="jobCompanyType">企业类型</label><input id="jobCompanyType" maxlength="160" placeholder="国企 / 科技公司"></div>
+              <div class="field"><label for="jobType">岗位类型（选填）</label><select id="jobType"><option value="">未分类</option><option value="产品岗">产品岗</option><option value="技术岗">技术岗</option><option value="数据岗">数据岗</option><option value="研发岗">研发岗</option><option value="科研岗">科研岗</option><option value="工程岗">工程岗</option><option value="运营岗">运营岗</option><option value="销售岗">销售岗</option><option value="市场岗">市场岗</option><option value="职能岗">职能岗</option><option value="设计岗">设计岗</option><option value="管培生">管培生</option><option value="通用校招">通用校招</option></select></div><div class="field"><label for="jobCompanyType">单位性质（选填）</label><input id="jobCompanyType" maxlength="160" placeholder="国企 / 科技公司"></div>
               <div class="field"><label for="jobCity">城市</label><input id="jobCity" maxlength="200" placeholder="城市 / 远程"></div>
               <div class="field"><label for="jobPriority">优先级</label><select id="jobPriority"><option value="high">高</option><option value="medium">中</option><option value="low">低</option></select></div>
               <div class="field"><label for="jobAnnualSalaryWan">预估年薪（万元）</label><input id="jobAnnualSalaryWan" type="number" min="0.1" max="10000" step="0.1" inputmode="decimal" placeholder="41.1"></div>
               <div class="field"><label for="jobDeadline">截止日期</label><input id="jobDeadline" type="date"><small>截止日前一天触发 #1 全屏提醒</small></div>
               <div class="field"><label for="jobAppliedAt">投递日期</label><input id="jobAppliedAt" type="date"></div>
               <div class="field full"><label for="jobContact">联系人 / 渠道</label><input id="jobContact" maxlength="300" placeholder="招聘平台、内推人或 HR"></div>
+              <div class="field full"><label for="jobSourceUrl">岗位链接</label><input id="jobSourceUrl" type="url" maxlength="2000" placeholder="https://"></div>
+              <div class="field"><label for="jobResumeName">简历名称</label><input id="jobResumeName" maxlength="200" placeholder="选填"></div>
+              <div class="field full"><label for="jobTags">标签</label><input id="jobTags" maxlength="1000" placeholder="用逗号分隔"></div><div class="field full"><label for="jobJdText">岗位描述 / JD</label><textarea id="jobJdText" rows="3" maxlength="30000"></textarea></div>
               <div class="field full"><label for="jobNotes">备注</label><textarea id="jobNotes" rows="3" maxlength="10000" placeholder="岗位亮点、准备重点、反馈与下一步"></textarea></div>
             </div>
           </section>

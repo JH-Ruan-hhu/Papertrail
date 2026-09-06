@@ -457,8 +457,8 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   const preloadJs = readProjectFile('src', 'preload.js');
   assert.match(indexHtml, /<script src="\.\.\/job-core\.js"><\/script>[\s\S]*<script src="workbench\.js"><\/script>/);
   assert.match(workbenchJs, /window\.YanjiJobCore/);
-  assert.match(indexHtml, /id="jobTotalJobs"/);
-  assert.match(indexHtml, /id="jobTodayAdded"/);
+  assert.doesNotMatch(indexHtml, /id="jobTotalJobs"/);
+  assert.match(indexHtml, /class="job-search-card"/);
   assert.match(indexHtml, /id="jobQuickFilters"/);
   assert.match(indexHtml, /id="jobWorkflowEditor"/);
   assert.match(indexHtml, /id="jobAnnualSalaryWan"/);
@@ -478,7 +478,7 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(indexHtml, /id="importJobsButton"/);
   assert.match(indexHtml, /id="exportJobsButton"/);
   assert.match(indexHtml, /id="exportJobsImageButton"/);
-  assert.match(indexHtml, /id="exportJobsButton"[^>]*>导出数据<\/button>/);
+  assert.match(indexHtml, /id="exportJobsButton"[^>]*>导出投递记录<\/button>/);
   assert.match(indexHtml, /id="exportJobsImageButton"[^>]*>导出图片<\/button>/);
   assert.match(mainJs, /ipcMain\.handle\('jobs:import'/);
   assert.match(mainJs, /ipcMain\.handle\('jobs:export'/);
@@ -772,12 +772,11 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
   assert.doesNotMatch(indexHtml.match(/id="jobStatusFilter"[\s\S]*?<\/select>/)?.[0] || '', /准备中|暂停/);
   assert.match(indexHtml, /优先级：不限/);
   assert.match(indexHtml, /城市：不限/);
-  assert.match(indexHtml, /class="job-table-head"[\s\S]*预估年薪/);
-  assert.match(indexHtml, /class="job-table-head"[\s\S]*截止日期/);
+  assert.match(indexHtml, /class="job-table-head"[\s\S]*岗位类型/);
+  assert.match(indexHtml, /class="job-table-head"[\s\S]*时间（可修改）/);
   assert.match(indexHtml, /id="jobDeadline"/);
   assert.match(indexHtml, /id="jobSettingsButton"[\s\S]*<circle cx="12" cy="12" r="3"/);
-  assert.match(workbenchJs, /class="job-salary-cell"/);
-  assert.match(workbenchJs, /jobs\.filter\(\(job\) => job\.status !== 'closed'\)/);
+  assert.match(readProjectFile('src', 'renderer', 'career.js'), /function careerTableRow/);
   assert.match(workbenchJs, /const closedDifference = Number\(left\.status === 'closed'\) - Number\(right\.status === 'closed'\);[\s\S]*if \(closedDifference\) return closedDifference;/);
   assert.match(workbenchJs, /class="job-closed-divider"[^>]*><span>已结束 · 保留记录<\/span>/);
   assert.match(readProjectFile('src', 'renderer', 'v11-layout.css'), /\.job-position\.job-row-status-closed[\s\S]*background:\s*#fafafa/);

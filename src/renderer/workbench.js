@@ -69,10 +69,7 @@ const JOB_PRIORITY_OPTIONS = Object.freeze([
   ['medium', '中'],
   ['low', '低']
 ]);
-const JOB_QUICK_FILTER_OPTIONS = Object.freeze([
-  ['all', '全部'], ['due-soon', '三天内截止'], ['high-priority', '高优先级'],
-  ['no-time', '未设置时间'], ['incomplete', '进行中'], ['closed', '已关闭']
-]);
+const JOB_QUICK_FILTER_OPTIONS = Object.freeze([['all','全部'],['favorite','已置顶'],['due-soon','3 天内截止'],['no-time','未设置时间'],['incomplete','进行中'],['closed','已结束']]);
 const HOME_JOB_FUNNEL_OPTIONS = Object.freeze([
   ['offer', 'Offer'],
   ['interview', '面试'],
@@ -604,11 +601,15 @@ function jobFunnelCounts(jobs) {
 function jobMatchesQuickFilter(job, filter, now = new Date()) {
   const currentStage = jobCurrentStage(job);
   switch (filter) {
+    case 'favorite': return job.pinned === true || job.favorite === true;
+    case 'matched': return Number.isFinite(job.matchScore);
+    case 'high-match': return Number.isFinite(job.matchScore) && job.matchScore >= 80;
+    case 'resume': return Boolean(job.resumeName);
     case 'today-added': return sameDay(job.createdAt, now);
     case 'awaiting-review': return job.status === 'preparing';
     case 'high-priority': return job.priority === 'high';
     case 'due-soon': return job.status !== 'closed' && jobDateWithinNextDays(job.deadline, now, 3);
-    case 'no-time': return job.status !== 'closed' && !job.deadline && !job.nextFollowUpAt && !(job.workflowStages || []).some(stage => stage.date);
+    case 'no-time': return !window.YanjiCareerData.time(job).value;
     case 'submitted': return jobWorkflowStageIndex(job) === 0;
     case 'interviewing': return /面/.test(currentStage?.name || '');
     case 'follow-up': return job.status !== 'closed' && jobDateWithinNextDays(job.nextFollowUpAt, now, 7);
@@ -657,6 +658,10 @@ function sortJobs(jobs) {
     }
     let comparison = 0;
     if (wb.jobSort === 'company') comparison = textValue(left).localeCompare(textValue(right), 'zh-CN');
+    else if (['city','jobType','resumeName','tags'].includes(wb.jobSort)) comparison=String(left[wb.jobSort]||'').localeCompare(String(right[wb.jobSort]||''),'zh-CN');
+    else if (wb.jobSort === 'phase') comparison=window.YanjiCareerData.stages.findIndex(([id])=>id===window.YanjiCareerData.bucket(left))-window.YanjiCareerData.stages.findIndex(([id])=>id===window.YanjiCareerData.bucket(right));
+    else if (wb.jobSort === 'phaseTime') comparison=dateValue(window.YanjiCareerData.time(left).value)-dateValue(window.YanjiCareerData.time(right).value);
+    else if (wb.jobSort === 'matchScore') comparison=(left.matchScore??-1)-(right.matchScore??-1);
     else if (wb.jobSort === 'createdAt') comparison = dateValue(left.createdAt) - dateValue(right.createdAt);
     else if (wb.jobSort === 'deadline') comparison = dateValue(left.deadline) - dateValue(right.deadline);
     else if (wb.jobSort === 'annualSalaryWan') comparison = Number(left.annualSalaryWan || 0) - Number(right.annualSalaryWan || 0);
@@ -684,7 +689,7 @@ function renderJobQuickFilters(jobs, now = new Date()) {
   const container = document.getElementById('jobQuickFilters');
   if (!container) return;
   const counts = jobQuickFilterCounts(jobs, now);
-  container.innerHTML = JOB_QUICK_FILTER_OPTIONS.map(([filter, label]) => `<button class="job-quick-filter${wb.jobQuickFilter === filter ? ' active' : ''}" data-job-quick-filter="${filter}" type="button">${label}<b>${counts[filter]}</b></button>`).join('');
+  container.innerHTML = JOB_QUICK_FILTER_OPTIONS.map(([filter, label]) => `<button class="job-quick-filter${wb.jobQuickFilter === filter ? ' active' : ''}" data-job-quick-filter="${filter}" type="button">${label}</button>`).join('');
 }
 
 function renderJobCityFilter(jobs) {
@@ -719,15 +724,7 @@ function jobPriorityOptions(selected) {
   return JOB_PRIORITY_OPTIONS.map(([priority, label]) => `<option value="${priority}"${selected === priority ? ' selected' : ''}>${label}</option>`).join('');
 }
 
-function jobRowHtml(job) {
-  const city = job.city || job.location || '';
-  const salary = Number(job.annualSalaryWan) > 0 ? `${Number(job.annualSalaryWan).toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 万` : '—';
-  const deadline = job.deadline ? jobDateLabel(job.deadline, { year: 'numeric', month: '2-digit', day: '2-digit' }) : '—';
-  const deadlineClass = jobDateWithinNextDays(job.deadline, new Date(), 7) ? ' is-soon' : (Date.parse(job.deadline) < Date.now() ? ' is-overdue' : '');
-  const currentStage = jobCurrentStage(job);
-  const pinLabel = job.pinned ? '取消置顶' : '置顶';
-  return `<article class="job-position job-row-status-${wbEscape(job.status)}${job.pinned ? ' is-pinned' : ''}" data-job-id="${wbEscape(job.id)}" tabindex="0" aria-label="${wbEscape(job.company)} · ${wbEscape(job.role)}${job.pinned ? '，已置顶' : ''}"><div class="job-position-main"><div class="job-company-cell"><div class="job-company-line"><button class="job-pin-button${job.pinned ? ' is-active' : ''}" data-toggle-job-pin="${wbEscape(job.id)}" type="button" aria-pressed="${job.pinned ? 'true' : 'false'}" aria-label="${pinLabel} ${wbEscape(job.company)} · ${wbEscape(job.role)}" title="${pinLabel}">${uiIcon('pin')}</button><div><strong>${wbEscape(job.company)}</strong><span>${wbEscape(job.role)}</span></div></div></div><div class="job-type-cell">${wbEscape(job.companyType || '—')}</div><div class="job-city-cell">${wbEscape(city || '—')}</div><div class="job-salary-cell">${salary}</div><div class="job-deadline-cell${deadlineClass}">${deadline}</div><label class="job-inline-control job-status-cell"><span class="sr-only">${wbEscape(job.company)}状态</span><select data-job-field="status" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}状态">${jobStatusOptions(job.status)}</select></label><label class="job-inline-control job-priority-cell"><span class="sr-only">${wbEscape(job.company)}优先级</span><span class="job-priority-dot priority-${wbEscape(job.priority)}" aria-hidden="true"></span><select data-job-field="priority" data-job-id="${wbEscape(job.id)}" aria-label="${wbEscape(job.company)}优先级">${jobPriorityOptions(job.priority)}</select></label><label class="job-inline-control job-notes-cell"><span class="sr-only">${wbEscape(job.company)}备注</span><input data-job-field="notes" data-job-id="${wbEscape(job.id)}" type="text" value="${wbEscape(job.notes || '')}" placeholder="备注" aria-label="${wbEscape(job.company)}备注"></label><div class="job-position-actions"><button class="job-row-action" data-edit-job="${wbEscape(job.id)}" type="button">${uiIcon('eye')}<span>详情</span></button><button class="job-row-action danger" data-delete-job="${wbEscape(job.id)}" type="button" aria-label="删除 ${wbEscape(job.company)} ${wbEscape(job.role)}">${uiIcon('trash')}</button></div></div>${jobWorkflowTrackHtml({ ...job, currentStage })}</article>`;
-}
+function jobRowHtml(job) { return careerTableRow(job); }
 
 function renderJobs() {
   const jobs = wb.workspace.jobApplications || [];
@@ -739,28 +736,17 @@ function renderJobs() {
   const cityFilter = document.getElementById('jobCityFilter')?.value || 'all';
   renderJobQuickFilters(jobs, now);
 
-  const todayAdded = jobs.filter((job) => sameDay(job.createdAt, now)).length;
-  const todayApplied = jobs.filter((job) => sameDay(job.appliedAt, now)).length;
-  const awaitingReview = jobs.filter((job) => job.status === 'preparing').length;
-  const dueSoon = jobs.filter((job) => jobDateWithinNextDays(job.deadline, now, 7)).length;
-  const inProgress = jobs.filter((job) => job.status !== 'closed').length;
-  document.getElementById('jobTotalJobs').textContent = String(jobs.length);
-  document.getElementById('jobTodayAdded').textContent = String(todayAdded);
-  document.getElementById('jobTodayApplied').textContent = String(todayApplied);
-  document.getElementById('jobAwaitingReview').textContent = String(awaitingReview);
-  document.getElementById('jobDueSoon').textContent = String(dueSoon);
-  document.getElementById('jobInProgress').textContent = String(inProgress);
-  document.getElementById('jobTodayLabel').textContent = `${localDateKey(now)} · 我的投递`;
+  document.getElementById('jobTodayLabel').textContent = '我的投递';
 
   const visible = sortJobs(jobs.filter((job) => {
-    const searchable = `${job.company} ${job.role} ${job.companyType || ''} ${job.city || job.location || ''} ${job.contact || ''} ${job.sourceUrl || ''} ${job.notes || ''} ${jobCurrentStage(job)?.name || ''}`.toLowerCase();
+    const searchable = `${job.company} ${job.role} ${job.companyType || ''} ${job.jobType || ''} ${job.city || job.location || ''} ${job.contact || ''} ${job.sourceUrl || ''} ${job.notes || ''} ${(job.tags || []).join(' ')} ${job.resumeName || ''} ${job.jdText || ''} ${jobCurrentStage(job)?.name || ''}`.toLowerCase();
     return (statusFilter === 'all' || (statusFilter === 'active' ? job.status !== 'closed' : job.status === 'closed'))
       && (priorityFilter === 'all' || job.priority === priorityFilter)
       && (cityFilter === 'all' || (job.city || job.location || '') === cityFilter)
       && (wb.jobQuickFilter === 'all' || jobMatchesQuickFilter(job, wb.jobQuickFilter, now))
       && searchable.includes(query);
   }));
-  document.getElementById('jobResultSummary').textContent = `${visible.length} / ${jobs.length} 个岗位`;
+  document.getElementById('jobResultSummary').textContent = `显示 ${visible.length} / ${jobs.length}`;
   document.getElementById('jobSortDirectionButton').textContent = wb.jobSortDirection === 'asc' ? '↑ 升序' : '↓ 降序';
   document.getElementById('jobBoard').innerHTML = visible.length
     ? visible.map((job, index) => {
@@ -826,7 +812,7 @@ function readWorkflowEditor() {
   return workflow;
 }
 
-function openJobEditor(job = null, initialStatus = 'preparing') {
+function openJobEditor(job = null, initialStatus = 'active') {
   const dialog = document.getElementById('jobDialog');
   document.getElementById('jobForm').reset();
   document.getElementById('jobId').value = job?.id || '';
@@ -834,14 +820,21 @@ function openJobEditor(job = null, initialStatus = 'preparing') {
   document.getElementById('jobCompany').value = job?.company || '';
   document.getElementById('jobRole').value = job?.role || '';
   document.getElementById('jobCompanyType').value = job?.companyType || '';
+  const jobTypeSelect=document.getElementById('jobType');
+  jobTypeSelect.querySelectorAll('[data-legacy-type]').forEach(option=>option.remove());
+  const selectedType=job?.jobType || ([...jobTypeSelect.options].some(option=>option.value===job?.companyType)?job.companyType:'');
+  if(selectedType&&![...jobTypeSelect.options].some(option=>option.value===selectedType)){const option=new Option(selectedType,selectedType);option.dataset.legacyType='true';jobTypeSelect.add(option);}
+  jobTypeSelect.value=selectedType;
   document.getElementById('jobCity').value = job?.city || job?.location || '';
-  dialog.dataset.initialStatus = job?.status || (['preparing', 'active', 'closed'].includes(initialStatus) ? initialStatus : 'preparing');
+  dialog.dataset.initialStatus = job?.status || (['preparing', 'active', 'closed'].includes(initialStatus) ? initialStatus : 'active');
   document.getElementById('jobPriority').value = job?.priority || 'medium';
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobDeadline').value = localDateInputValue(job?.deadline);
   document.getElementById('jobAppliedAt').value = localDateInputValue(job?.appliedAt);
   document.getElementById('jobContact').value = job?.contact || '';
   document.getElementById('jobNotes').value = job?.notes || '';
+  for (const [id,key] of [['jobSourceUrl','sourceUrl'],['jobResumeName','resumeName'],['jobJdText','jdText']]) document.getElementById(id).value=job?.[key]??'';
+  document.getElementById('jobTags').value=(job?.tags||[]).join('，');
   document.getElementById('jobError').textContent = '';
   document.getElementById('deleteJobButton').hidden = !job;
   dialog.dataset.revision = String(job?.revision ?? '');
@@ -862,6 +855,7 @@ async function saveJobFromEditor() {
     company: document.getElementById('jobCompany').value,
     role: document.getElementById('jobRole').value,
     companyType: document.getElementById('jobCompanyType').value,
+    jobType: document.getElementById('jobType').value,
     city,
     location: city,
     deadline: dateInputToIso(document.getElementById('jobDeadline').value),
@@ -874,6 +868,10 @@ async function saveJobFromEditor() {
     workflow: readWorkflowEditor(),
     contact: document.getElementById('jobContact').value,
     notes: document.getElementById('jobNotes').value,
+    sourceUrl: document.getElementById('jobSourceUrl').value,
+    resumeName: document.getElementById('jobResumeName').value,
+    jdText: document.getElementById('jobJdText').value,
+    tags: document.getElementById('jobTags').value.split(/[,，]/),
     revision: document.getElementById('jobDialog').dataset.revision || undefined
   };
   try {

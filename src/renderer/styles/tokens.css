@@ -1,16 +1,16 @@
 :root {
   color-scheme: light;
-  --app-bg: #f6f9ff;
-  --sidebar-bg: #f4f8ff;
+  --app-bg: #eef5ff;
+  --sidebar-bg: rgba(248,252,255,.80);
   --surface: #ffffff;
   --surface-soft: #f8fbff;
   --text-strong: #101828;
   --text: #344054;
-  --text-muted: #667085;
-  --primary: #2f6df6;
+  --text-muted: #7183a0;
+  --primary: #2864f1;
   --primary-hover: #255fe0;
   --primary-soft: #edf4ff;
-  --border: #e4ebf5;
+  --border: #d7e5ff;
   --border-strong: #d5e1f0;
   --success: #16b67a;
   --warning: #f59e0b;

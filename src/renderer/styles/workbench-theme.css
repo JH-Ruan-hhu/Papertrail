@@ -1,0 +1,51 @@
+/* A shared blue/white visual system for every workbench surface. */
+body { color:var(--text); background:#eef5ff; -webkit-font-smoothing:antialiased; }
+.app-layout { background:radial-gradient(ellipse at 76% 8%,#e7f1ff 0,transparent 56%),linear-gradient(130deg,#f5f9ff,#edf5ff 62%,#f3f8ff); }
+.workspace { background:transparent; padding:32px 40px; }
+.window-titlebar { background:rgba(243,249,255,.9); border-bottom:1px solid #deebfc; }
+.sidebar { background:rgba(249,252,255,.77); backdrop-filter:blur(20px); border-right:1px solid rgba(192,214,247,.48); box-shadow:8px 0 26px rgba(59,108,183,.04); padding:24px 16px 18px; }
+.sidebar .brand { display:flex; flex-direction:row; align-items:center; gap:12px; padding:0 8px 22px; }.sidebar .brand strong { font-size:18px; letter-spacing:0; line-height:1.4; color:#17253e; }.sidebar .brand small { margin-top:4px; font-size:12px; color:#7d8daa; }.sidebar .brand-mark { flex:0 0 42px; width:42px; height:42px; }.sidebar .brand-mark img { width:42px; height:42px; }
+.sidebar-active-indicator { display:none; }
+.side-nav { gap:5px; }.side-nav .nav-label { font-size:11px; color:#8b9bb3; letter-spacing:.08em; margin:8px 12px; }.side-nav .nav-item { min-height:42px; font-size:14px; padding:10px 13px; border:1px solid transparent; border-radius:8px; color:#566a87; background:transparent; box-shadow:none; }.side-nav .nav-item.active { color:#2563ed; background:#eaf3ff; border-color:#c9dfff; box-shadow:0 5px 13px #2563eb0a; font-weight:650; }.side-nav .nav-item b { background:#f0f6ff; color:#6d84aa; border:1px solid #ddeaff; }.side-nav .nav-item.active b { background:white; color:#2563ed; }
+.nav-career-group { position:relative; display:grid; gap:4px; padding:5px 0 0; margin-top:5px; }.nav-career-group::before { content:''; position:absolute; top:35px; bottom:10px; left:14px; width:1px; background:#cbddf7; }.side-nav .nav-career-group .nav-item { margin-left:26px; width:calc(100% - 26px); padding-left:11px; min-height:39px; font-size:13px; }.side-nav .nav-career-group .nav-item .nav-icon { width:16px; height:16px; }.nav-career-group .nav-item.active::before { content:''; position:absolute; left:-14px; width:5px; height:5px; background:var(--primary); border-radius:50%; }.nav-career-group .nav-item { position:relative; }
+.sidebar-bottom { gap:8px; }.account-sidebar { background:rgba(255,255,255,.72); border-color:#d8e7ff; }.quick-capture-tip,.settings-entry { background:transparent; border:1px solid transparent; border-radius:9px; }
+:is(.home-next-event-card,.home-today-card,.home-attendance-card,.home-schedule-panel,.focus-timer-panel,.latest-notes-panel,.home-job-panel,.focus-usage-panel,.attendance-summary article,.attendance-timeline-shell,.note-card,.paper-card,.todo-card,.account-panel,.career-metrics article,.career-panel,.settings-panel,.settings-section,.schedule-board-shell) { background:rgba(255,255,255,.95); border:1px solid #d7e5ff; border-radius:11px; box-shadow:0 3px 12px rgba(40,89,164,.045); }
+:is(.home-progress-strip,.home-welcome,.page-banner) { background:linear-gradient(115deg,#e7f1ff,#f3f8ff); border-color:#d6e6ff; }
+.workspace :is(h1,h2,h3) { color:#15213a; letter-spacing:-.025em; }.workspace .page-head-row h1 { font-size:28px; }.workspace :is(.eyebrow,.heading-icon) { color:var(--primary); }.workspace .panel-heading h2 { font-size:17px; }.workspace .panel-heading p { color:#788ba8; }
+.button { border-radius:8px; font-weight:600; }.button.primary { color:white; background:#2864f1; border-color:#2864f1; box-shadow:0 5px 14px #2864f124; }.button.secondary { color:#304363; background:white; border-color:#d0e1ff; box-shadow:0 2px 3px #23457908; }
+.workspace :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea),dialog :is(input:not([type="checkbox"]):not([type="radio"]),select,textarea) { border-color:#d3e3fe; border-radius:7px; background-color:#fff; color:#263955; }
+:is(input,textarea,select,button,a):focus-visible { outline:2px solid #6b9dff; outline-offset:3px; }
+.modal,dialog { border-color:#d3e3fe; background:#fff; box-shadow:0 22px 65px #214f9026; }.modal::backdrop { background:rgba(35,60,96,.24); }
+:is(.note-toolbar,.note-editor-toolbar,.settings-nav,.schedule-toolbar,.attendance-toolbar) { background:#f2f7ff; border-color:#d5e5fd; }.note-content,.note-editor { color:#293b55; }
+.job-page .career-job.is-pinned { background:#eaf3ff; border-color:#7cabff; box-shadow:inset 3px 0 #2f6df6,0 3px 10px #2864f11a; }.job-page .job-position.is-pinned { background:#eaf3ff; box-shadow:inset 3px 0 #2f6df6; }.job-page .job-position.is-pinned:hover { background:#e1eeff; }.career-tool.is-favorite { color:#2463ef; background:#dceaff; }.career-tool.is-favorite .career-icon { fill:#2463ef; }
+.job-page .job-table-head,.job-page .job-position-main { grid-template-columns:minmax(180px,1.8fr) minmax(70px,.8fr) minmax(80px,.85fr) 130px 150px 125px minmax(140px,1.25fr) 132px; min-width:1160px; }.job-page .job-table-head>button,.job-page .job-table-head>span { text-align:left; }.job-page .job-position-main>div { min-width:0; text-align:left; }
+/* Let the calendar use the remaining viewport and keep all event lines readable. */
+.career-calendar { height:var(--career-calendar-height,464px); grid-template-rows:26px repeat(6,minmax(68px,1fr)); align-content:stretch; }.career-calendar .calendar-day { min-height:68px; height:auto; overflow:visible; gap:3px; padding:6px 8px; }.career-calendar .calendar-day span { display:block; font-size:11px; line-height:14px; }.career-calendar .calendar-day span:nth-of-type(n+2) { display:block; }.career-calendar .calendar-day small { font-size:10px; line-height:12px; }.career-calendar .calendar-weekday { padding:3px 0; }.career-calendar-layout { align-items:start; }.career-calendar .calendar-day.selected { border-color:#80abff; background:#edf4ff; }
+#careerDayEvents { max-height:var(--career-calendar-height,464px); } 
+@media(min-width:1400px) and (min-height:900px) { .career-hero { padding:10px 20px; margin-bottom:12px; }.career-hero h1 { font-size:25px; }.career-hero p { margin:5px 0; }.career-metrics { margin-bottom:12px; }.career-metrics article { padding:12px 18px; gap:3px; }.career-metrics strong { font-size:26px; }.career-charts { margin-bottom:12px; }.career-charts .career-panel { padding:12px 18px; }#careerTrend svg { max-height:105px; } }
+/* Frequent pointer feedback: two-pixel lift, 160ms, immediately reversible. */
+:is(.button,.career-job,.note-card,.todo-card,.paper-card,.career-metrics article,.home-next-event-card,.home-today-card,.home-attendance-card,.career-deadline,.account-sidebar,.quick-capture-tip,.settings-entry,.nav-item) { transition:transform 160ms cubic-bezier(.23,1,.32,1),box-shadow 160ms ease,border-color 160ms ease,background-color 160ms ease; }
+@media(hover:hover) and (pointer:fine) { :is(.button,.career-job,.note-card,.todo-card,.paper-card,.career-metrics article,.home-next-event-card,.home-today-card,.home-attendance-card,.career-deadline):hover { transform:translateY(-2px); border-color:#adcaff; box-shadow:0 8px 20px #2b65b314; }.side-nav .nav-item:hover,.quick-capture-tip:hover,.settings-entry:hover { background:#eaf3ff; color:#2864f1; }.button:active { transform:translateY(0) scale(.98); } }
+@media(prefers-reduced-motion:reduce) { :is(.button,.career-job,.note-card,.todo-card,.paper-card,.career-metrics article,.home-next-event-card,.home-today-card,.home-attendance-card,.career-deadline):hover { transform:none; } }
+@media(prefers-reduced-transparency:reduce) { .sidebar { background:#f6faff; backdrop-filter:none; } }
+@media(max-height:800px) { .workspace { padding:22px 28px; }.sidebar { padding:16px 12px; }.sidebar .brand { padding-bottom:12px; }.side-nav { gap:3px; }.side-nav .nav-item { min-height:36px; padding-block:7px; }.nav-career-group { margin-top:0; }.side-nav .nav-career-group .nav-item { min-height:35px; } }
+.career-calendar .calendar-day>* { flex-shrink:0; }
+@media(min-width:1400px) and (min-height:900px) {
+ .career-hero #careerSyncLabel { display:none; }
+ .career-hero { padding:8px 20px; }
+ .career-metrics article { padding:8px 18px; }
+ .career-charts .career-panel { padding:8px 18px; }
+ #careerTrend svg { max-height:80px; }
+ #careerDeadlines .career-deadline { padding:6px 10px; gap:3px; margin:5px 0; }
+}
+.job-page .job-table-head,.job-page .job-position-main { grid-template-columns:minmax(200px,2fr) minmax(90px,.9fr) minmax(100px,1fr) 165px minmax(180px,1.5fr) 140px; min-width:1040px; }
+.career-workflow { padding:2px 24px 16px; overflow-x:auto; }
+.career-workflow-track { display:flex; align-items:flex-start; justify-content:space-between; position:relative; min-width:600px; padding-top:5px; }
+.career-workflow-line { position:absolute; left:22px; right:22px; top:9px; height:2px; background:#dbe5f4; }
+.career-workflow-line progress { display:block; appearance:none; width:100%; height:2px; border:0; }
+.career-workflow-line progress::-webkit-progress-bar { background:#dbe5f4; }.career-workflow-line progress::-webkit-progress-value { background:#8babf8; }
+.career-workflow-step { display:grid; justify-items:center; gap:2px; min-width:44px; max-width:100px; padding:0 4px; border:0; background:transparent; color:#8a99b2; font-size:12px; line-height:1.25; position:relative; cursor:pointer; }
+.career-workflow-step i { width:8px; height:8px; border-radius:50%; background:#dbe4f1; border:1px solid #cfdbed; margin-bottom:3px; }.career-workflow-step small { font-size:11px; }.career-workflow-step.reached { color:#416bcd; }.career-workflow-step.reached i { background:#3d6fe7; border-color:#3d6fe7; }.career-workflow-step.current i { box-shadow:0 0 0 3px #dfeaff; }.career-workflow-step:hover { color:#2563eb; }
+.job-page .career-job.is-pinned,.job-page .job-position.is-pinned { background:linear-gradient(90deg,#dceaff 0,#eff5ff 22%,#fff 62%); border-color:#b3cdff; box-shadow:inset 3px 0 #7ba8ff; }
+.job-page .career-job.is-pinned:hover,.job-page .job-position.is-pinned:hover { background:linear-gradient(90deg,#d3e5ff 0,#eaf3ff 22%,#fff 66%); }
+.career-type-select { min-width:0; width:100%; height:36px; padding:6px 10px; border:1px solid #d1e2ff; border-radius:6px; background:#f6f9ff; color:#536c91; font-size:13px; }

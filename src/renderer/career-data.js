@@ -1,10 +1,10 @@
 'use strict';
 (function(root) {
   const key = d => { const v = new Date(d); return Number.isFinite(v.getTime()) ? `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}` : null; };
-  const stages = Object.freeze([['preparing','待投递'],['apply','已投递'],['assessment','笔试'],['first','一面'],['second','二面'],['hr','HR 面'],['offer','Offer'],['closed','已拒绝 / 结束']]);
+  const stages = Object.freeze([['apply','已投递'],['assessment','笔试'],['first','一面'],['second','二面'],['hr','HR 面'],['offer','Offer'],['closed','已拒绝 / 结束']]);
   const category = name => /offer/i.test(name) ? 'offer' : /HR|三面|终面/i.test(name) ? 'hr' : /二面/.test(name) ? 'second' : /一面|面试/.test(name) ? 'first' : /测评|笔试|网测/.test(name) ? 'assessment' : /投递/.test(name) ? 'apply' : 'custom';
   const current = job => job.workflow?.stages?.find(s=>s.id===job.workflow.currentStageId);
-  const bucket = job => job.status === 'preparing' ? 'preparing' : job.status === 'closed' && category(current(job)?.name || '') !== 'offer' ? 'closed' : category(current(job)?.name || '投递');
+  const bucket = job => job.status === 'preparing' ? 'apply' : job.status === 'closed' ? 'closed' : category(current(job)?.name || '投递');
   const applied = job => job.workflow?.timeline?.find(t=>category(job.workflow.stages.find(s=>s.id===t.stageId)?.name || '')==='apply' && t.date)?.date || job.appliedAt;
   function events(jobs) {
     const rows=[];
@@ -38,6 +38,23 @@
     if(target==='apply' && !next.appliedAt) next.appliedAt=today;
     return next;
   }
-  const api={key,stages,category,current,bucket,applied,events,overview,move};
+  function time(job) {
+    const stage=current(job), stageId=stage?.id, phase=bucket(job);
+    if(job.status==='preparing')return {value:job.deadline||null,label:'截止',kind:'deadline'};
+    const value=job.workflow?.timeline?.find(t=>t.stageId===stageId)?.date || (phase==='apply'?job.appliedAt:null);
+    return {value:value||null,label:phase==='apply'?'投递时间':phase==='assessment'?'笔试时间':phase==='offer'?'Offer 时间':'面试时间',kind:'stage',stageId};
+  }
+  function withTime(job,value) {
+    const next=JSON.parse(JSON.stringify(job)), info=time(next);
+    if(value && !Number.isFinite(Date.parse(value)))throw new Error('时间无效');
+    if(info.kind==='deadline'){next.deadline=value||null;return next;}
+    next.workflow ||= {stages:[{id:'stage-apply',name:'投递'}],currentStageId:'stage-apply',timeline:[]};
+    const stageId=info.stageId||next.workflow.currentStageId;
+    next.workflow.timeline=(next.workflow.timeline||[]).filter(t=>t.stageId!==stageId);
+    if(value)next.workflow.timeline.push({stageId,date:value});
+    if(bucket(next)==='apply')next.appliedAt=value||null;
+    return next;
+  }
+  const api={time,withTime,key,stages,category,current,bucket,applied,events,overview,move};
   if(typeof module!=='undefined')module.exports=api;else root.YanjiCareerData=api;
 }(globalThis));

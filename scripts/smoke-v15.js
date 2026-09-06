@@ -17,10 +17,11 @@ app.whenReady().then(async()=>{
     check(document.querySelectorAll('[data-career-date]').length===42,'calendar cells');
     check(document.querySelectorAll('#careerTrend circle').length===7,'trend points');
     const parent=document.querySelector('.nav-item[data-workbench-page="jobs-overview"]'),child=document.querySelector('.nav-item[data-workbench-page="jobs-applications"]');
-    check(child.getBoundingClientRect().left-parent.getBoundingClientRect().left>=20,'child navigation indentation');
-    if(innerWidth>1400)check(document.querySelector('.career-calendar').getBoundingClientRect().bottom<=innerHeight,'calendar fully visible');
+    check(child.closest('.nav-career-group')===parent.closest('.nav-career-group'),'career navigation grouped');check(Math.abs(child.getBoundingClientRect().left-parent.getBoundingClientRect().left)<1,'sibling navigation aligned');
+    await new Promise(r=>requestAnimationFrame(r));
+    if(innerWidth>1400)check(document.querySelector('.career-calendar').getBoundingClientRect().bottom<=innerHeight,'calendar fully visible '+JSON.stringify({top:document.querySelector('.career-calendar').getBoundingClientRect().top,bottom:document.querySelector('.career-calendar').getBoundingClientRect().bottom,viewport:innerHeight,rows:getComputedStyle(document.querySelector('.career-calendar')).gridTemplateRows}));
     switchWorkbenchPage('jobs-applications');
-    check(document.querySelectorAll('.career-column').length>=8,'kanban columns');
+    check(document.querySelectorAll('.career-column').length>=7,'kanban columns');
     document.querySelector('[data-career-view="table"]').click();check(!document.getElementById('jobBoard').hidden,'table switch');
     document.querySelector('[data-career-view="cards"]').click();
     switchWorkbenchPage('schedule');
@@ -45,5 +46,5 @@ app.whenReady().then(async()=>{
    console.log('YANJI_V15_UI_OK '+JSON.stringify(result));win.destroy();win=null;
   }
   app.exit(0);
- }catch(error){console.error(error.stack);if(win)win.destroy();app.exit(1);}
+ }catch(error){console.error(error.stack);if(win){win.showInactive();await new Promise(r=>setTimeout(r,400));fs.writeFileSync(path.join(__dirname,'../work/v15-error.png'),(await win.webContents.capturePage()).toPNG());win.destroy();}app.exit(1);}
 });
