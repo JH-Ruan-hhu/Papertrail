@@ -17,7 +17,7 @@ body { color:var(--text); background:#eef5ff; -webkit-font-smoothing:antialiased
 :is(input,textarea,select,button,a):focus-visible { outline:2px solid #6b9dff; outline-offset:3px; }
 .modal,dialog { border-color:#d3e3fe; background:#fff; box-shadow:0 22px 65px #214f9026; }.modal::backdrop { background:rgba(35,60,96,.24); }
 :is(.note-toolbar,.note-editor-toolbar,.settings-nav,.schedule-toolbar,.attendance-toolbar) { background:#f2f7ff; border-color:#d5e5fd; }.note-content,.note-editor { color:#293b55; }
-.job-page .career-job.is-pinned { background:#eaf3ff; border-color:#7cabff; box-shadow:inset 3px 0 #2f6df6,0 3px 10px #2864f11a; }.job-page .job-position.is-pinned { background:#eaf3ff; box-shadow:inset 3px 0 #2f6df6; }.job-page .job-position.is-pinned:hover { background:#e1eeff; }.career-tool.is-favorite { color:#2463ef; background:#dceaff; }.career-tool.is-favorite .career-icon { fill:#2463ef; }
+
 .job-page .job-table-head,.job-page .job-position-main { grid-template-columns:minmax(180px,1.8fr) minmax(70px,.8fr) minmax(80px,.85fr) 130px 150px 125px minmax(140px,1.25fr) 132px; min-width:1160px; }.job-page .job-table-head>button,.job-page .job-table-head>span { text-align:left; }.job-page .job-position-main>div { min-width:0; text-align:left; }
 /* Let the calendar use the remaining viewport and keep all event lines readable. */
 .career-calendar { height:var(--career-calendar-height,464px); grid-template-rows:26px repeat(6,minmax(68px,1fr)); align-content:stretch; }.career-calendar .calendar-day { min-height:68px; height:auto; overflow:visible; gap:3px; padding:6px 8px; }.career-calendar .calendar-day span { display:block; font-size:11px; line-height:14px; }.career-calendar .calendar-day span:nth-of-type(n+2) { display:block; }.career-calendar .calendar-day small { font-size:10px; line-height:12px; }.career-calendar .calendar-weekday { padding:3px 0; }.career-calendar-layout { align-items:start; }.career-calendar .calendar-day.selected { border-color:#80abff; background:#edf4ff; }
@@ -46,6 +46,26 @@ body { color:var(--text); background:#eef5ff; -webkit-font-smoothing:antialiased
 .career-workflow-line progress::-webkit-progress-bar { background:#dbe5f4; }.career-workflow-line progress::-webkit-progress-value { background:#8babf8; }
 .career-workflow-step { display:grid; justify-items:center; gap:2px; min-width:44px; max-width:100px; padding:0 4px; border:0; background:transparent; color:#8a99b2; font-size:12px; line-height:1.25; position:relative; cursor:pointer; }
 .career-workflow-step i { width:8px; height:8px; border-radius:50%; background:#dbe4f1; border:1px solid #cfdbed; margin-bottom:3px; }.career-workflow-step small { font-size:11px; }.career-workflow-step.reached { color:#416bcd; }.career-workflow-step.reached i { background:#3d6fe7; border-color:#3d6fe7; }.career-workflow-step.current i { box-shadow:0 0 0 3px #dfeaff; }.career-workflow-step:hover { color:#2563eb; }
-.job-page .career-job.is-pinned,.job-page .job-position.is-pinned { background:linear-gradient(90deg,#dceaff 0,#eff5ff 22%,#fff 62%); border-color:#b3cdff; box-shadow:inset 3px 0 #7ba8ff; }
-.job-page .career-job.is-pinned:hover,.job-page .job-position.is-pinned:hover { background:linear-gradient(90deg,#d3e5ff 0,#eaf3ff 22%,#fff 66%); }
+
+
 .career-type-select { min-width:0; width:100%; height:36px; padding:6px 10px; border:1px solid #d1e2ff; border-radius:6px; background:#f6f9ff; color:#536c91; font-size:13px; }
+
+/* Dense applications: pin state is carried by the star, not row decoration. */
+.job-page .career-job.is-pinned { background:white; border-color:#d4e1ff; box-shadow:0 2px 3px #1a3b6610; }
+.job-page .job-position.is-pinned { background:white; box-shadow:none; }
+.job-page .job-position.is-pinned:hover { background:#fbfdff; }
+.job-page .career-column { flex-basis:310px; min-width:310px; }
+.job-page .career-card-role { height:23px; line-height:23px; margin:8px 0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+.career-time { white-space:nowrap; }
+.career-time.is-soon .career-icon,.career-time.is-overdue .career-icon { color:inherit; }
+.job-page .job-position-main { min-height:50px; padding:5px 16px; gap:12px; }
+.job-page .job-table-head { gap:12px; }
+.job-page .job-company-cell>span { margin-top:0; line-height:17px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.career-type-select { width:50%; min-width:72px; height:28px; padding:3px 5px; font-size:12px; }
+.career-workflow { padding:0 24px 5px; }
+.career-workflow-track { padding-top:2px; }
+.career-workflow-line { top:6px; }
+.career-workflow-step { gap:0; line-height:12px; font-size:11px; }
+.career-workflow-step i { margin-bottom:1px; }
+.career-workflow-step small { font-size:10px; line-height:12px; }
+.job-page .job-position .career-time { padding:3px; font-size:11px; }

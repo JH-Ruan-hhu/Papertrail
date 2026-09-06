@@ -33,9 +33,9 @@ function careerTags(job) {return `<div class="career-tags">${(job.tags||[]).map(
 function careerTime(job) {
  const info=window.YanjiCareerData.time(job),date=info.value?new Date(info.value):null,valid=date&&Number.isFinite(date.getTime());
  const remaining=valid?(date-new Date())/86400000:Infinity;
- const tone=info.kind==='deadline'?(remaining<0?' is-overdue':remaining<=3?' is-soon':''):valid&&remaining>=0&&remaining<=3?' is-soon':'';
+ const tone=info.kind==='deadline'?(remaining<=1?' is-overdue':remaining<=3?' is-soon':''):'';
  const text=valid?`${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}${date.getHours()||date.getMinutes()?' '+String(date.getHours()).padStart(2,'0')+':'+String(date.getMinutes()).padStart(2,'0'):''}`:'时间未定';
- return `<button type="button" class="career-time${tone}" data-career-time="${wbEscape(job.id)}" aria-label="修改${wbEscape(job.company)}${info.label}">${careerIcon('calendar')}<span>${info.label==='投递时间'?'投递':info.label}${info.label==='投递时间'||info.kind==='deadline'?' ':'<br>'}${text}</span></button>`;
+ return `<button type="button" class="career-time${tone}" data-career-time="${wbEscape(job.id)}" aria-label="修改${wbEscape(job.company)}${info.label}">${careerIcon('calendar')}<span>${info.label==='投递时间'?'投递':info.label} ${text}</span></button>`;
 }
 function careerActions(job,expanded=false) {
  const id=wbEscape(job.id);return `<button type="button" class="career-tool${careerPinned(job)?' is-favorite':''}" data-career-favorite="${id}" aria-label="${careerPinned(job)?'取消置顶':'置顶'} ${wbEscape(job.company)}" aria-pressed="${careerPinned(job)}">${careerIcon('star')}</button><button type="button" class="career-tool" data-delete-job="${id}" aria-label="删除 ${wbEscape(job.company)}">${careerIcon('trash')}</button><button type="button" class="career-tool" data-career-expand="${id}" aria-label="${expanded?'收起':'展开'} ${wbEscape(job.company)}" aria-expanded="${expanded}">${careerIcon(expanded?'up':'down')}</button>`;
