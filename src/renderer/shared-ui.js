@@ -20,9 +20,15 @@ function finishConfirm(accepted) {
   if (!settleConfirm) return;
   const settle = settleConfirm;
   settleConfirm = null;
-  if (confirmDialog.open) confirmDialog.close();
-  syncConfirmModalState();
-  settle(Boolean(accepted));
+  const finish = () => {
+    syncConfirmModalState();
+    settle(Boolean(accepted));
+  };
+  if (confirmDialog.open && window.YanjiMotion?.closeDialog) window.YanjiMotion.closeDialog(confirmDialog, finish);
+  else {
+    if (confirmDialog.open) confirmDialog.close();
+    finish();
+  }
 }
 
 window.yanjiConfirm = ({
@@ -37,6 +43,7 @@ window.yanjiConfirm = ({
   confirmMessage.textContent = popupText(message);
   confirmAccept.textContent = popupText(confirmText);
   confirmAccept.classList.toggle('danger', tone === 'danger');
+  window.YanjiMotion?.animateDialog(confirmDialog);
   confirmDialog.showModal();
   syncConfirmModalState();
   requestAnimationFrame(() => confirmCancel.focus());

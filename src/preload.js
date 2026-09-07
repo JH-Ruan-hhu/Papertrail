@@ -2,12 +2,34 @@
 
 const { contextBridge, ipcRenderer } = require('electron');
 
+const on = (channel) => (callback) => {
+  const listener = (_event, ...args) => callback(...args);
+  ipcRenderer.on(channel, listener);
+  return () => ipcRenderer.removeListener(channel, listener);
+};
+
 contextBridge.exposeInMainWorld('paperTrail', {
+  getAuthState: () => ipcRenderer.invoke('auth:get-session'),
+  configureCloud: url => ipcRenderer.invoke('auth:configure', url),
+  loginAccount: input => ipcRenderer.invoke('auth:login', input),
+  registerAccount: input => ipcRenderer.invoke('auth:register', input),
+  sendVerificationCode: input => ipcRenderer.invoke('auth:verification', input),
+  resetPassword: input => ipcRenderer.invoke('auth:reset-password', input),
+  logoutAccount: () => ipcRenderer.invoke('auth:logout'),
+  startWechatLogin: () => ipcRenderer.invoke('auth:wechat-start'),
+  pollWechatLogin: () => ipcRenderer.invoke('auth:wechat-poll'),
+  syncWorkspace: () => ipcRenderer.invoke('sync:run'),
+  migrateLocalWorkspace: confirmed => ipcRenderer.invoke('sync:migrate', confirmed),
+  resolveSyncConflict: input => ipcRenderer.invoke('sync:resolve', input),
+  importBetaData: () => ipcRenderer.invoke('beta:import-copy'),
+  onAuthState: on('auth:state'),
   getWorkspace: () => ipcRenderer.invoke('workspace:get'),
-  getTodayWidgetData: () => ipcRenderer.invoke('today-widget:get-data'),
   parseSchedule: (input) => ipcRenderer.invoke('schedules:parse', input),
   saveSchedule: (input) => ipcRenderer.invoke('schedules:save', input),
   deleteSchedule: (id) => ipcRenderer.invoke('schedules:delete', id),
+  completeSchedule: (id, completed = true) => ipcRenderer.invoke('schedules:complete', id, Boolean(completed)),
+  saveCountdown: (input) => ipcRenderer.invoke('countdowns:save', input),
+  deleteCountdown: (id) => ipcRenderer.invoke('countdowns:delete', id),
   convertScheduleToTodo: (id, input) => ipcRenderer.invoke('schedules:convert-to-todo', id, input),
   detachSchedule: (id) => ipcRenderer.invoke('schedules:detach', id),
   parseTodo: (input) => ipcRenderer.invoke('todos:parse', input),
@@ -19,10 +41,8 @@ contextBridge.exposeInMainWorld('paperTrail', {
   snoozeTodo: (id, until) => ipcRenderer.invoke('todos:snooze', id, until),
   getLinkedSchedules: (id) => ipcRenderer.invoke('todos:get-linked-schedules', id),
   scheduleTodo: (id, input) => ipcRenderer.invoke('todos:schedule', id, input),
+  createScheduledTodo: (input) => ipcRenderer.invoke('todos:create-scheduled', input),
   convertTodoToSchedule: (id, input) => ipcRenderer.invoke('todos:convert-to-schedule', id, input),
-  showScheduleWidget: () => ipcRenderer.invoke('schedule-widget:show'),
-  closeScheduleWidget: () => ipcRenderer.invoke('schedule-widget:close'),
-  openScheduleWidgetMain: () => ipcRenderer.invoke('schedule-widget:open-main'),
   saveNote: (input) => ipcRenderer.invoke('notes:save', input),
   appendDailyNote: (input) => ipcRenderer.invoke('notes:append-daily', input),
   deleteNote: (id) => ipcRenderer.invoke('notes:delete', id),
@@ -30,13 +50,11 @@ contextBridge.exposeInMainWorld('paperTrail', {
   addNoteAttachment: (id) => ipcRenderer.invoke('notes:add-attachment', id),
   getNoteAttachment: (id, attachmentId) => ipcRenderer.invoke('notes:get-attachment', id, attachmentId),
   deleteNoteAttachment: (id, attachmentId) => ipcRenderer.invoke('notes:delete-attachment', id, attachmentId),
-  openStickyNote: (id) => ipcRenderer.invoke('notes:open-sticky', id),
-  getStickyNote: (id) => ipcRenderer.invoke('notes:get-sticky', id),
-  createStickyNote: () => ipcRenderer.invoke('notes:create-sticky'),
   saveJobApplication: (input) => ipcRenderer.invoke('jobs:save', input),
   deleteJobApplication: (id) => ipcRenderer.invoke('jobs:delete', id),
   importJobApplications: () => ipcRenderer.invoke('jobs:import'),
   exportJobApplications: () => ipcRenderer.invoke('jobs:export'),
+  exportJobApplicationImages: () => ipcRenderer.invoke('jobs:export-image'),
   saveMetadataFields: (fields) => ipcRenderer.invoke('metadata:save-fields', fields),
   clockAttendance: (action) => ipcRenderer.invoke('attendance:clock', action),
   saveAttendance: (input) => ipcRenderer.invoke('attendance:save', input),
@@ -48,8 +66,6 @@ contextBridge.exposeInMainWorld('paperTrail', {
   hideCapture: () => ipcRenderer.invoke('capture:hide'),
   setCaptureContentState: (hasContent) => ipcRenderer.send('capture:content-state', Boolean(hasContent)),
   submitCapture: (input) => ipcRenderer.invoke('capture:submit', input),
-  closeSticky: () => ipcRenderer.invoke('sticky:close'),
-  setStickyAlwaysOnTop: (enabled) => ipcRenderer.invoke('sticky:set-always-on-top', enabled),
   dismissDeadline: () => ipcRenderer.invoke('deadline:dismiss'),
   snoozeDeadline: (until) => ipcRenderer.invoke('deadline:snooze', until),
   listPapers: () => ipcRenderer.invoke('papers:list'),
@@ -84,61 +100,15 @@ contextBridge.exposeInMainWorld('paperTrail', {
   openExternal: (url) => ipcRenderer.invoke('system:open-external', url),
   restartApp: () => ipcRenderer.invoke('system:restart-app'),
   setModalWindowState: (active) => ipcRenderer.invoke('window:set-modal-state', Boolean(active)),
-  onPapersChanged: (callback) => {
-    const listener = (_event, papers) => callback(papers);
-    ipcRenderer.on('papers:changed', listener);
-    return () => ipcRenderer.removeListener('papers:changed', listener);
-  },
-  onRefreshState: (callback) => {
-    const listener = (_event, state) => callback(state);
-    ipcRenderer.on('refresh:state', listener);
-    return () => ipcRenderer.removeListener('refresh:state', listener);
-  },
-  onUpdateState: (callback) => {
-    const listener = (_event, state) => callback(state);
-    ipcRenderer.on('updates:state', listener);
-    return () => ipcRenderer.removeListener('updates:state', listener);
-  },
-  onWorkspaceChanged: (callback) => {
-    const listener = (_event, workspace) => callback(workspace);
-    ipcRenderer.on('workspace:changed', listener);
-    return () => ipcRenderer.removeListener('workspace:changed', listener);
-  },
-  onTodayWidgetChanged: (callback) => {
-    const listener = (_event, data) => callback(data);
-    ipcRenderer.on('today-widget:changed', listener);
-    return () => ipcRenderer.removeListener('today-widget:changed', listener);
-  },
-  onSettingsChanged: (callback) => {
-    const listener = (_event, settings) => callback(settings);
-    ipcRenderer.on('settings:changed', listener);
-    return () => ipcRenderer.removeListener('settings:changed', listener);
-  },
-  onWorkspaceNavigate: (callback) => {
-    const listener = (_event, page) => callback(page);
-    ipcRenderer.on('workspace:navigate', listener);
-    return () => ipcRenderer.removeListener('workspace:navigate', listener);
-  },
-  onFocusChanged: (callback) => {
-    const listener = (_event, sessions) => callback(sessions);
-    ipcRenderer.on('focus:changed', listener);
-    return () => ipcRenderer.removeListener('focus:changed', listener);
-  },
-  onCaptureFocus: (callback) => {
-    const listener = () => callback();
-    ipcRenderer.on('capture:focus', listener);
-    return () => ipcRenderer.removeListener('capture:focus', listener);
-  },
-  onStickyFocus: (callback) => {
-    const listener = () => callback();
-    ipcRenderer.on('sticky:focus', listener);
-    return () => ipcRenderer.removeListener('sticky:focus', listener);
-  },
-  onDeadlineShow: (callback) => {
-    const listener = (_event, schedule) => callback(schedule);
-    ipcRenderer.on('deadline:show', listener);
-    return () => ipcRenderer.removeListener('deadline:show', listener);
-  },
+  onPapersChanged: on('papers:changed'),
+  onRefreshState: on('refresh:state'),
+  onUpdateState: on('updates:state'),
+  onWorkspaceChanged: on('workspace:changed'),
+  onSettingsChanged: on('settings:changed'),
+  onWorkspaceNavigate: on('workspace:navigate'),
+  onFocusChanged: on('focus:changed'),
+  onCaptureFocus: on('capture:focus'),
+  onDeadlineShow: on('deadline:show'),
   // Namespaced aliases mirror the v1.1 contract while the flat methods above
   // preserve the existing PaperTrail renderer API.
   todos: {

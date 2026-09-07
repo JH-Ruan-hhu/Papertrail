@@ -1,0 +1,3 @@
+'use strict';
+const test=require('node:test');const assert=require('node:assert/strict');const V=require('../src/renderer/auth-validation');
+test('auth input rejects malformed identities, weak passwords and spaced codes',()=>{for(const value of ['a@a','a..b@a.com','+86138123','123456789'])assert.throws(()=>V.identity(value));assert.equal(V.identity('a@a.com'),'a@a.com');assert.equal(V.identity('+8613812345678'),'+8613812345678');for(const p of ['123456','Password1!','AAAaaa111!!!'])assert.throws(()=>V.password(p));assert.equal(V.password('Maple4!River'),'Maple4!River');assert.throws(()=>V.code('12 3456'));assert.equal(V.code('123456'),'123456');});

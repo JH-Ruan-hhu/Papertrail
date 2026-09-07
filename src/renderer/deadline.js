@@ -19,6 +19,6 @@ api.onDeadlineShow((schedule) => {
   meta.textContent = [schedule.priority === 'high' ? '最高优先级' : schedule.priority === 'medium' ? '重要优先级' : '普通优先级', overdue ? '已逾期' : isTodo ? '待办提醒' : '日程提醒'].join(' · ');
   meta.hidden = false;
 });
-document.getElementById('snoozeButton')?.addEventListener('click', () => api.snoozeDeadline(15 * 60_000));
+document.getElementById('snoozeButton')?.addEventListener('click', () => api.snoozeDeadline(10 * 60_000));
 document.getElementById('dismissButton').addEventListener('click', dismiss);
 document.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === 'Escape') dismiss(); });

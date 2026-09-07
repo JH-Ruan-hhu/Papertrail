@@ -536,7 +536,7 @@ async function confirmJourneyLink() {
   elements.confirmJourneyButton.disabled = true;
   try {
     state.papers = await api.linkPaperJourney(state.journeyLinkId, elements.journeyTarget.value);
-    elements.journeyDialog.close();
+    closeDialog(elements.journeyDialog);
     render();
     showToast('投稿记录已关联，可在进展中查看跨期刊历程。');
   } catch (error) {
@@ -747,7 +747,7 @@ async function addPaper() {
   elements.confirmAddButton.textContent = '正在读取…';
   try {
     await api.addPaper(payload);
-    elements.addDialog.close();
+    closeDialog(elements.addDialog);
     showToast(state.addMode === 'author' ? '已添加文章并保存出版进展。' : '已添加稿件并保存审稿进展。');
   } catch (error) {
     elements.addError.textContent = getErrorMessage(error);
@@ -826,7 +826,7 @@ function renderUpdatePrompt() {
   if (status === 'available' && state.dismissedUpdateVersion !== versionKey && !dialog.open) openDialog(dialog);
   if (!dialog.open) return;
   if (!['checking', 'available', 'downloading', 'downloaded', 'error'].includes(status)) {
-    dialog.close();
+    closeDialog(dialog);
     return;
   }
 
@@ -856,7 +856,7 @@ function renderUpdatePrompt() {
 
 function dismissUpdatePrompt() {
   state.dismissedUpdateVersion = updatePromptVersionKey();
-  if (elements.updatePromptDialog.open) elements.updatePromptDialog.close();
+  if (elements.updatePromptDialog.open) closeDialog(elements.updatePromptDialog);
 }
 
 async function handleUpdatePromptAction() {
@@ -918,17 +918,11 @@ function populateSettings() {
   document.getElementById('todoNotifications').checked = settings.todoNotifications !== false;
   document.getElementById('defaultEventReminderMinutes').value = String(settings.defaultEventReminderMinutes == null ? 'null' : settings.defaultEventReminderMinutes);
   document.getElementById('defaultTodoReminderMode').value = settings.defaultTodoReminderMode || 'at-due';
-  document.getElementById('todayWidgetEnabled').checked = settings.todayWidgetEnabled ?? settings.scheduleWidgetEnabled;
-  document.getElementById('widgetShowSchedules').checked = settings.widgetShowSchedules !== false;
-  document.getElementById('widgetShowTodos').checked = settings.widgetShowTodos !== false;
-  document.querySelectorAll('input[name="appearanceTheme"]').forEach((input) => { input.checked = input.value === (settings.appearanceTheme || 'liquid-glass'); });
   document.getElementById('closeToTray').checked = settings.closeToTray;
   document.getElementById('startAtLogin').checked = settings.startAtLogin;
   document.getElementById('autoCheckUpdates').checked = settings.autoCheckUpdates !== false;
   document.getElementById('quickCaptureShortcut').value = settings.quickCaptureShortcut || 'CommandOrControl+Shift+Space';
-  document.getElementById('stickyNoteShortcut').value = settings.stickyNoteShortcut || 'CommandOrControl+Alt+N';
   syncReminderSettings();
-  syncTodayWidgetSettings();
   populateSettingsMetadata();
 }
 
@@ -943,17 +937,9 @@ function syncReminderSettings() {
   });
 }
 
-function syncTodayWidgetSettings() {
-  const enabled = document.getElementById('todayWidgetEnabled').checked;
-  document.querySelectorAll('[data-widget-dependent]').forEach((row) => {
-    row.classList.toggle('is-setting-disabled', !enabled);
-    row.querySelectorAll('input, select, button').forEach((control) => { control.disabled = !enabled; });
-  });
-}
-
 const SETTINGS_SECTION_COPY = Object.freeze({
   general: ['通用', 'Windows 行为与全局快捷操作'],
-  appearance: ['外观', '选择液态玻璃或经典工作台，并配置桌面概览'],
+  appearance: ['外观', '工作台显示设置'],
   notifications: ['提醒', '管理日程、任务和投稿进展的 Windows 通知'],
   tracking: ['投稿追踪', '设置稿件状态的后台检查频率'],
   storage: ['数据与备份', '管理整个科研工作台的数据位置和迁移备份'],
@@ -1058,18 +1044,16 @@ function syncModalTitleBar() {
 }
 
 function openDialog(dialog) {
-  const shouldAnimate = document.visibilityState === 'visible'
-    && document.hasFocus()
-    && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    && !state.lastInputWasKeyboard;
-  if (shouldAnimate) dialog.classList.add('dialog-entering');
+  window.YanjiMotion?.animateDialog(dialog);
   dialog.showModal();
-  if (shouldAnimate) {
-    const finishEntering = () => dialog.classList.remove('dialog-entering');
-    requestAnimationFrame(() => requestAnimationFrame(finishEntering));
-    setTimeout(finishEntering, 60);
-  }
   syncModalTitleBar();
+}
+
+function closeDialog(dialog) {
+  if (window.YanjiMotion?.closeDialog) return window.YanjiMotion.closeDialog(dialog, syncModalTitleBar);
+  if (dialog?.open) dialog.close();
+  syncModalTitleBar();
+  return Promise.resolve(true);
 }
 
 function closeOnBackdrop(event) {
@@ -1078,7 +1062,7 @@ function closeOnBackdrop(event) {
   const rect = dialog.getBoundingClientRect();
   const inside = event.clientX >= rect.left && event.clientX <= rect.right
     && event.clientY >= rect.top && event.clientY <= rect.bottom;
-  if (!inside) dialog.close();
+  if (!inside) closeDialog(dialog);
 }
 
 async function saveSettings() {
@@ -1094,20 +1078,14 @@ async function saveSettings() {
       todoNotifications: document.getElementById('todoNotifications').checked,
       defaultEventReminderMinutes: document.getElementById('defaultEventReminderMinutes').value === 'null' ? null : Number(document.getElementById('defaultEventReminderMinutes').value),
       defaultTodoReminderMode: document.getElementById('defaultTodoReminderMode').value,
-      appearanceTheme: document.querySelector('input[name="appearanceTheme"]:checked')?.value || 'liquid-glass',
-      todayWidgetEnabled: document.getElementById('todayWidgetEnabled').checked,
-      widgetShowSchedules: document.getElementById('widgetShowSchedules').checked,
-      widgetShowTodos: document.getElementById('widgetShowTodos').checked,
       closeToTray: document.getElementById('closeToTray').checked,
       startAtLogin: document.getElementById('startAtLogin').checked,
       autoCheckUpdates: document.getElementById('autoCheckUpdates').checked,
       quickCaptureShortcut: document.getElementById('quickCaptureShortcut').value,
-      stickyNoteShortcut: document.getElementById('stickyNoteShortcut').value
     });
     window.yanjiTheme?.apply(state.settings);
     const formatShortcut = (value) => String(value || '').replace('CommandOrControl', 'Ctrl').replaceAll('+', ' + ');
     document.getElementById('shortcutTip').textContent = formatShortcut(state.settings.quickCaptureShortcut);
-    document.getElementById('stickyShortcutTip').textContent = formatShortcut(state.settings.stickyNoteShortcut);
     render();
     showToast('设置已保存。');
   } catch (error) {
@@ -1124,7 +1102,6 @@ async function handlePaperAction(event) {
   const id = card?.dataset.paperId;
   const paper = state.papers.find((item) => item.id === id);
   if (!paper) return;
-
   if (button.dataset.action === 'copy-doi') {
     try {
       await api.copyText(button.dataset.copyText);
@@ -1208,7 +1185,7 @@ async function removeSelectedPaper() {
   elements.confirmRemoveButton.disabled = true;
   try {
     await api.removePaper(removeId);
-    elements.removeDialog.close();
+    closeDialog(elements.removeDialog);
     state.expandedIds.delete(removeId);
     showToast('本地记录已永久删除');
   } catch (error) {
@@ -1256,12 +1233,12 @@ function bindEvents() {
   elements.saveRevisionButton.addEventListener('click', saveWorkflowRevision);
   elements.cancelRevisionEditButton.addEventListener('click', resetRevisionEditor);
   elements.workflowDialog.addEventListener('click', handleWorkflowAction);
-  elements.closeAddDialogButton.addEventListener('click', () => elements.addDialog.close());
-  elements.cancelAddButton.addEventListener('click', () => elements.addDialog.close());
-  elements.closeJourneyDialogButton.addEventListener('click', () => elements.journeyDialog.close());
-  elements.cancelJourneyButton.addEventListener('click', () => elements.journeyDialog.close());
-  elements.closeWorkflowDialogButton.addEventListener('click', () => elements.workflowDialog.close());
-  elements.closeWorkflowFooterButton.addEventListener('click', () => elements.workflowDialog.close());
+  elements.closeAddDialogButton.addEventListener('click', () => closeDialog(elements.addDialog));
+  elements.cancelAddButton.addEventListener('click', () => closeDialog(elements.addDialog));
+  elements.closeJourneyDialogButton.addEventListener('click', () => closeDialog(elements.journeyDialog));
+  elements.cancelJourneyButton.addEventListener('click', () => closeDialog(elements.journeyDialog));
+  elements.closeWorkflowDialogButton.addEventListener('click', () => closeDialog(elements.workflowDialog));
+  elements.closeWorkflowFooterButton.addEventListener('click', () => closeDialog(elements.workflowDialog));
   elements.addModeLink.addEventListener('click', () => setAddMode('link'));
   elements.addModeAuthor.addEventListener('click', () => setAddMode('author'));
   [elements.trackingUrl, elements.productionReference, elements.authorLastName, elements.authorFirstName].forEach((input) => {
@@ -1306,7 +1283,6 @@ function bindEvents() {
   elements.dismissUpdatePromptButton.addEventListener('click', dismissUpdatePrompt);
   elements.closeUpdatePromptButton.addEventListener('click', dismissUpdatePrompt);
   document.getElementById('notifications').addEventListener('change', syncReminderSettings);
-  document.getElementById('todayWidgetEnabled').addEventListener('change', syncTodayWidgetSettings);
   elements.addDialog.addEventListener('click', closeOnBackdrop);
   elements.journeyDialog.addEventListener('click', closeOnBackdrop);
   elements.workflowDialog.addEventListener('click', closeOnBackdrop);

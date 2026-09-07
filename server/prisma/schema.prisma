@@ -1,0 +1,29 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+// Auth identities, verification challenges, refresh families and security
+// events use distinct namespaces and unique keys. Payloads never contain raw
+// passwords, verification codes, refresh tokens or provider secrets.
+model AuthRecord {
+  kind String
+  id String
+  payload Json
+  @@id([kind, id])
+  @@map("auth_records")
+}
+model WorkspaceRecord {
+  userId String
+  entity String
+  id String
+  revision Int
+  cursor Int
+  deletedAt DateTime?
+  payload Json
+  @@id([userId, entity, id])
+  @@index([userId, cursor])
+  @@map("workspace_records")
+}

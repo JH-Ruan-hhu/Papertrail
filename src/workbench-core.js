@@ -1,6 +1,6 @@
 'use strict';
 
-const { TIME_NUMBER_PATTERN, parseMinuteToken } = require('./natural-time');
+const { TIME_NUMBER_PATTERN, chineseNumber, parseMinuteToken } = require('./natural-time');
 
 const SCHEDULE_PRIORITIES = Object.freeze(['high', 'medium', 'low']);
 const SCHEDULE_REMINDER_MINUTES = Object.freeze([null, 0, 5, 10, 15, 30, 60, 1440]);
@@ -160,17 +160,6 @@ function mergeLegacyDailyEntries(entries = [], fallbackContent = '', fallbackAtt
   return { content, attachments };
 }
 
-function chineseNumber(value) {
-  if (/^\d+$/.test(value)) return Number(value);
-  const digits = { 零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
-  if (value === '十') return 10;
-  if (value.includes('十')) {
-    const [left, right] = value.split('十');
-    return (left ? digits[left] : 1) * 10 + (right ? digits[right] : 0);
-  }
-  return digits[value];
-}
-
 function resolveHour(hour, dayPart) {
   let resolved = Number(hour);
   if (!Number.isFinite(resolved)) return null;
@@ -185,21 +174,24 @@ function defaultHour(dayPart) {
 }
 
 function resolveDate(text, baseDate) {
+  const withDeadlineSuffix = (token) => text.slice(text.indexOf(token), text.indexOf(token) + token.length + 1).endsWith(`${token}前`)
+    ? `${token}前`
+    : token;
   const relative = [
     ['大后天', 3],
     ['后天', 2],
     ['明天', 1],
     ['今天', 0]
   ].find(([token]) => text.includes(token));
-  if (relative) return { date: addLocalDays(baseDate, relative[1]), token: relative[0] };
+  if (relative) return { date: addLocalDays(baseDate, relative[1]), token: withDeadlineSuffix(relative[0]) };
 
-  const isoMatch = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})\b/);
+  const isoMatch = text.match(/\b(20\d{2})-(\d{1,2})-(\d{1,2})(?:前)?(?=$|[^\d])/);
   if (isoMatch) {
     const candidate = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]), 12);
     if (candidate.getMonth() === Number(isoMatch[2]) - 1) return { date: candidate, token: isoMatch[0] };
   }
 
-  const monthDay = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?/);
+  const monthDay = text.match(/(\d{1,2})\s*月\s*(\d{1,2})\s*[日号]?(?:前)?/);
   if (monthDay) {
     let year = baseDate.getFullYear();
     let candidate = new Date(year, Number(monthDay[1]) - 1, Number(monthDay[2]), 12);
@@ -207,7 +199,7 @@ function resolveDate(text, baseDate) {
     return { date: candidate, token: monthDay[0] };
   }
 
-  const slashDate = text.match(/\b(\d{1,2})\/(\d{1,2})\b/);
+  const slashDate = text.match(/\b(\d{1,2})\/(\d{1,2})(?:前)?(?=$|[^\d])/);
   if (slashDate) {
     let candidate = new Date(baseDate.getFullYear(), Number(slashDate[1]) - 1, Number(slashDate[2]), 12);
     if (candidate < addLocalDays(baseDate, -1)) candidate.setFullYear(candidate.getFullYear() + 1);
@@ -395,7 +387,7 @@ function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOStrin
   const legacy = asObject(value.legacy) ? { ...value.legacy } : {};
   const knownKeys = new Set([
     'id', 'title', 'startAt', 'endAt', 'allDay', 'priority', 'reminderMinutesBefore',
-    'reminderSentAt', 'sourceRef', 'createdAt', 'updatedAt', 'legacy',
+    'reminderSentAt', 'reminderOccurrence', 'snoozedUntil', 'repeat', 'sourceRef', 'createdAt', 'updatedAt', 'legacy',
     'deadline', 'completedAt', 'remindedAt'
   ]);
   for (const [key, item] of Object.entries(value)) {
@@ -424,14 +416,17 @@ function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOStrin
     priority: SCHEDULE_PRIORITIES.includes(value.priority) ? value.priority : 'low',
     reminderMinutesBefore,
     reminderSentAt,
+    reminderOccurrence: /^\d{4}-\d{2}-\d{2}$/.test(String(value.reminderOccurrence || '')) ? String(value.reminderOccurrence) : null,
+    snoozedUntil: isoDate(value.snoozedUntil),
+    repeat: value.repeat === 'daily' ? 'daily' : null,
     sourceRef,
+    completedAt: isoDate(value.completedAt || legacy.completedAt),
     createdAt,
     updatedAt: isoDate(value.updatedAt, createdAt),
     legacy
   };
   Object.defineProperties(schedule, {
     deadline: { value: Boolean(value.deadline || legacy.deadline), enumerable: false, configurable: true, writable: true },
-    completedAt: { value: isoDate(value.completedAt || legacy.completedAt), enumerable: false, configurable: true, writable: true },
     remindedAt: { value: reminderSentAt, enumerable: false, configurable: true, writable: true }
   });
   return schedule;
@@ -582,6 +577,7 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
   const nextEndAt = hasInput('endAt') ? input.endAt : existing?.endAt;
   const nextAllDay = hasInput('allDay') ? input.allDay : existing?.allDay;
   const nextPriority = hasInput('priority') ? input.priority : existing?.priority;
+  const nextRepeat = hasInput('repeat') ? input.repeat : existing?.repeat;
   const requestedReminderMinutes = hasInput('reminderMinutesBefore') ? input.reminderMinutesBefore : existing?.reminderMinutesBefore;
   const nextReminderMinutes = requestedReminderMinutes == null && ['high', 'medium'].includes(nextPriority)
     ? 0
@@ -590,20 +586,47 @@ function saveSchedule(list, input, now = new Date().toISOString(), makeId = () =
     && existing.startAt === nextStartAt
     && existing.endAt === nextEndAt
     && existing.allDay === Boolean(nextAllDay)
+    && existing.repeat === (nextRepeat === 'daily' ? 'daily' : null)
     && existing.reminderMinutesBefore === nextReminderMinutes);
   const requestedReminder = input?.reminderSentAt ?? null;
+  const snoozedUntil = sameReminderIdentity ? (input?.snoozedUntil ?? existing?.snoozedUntil ?? null) : null;
   const candidate = normalizeSchedule({
     ...existing,
     ...input,
     reminderMinutesBefore: nextReminderMinutes,
+    repeat: nextRepeat,
     id: existing?.id || makeId(),
     createdAt: existing?.createdAt || now,
     updatedAt: now,
-    reminderSentAt: sameReminderIdentity ? (existing.reminderSentAt || requestedReminder) : requestedReminder
+    reminderSentAt: sameReminderIdentity ? (existing.reminderSentAt || requestedReminder) : requestedReminder,
+    snoozedUntil
   }, 0, now);
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
     : [candidate, ...list];
+}
+
+function scheduleOccurrenceForDate(schedule, date = new Date()) {
+  if (!schedule || schedule.repeat !== 'daily') return schedule || null;
+  const sourceStart = new Date(schedule.startAt);
+  const sourceEnd = new Date(schedule.endAt);
+  const target = date instanceof Date ? new Date(date) : new Date(date);
+  if (![sourceStart, sourceEnd, target].every((item) => Number.isFinite(item.getTime()))) return null;
+  const sourceDay = new Date(sourceStart.getFullYear(), sourceStart.getMonth(), sourceStart.getDate());
+  const targetDay = new Date(target.getFullYear(), target.getMonth(), target.getDate());
+  if (targetDay < sourceDay) return null;
+  const occurrenceStart = new Date(targetDay);
+  occurrenceStart.setHours(sourceStart.getHours(), sourceStart.getMinutes(), sourceStart.getSeconds(), sourceStart.getMilliseconds());
+  const occurrenceEnd = new Date(occurrenceStart.getTime() + (sourceEnd.getTime() - sourceStart.getTime()));
+  const occurrenceKey = localDateKey(targetDay);
+  return {
+    ...schedule,
+    startAt: occurrenceStart.toISOString(),
+    endAt: occurrenceEnd.toISOString(),
+    occurrenceKey,
+    reminderSentAt: schedule.reminderOccurrence === occurrenceKey ? schedule.reminderSentAt : null,
+    snoozedUntil: schedule.reminderOccurrence === occurrenceKey ? schedule.snoozedUntil : null
+  };
 }
 
 function saveNote(list, input, now = new Date().toISOString(), makeId = () => `note-${Date.now()}`) {
@@ -732,5 +755,6 @@ module.exports = {
   saveAttendance,
   saveFocusSession,
   saveNote,
-  saveSchedule
+  saveSchedule,
+  scheduleOccurrenceForDate
 };

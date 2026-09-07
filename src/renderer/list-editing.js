@@ -138,10 +138,11 @@ function replaceContentEditablePrefix(editor, context, prefix, replacement) {
 
 function continueContentEditableList(editor, insertion) {
   const document = editor.ownerDocument;
-  if (typeof document.execCommand !== 'function') return false;
+  if (typeof document.execCommand !== 'function') return insertContentEditableText(editor, `\n${insertion}`);
   const openedParagraph = document.execCommand('insertParagraph', false, null);
-  if (!openedParagraph) return false;
-  document.execCommand('insertText', false, insertion);
+  if (!openedParagraph) return insertContentEditableText(editor, `\n${insertion}`);
+  const inserted = document.execCommand('insertText', false, insertion);
+  if (!inserted) return insertContentEditableText(editor, insertion);
   editor.dispatchEvent(new Event('input', { bubbles: true }));
   return true;
 }
@@ -164,7 +165,7 @@ function applyContentEditableListEditing(editor, event) {
   const prefix = parseListPrefix(context.line);
   if (!prefix) {
     if (event.key !== 'Tab' || event.shiftKey) return false;
-    return insertContentEditableText(editor, '  ');
+    return insertContentEditableText(editor, '\t');
   }
 
   if (event.key === 'Enter') {
@@ -179,7 +180,7 @@ function applyContentEditableListEditing(editor, event) {
     : prefix.letter != null
       ? prefix.letter - (prefix.letter >= 65 && prefix.letter <= 90 ? 64 : 96)
       : 1;
-  return replaceContentEditablePrefix(editor, context, prefix, `${'  '.repeat(level)}${markerForLevel(level, prefix, sequence)} `);
+  return replaceContentEditablePrefix(editor, context, prefix, `${'\t'.repeat(level)}${markerForLevel(level, prefix, sequence)} `);
 }
 
 function lineBounds(value, start, end = start) {

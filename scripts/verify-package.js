@@ -14,7 +14,7 @@ function findPackagedExe(unpackedDirectory) {
 }
 
 function main() {
-  const outputRoot = path.resolve(process.argv[2] || 'outputs');
+  const outputRoot = path.resolve(process.argv[2] || require('../package.json').build.directories.output);
   const unpackedDirectory = path.join(outputRoot, 'win-unpacked');
   const resourcesDirectory = path.join(unpackedDirectory, 'resources');
   const asarPath = path.join(resourcesDirectory, 'app.asar');

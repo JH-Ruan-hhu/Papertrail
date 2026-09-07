@@ -1,9 +1,21 @@
 'use strict';
 
+const fs = require('node:fs');
 const { contextBridge } = require('electron');
+
+const smokeBannerPath = process.env.WORKBENCH_HOME_BANNER_PATH;
+const smokeBannerDataUrl = smokeBannerPath && fs.existsSync(smokeBannerPath)
+  ? `data:image/jpeg;base64,${fs.readFileSync(smokeBannerPath).toString('base64')}`
+  : '';
 
 const now = Date.now();
 const todayAt = (hour, minute = 0) => new Date(new Date().setHours(hour, minute, 0, 0)).toISOString();
+const tomorrowAt = (hour, minute = 0) => {
+  const value = new Date();
+  value.setDate(value.getDate() + 1);
+  value.setHours(hour, minute, 0, 0);
+  return value.toISOString();
+};
 const todayKey = new Date().toLocaleDateString('en-CA');
 const smokeWorkflow = (prefix, names, currentIndex, dates = {}) => {
   const stages = names.map((name, index) => ({ id: `${prefix}-${index + 1}`, name }));
@@ -206,8 +218,10 @@ let smokeWorkspace = {
   metadataFields: [{ id: 'topic', name: '类型', type: 'select', options: ['实验', '文献', '写作'] }],
   attendance: [
     { id: 'attendance-morning', date: todayKey, clockInAt: todayAt(8, 45), clockOutAt: todayAt(12, 5), appUsage: { WINWORD: 1620, chrome: 840 }, createdAt: todayAt(8, 45), updatedAt: todayAt(12, 5) },
-    { id: 'attendance-afternoon', date: todayKey, clockInAt: todayAt(13, 20), clockOutAt: todayAt(17, 35), appUsage: { Zotero: 1320, WINWORD: 780 }, createdAt: todayAt(13, 20), updatedAt: todayAt(17, 35) }
+    { id: 'attendance-afternoon', date: todayKey, clockInAt: todayAt(13, 20), clockOutAt: todayAt(17, 35), appUsage: { Zotero: 1320, WINWORD: 780 }, createdAt: todayAt(13, 20), updatedAt: todayAt(17, 35) },
+    { id: 'attendance-midnight', date: todayKey, clockInAt: todayAt(18, 0), clockOutAt: tomorrowAt(0, 0), appUsage: { WINWORD: 5400 }, createdAt: todayAt(18, 0), updatedAt: tomorrowAt(0, 0) }
   ],
+  countdowns: [{ id: 'countdown-smoke-1', title: '论文返修截止', targetAt: new Date(now + 17 * 86_400_000).toISOString(), createdAt: new Date(now - 86_400_000).toISOString(), updatedAt: new Date(now - 86_400_000).toISOString() }],
   focusSessions: [
     { id: 'focus-today', startedAt: todayAt(10, 0), endedAt: todayAt(10, 50), plannedMinutes: 50, status: 'completed', appUsage: { WINWORD: 1260, chrome: 980, Zotero: 510 }, suppressNotifications: true, notificationsSuppressed: true, notificationRestore: null, notificationRestoredAt: todayAt(10, 50), notificationError: null, createdAt: todayAt(10, 0), updatedAt: todayAt(10, 50) }
   ],
@@ -231,6 +245,7 @@ let smokeUpdateState = {
 };
 
 contextBridge.exposeInMainWorld('paperTrail', {
+  ...(process.env.YANJI_AUTH_UI_SMOKE ? {getAuthState:async()=>({user:null,configured:false,baseUrl:'',status:'offline',conflicts:[]}),onAuthState:()=>{}} : {}),
   getWorkspace: async () => smokeWorkspace,
   getTodayWidgetData: async () => smokeWorkspace,
   onTodayWidgetChanged: () => {},
@@ -245,6 +260,12 @@ contextBridge.exposeInMainWorld('paperTrail', {
   },
   parseSchedule: async (input) => {
     const text = String(input || '');
+    if (text.includes('今天下午一点')) {
+      const tokens = ['今天', '下午', '下午一点'];
+      const matches = tokens.map((token) => ({ start: text.indexOf(token), end: text.indexOf(token) + token.length, text: token }));
+      const parsed = { valid: true, title: '点去找赵博', startAt: new Date(now).toISOString(), endAt: new Date(now + 3_600_000).toISOString(), priority: 'low', deadline: false, matches, meta: { explicitTime: true } };
+      return { ...parsed, schedules: [parsed] };
+    }
     if (text.includes('，')) {
       const schedules = [
         { valid: true, title: '去采样', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: 'low', deadline: false, matches: [] },
@@ -257,9 +278,41 @@ contextBridge.exposeInMainWorld('paperTrail', {
     const parsed = { valid: true, title: '组会', startAt: new Date(now + 86_400_000).toISOString(), endAt: new Date(now + 90_000_000).toISOString(), priority: /#1/.test(text) ? 'high' : 'low', deadline: false, matches };
     return { ...parsed, schedules: [parsed] };
   },
-  saveSchedule: async (input) => { document.body.dataset.savedScheduleCount = String(Number(document.body.dataset.savedScheduleCount || 0) + 1); return input; },
+  saveSchedule: async (input) => {
+    document.body.dataset.savedScheduleCount = String(Number(document.body.dataset.savedScheduleCount || 0) + 1);
+    document.body.dataset.lastSavedSchedule = JSON.stringify(input);
+    return input;
+  },
+  createScheduledTodo: async (input) => {
+    const todo = { ...input.todo, id: `todo-scheduled-${Date.now()}`, status: 'open', updatedAt: new Date().toISOString() };
+    const schedule = { ...input.schedule, id: `schedule-linked-${Date.now()}`, sourceRef: { type: 'todo', id: todo.id } };
+    smokeWorkspace.todos = [todo, ...(smokeWorkspace.todos || [])];
+    smokeWorkspace.schedules = [schedule, ...(smokeWorkspace.schedules || [])];
+    document.body.dataset.savedScheduleCount = String(Number(document.body.dataset.savedScheduleCount || 0) + 1);
+    document.body.dataset.lastSavedSchedule = JSON.stringify(schedule);
+    document.body.dataset.createdScheduledTodo = JSON.stringify({ todo, schedule });
+    return { todo, schedule };
+  },
   deleteSchedule: async () => true,
-  completeSchedule: async () => true,
+  completeSchedule: async (id, completed) => {
+    let updated = null;
+    smokeWorkspace.schedules = (smokeWorkspace.schedules || []).map((schedule) => {
+      if (schedule.id !== id) return schedule;
+      updated = { ...schedule, completedAt: completed ? new Date().toISOString() : null };
+      return updated;
+    });
+    return updated;
+  },
+  saveCountdown: async (input) => {
+    const existing = (smokeWorkspace.countdowns || []).find((item) => item.id === input?.id);
+    const saved = { ...existing, ...input, id: existing?.id || `countdown-${Date.now()}`, createdAt: existing?.createdAt || new Date().toISOString(), updatedAt: new Date().toISOString() };
+    smokeWorkspace.countdowns = [saved, ...(smokeWorkspace.countdowns || []).filter((item) => item.id !== saved.id)];
+    return saved;
+  },
+  deleteCountdown: async (id) => {
+    smokeWorkspace.countdowns = (smokeWorkspace.countdowns || []).filter((item) => item.id !== id);
+    return true;
+  },
   showScheduleWidget: async () => ({ attached: true }),
   closeScheduleWidget: async () => { document.body.dataset.closeRequested = 'true'; return true; },
   openScheduleWidgetMain: async () => { document.body.dataset.openMainRequested = 'true'; return true; },
@@ -283,7 +336,14 @@ contextBridge.exposeInMainWorld('paperTrail', {
     smokeWorkspace.todos = [todo, ...(smokeWorkspace.todos || []).filter((item) => item.id !== todo.id)];
     return todo;
   },
-  parseTodo: async (input) => ({ valid: true, title: String(input || '').replace(/明天.*?点半?/u, '').trim(), dueAt: null, reminderMode: 'none', priority: 'medium' }),
+  parseTodo: async (input) => {
+    const text = String(input || '');
+    if (text.includes('今天下午一点')) {
+      return { valid: true, title: '点去找赵博', dueAt: new Date(now).toISOString(), reminderMode: 'at-time', priority: 'medium', matches: [{ start: 0, end: 2, text: '今天' }, { start: 2, end: 4, text: '下午' }], meta: { explicitTime: true } };
+    }
+    const matches = ['明天', '下午 3 点到 5 点', '#1'].map((token) => ({ start: text.indexOf(token), end: text.indexOf(token) + token.length, text: token })).filter((match) => match.start >= 0);
+    return { valid: true, title: text.replace(/明天.*?点半?/u, '').trim(), dueAt: new Date(now + 86_400_000).toISOString(), reminderMode: 'at-time', priority: /#1/.test(text) ? 'high' : 'medium', matches, meta: { explicitTime: /点/.test(text) } };
+  },
   deleteTodo: async (id) => { smokeWorkspace.todos = smokeWorkspace.todos.filter((todo) => todo.id !== id); return true; },
   reopenTodo: async (id) => {
     let updated = null;
@@ -330,6 +390,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   deleteJobApplication: async (id) => { smokeWorkspace.jobApplications = smokeWorkspace.jobApplications.filter((item) => item.id !== id); return true; },
   importJobApplications: async () => ({ canceled: true }),
   exportJobApplications: async () => ({ canceled: true }),
+  exportJobApplicationImages: async () => ({ canceled: true }),
   saveMetadataFields: async (fields) => fields,
   clockAttendance: async () => smokeWorkspace.attendance[0],
   saveAttendance: async (input) => input,
@@ -347,6 +408,7 @@ contextBridge.exposeInMainWorld('paperTrail', {
   showCapture: async () => true,
   hideCapture: async () => { document.body.dataset.hideRequested = 'true'; return true; },
   setCaptureContentState: () => {},
+  submitCapture: async (input) => { document.body.dataset.captureSubmitted = JSON.stringify(input); return input; },
   listPapers: async () => smokePapers,
   addPaper: async (payload) => payload?.mode === 'author' ? productionPaper : mockPaper,
   refreshPaper: async () => mockPaper,
@@ -370,6 +432,9 @@ contextBridge.exposeInMainWorld('paperTrail', {
     autoCheckUpdates: true,
     quickCaptureShortcut: 'CommandOrControl+Shift+Space',
     stickyNoteShortcut: 'CommandOrControl+Alt+N',
+    homeBannerImageMode: smokeBannerDataUrl ? 'bing' : 'default',
+    homeBannerImageCredit: smokeBannerDataUrl ? '必应每日壁纸视觉检查' : '',
+    homeBannerImageDataUrl: smokeBannerDataUrl,
     appVersion: '1.0.0',
     dataDirectory: 'C:\\Users\\Demo\\Documents\\Yanji Data',
     backupCount: 1,
@@ -377,6 +442,19 @@ contextBridge.exposeInMainWorld('paperTrail', {
     isDefaultDataDirectory: false
   }),
   updateSettings: async (settings) => settings,
+  chooseHomeBannerImage: async () => ({
+    canceled: false,
+    settings: {
+      homeBannerImageMode: 'local',
+      homeBannerImageCredit: '',
+      homeBannerImageDataUrl: 'data:image/jpeg;base64,/9j/2Q=='
+    }
+  }),
+  refreshBingHomeBanner: async () => ({
+    homeBannerImageMode: 'bing',
+    homeBannerImageCredit: '示例必应每日图片',
+    homeBannerImageDataUrl: 'data:image/jpeg;base64,/9j/2Q=='
+  }),
   chooseDataDirectory: async () => ({
     canceled: false,
     settings: {

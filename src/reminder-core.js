@@ -15,7 +15,7 @@ function normalizeReminderPayload(item, kind = 'todo', level = 'reminder') {
   const source = item && typeof item === 'object' ? item : {};
   const reminderKind = kind === 'schedule' ? 'schedule' : 'todo';
   const scheduledAt = reminderKind === 'todo' ? source.dueAt || null : source.startAt || null;
-  const overdue = level === 'overdue' || (reminderKind === 'todo' && source.status === 'open' && scheduledAt && Date.parse(scheduledAt) < Date.now());
+  const overdue = level === 'overdue';
   return {
     kind: reminderKind,
     level: level === 'overdue' ? 'overdue' : 'reminder',
@@ -60,6 +60,8 @@ function eventReminderDue(schedule, now = new Date(), graceMs = EVENT_REMINDER_G
   const current = asTime(now);
   const reminderAt = eventReminderAt(schedule);
   if (start == null || end == null || current == null || reminderAt == null) return false;
+  const snoozedUntil = asTime(schedule.snoozedUntil);
+  if (snoozedUntil != null) return current >= snoozedUntil;
   if (schedule.allDay) {
     if (Number(schedule.reminderMinutesBefore) !== 0) return false;
     return current >= reminderAt && current <= reminderAt + graceMs;
@@ -105,8 +107,8 @@ function collectReminderCandidates({ schedules = [], todos = [], now = new Date(
   }
   if (settings.todoNotifications !== false) {
     for (const todo of todos) {
-      if (todoReminderDue(todo, now)) candidates.push({ type: 'todo', level: 'reminder', item: todo, key: buildReminderKey('todo-reminder', todo.id, todo.reminderAt) });
       if (todoOverdueNotificationDue(todo, now)) candidates.push({ type: 'todo', level: 'overdue', item: todo, key: buildReminderKey('todo-overdue', todo.id, todo.dueAt) });
+      else if (todoReminderDue(todo, now)) candidates.push({ type: 'todo', level: 'reminder', item: todo, key: buildReminderKey('todo-reminder', todo.id, todo.reminderAt) });
     }
   }
   return candidates;

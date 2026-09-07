@@ -1,6 +1,6 @@
 'use strict';
 
-const { TIME_NUMBER_PATTERN, parseMinuteToken } = require('./natural-time');
+const { TIME_NUMBER_PATTERN, chineseNumber, parseMinuteToken } = require('./natural-time');
 
 // Todo is deliberately independent from the schedule model. A todo is an
 // outcome with an optional deadline; a schedule is a time block used to do it.
@@ -54,18 +54,6 @@ function addLocalDays(date, days) {
   value.setHours(12, 0, 0, 0);
   value.setDate(value.getDate() + days);
   return value;
-}
-
-function chineseNumber(value) {
-  const text = String(value || '');
-  if (/^\d+$/.test(text)) return Number(text);
-  const digits = { 零: 0, 〇: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
-  if (text === '十') return 10;
-  if (text.includes('十')) {
-    const [left, right] = text.split('十');
-    return (left ? digits[left] : 1) * 10 + (right ? digits[right] : 0);
-  }
-  return digits[text];
 }
 
 function resolveHour(hour, dayPart = '') {
@@ -134,6 +122,28 @@ function parseDateExpression(text, baseDate) {
     if (!date) return { invalid: true, token: slashDate[0], explicit: true };
     if (date < addLocalDays(base, -1)) date = atLocalDate(base.getFullYear() + 1, month, day, 12);
     return { date, token: slashDate[0], explicit: true };
+  }
+
+  // A bare day such as “2号晚上” means the next occurrence of that day in
+  // the current or following month. Consume an optional “前” so deadline
+  // wording leaves a clean task title.
+  const dayOnly = text.match(/(?<![\d月])(\d{1,2})\s*(?:日|号)(?:前)?(?=$|[^\d])/);
+  if (dayOnly) {
+    const day = Number(dayOnly[1]);
+    let year = base.getFullYear();
+    let month = base.getMonth() + 1;
+    let date = atLocalDate(year, month, day, 12);
+    if (!date) return { invalid: true, token: dayOnly[0].trim(), explicit: true };
+    if (date < addLocalDays(base, -1)) {
+      month += 1;
+      if (month > 12) {
+        month = 1;
+        year += 1;
+      }
+      date = atLocalDate(year, month, day, 12);
+      if (!date) return { invalid: true, token: dayOnly[0].trim(), explicit: true };
+    }
+    return { date, token: dayOnly[0].trim(), explicit: true };
   }
 
   const week = text.match(/(下周|下星期|本周|本星期|这周|这星期|周|星期)([一二三四五六日天])/);
@@ -413,8 +423,7 @@ function matchesTodoSearch(todo, query) {
 
 function filterTodos(list, { view = 'today', query = '', now = new Date(), showAllCompleted = false } = {}) {
   const todos = (list || []).filter((todo) => matchesTodoSearch(todo, query));
-  if (view === 'inbox') return sortTodos(todos.filter((todo) => todo.status === 'open' && !todo.dueAt), now);
-  if (view === 'today') return sortTodos(todos.filter((todo) => todo.status === 'open' && (isDueToday(todo, now) || isOverdue(todo, now))), now);
+  if (view === 'inbox' || view === 'today') return sortTodos(todos.filter((todo) => todo.status === 'open' && (!todo.dueAt || isDueToday(todo, now) || isOverdue(todo, now))), now);
   if (view === 'upcoming') return sortTodos(todos.filter((todo) => isUpcoming(todo, now)), now);
   if (view === 'completed') {
     const completed = todos.filter((todo) => todo.status === 'completed').sort((a, b) => Date.parse(b.completedAt || 0) - Date.parse(a.completedAt || 0));
@@ -429,7 +438,7 @@ function groupTodos(list, { view = 'today', now = new Date() } = {}) {
   const groups = new Map();
   for (const todo of filterTodos(list, { view, now })) {
     let label = '未来';
-    if (view === 'inbox' || !todo.dueAt) label = '无日期';
+    if (!todo.dueAt) label = '今天';
     else if (isOverdue(todo, now)) label = '逾期';
     else if (isDueToday(todo, now)) label = '今天';
     else if (view === 'upcoming') {
@@ -453,6 +462,9 @@ function needsReminder(todo, now = new Date()) {
 }
 
 function needsOverdueNotification(todo, now = new Date()) {
+  const current = now instanceof Date ? now.getTime() : Date.parse(now);
+  const snoozedUntil = Date.parse(todo?.snoozedUntil || '');
+  if (Number.isFinite(snoozedUntil) && current < snoozedUntil) return false;
   return isOverdue(todo, now) && !todo.overdueNotifiedAt;
 }
 
@@ -470,7 +482,8 @@ function snoozeTodo(todo, until, now = new Date().toISOString()) {
     ? new Date((Number.isFinite(nowMs) ? nowMs : Date.now()) + until).toISOString()
     : isoDate(until);
   if (!snoozedUntil) throw new Error('稍后提醒时间无效。');
-  return normalizeTodo({ ...todo, snoozedUntil, reminderSentAt: null, updatedAt: now }, 0, now);
+  const overdue = todo?.dueAt && Date.parse(todo.dueAt) < nowMs;
+  return normalizeTodo({ ...todo, snoozedUntil, reminderSentAt: null, overdueNotifiedAt: overdue ? null : todo.overdueNotifiedAt, updatedAt: now }, 0, now);
 }
 
 module.exports = {

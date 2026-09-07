@@ -43,11 +43,7 @@ function normalizeSettings(source, defaults) {
   const input = asObject(source) || {};
   const safeDefaults = asObject(defaults) || {};
   const settings = { ...safeDefaults, ...input };
-  settings.todayWidgetEnabled = input.todayWidgetEnabled ?? input.scheduleWidgetEnabled ?? safeDefaults.todayWidgetEnabled ?? false;
-  settings.widgetShowSchedules = input.widgetShowSchedules !== false;
-  settings.widgetShowTodos = input.widgetShowTodos !== false;
-  settings.widgetShowCompletedTodos = input.widgetShowCompletedTodos === true;
-  settings.appearanceTheme = input.appearanceTheme === 'classic' ? 'classic' : (input.appearanceTheme === 'liquid-glass' ? 'liquid-glass' : (safeDefaults.appearanceTheme || 'liquid-glass'));
+  delete settings.appearanceTheme; // Ignore the retired setting in legacy JSON.
   settings.eventNotifications = input.eventNotifications !== false;
   settings.todoNotifications = input.todoNotifications !== false;
   const allowedEventReminders = new Set([null, 0, 5, 10, 15, 30, 60, 1440]);
@@ -58,7 +54,6 @@ function normalizeSettings(source, defaults) {
   settings.defaultTodoReminderMode = allowedTodoModes.has(input.defaultTodoReminderMode)
     ? input.defaultTodoReminderMode
     : safeDefaults.defaultTodoReminderMode ?? 'at-due';
-  delete settings.scheduleWidgetEnabled;
   return settings;
 }
 

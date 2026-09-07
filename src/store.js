@@ -11,21 +11,12 @@ const DEFAULT_SETTINGS = Object.freeze({
   notifications: true,
   closeToTray: true,
   startAtLogin: false,
-  autoCheckUpdates: true,
-  // Kept in the defaults as a read-compatibility marker; Schema 9 stores
-  // todayWidgetEnabled and getSettings exposes the old name as an alias.
-  scheduleWidgetEnabled: false,
-  todayWidgetEnabled: false,
-  widgetShowSchedules: true,
-  widgetShowTodos: true,
-  widgetShowCompletedTodos: false,
-  appearanceTheme: 'liquid-glass',
+  autoCheckUpdates: false,
   eventNotifications: true,
   todoNotifications: true,
   defaultEventReminderMinutes: 10,
   defaultTodoReminderMode: 'at-due',
-  quickCaptureShortcut: 'CommandOrControl+Shift+Space',
-  stickyNoteShortcut: 'CommandOrControl+Alt+N'
+  quickCaptureShortcut: 'CommandOrControl+Alt+Space',
 });
 
 class JsonStore {
@@ -33,13 +24,13 @@ class JsonStore {
     this.filePath = filePath;
     this.attachmentsDirectory = path.join(path.dirname(filePath), 'attachments');
     const initialSettings = { ...DEFAULT_SETTINGS };
-    delete initialSettings.scheduleWidgetEnabled;
     this.data = {
       version: DATA_VERSION,
       settings: initialSettings,
       papers: [],
       schedules: [],
       todos: [],
+      countdowns: [],
       notes: [],
       metadataFields: [],
       attendance: [],
@@ -127,14 +118,11 @@ class JsonStore {
   getSettings() {
     return {
       ...this.data.settings,
-      scheduleWidgetEnabled: this.data.settings.todayWidgetEnabled ?? this.data.settings.scheduleWidgetEnabled ?? false
     };
   }
 
   updateSettings(patch) {
     const next = { ...this.data.settings, ...patch };
-    if ('scheduleWidgetEnabled' in patch && !('todayWidgetEnabled' in patch)) next.todayWidgetEnabled = Boolean(patch.scheduleWidgetEnabled);
-    delete next.scheduleWidgetEnabled;
     this.data.settings = next;
     this.save();
     return this.getSettings();
@@ -204,6 +192,16 @@ class JsonStore {
     this.data.todos = todos;
     this.save();
     return this.data.todos;
+  }
+
+  listCountdowns() {
+    return this.data.countdowns || [];
+  }
+
+  setCountdowns(countdowns) {
+    this.data.countdowns = countdowns;
+    this.save();
+    return this.data.countdowns;
   }
 
   listNotes() {

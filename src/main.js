@@ -20,6 +20,10 @@ const {
   shell,
   Tray
 } = require('electron');
+const { createCloudClient } = require('./cloud-client');
+let cloudClient;
+let localWorkspacePath;
+const APP_CHANNEL = require('./app-channel');
 let autoUpdater = null;
 let updaterLoadError = null;
 try {
@@ -31,7 +35,6 @@ try {
 }
 const { JsonStore, DEFAULT_SETTINGS } = require('./store');
 const {
-  appendDailyNoteContent,
   isManagedBackupPath,
   readStoragePointer: readStoragePointerState,
   resolveStorageState,
@@ -39,10 +42,11 @@ const {
 } = require('./storage-core');
 const { clearSystemRecovery, readSystemRecovery, writeSystemRecovery } = require('./system-recovery-core');
 const { createPlanningService } = require('./planning-service');
+const { normalizeCaptureInput } = require('./capture-core');
+const { deleteCountdown, saveCountdown } = require('./countdown-core');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
-const { desktopWidgetPresentation } = require('./desktop-widget-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
-const { deleteJobApplication, normalizeJobApplication, saveJobApplication } = require('./job-core');
+const { deleteJobApplication, jobDeadlineReminderDue, mergeImportedJobApplications, normalizeJobApplication, saveJobApplication } = require('./job-core');
 const { resolveStableUserDataPath } = require('./user-data-path');
 const {
   parseTrackingInput,
@@ -60,6 +64,7 @@ const {
 } = require('./production-core');
 const { importantChanges } = require('./notification-core');
 const {
+  appendDailyNoteContent,
   closeStaleAttendanceRecords,
   normalizeMetadataField,
   normalizeNote,
@@ -69,7 +74,7 @@ const {
   saveAttendance,
   saveFocusSession,
   saveNote,
-  saveSchedule
+  scheduleOccurrenceForDate
 } = require('./workbench-core');
 const {
   applyRefreshFailure,
@@ -101,12 +106,12 @@ const {
   nextUpdateState
 } = require('./update-core');
 
-const APP_NAME = '研迹 · 科研工作台';
-const APP_ID = 'io.papertrail.desktop';
+const APP_NAME = APP_CHANNEL.name;
+const APP_ID = APP_CHANNEL.appId;
 // Windows stores notification-area visibility against this identity. Keep it
 // stable across every release so an updater replacement does not look like a
 // brand-new tray icon and move Yanji back into the overflow menu.
-const TRAY_GUID = 'd47b4b95-2cf8-4d84-b2bc-671a0f5161fa';
+const TRAY_GUID = APP_CHANNEL.trayGuid;
 const BUILD_DIR = app.isPackaged
   ? path.join(process.resourcesPath, 'app.asar.unpacked', 'build')
   : path.join(__dirname, '..', 'build');
@@ -136,7 +141,7 @@ function applyWindowsTaskbarIdentity(window) {
         appIconPath: APP_ICON_PATH,
         appIconIndex: 0,
         relaunchCommand: process.execPath,
-        relaunchDisplayName: '研迹'
+        relaunchDisplayName: APP_CHANNEL.name
       });
     }
   } catch (error) {
@@ -154,8 +159,7 @@ const MAX_NOTE_ATTACHMENT_SIZE = 12 * 1024 * 1024;
 const MAX_NOTE_ATTACHMENTS_TOTAL = 50 * 1024 * 1024;
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
-const DEFAULT_QUICK_CAPTURE_SHORTCUT = 'CommandOrControl+Shift+Space';
-const DEFAULT_STICKY_NOTE_SHORTCUT = 'CommandOrControl+Alt+N';
+const DEFAULT_QUICK_CAPTURE_SHORTCUT = APP_CHANNEL.shortcut;
 const TITLE_BAR_NORMAL = Object.freeze({ color: '#eaf5fb', symbolColor: '#35566b', height: 38 });
 const TITLE_BAR_MODAL = Object.freeze({ color: '#9dabb6', symbolColor: '#f5fbfe', height: 38 });
 
@@ -170,8 +174,6 @@ let coldStartRefreshStarted = false;
 let updateState;
 let updaterInitialized = false;
 let quickCaptureWindow;
-let scheduleWidgetWindow;
-let desktopIconReservation;
 let quickCaptureHasContent = false;
 let focusTimer;
 let focusSampler;
@@ -184,7 +186,6 @@ let attendanceUsageLive = {};
 let attendanceLastPersistAt = 0;
 let lastBackupCleanupAt = 0;
 let systemRecoveryWarning = null;
-const stickyWindows = new Map();
 const deadlineWindows = new Map();
 const refreshingIds = new Set();
 
@@ -574,6 +575,7 @@ function isPortableBuild() {
 }
 
 function updateStateForRenderer() {
+  if (!APP_CHANNEL.updatesEnabled) return { ...createInitialUpdateState({ currentVersion: app.getVersion(), packaged: false }), message: '当前安装渠道不接收自动更新，请手动安装后续版本。' };
   if (!updateState) {
     updateState = createInitialUpdateState({
       currentVersion: app.getVersion(),
@@ -598,6 +600,10 @@ function setUpdateState(event, payload) {
 }
 
 function initializeUpdater() {
+  if (!APP_CHANNEL.updatesEnabled) {
+    updateState = { ...createInitialUpdateState({currentVersion: app.getVersion(), packaged: false}), message: '当前安装渠道不接收自动更新，请手动安装后续版本。' };
+    return;
+  }
   if (updaterInitialized) return;
   updaterInitialized = true;
   updateState = createInitialUpdateState({
@@ -678,11 +684,13 @@ function installDownloadedUpdate() {
 }
 
 async function openUpdateReleasePage() {
+  if (!APP_CHANNEL.updatesEnabled) return false;
   await shell.openExternal(RELEASES_URL);
   return true;
 }
 
 async function chooseDataDirectory(request = {}) {
+  if (cloudClient?.state().user) throw new Error('请先退出账号再调整本机数据位置');
   let selectedDirectory;
   if (request?.confirmedExisting && request?.selectedDirectory) {
     selectedDirectory = path.resolve(String(request.selectedDirectory));
@@ -699,6 +707,7 @@ async function chooseDataDirectory(request = {}) {
     selectedDirectory = path.resolve(result.filePaths[0]);
   }
   const targetFile = path.join(selectedDirectory, DATA_FILE_NAME);
+  if (!samePath(targetFile, store.filePath) && fs.existsSync(targetFile)) throw new Error('测试版不能直接使用已有数据目录。请在账号页导入数据副本。');
   if (samePath(targetFile, store.filePath)) {
     return { canceled: false, settings: settingsForRenderer() };
   }
@@ -774,46 +783,12 @@ function broadcastPapers() {
   }
 }
 
-function todayWidgetForRenderer() {
-  const now = new Date();
-  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-  const settings = store.getSettings();
-  const schedules = store.listSchedules()
-    .filter((item) => {
-      const start = Date.parse(item.startAt);
-      const end = Date.parse(item.endAt || item.startAt);
-      return Number.isFinite(start) && Number.isFinite(end) && start < dayEnd.getTime() && end > dayStart.getTime();
-    })
-    .sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt))
-    .map((item) => ({
-      id: item.id,
-      title: item.title,
-      startAt: item.startAt,
-      endAt: item.endAt,
-      allDay: Boolean(item.allDay),
-      priority: item.priority,
-      sourceRef: item.sourceRef || null
-    }));
-  const todos = store.listTodos()
-    .filter((item) => item.status === 'open' && (!item.dueAt || localDateKey(new Date(item.dueAt)) === localDateKey(now)))
-    .sort((a, b) => (a.dueAt ? Date.parse(a.dueAt) : Number.POSITIVE_INFINITY) - (b.dueAt ? Date.parse(b.dueAt) : Number.POSITIVE_INFINITY))
-    .slice(0, 12)
-    .map((item) => ({ id: item.id, title: item.title, dueAt: item.dueAt, priority: item.priority, status: item.status }));
-  return {
-    date: localDateKey(now),
-    schedules: settings.widgetShowSchedules !== false ? schedules : [],
-    todos: settings.widgetShowTodos !== false ? todos : [],
-    showCompletedTodos: settings.widgetShowCompletedTodos === true
-  };
-}
-
 function workspaceForRenderer() {
   const activeAttendance = activeAttendanceRecord();
   return {
     schedules: [...store.listSchedules()].sort((a, b) => Date.parse(a.startAt) - Date.parse(b.startAt)),
     todos: [...store.listTodos()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
+    countdowns: [...store.listCountdowns()].sort((a, b) => Date.parse(a.targetAt) - Date.parse(b.targetAt)),
     notes: [...store.listNotes()].sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt)),
     metadataFields: store.listMetadataFields(),
     attendance: [...store.listAttendance()]
@@ -831,15 +806,12 @@ function broadcastWorkspace() {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send('workspace:changed', workspace);
   }
-  if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
-    scheduleWidgetWindow.webContents.send('today-widget:changed', todayWidgetForRenderer());
-  }
   return workspace;
 }
 
 function broadcastSettings() {
   const settings = settingsForRenderer();
-  for (const window of [mainWindow, quickCaptureWindow, scheduleWidgetWindow, ...stickyWindows.values()]) {
+  for (const window of [mainWindow, quickCaptureWindow]) {
     if (window && !window.isDestroyed()) window.webContents.send('settings:changed', settings);
   }
   return settings;
@@ -851,25 +823,11 @@ function getPlanningService() {
 }
 
 function saveWorkspaceSchedule(input) {
-  if (planningService) return getPlanningService().saveSchedule(input);
-  const schedules = saveSchedule(
-    store.listSchedules(),
-    input,
-    new Date().toISOString(),
-    () => crypto.randomUUID()
-  );
-  store.setSchedules(schedules);
-  broadcastWorkspace();
-  return schedules.find((item) => item.id === String(input?.id || '')) || schedules[0];
+  return getPlanningService().saveSchedule(input);
 }
 
 function deleteWorkspaceSchedule(id) {
-  if (planningService) return getPlanningService().deleteSchedule(id);
-  const schedules = store.listSchedules();
-  if (!schedules.some((item) => item.id === id)) throw new Error('找不到这条日程。');
-  store.setSchedules(schedules.filter((item) => item.id !== id));
-  broadcastWorkspace();
-  return true;
+  return getPlanningService().deleteSchedule(id);
 }
 
 function setWorkspaceScheduleCompleted(id, completed) {
@@ -887,7 +845,7 @@ function saveWorkspaceNote(input) {
   const notes = store.listNotes();
   const existing = requested.id ? notes.find((item) => item.id === String(requested.id)) : null;
   if (requested.id && !existing) throw new Error('找不到这条笔记。');
-  // A new editor or sticky window reuses today's one daily document. Content
+  // A new editor reuses today's one daily document. Content
   // capture uses appendWorkspaceDailyNote below so it never replaces a stale
   // renderer snapshot.
   if (!existing && requested.kind !== 'standalone') {
@@ -904,6 +862,19 @@ function saveWorkspaceNote(input) {
   store.setNotes(savedNotes);
   broadcastWorkspace();
   return saved;
+}
+
+function saveWorkspaceCountdown(input) {
+  const result = saveCountdown(store.listCountdowns(), input, new Date().toISOString(), () => crypto.randomUUID());
+  store.setCountdowns(result.countdowns);
+  broadcastWorkspace();
+  return result.countdown;
+}
+
+function deleteWorkspaceCountdown(id) {
+  store.setCountdowns(deleteCountdown(store.listCountdowns(), id));
+  broadcastWorkspace();
+  return true;
 }
 
 function appendWorkspaceDailyNote(input) {
@@ -942,9 +913,6 @@ function deleteWorkspaceNote(id) {
   for (const item of staged) {
     try { fs.unlinkSync(item.temporary); } catch { /* orphaned delete staging remains recoverable */ }
   }
-  const sticky = stickyWindows.get(id);
-  if (sticky && !sticky.isDestroyed()) sticky.close();
-  stickyWindows.delete(id);
   broadcastWorkspace();
   return true;
 }
@@ -987,6 +955,69 @@ function jobImportList(parsed) {
   return null;
 }
 
+function portableJobHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+
+function portableJobDate(value) {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return '—';
+  const date = new Date(timestamp);
+  return `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function portableJobPreviewHtml(jobs, pageNumber, pageCount, exportedAt) {
+  const statusLabels = { preparing: '进行中', active: '进行中', paused: '进行中', closed: '已结束' };
+  const priorityLabels = { high: '高', medium: '中', low: '低' };
+  const rows = jobs.map((job) => {
+    const stages = Array.isArray(job.workflow?.stages) ? job.workflow.stages : [];
+    const currentIndex = Math.max(0, stages.findIndex((stage) => stage.id === job.workflow?.currentStageId));
+    const currentStage = stages[currentIndex]?.name || '—';
+    const progress = stages.length ? `${currentIndex + 1}/${stages.length}` : '—';
+    const salary = Number(job.annualSalaryWan) > 0 ? `${Number(job.annualSalaryWan).toLocaleString('zh-CN', { maximumFractionDigits: 1 })} 万` : '—';
+    return `<section class="row"><div class="primary"><strong>${portableJobHtml(job.company || '未命名单位')}</strong><span>${portableJobHtml(job.role || '未命名岗位')}</span></div><div>${portableJobHtml(job.companyType || '—')}</div><div>${portableJobHtml(job.city || job.location || '—')}</div><div>${portableJobHtml(salary)}</div><div>${portableJobHtml(portableJobDate(job.deadline))}</div><div>${portableJobHtml(statusLabels[job.status] || '进行中')}</div><div>${portableJobHtml(priorityLabels[job.priority] || job.priority || '—')}</div><div class="notes">${portableJobHtml(job.notes || '—')}</div><p>招聘流程：${portableJobHtml(currentStage)} · ${portableJobHtml(progress)}</p></section>`;
+  }).join('');
+  return `<!doctype html><html><head><meta charset="utf-8"><style>*{box-sizing:border-box}html,body{margin:0;width:1400px;overflow:hidden;background:#f3f6fb;color:#25324a;font-family:"Microsoft YaHei","Segoe UI",sans-serif}body{padding:38px}.sheet{overflow:hidden;background:#fff;border:1px solid #dfe6f0;border-radius:22px;box-shadow:0 16px 46px rgba(42,63,96,.1)}header{display:flex;align-items:end;justify-content:space-between;padding:28px 30px 22px;background:linear-gradient(120deg,#edf7fb,#f7f1fc)}h1{margin:0;font-size:28px}header p,footer{margin:7px 0 0;color:#738096;font-size:14px}.head,.row{display:grid;grid-template-columns:220px 120px 105px 120px 120px 105px 80px minmax(210px,1fr);column-gap:10px;align-items:center}.head{min-height:48px;padding:0 30px;color:#64728a;background:#f8fafc;border-bottom:1px solid #e6ebf2;font-size:14px;font-weight:700;text-align:center}.head span:first-child{text-align:left}.row{position:relative;min-height:88px;padding:13px 30px 29px;border-bottom:1px solid #edf1f6;font-size:15px;text-align:center}.row:last-child{border-bottom:0}.primary,.notes{text-align:left}.primary strong,.primary span{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.primary strong{font-size:18px}.primary span{margin-top:5px;color:#66758c}.notes{overflow:hidden;color:#526176;text-overflow:ellipsis;white-space:nowrap}.row p{position:absolute;left:30px;bottom:8px;margin:0;color:#6d7fa5;font-size:12px}footer{display:flex;justify-content:space-between;padding:15px 30px 19px;background:#fbfcfe}</style></head><body><main class="sheet"><header><div><h1>研迹 · 求职岗位</h1><p>${portableJobHtml(exportedAt)} 导出 · 共 ${jobs.length} 条（本页）</p></div><p>第 ${pageNumber}/${pageCount} 页</p></header><div class="head"><span>公司 / 岗位</span><span>企业类型</span><span>城市</span><span>预估年薪</span><span>截止日期</span><span>状态</span><span>优先级</span><span>备注</span></div>${rows || '<div style="padding:70px;text-align:center;color:#8290a5">暂无岗位数据</div>'}<footer><span>手机可直接查看此图片</span><span>迁移岗位时请单独导出 JSON 数据文件</span></footer></main></body></html>`;
+}
+
+async function exportPortableJobPreview(jobs, jsonFilePath, exportedAt) {
+  const pageSize = 25;
+  const pages = jobs.length ? Array.from({ length: Math.ceil(jobs.length / pageSize) }, (_, index) => jobs.slice(index * pageSize, (index + 1) * pageSize)) : [[]];
+  const parsedPath = path.parse(jsonFilePath);
+  const outputPaths = [];
+  for (let index = 0; index < pages.length; index += 1) {
+    const pageJobs = pages[index];
+    const height = Math.max(420, 320 + pageJobs.length * 88);
+    const previewWindow = new BrowserWindow({
+      show: false,
+      width: 1400,
+      height,
+      useContentSize: true,
+      backgroundColor: '#f3f6fb',
+      webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, offscreen: true }
+    });
+    try {
+      const html = portableJobPreviewHtml(pageJobs, index + 1, pages.length, exportedAt);
+      await previewWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(html)}`);
+      await previewWindow.webContents.executeJavaScript('document.fonts.ready.then(() => true)');
+      const renderedHeight = await previewWindow.webContents.executeJavaScript('Math.ceil(Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, document.body.getBoundingClientRect().height))');
+      const captureHeight = Math.max(420, Number(renderedHeight) || height);
+      previewWindow.setContentSize(1400, captureHeight, false);
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      const image = await previewWindow.webContents.capturePage({ x: 0, y: 0, width: 1400, height: captureHeight });
+      if (image.isEmpty()) throw new Error('岗位预览图片生成失败。');
+      const suffix = pages.length > 1 ? `-${String(index + 1).padStart(2, '0')}` : '';
+      const extension = parsedPath.ext.toLowerCase() === '.jpg' || parsedPath.ext.toLowerCase() === '.jpeg' ? '.jpg' : '.png';
+      const imagePath = path.join(parsedPath.dir, `${parsedPath.name}${suffix}${extension}`);
+      fs.writeFileSync(imagePath, extension === '.jpg' ? image.toJPEG(92) : image.toPNG());
+      outputPaths.push(imagePath);
+    } finally {
+      if (!previewWindow.isDestroyed()) previewWindow.destroy();
+    }
+  }
+  return outputPaths;
+}
+
 async function importWorkspaceJobApplications() {
   const result = await dialog.showOpenDialog(mainWindow, {
     title: '导入求职岗位',
@@ -1006,40 +1037,51 @@ async function importWorkspaceJobApplications() {
   if (!sourceList) throw new Error('岗位文件需要包含岗位数组。');
   if (sourceList.length > 500) throw new Error('一次最多导入 500 条岗位记录。');
 
-  const now = new Date().toISOString();
-  const normalized = sourceList.map((item, index) => {
-    if (!item || typeof item !== 'object' || Array.isArray(item)) throw new Error(`第 ${index + 1} 条求职记录格式无效。`);
-    return normalizeJobApplication({ ...item, imported: true }, index, now);
-  });
-  let jobs = store.listJobApplications();
-  const backup = createManagedDataBackup(store.filePath);
-  for (const item of normalized) {
-    const existing = jobs.find((candidate) => candidate.id === item.id);
-    jobs = saveJobApplication(jobs, existing
-      ? { ...item, id: existing.id, revision: existing.revision }
-      : { ...item, id: undefined, revision: 0 }, now, () => crypto.randomUUID());
+  const merge = mergeImportedJobApplications(store.listJobApplications(), sourceList, new Date().toISOString(), () => crypto.randomUUID());
+  if (merge.added || merge.updated) {
+    const backup = createManagedDataBackup(store.filePath);
+    if (backup) writeStoragePointer(path.dirname(store.filePath), [...knownBackupFiles(), backup], store.filePath);
+    store.setJobApplications(merge.jobs);
   }
-  if (backup) writeStoragePointer(path.dirname(store.filePath), [...knownBackupFiles(), backup], store.filePath);
-  store.setJobApplications(jobs);
   const workspace = broadcastWorkspace();
-  return { canceled: false, count: normalized.length, jobApplications: workspace.jobApplications };
+  return {
+    canceled: false,
+    count: merge.count,
+    added: merge.added,
+    updated: merge.updated,
+    skipped: merge.skipped,
+    jobApplications: workspace.jobApplications
+  };
 }
 
-async function exportWorkspaceJobApplications() {
+async function exportWorkspaceJobApplicationData() {
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: '导出求职岗位',
+    title: '导出岗位数据',
     defaultPath: path.join(app.getPath('documents'), `研迹求职岗位-${new Date().toISOString().slice(0, 10)}.json`),
     filters: [{ name: '研迹岗位 JSON', extensions: ['json'] }]
   });
   if (result.canceled || !result.filePath) return { canceled: true };
   const workspace = workspaceForRenderer();
+  const exportedAt = new Date().toISOString();
   fs.writeFileSync(result.filePath, JSON.stringify({
     format: 'papertrail-job-applications',
     version: 1,
-    exportedAt: new Date().toISOString(),
+    exportedAt,
     jobApplications: workspace.jobApplications
   }, null, 2), 'utf8');
   return { canceled: false, filePath: result.filePath, count: workspace.jobApplications.length };
+}
+
+async function exportWorkspaceJobApplicationImages() {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '导出岗位图片',
+    defaultPath: path.join(app.getPath('pictures'), `研迹求职岗位-${new Date().toISOString().slice(0, 10)}-手机预览.png`),
+    filters: [{ name: 'PNG 图片', extensions: ['png'] }, { name: 'JPG 图片', extensions: ['jpg', 'jpeg'] }]
+  });
+  if (result.canceled || !result.filePath) return { canceled: true };
+  const workspace = workspaceForRenderer();
+  const imagePaths = await exportPortableJobPreview(workspace.jobApplications, result.filePath, new Date().toISOString());
+  return { canceled: false, imagePaths, count: workspace.jobApplications.length };
 }
 
 function saveMetadataFields(input) {
@@ -1055,10 +1097,6 @@ function saveMetadataFields(input) {
 
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function saveWorkspaceTodo(input) {
-  return getPlanningService().saveTodo(input);
 }
 
 function reconcileStaleAttendance(now = new Date()) {
@@ -1593,8 +1631,8 @@ function resumeAttendanceRuntime() {
 function createQuickCaptureWindow() {
   if (quickCaptureWindow && !quickCaptureWindow.isDestroyed()) return quickCaptureWindow;
   quickCaptureWindow = new BrowserWindow({
-    width: 720,
-    height: 222,
+    width: 760,
+    height: 420,
     show: false,
     frame: false,
     transparent: true,
@@ -1614,7 +1652,7 @@ function createQuickCaptureWindow() {
       backgroundThrottling: true
     }
   });
-  quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+  quickCaptureWindow.loadFile(path.join(__dirname, 'renderer', 'capture.html'));
   quickCaptureWindow.on('blur', () => {
     setTimeout(() => {
       if (quickCaptureWindow && !quickCaptureWindow.isDestroyed() && quickCaptureWindow.isVisible() && !quickCaptureHasContent) {
@@ -1642,7 +1680,6 @@ function registerWorkbenchShortcuts(settings = store?.getSettings(), { allowFall
   globalShortcut.unregisterAll();
   const registrations = [
     ['quickCaptureShortcut', DEFAULT_QUICK_CAPTURE_SHORTCUT, toggleQuickCapture],
-    ['stickyNoteShortcut', DEFAULT_STICKY_NOTE_SHORTCUT, createNewStickyNote]
   ];
   const registered = {};
   for (const [key, fallback, handler] of registrations) {
@@ -1658,387 +1695,6 @@ function registerWorkbenchShortcuts(settings = store?.getSettings(), { allowFall
     registered[key] = shortcut;
   }
   return registered;
-}
-
-async function focusStickyWindow(window) {
-  if (!window || window.isDestroyed()) return;
-  window.show();
-  window.focus();
-  if (typeof window.webContents.focus === 'function') window.webContents.focus();
-  if (!window.webContents.isLoading()) window.webContents.send('sticky:focus');
-}
-
-async function openStickyNote(noteId) {
-  const id = String(noteId || '');
-  const note = store.listNotes().find((item) => item.id === id);
-  if (!note) throw new Error('找不到这条笔记。');
-  const existing = stickyWindows.get(id);
-  if (existing && !existing.isDestroyed()) {
-    await focusStickyWindow(existing);
-    return true;
-  }
-  const window = new BrowserWindow({
-    width: 380,
-    height: 440,
-    minWidth: 300,
-    minHeight: 260,
-    frame: false,
-    alwaysOnTop: true,
-    skipTaskbar: false,
-    backgroundColor: '#f5fbff',
-    icon: createAppWindowIcon(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      devTools: !app.isPackaged
-    }
-  });
-  stickyWindows.set(id, window);
-  await window.loadFile(path.join(__dirname, 'renderer', 'sticky.html'), { query: { id, appearance: store.getSettings().appearanceTheme } });
-  await focusStickyWindow(window);
-  window.on('closed', () => {
-    stickyWindows.delete(id);
-    try { deleteWorkspaceNoteIfEmpty(id); } catch (error) { console.warn(`[研迹] 空便笺清理失败: ${error.message}`); }
-  });
-  return true;
-}
-
-async function createNewStickyNote() {
-  const now = new Date();
-  const note = saveWorkspaceNote({ kind: 'daily', dateKey: localDateKey(now), content: '' });
-  await openStickyNote(note.id);
-  return note;
-}
-
-function nativeWindowHandleValue(window) {
-  const handle = window.getNativeWindowHandle();
-  if (handle.length >= 8) return handle.readBigUInt64LE(0).toString();
-  return BigInt(handle.readUInt32LE(0)).toString();
-}
-
-async function attachWindowToDesktop(window, targetSize) {
-  if (process.platform !== 'win32') return false;
-  const script = String.raw`
-$ChildHandle = [UInt64]::Parse($env:YANJI_DESKTOP_CHILD_HANDLE)
-$TargetWidth = [Int32]::Parse($env:YANJI_DESKTOP_CHILD_WIDTH)
-$TargetHeight = [Int32]::Parse($env:YANJI_DESKTOP_CHILD_HEIGHT)
-$source = @'
-using System;
-using System.Runtime.InteropServices;
-
-public static class YanjiDesktopHost {
-  private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
-
-  [StructLayout(LayoutKind.Sequential)]
-  private struct RECT { public int Left, Top, Right, Bottom; }
-
-  [StructLayout(LayoutKind.Sequential)]
-  private struct POINT { public int X, Y; }
-
-  [DllImport("user32.dll")]
-  private static extern bool EnumWindows(EnumWindowsProc callback, IntPtr lParam);
-
-  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
-  private static extern IntPtr FindWindowEx(IntPtr parent, IntPtr childAfter, string className, string title);
-
-  [DllImport("user32.dll")]
-  private static extern IntPtr GetShellWindow();
-
-  [DllImport("user32.dll", SetLastError = true)]
-  private static extern IntPtr SetParent(IntPtr child, IntPtr parent);
-
-  [DllImport("user32.dll")]
-  private static extern IntPtr GetParent(IntPtr child);
-
-  [DllImport("user32.dll")]
-  private static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
-
-  [DllImport("user32.dll")]
-  private static extern bool ScreenToClient(IntPtr hWnd, ref POINT point);
-
-  [DllImport("user32.dll", EntryPoint = "GetWindowLongPtr", SetLastError = true)]
-  private static extern IntPtr GetWindowLongPtr64(IntPtr hWnd, int index);
-
-  [DllImport("user32.dll", EntryPoint = "GetWindowLong", SetLastError = true)]
-  private static extern IntPtr GetWindowLong32(IntPtr hWnd, int index);
-
-  [DllImport("user32.dll", EntryPoint = "SetWindowLongPtr", SetLastError = true)]
-  private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int index, IntPtr value);
-
-  [DllImport("user32.dll", EntryPoint = "SetWindowLong", SetLastError = true)]
-  private static extern IntPtr SetWindowLong32(IntPtr hWnd, int index, IntPtr value);
-
-  [DllImport("user32.dll", SetLastError = true)]
-  private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int width, int height, uint flags);
-
-  [DllImport("gdi32.dll", SetLastError = true)]
-  private static extern IntPtr CreateRoundRectRgn(int left, int top, int right, int bottom, int widthEllipse, int heightEllipse);
-
-  [DllImport("user32.dll", SetLastError = true)]
-  private static extern int SetWindowRgn(IntPtr hWnd, IntPtr region, bool redraw);
-
-  [DllImport("gdi32.dll")]
-  private static extern bool DeleteObject(IntPtr value);
-
-  private static IntPtr GetStyle(IntPtr hWnd) {
-    return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, -16) : GetWindowLong32(hWnd, -16);
-  }
-
-  private static void SetStyle(IntPtr hWnd, IntPtr value) {
-    if (IntPtr.Size == 8) SetWindowLongPtr64(hWnd, -16, value);
-    else SetWindowLong32(hWnd, -16, value);
-  }
-
-  private static IntPtr GetExtendedStyle(IntPtr hWnd) {
-    return IntPtr.Size == 8 ? GetWindowLongPtr64(hWnd, -20) : GetWindowLong32(hWnd, -20);
-  }
-
-  private static void SetExtendedStyle(IntPtr hWnd, IntPtr value) {
-    if (IntPtr.Size == 8) SetWindowLongPtr64(hWnd, -20, value);
-    else SetWindowLong32(hWnd, -20, value);
-  }
-
-  private static IntPtr FindIconHost() {
-    IntPtr host = IntPtr.Zero;
-    EnumWindows(delegate(IntPtr candidate, IntPtr state) {
-      if (FindWindowEx(candidate, IntPtr.Zero, "SHELLDLL_DefView", null) != IntPtr.Zero) {
-        host = candidate;
-        return false;
-      }
-      return true;
-    }, IntPtr.Zero);
-    return host != IntPtr.Zero ? host : GetShellWindow();
-  }
-
-  public static int Attach(UInt64 childValue, int targetWidth, int targetHeight) {
-    IntPtr child = new IntPtr(unchecked((long)childValue));
-    IntPtr host = FindIconHost();
-    if (child == IntPtr.Zero) return 11;
-    if (host == IntPtr.Zero) return 12;
-    if (targetWidth <= 0 || targetHeight <= 0) return 13;
-
-    RECT rect;
-    if (!GetWindowRect(child, out rect)) return 2;
-    POINT origin = new POINT { X = rect.Left, Y = rect.Top };
-    ScreenToClient(host, ref origin);
-
-    long style = GetStyle(child).ToInt64();
-    const long nativeFrame = 0x00C00000L | 0x00040000L | 0x00080000L | 0x00020000L | 0x00010000L;
-    style = (style & ~0x80000000L & ~nativeFrame) | 0x40000000L;
-    SetStyle(child, new IntPtr(style));
-    long extendedStyle = GetExtendedStyle(child).ToInt64();
-    const long extendedFrame = 0x00000100L | 0x00000200L | 0x00020000L;
-    SetExtendedStyle(child, new IntPtr(extendedStyle & ~extendedFrame));
-    SetParent(child, host);
-    if (GetParent(child) != host) return 3;
-
-    const uint flags = 0x0010 | 0x0020 | 0x0040;
-    if (!SetWindowPos(child, IntPtr.Zero, origin.X, origin.Y, targetWidth, targetHeight, flags)) return 4;
-    IntPtr region = CreateRoundRectRgn(0, 0, targetWidth + 1, targetHeight + 1, 40, 40);
-    if (region == IntPtr.Zero) return 5;
-    if (SetWindowRgn(child, region, true) == 0) {
-      DeleteObject(region);
-      return 6;
-    }
-    return 0;
-  }
-}
-'@
-Add-Type -TypeDefinition $source
-$attachResult = [YanjiDesktopHost]::Attach($ChildHandle, $TargetWidth, $TargetHeight)
-Write-Output "YANJI_DESKTOP_RESULT=$attachResult"
-if ($attachResult -eq 0) { Write-Output 'YANJI_DESKTOP_ATTACHED'; exit 0 }
-exit 1
-`;
-  const result = await new Promise((resolve) => {
-    const child = spawn('powershell.exe', [
-      '-NoProfile',
-      '-NonInteractive',
-      '-WindowStyle',
-      'Hidden',
-      '-Command',
-      script
-    ], {
-      windowsHide: true,
-      env: {
-        ...process.env,
-        YANJI_DESKTOP_CHILD_HANDLE: nativeWindowHandleValue(window),
-        YANJI_DESKTOP_CHILD_WIDTH: String(targetSize.width),
-        YANJI_DESKTOP_CHILD_HEIGHT: String(targetSize.height)
-      },
-      stdio: ['ignore', 'pipe', 'pipe']
-    });
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      resolve(value);
-    };
-    const timeout = setTimeout(() => {
-      child.kill();
-      finish({ status: null, signal: 'TIMEOUT', stdout, stderr, error: new Error('desktop attach timed out') });
-    }, 8_000);
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    child.on('error', (error) => finish({ status: null, signal: null, stdout, stderr, error }));
-    child.on('close', (status, signal) => finish({ status, signal, stdout, stderr }));
-  });
-  const attached = result.status === 0 && result.stdout.includes('YANJI_DESKTOP_ATTACHED');
-  if (!attached && process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-    console.warn(`DESKTOP_WIDGET_NATIVE_DIAGNOSTIC ${JSON.stringify({ handle: nativeWindowHandleValue(window), status: result.status, signal: result.signal, stdout: result.stdout, stderr: result.stderr, error: result.error?.message })}`);
-  }
-  return attached;
-}
-
-function desktopIconHelperPath() {
-  if (app.isPackaged) return path.join(process.resourcesPath, 'app.asar.unpacked', 'src', 'windows-desktop-icons.ps1');
-  return path.join(__dirname, 'windows-desktop-icons.ps1');
-}
-
-function runDesktopIconHelper(operation, extraEnv = {}, { synchronous = false } = {}) {
-  const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', desktopIconHelperPath()];
-  const options = {
-    windowsHide: true,
-    env: { ...process.env, YANJI_DESKTOP_ICON_OPERATION: operation, ...extraEnv },
-    encoding: 'utf8'
-  };
-  if (synchronous) return spawnSync('powershell.exe', args, { ...options, timeout: 8_000 });
-  return new Promise((resolve) => {
-    const child = spawn('powershell.exe', args, { ...options, stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    let stderr = '';
-    let settled = false;
-    const finish = (value) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timeout);
-      resolve(value);
-    };
-    const timeout = setTimeout(() => {
-      child.kill();
-      finish({ status: null, signal: 'TIMEOUT', stdout, stderr, error: new Error(`desktop icon ${operation} timed out`) });
-    }, 8_000);
-    child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
-    child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
-    child.on('error', (error) => finish({ status: null, signal: null, stdout, stderr, error }));
-    child.on('close', (status, signal) => finish({ status, signal, stdout, stderr }));
-  });
-}
-
-async function reserveDesktopIcons(window) {
-  if (process.platform !== 'win32' || process.env.YANJI_DESKTOP_WIDGET_NO_ICON_REFLOW || process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) return { reserved: true, movedIcons: 0, snapshot: null };
-  const result = await runDesktopIconHelper('reserve', { YANJI_DESKTOP_CHILD_HANDLE: nativeWindowHandleValue(window) });
-  const match = String(result.stdout || '').match(/YANJI_DESKTOP_RESERVATION=([^\r\n]+)/);
-  if (result.status !== 0 || !match) {
-    console.warn(`[研迹] 桌面图标占位失败: ${String(result.stderr || result.error?.message || 'unknown').trim()}`);
-    return { reserved: false, movedIcons: 0, snapshot: null };
-  }
-  const decoded = Buffer.from(match[1], 'base64').toString('utf8');
-  const movedIcons = decoded.includes('|') && decoded.split('|')[1] ? decoded.split('|')[1].split(';').filter(Boolean).length : 0;
-  return { reserved: true, movedIcons, snapshot: match[1] };
-}
-
-async function restoreDesktopIcons() {
-  const snapshot = desktopIconReservation;
-  desktopIconReservation = null;
-  if (!snapshot || process.platform !== 'win32') return true;
-  const result = await runDesktopIconHelper('restore', { YANJI_DESKTOP_ICON_SNAPSHOT: snapshot });
-  if (result.status !== 0) console.warn(`[研迹] 桌面图标位置恢复失败: ${String(result.stderr || result.error?.message || result.status).trim()}`);
-  return result.status === 0;
-}
-
-function restoreDesktopIconsSync() {
-  const snapshot = desktopIconReservation;
-  desktopIconReservation = null;
-  if (!snapshot || process.platform !== 'win32') return true;
-  const result = runDesktopIconHelper('restore', { YANJI_DESKTOP_ICON_SNAPSHOT: snapshot }, { synchronous: true });
-  return result.status === 0;
-}
-
-async function showScheduleWidget() {
-  if (scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
-    if (!scheduleWidgetWindow.isVisible()) scheduleWidgetWindow.showInactive();
-    return desktopWidgetPresentation({
-      attached: Boolean(scheduleWidgetWindow.yanjiDesktopAttached),
-      reserved: Boolean(scheduleWidgetWindow.yanjiDesktopReserved),
-      movedIcons: Number(scheduleWidgetWindow.yanjiMovedDesktopIcons) || 0,
-      attempts: scheduleWidgetWindow.yanjiDesktopDiagnostic?.attempts || 0,
-      supported: process.platform === 'win32'
-    });
-  }
-  const display = screen.getPrimaryDisplay();
-  const { workArea, scaleFactor } = display;
-  const width = 360;
-  const height = 480;
-  const window = new BrowserWindow({
-    width,
-    height,
-    x: workArea.x + workArea.width - width - 24,
-    y: workArea.y + 24,
-    show: false,
-    frame: false,
-    thickFrame: false,
-    transparent: true,
-    resizable: false,
-    maximizable: false,
-    minimizable: false,
-    fullscreenable: false,
-    alwaysOnTop: false,
-    skipTaskbar: true,
-    hasShadow: false,
-    backgroundColor: '#00000000',
-    icon: createAppWindowIcon(),
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false,
-      sandbox: true,
-      devTools: !app.isPackaged
-    }
-  });
-  scheduleWidgetWindow = window;
-  window.on('closed', () => {
-    restoreDesktopIcons().catch(() => {});
-    if (scheduleWidgetWindow === window) scheduleWidgetWindow = null;
-  });
-  await window.loadFile(path.join(__dirname, 'renderer', 'schedule-widget.html'), { query: { appearance: store.getSettings().appearanceTheme } });
-  const targetSize = {
-    width: Math.round(width * scaleFactor),
-    height: Math.round(height * scaleFactor)
-  };
-  let attached = false;
-  const diagnostics = [];
-  for (let attempt = 1; attempt <= 3 && !attached; attempt += 1) {
-    attached = await attachWindowToDesktop(window, targetSize);
-    if (!attached) {
-      diagnostics.push(`attempt-${attempt}-failed`);
-      await new Promise((resolve) => setTimeout(resolve, 250 * attempt));
-    }
-  }
-  window.yanjiDesktopAttached = attached;
-  const reservation = attached ? await reserveDesktopIcons(window) : { reserved: false, movedIcons: 0, snapshot: null };
-  desktopIconReservation = reservation.snapshot;
-  window.yanjiDesktopReserved = reservation.reserved;
-  window.yanjiMovedDesktopIcons = reservation.movedIcons;
-  const widgetPresentation = desktopWidgetPresentation({ attached, reserved: reservation.reserved, movedIcons: reservation.movedIcons, attempts: diagnostics.length, supported: process.platform === 'win32' });
-  window.yanjiDesktopDiagnostic = widgetPresentation.diagnostic;
-  if (attached) {
-    window.webContents.setZoomFactor(scaleFactor);
-    await new Promise((resolve) => setTimeout(resolve, 80));
-  } else {
-    if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-      console.warn(`DESKTOP_WIDGET_STATE ${JSON.stringify(window.yanjiDesktopDiagnostic)}`);
-    }
-    window.close();
-    return widgetPresentation;
-  }
-  window.showInactive();
-  return widgetPresentation;
 }
 
 function showScheduleNotification(schedule) {
@@ -2089,7 +1745,7 @@ function showDeadlineWindow(item, kind = 'todo', level = 'reminder') {
     window.yanjiDeadlineId = payload.id;
     window.yanjiDeadlineKind = kind;
     windows.add(window);
-    window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+    window.loadFile(path.join(__dirname, 'renderer', 'deadline.html'));
     window.webContents.once('did-finish-load', () => {
       window.webContents.send('deadline:show', payload);
       window.setAlwaysOnTop(true, 'screen-saver');
@@ -2131,22 +1787,9 @@ function showTodoNotification(todo, level = 'reminder') {
   notification.show();
 }
 
-function stickyNoteForRenderer(noteId) {
-  const id = String(noteId || '');
-  const note = store.listNotes().find((item) => item.id === id);
-  if (!note) return null;
-  return {
-    id: note.id,
-    title: note.title,
-    content: note.content,
-    revision: note.revision || 0,
-    kind: note.kind
-  };
-}
-
 function runWorkspaceReminders(now = new Date()) {
   const candidates = collectReminderCandidates({
-    schedules: store.listSchedules(),
+    schedules: store.listSchedules().map((schedule) => scheduleOccurrenceForDate(schedule, now)).filter(Boolean),
     todos: store.listTodos(),
     now,
     settings: store.getSettings()
@@ -2159,7 +1802,7 @@ function runWorkspaceReminders(now = new Date()) {
       else showScheduleNotification(candidate.item);
       store.updateWorkspace((workspace) => {
         workspace.schedules = workspace.schedules.map((item) => item.id === candidate.item.id
-          ? { ...item, reminderSentAt: now.toISOString(), updatedAt: now.toISOString() }
+          ? { ...item, reminderSentAt: now.toISOString(), reminderOccurrence: candidate.item.occurrenceKey || null, snoozedUntil: null, updatedAt: now.toISOString() }
           : item);
         return workspace;
       });
@@ -2362,6 +2005,7 @@ async function addPaper(input) {
 }
 
 async function refreshPaper(id, { notify = true } = {}) {
+  if (store.findPaper(id)?.cloudCredentialMissing) throw new Error('这台设备未配置投稿追踪凭证；云端快照和本地任务仍可查看。');
   if (refreshingIds.has(id)) {
     const existing = store.findPaper(id);
     return existing ? serializePaper(existing) : null;
@@ -2431,7 +2075,7 @@ async function refreshPaper(id, { notify = true } = {}) {
 
 async function refreshAll({ notify = true } = {}) {
   const results = [];
-  for (const paper of store.listPapers().filter((item) => !item.archivedAt)) {
+  for (const paper of store.listPapers().filter((item) => !item.archivedAt && !item.cloudCredentialMissing)) {
     try {
       results.push({ id: paper.id, ok: true, paper: await refreshPaper(paper.id, { notify }) });
     } catch (error) {
@@ -2449,8 +2093,7 @@ function validateSettings(patch) {
   const allowed = {};
   for (const key of [
     'autoRefresh', 'refreshOnStartup', 'notifications', 'closeToTray', 'startAtLogin', 'autoCheckUpdates',
-    'todayWidgetEnabled', 'scheduleWidgetEnabled', 'widgetShowSchedules', 'widgetShowTodos',
-    'widgetShowCompletedTodos', 'eventNotifications', 'todoNotifications'
+    'eventNotifications', 'todoNotifications'
   ]) {
     if (key in patch) allowed[key] = Boolean(patch[key]);
   }
@@ -2458,7 +2101,7 @@ function validateSettings(patch) {
     allowed.eventNotifications = false;
     allowed.todoNotifications = false;
   }
-  for (const key of ['quickCaptureShortcut', 'stickyNoteShortcut']) {
+  for (const key of ['quickCaptureShortcut']) {
     if (!(key in patch)) continue;
     const shortcut = String(patch[key] || '').trim();
     if (!shortcut || shortcut.length > 100) throw new Error('快捷键格式不正确。');
@@ -2470,11 +2113,6 @@ function validateSettings(patch) {
       throw new Error('自动刷新间隔必须在 60–1440 分钟之间。');
     }
     allowed.refreshMinutes = minutes;
-  }
-  if ('appearanceTheme' in patch) {
-    const theme = String(patch.appearanceTheme || '').trim();
-    if (!['liquid-glass', 'classic'].includes(theme)) throw new Error('外观主题不受支持。');
-    allowed.appearanceTheme = theme;
   }
   if ('defaultEventReminderMinutes' in patch) {
     const minutes = patch.defaultEventReminderMinutes == null ? null : Number(patch.defaultEventReminderMinutes);
@@ -2533,7 +2171,7 @@ function createWindow() {
       console.error(`YANJI_SMOKE_LOAD_FAILED ${JSON.stringify({ code, description, url, isMainFrame })}`);
     });
   }
-  mainWindow.yanjiLoadPromise = mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'), { query: { appearance: store.getSettings().appearanceTheme } });
+  mainWindow.yanjiLoadPromise = mainWindow.loadFile(path.join(__dirname, 'renderer', 'index.html'));
   mainWindow.on('show', () => applyWindowsTaskbarIdentity(mainWindow));
   mainWindow.on('restore', () => applyWindowsTaskbarIdentity(mainWindow));
   mainWindow.webContents.once('did-finish-load', () => {
@@ -2555,8 +2193,7 @@ function createWindow() {
     }
   });
   mainWindow.on('close', (event) => {
-    const widgetKeepsHostAlive = Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) || store.getSettings().todayWidgetEnabled === true;
-    if (!isQuitting && tray && (store.getSettings().closeToTray || widgetKeepsHostAlive)) {
+    if (!isQuitting && tray && (store.getSettings().closeToTray)) {
       event.preventDefault();
       mainWindow.hide();
       mainWindow.webContents.setAudioMuted(true);
@@ -2571,6 +2208,28 @@ function createWindow() {
     mainWindow = null;
   });
   return mainWindow;
+}
+
+function runJobDeadlineReminders(now = new Date()) {
+  if (!store.getSettings().notifications) return [];
+  const dueJobs = store.listJobApplications().filter((job) => jobDeadlineReminderDue(job, now));
+  if (!dueJobs.length) return [];
+  const remindedAt = now.toISOString();
+  for (const job of dueJobs) {
+    showDeadlineWindow({
+      id: `job-deadline-${job.id}`,
+      title: `${job.company} · ${job.role} 明天截止`,
+      notes: job.notes || '请及时完成岗位申请。',
+      priority: 'high',
+      startAt: job.deadline
+    }, 'schedule');
+  }
+  const dueIds = new Set(dueJobs.map((job) => job.id));
+  store.setJobApplications(store.listJobApplications().map((job) => dueIds.has(job.id)
+    ? { ...job, deadlineReminderSentAt: remindedAt }
+    : job));
+  broadcastWorkspace();
+  return dueJobs;
 }
 
 async function runPackagedSmokeTest() {
@@ -2700,9 +2359,11 @@ function runDeadlineReminders() {
 }
 
 async function runScheduledWork() {
+  if (cloudClient?.state().user) await cloudClient.sync().catch(() => {});
   if (reconcileStaleAttendance()) broadcastWorkspace();
   runDeadlineReminders();
   runWorkspaceReminders();
+  runJobDeadlineReminders();
   if (Date.now() - lastBackupCleanupAt >= 24 * 60 * 60_000) cleanupExpiredBackups();
   await runScheduledRefresh();
 }
@@ -2803,20 +2464,107 @@ async function exportPaper(id, format) {
   return { canceled: false, filePath: result.filePath };
 }
 
+function initializeCloudClient() {
+  const accountPath = id => path.join(app.getPath('userData'), 'accounts', id, DATA_FILE_NAME);
+  cloudClient = createCloudClient({
+    directory: app.getPath('userData'), safeStorage, getStore: () => store,
+    activateAccount: async id => {
+      if (store && activeFocusSession()) await finishFocusSession();
+      if (store && activeAttendanceRecord()) { persistAttendanceUsage(); clockWorkspaceAttendance('out'); }
+      stopUsageSamplerIfIdle(true);
+      const candidate = new JsonStore(id ? accountPath(id) : localWorkspacePath);
+      candidate.load(); store = candidate;
+      planningService = createPlanningService({ store, makeId: () => crypto.randomUUID(), onWorkspaceChanged: broadcastWorkspace });
+      broadcastWorkspace(); broadcastPapers(); broadcastSettings();
+    },
+    notify: value => {
+      if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('auth:state', value);
+      broadcastWorkspace(); broadcastPapers();
+    },
+    backupLocal: async () => {
+      const local = new JsonStore(localWorkspacePath); local.load();
+      local.copyTo(path.join(app.getPath('userData'), 'migration-backups', crypto.randomUUID(), DATA_FILE_NAME));
+    },
+    importLocal: async () => {
+      const local = new JsonStore(localWorkspacePath); local.load();
+      const keys = ['schedules','todos','countdowns','notes','metadataFields','attendance','focusSessions','jobApplications','papers'];
+      const next = structuredClone(store.data);
+      for (const key of keys) {
+        const existing = new Map((next[key] || []).map(row => [row.id, row]));
+        for (const row of local.data[key] || []) {
+          if (existing.has(row.id) && JSON.stringify(existing.get(row.id)) !== JSON.stringify(row)) throw new Error('本机与账号存在相同 ID 的不同记录，请先导出并处理冲突');
+          existing.set(row.id, row);
+        }
+        next[key] = [...existing.values()];
+      }
+      for (const note of local.listNotes()) for (const attachment of note.attachments || []) {
+        const name = attachment.storedName;
+        if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$/.test(name)) throw new Error('附件名称无效');
+        const source = path.join(local.attachmentsDirectory, name), target = path.join(store.attachmentsDirectory, name);
+        if (fs.existsSync(target) && !fs.readFileSync(source).equals(fs.readFileSync(target))) throw new Error('附件名称冲突，已保留本机和账号原文件');
+      }
+      fs.cpSync(local.attachmentsDirectory, store.attachmentsDirectory, { recursive: true, force: false });
+      store.save(next);
+    }
+  });
+}
+
+async function importBetaDataCopy() {
+  if (cloudClient.state().user) throw new Error('请先退出账号，导入到本机工作区后再选择同步');
+  const keys = ['papers','notes','schedules','todos','jobApplications','attendance','focusSessions','countdowns'];
+  if (keys.some(key => store.data[key]?.length)) throw new Error('为避免覆盖，导入副本需要空的本机工作区');
+  const selected = await dialog.showOpenDialog(mainWindow, { title: '选择旧版 JSON 数据副本', filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] });
+  if (selected.canceled) return { canceled: true };
+  const source = selected.filePaths[0];
+  // Parse without JsonStore.load(): migration must never write the source.
+  const { migrateData } = require('./paper-core');
+  const next = migrateData(JSON.parse(fs.readFileSync(source, 'utf8')), DEFAULT_SETTINGS).data;
+  delete next._cloud;
+  next.settings = { ...next.settings, autoCheckUpdates: false, startAtLogin: false, quickCaptureShortcut: APP_CHANNEL.shortcut };
+  const attachments = path.join(path.dirname(source), 'attachments');
+  const copies = [];
+  for (const note of next.notes || []) for (const attachment of note.attachments || []) {
+    if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,239}$/.test(attachment.storedName)) throw new Error('附件名称无效');
+    const original = path.join(attachments, attachment.storedName);
+    if (!fs.existsSync(original)) throw new Error('数据副本缺少笔记附件，请将 JSON 和 attachments 文件夹放在一起');
+    copies.push([original, path.join(store.attachmentsDirectory, attachment.storedName)]);
+  }
+  for (const [original, destination] of copies) fs.copyFileSync(original, destination);
+  store.save(next); broadcastWorkspace(); broadcastPapers(); broadcastSettings();
+  return { canceled: false };
+}
+
 function registerIpc() {
+  ipcMain.handle('auth:get-session', () => APP_CHANNEL.localOnly ? {status:'local',user:null,localOnly:true} : cloudClient.state());
+  if (!APP_CHANNEL.localOnly) {
+  ipcMain.handle('auth:configure', (_e, url) => cloudClient.configure(url));
+  ipcMain.handle('auth:login', async (_e, input) => { const result = await cloudClient.login(input); setTimeout(() => cloudClient.sync().catch(() => {}), 0); return result; });
+  ipcMain.handle('auth:register', (_e, input) => cloudClient.register(input));
+  ipcMain.handle('auth:verification', (_e, input) => cloudClient.sendCode(input));
+  ipcMain.handle('auth:reset-password', (_e, input) => cloudClient.reset(input));
+  ipcMain.handle('auth:logout', () => cloudClient.logout());
+  ipcMain.handle('auth:wechat-start', async () => { const result = await cloudClient.wechatStart(); const url = new URL(result.authorizationUrl); if (url.protocol !== 'https:' || url.hostname !== 'open.weixin.qq.com') throw new Error('微信授权地址无效'); await shell.openExternal(url.href); return { expiresIn: result.expiresIn }; });
+  ipcMain.handle('auth:wechat-poll', () => cloudClient.wechatPoll());
+  ipcMain.handle('sync:run', () => cloudClient.sync());
+  ipcMain.handle('sync:migrate', (_e, confirmed) => cloudClient.migrate(confirmed));
+  ipcMain.handle('sync:resolve', (_e, input) => cloudClient.resolve(input));
+  ipcMain.handle('beta:import-copy', () => importBetaDataCopy());
+  }
+
   ipcMain.handle('workspace:get', () => {
     reconcileStaleAttendance();
     return workspaceForRenderer();
   });
-  ipcMain.handle('today-widget:get-data', () => todayWidgetForRenderer());
   ipcMain.handle('schedules:parse', (_event, input) => parseNaturalLanguageSchedules(input, new Date()));
   ipcMain.handle('schedules:save', (_event, input) => getPlanningService().saveSchedule(input));
   ipcMain.handle('schedules:delete', (_event, id) => deleteWorkspaceSchedule(String(id)));
   ipcMain.handle('schedules:complete', (_event, id, completed) => setWorkspaceScheduleCompleted(String(id), Boolean(completed)));
+  ipcMain.handle('countdowns:save', (_event, input) => saveWorkspaceCountdown(input));
+  ipcMain.handle('countdowns:delete', (_event, id) => deleteWorkspaceCountdown(String(id)));
   ipcMain.handle('schedules:convert-to-todo', (_event, id, input) => getPlanningService().convertScheduleToTodo(String(id), input || {}));
   ipcMain.handle('schedules:detach', (_event, id) => getPlanningService().detachSchedule(String(id)));
   ipcMain.handle('todos:parse', (_event, input) => parseNaturalLanguageTodo(input, new Date()));
-  ipcMain.handle('todos:save', (_event, input) => getPlanningService().saveTodo(input));
+  ipcMain.handle('todos:save', (_event, input) => getPlanningService().saveTodoWithSchedule(input));
   ipcMain.handle('todos:delete', (_event, id) => getPlanningService().deleteTodo(String(id)));
   ipcMain.handle('todos:complete', (_event, id) => getPlanningService().completeTodo(String(id)));
   ipcMain.handle('todos:reopen', (_event, id) => getPlanningService().reopenTodo(String(id)));
@@ -2824,24 +2572,8 @@ function registerIpc() {
   ipcMain.handle('todos:snooze', (_event, id, until) => getPlanningService().snoozeTodo(String(id), until));
   ipcMain.handle('todos:get-linked-schedules', (_event, id) => getPlanningService().getLinkedSchedules(String(id)));
   ipcMain.handle('todos:schedule', (_event, id, input) => getPlanningService().scheduleTodo(String(id), input || {}));
+  ipcMain.handle('todos:create-scheduled', (_event, input) => getPlanningService().createScheduledTodo(input || {}));
   ipcMain.handle('todos:convert-to-schedule', (_event, id, input) => getPlanningService().convertTodoToSchedule(String(id), input || {}));
-  ipcMain.handle('schedule-widget:show', async () => {
-    const result = await showScheduleWidget();
-    store.updateSettings({ todayWidgetEnabled: result.attached, scheduleWidgetEnabled: result.attached });
-    broadcastSettings();
-    return result;
-  });
-  ipcMain.handle('schedule-widget:close', (event) => {
-    store.updateSettings({ todayWidgetEnabled: false, scheduleWidgetEnabled: false });
-    broadcastSettings();
-    BrowserWindow.fromWebContents(event.sender)?.close();
-    return true;
-  });
-  ipcMain.handle('schedule-widget:open-main', () => {
-    showMainWindow();
-    mainWindow?.webContents.send('workspace:navigate', 'schedule');
-    return true;
-  });
   ipcMain.handle('notes:save', (_event, input) => saveWorkspaceNote(input));
   ipcMain.handle('notes:append-daily', (_event, input) => appendWorkspaceDailyNote(input));
   ipcMain.handle('notes:delete', (_event, id) => deleteWorkspaceNote(String(id)));
@@ -2849,13 +2581,11 @@ function registerIpc() {
   ipcMain.handle('notes:add-attachment', (_event, id) => addNoteAttachment(String(id)));
   ipcMain.handle('notes:get-attachment', (_event, id, attachmentId) => getNoteAttachment(String(id), String(attachmentId)));
   ipcMain.handle('notes:delete-attachment', (_event, id, attachmentId) => deleteNoteAttachment(String(id), String(attachmentId)));
-  ipcMain.handle('notes:open-sticky', (_event, id) => openStickyNote(String(id)));
-  ipcMain.handle('notes:get-sticky', (_event, id) => stickyNoteForRenderer(String(id)));
-  ipcMain.handle('notes:create-sticky', () => createNewStickyNote());
   ipcMain.handle('jobs:save', (_event, input) => saveWorkspaceJobApplication(input));
   ipcMain.handle('jobs:delete', (_event, id) => deleteWorkspaceJobApplication(String(id)));
   ipcMain.handle('jobs:import', () => importWorkspaceJobApplications());
-  ipcMain.handle('jobs:export', () => exportWorkspaceJobApplications());
+  ipcMain.handle('jobs:export', () => exportWorkspaceJobApplicationData());
+  ipcMain.handle('jobs:export-image', () => exportWorkspaceJobApplicationImages());
   ipcMain.handle('metadata:save-fields', (_event, fields) => saveMetadataFields(fields));
   ipcMain.handle('attendance:clock', (_event, action) => clockWorkspaceAttendance(String(action || '')));
   ipcMain.handle('attendance:save', (_event, input) => saveWorkspaceAttendance(input));
@@ -2879,24 +2609,44 @@ function registerIpc() {
     if (input?.mode === 'note') {
       return { mode: 'note', item: appendWorkspaceDailyNote({ content: String(input.content || '') }) };
     }
+    if (input?.mode === 'item') {
+      const capture = normalizeCaptureInput(input);
+      if (!capture.content) throw new Error('请输入要创建的事项。');
+      if (input?.itemKind === 'event') {
+        const parsed = parseNaturalLanguageSchedules(capture.content, new Date());
+        if (!parsed.valid) throw new Error('没有识别到可创建的日程事件。');
+        const items = parsed.schedules.map((schedule) => getPlanningService().createScheduledTodo({
+          todo: { title: schedule.title, dueAt: schedule.endAt, priority: schedule.priority, reminderMode: 'none' },
+          schedule: { ...schedule, repeat: capture.repeat }
+        }));
+        return { mode: 'item', itemKind: 'event', item: items[0], items };
+      }
+      const parsedTodo = parseNaturalLanguageTodo(capture.content, new Date());
+      if (!parsedTodo.valid) throw new Error(parsedTodo.warning || '没有识别到可创建的任务。');
+      const parsedSchedules = parseNaturalLanguageSchedules(capture.content, new Date());
+      if (parsedTodo.meta?.explicitTime && parsedSchedules.valid && parsedSchedules.schedules.every((schedule) => schedule.meta?.explicitTime)) {
+        const items = parsedSchedules.schedules.map((schedule) => getPlanningService().createScheduledTodo({
+          todo: { title: schedule.title, dueAt: schedule.endAt, priority: schedule.priority, reminderMode: 'none' },
+          schedule: { ...schedule, repeat: capture.repeat }
+        }));
+        return { mode: 'item', itemKind: 'task', item: items[0], items };
+      }
+      if (capture.repeat === 'daily') throw new Error('每日重复任务需要写明具体时间，以便安排每天的时间块。');
+      return { mode: 'item', itemKind: 'task', item: getPlanningService().saveTodoWithSchedule(parsedTodo) };
+    }
     if (input?.mode === 'todo') {
       const parsed = parseNaturalLanguageTodo(input?.content, new Date());
       if (!parsed.valid) throw new Error(parsed.warning || '没有识别到可创建的待办。');
-      const item = getPlanningService().saveTodo(parsed);
+      const item = getPlanningService().saveTodoWithSchedule(parsed);
       return { mode: 'todo', item };
     }
     const parsed = parseNaturalLanguageSchedules(input?.content, new Date());
     if (!parsed.valid) throw new Error('没有识别到可创建的日程。');
-    const items = parsed.schedules.map((schedule) => saveWorkspaceSchedule(schedule));
+    const items = parsed.schedules.map((schedule) => getPlanningService().createScheduledTodo({
+      todo: { title: schedule.title, dueAt: schedule.endAt, priority: schedule.priority, reminderMode: 'none' },
+      schedule
+    }));
     return { mode: 'schedule', item: items[0], items };
-  });
-  ipcMain.handle('sticky:close', (event) => {
-    BrowserWindow.fromWebContents(event.sender)?.close();
-    return true;
-  });
-  ipcMain.handle('sticky:set-always-on-top', (event, enabled) => {
-    BrowserWindow.fromWebContents(event.sender)?.setAlwaysOnTop(Boolean(enabled), 'floating');
-    return true;
   });
   ipcMain.handle('deadline:dismiss', (event) => {
     const window = BrowserWindow.fromWebContents(event.sender);
@@ -2910,6 +2660,19 @@ function registerIpc() {
       const result = getPlanningService().snoozeTodo(window.yanjiDeadlineId, until);
       dismissDeadlineWindows(window.yanjiDeadlineId);
       return result;
+    }
+    if (window?.yanjiDeadlineKind === 'schedule' && window.yanjiDeadlineId) {
+      const delay = Number(until);
+      const snoozedUntil = new Date(Date.now() + (Number.isFinite(delay) && delay > 0 ? delay : 10 * 60_000)).toISOString();
+      store.updateWorkspace((workspace) => {
+        workspace.schedules = workspace.schedules.map((item) => item.id === window.yanjiDeadlineId
+          ? { ...item, reminderSentAt: null, snoozedUntil, updatedAt: new Date().toISOString() }
+          : item);
+        return workspace;
+      });
+      broadcastWorkspace();
+      dismissDeadlineWindows(window.yanjiDeadlineId);
+      return { id: window.yanjiDeadlineId, snoozedUntil };
     }
     if (window?.yanjiDeadlineId) dismissDeadlineWindows(window.yanjiDeadlineId);
     else window?.close();
@@ -2961,7 +2724,7 @@ function registerIpc() {
   ipcMain.handle('settings:update', async (_event, patch) => {
     const validated = validateSettings(patch);
     const previousSettings = store.getSettings();
-    if ('quickCaptureShortcut' in validated || 'stickyNoteShortcut' in validated) {
+    if ('quickCaptureShortcut' in validated) {
       const registered = registerWorkbenchShortcuts({ ...previousSettings, ...validated });
       if (!registered) {
         registerWorkbenchShortcuts(previousSettings, { allowFallback: true });
@@ -2969,17 +2732,8 @@ function registerIpc() {
       }
     }
     let updated = store.updateSettings(validated);
-    const widgetSettingChanged = 'todayWidgetEnabled' in validated
-      && Boolean(previousSettings.todayWidgetEnabled) !== Boolean(validated.todayWidgetEnabled);
-    if (widgetSettingChanged && validated.todayWidgetEnabled) {
-      const result = await showScheduleWidget();
-      if (!result.attached) updated = store.updateSettings({ todayWidgetEnabled: false, scheduleWidgetEnabled: false });
-    } else if (widgetSettingChanged && scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) {
-      scheduleWidgetWindow.close();
-    }
     updateLoginItemSetting(updated.startAtLogin);
     broadcastSettings();
-    if (Object.keys(validated).some((key) => ['todayWidgetEnabled', 'scheduleWidgetEnabled', 'widgetShowSchedules', 'widgetShowTodos', 'widgetShowCompletedTodos'].includes(key))) broadcastWorkspace();
     return settingsForRenderer();
   });
   ipcMain.handle('settings:choose-data-directory', (_event, request) => chooseDataDirectory(request));
@@ -3017,7 +2771,7 @@ function registerIpc() {
 if (process.env.YANJI_QA_USER_DATA) {
   app.setPath('userData', path.resolve(process.env.YANJI_QA_USER_DATA));
 } else {
-  app.setPath('userData', resolveStableUserDataPath(app.getPath('appData')));
+  app.setPath('userData', APP_CHANNEL.userData(app.getPath('appData')));
 }
 
 if (isPackagedSmokeTest()) {
@@ -3030,7 +2784,7 @@ if (isPackagedSmokeTest()) {
 // Set the Windows identity before the single-instance lock and before any
 // BrowserWindow exists, so taskbar grouping resolves the packaged Yanji icon
 // instead of inheriting Electron's executable identity.
-app.setName('研迹');
+app.setName(APP_CHANNEL.name);
 app.setAppUserModelId(APP_ID);
 
 const gotLock = isPackagedSmokeTest() || app.requestSingleInstanceLock();
@@ -3047,6 +2801,7 @@ if (!gotLock) {
         app.quit();
         return;
       }
+      require('./upgrade-backup').backupBeforeUpgrade(resolvedStorage.filePath, app.getPath('userData'), app.getVersion());
       store = new JsonStore(resolvedStorage.filePath);
       store.load();
       await runNonCriticalStartup('Windows Focus 恢复', recoverInterruptedFocusSessionOnStartup);
@@ -3055,6 +2810,9 @@ if (!gotLock) {
         makeId: () => crypto.randomUUID(),
         onWorkspaceChanged: () => broadcastWorkspace()
       });
+      localWorkspacePath = store.filePath;
+      initializeCloudClient();
+      if (!APP_CHANNEL.localOnly) await cloudClient.initialize();
       registerIpc();
       if (isPackagedSmokeTest()) {
         await runNonCriticalStartup('自动更新', initializeUpdater);
@@ -3076,47 +2834,15 @@ if (!gotLock) {
       scheduler = setInterval(() => runScheduledWork().catch((error) => console.error('[scheduler]', error)), 60_000);
       setTimeout(() => runNonCriticalStartup('截止提醒', runDeadlineReminders), 1500);
       setTimeout(() => runNonCriticalStartup('工作台提醒', runWorkspaceReminders), 1800);
+      setTimeout(() => runNonCriticalStartup('岗位截止提醒', runJobDeadlineReminders), 2100);
       await runNonCriticalStartup('Focus 运行时', resumeFocusRuntime);
       await runNonCriticalStartup('考勤采样', resumeAttendanceRuntime);
       if (store.getSettings().autoCheckUpdates) {
         setTimeout(() => checkForAppUpdate().catch(() => {}), 4000);
       }
-      if ((store.getSettings().todayWidgetEnabled || store.getSettings().scheduleWidgetEnabled) && !process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-        setTimeout(() => showScheduleWidget().catch(() => {}), 900);
-      }
-      if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-        const result = await showScheduleWidget();
-        mainWindow.close();
-        await new Promise((resolve) => setTimeout(resolve, 120));
-        const persistsWithoutMainWindow = !mainWindow.isVisible() && Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed() && scheduleWidgetWindow.isVisible());
-        const bounds = scheduleWidgetWindow.getBounds();
-        const [contentWidth, contentHeight] = scheduleWidgetWindow.getContentSize();
-        const scaleFactor = screen.getPrimaryDisplay().scaleFactor;
-        const layout = await scheduleWidgetWindow.webContents.executeJavaScript(`(() => { const close = document.getElementById('closeWidgetButton').getBoundingClientRect(); const footer = document.querySelector('footer').getBoundingClientRect(); return { innerWidth, innerHeight, closeRight: close.right, footerBottom: footer.bottom }; })()`);
-        const expectedWidth = Math.round(360 * scaleFactor);
-        const expectedHeight = Math.round(480 * scaleFactor);
-        console.log(`DESKTOP_WIDGET_ATTACH_OK ${JSON.stringify({ attached: result.attached, reserved: result.reserved, movedIcons: result.movedIcons, persistsWithoutMainWindow, scaleFactor, contentWidth, contentHeight, outerWidth: bounds.width, outerHeight: bounds.height, layout, alwaysOnTop: scheduleWidgetWindow.isAlwaysOnTop(), skipTaskbar: true })}`);
-        if (!result.attached || !result.reserved || !persistsWithoutMainWindow || contentWidth !== expectedWidth || contentHeight !== expectedHeight || Math.abs(layout.innerWidth - 360) > 1 || Math.abs(layout.innerHeight - 480) > 1 || layout.closeRight > layout.innerWidth || layout.footerBottom > layout.innerHeight || scheduleWidgetWindow.isAlwaysOnTop()) {
-          throw new Error('桌面日程组件没有按 3:4 非置顶桌面层模式打开。');
-        }
-        try {
-          const image = await scheduleWidgetWindow.webContents.capturePage();
-          fs.writeFileSync(path.resolve(process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT), image.toPNG());
-        } catch (error) {
-          console.warn(`DESKTOP_WIDGET_CAPTURE_SKIPPED ${error?.message || error}`);
-        }
-        isQuitting = true;
-        setTimeout(() => app.quit(), 120);
-      }
     } catch (error) {
       if (isPackagedSmokeTest()) {
         console.error(`YANJI_PACKAGED_SMOKE_STARTUP_FAILED ${error?.stack || error}`);
-        isQuitting = true;
-        app.exit(1);
-        return;
-      }
-      if (process.env.YANJI_DESKTOP_WIDGET_SMOKE_OUTPUT) {
-        console.error(`DESKTOP_WIDGET_ATTACH_FAILED ${error?.stack || error}`);
         isQuitting = true;
         app.exit(1);
         return;
@@ -3131,7 +2857,6 @@ if (!gotLock) {
 app.on('activate', showMainWindow);
 app.on('before-quit', () => {
   isQuitting = true;
-  restoreDesktopIconsSync();
   if (scheduler) clearInterval(scheduler);
   const active = store && activeFocusSession();
   if (active) {
@@ -3152,8 +2877,7 @@ app.on('before-quit', () => {
   globalShortcut.unregisterAll();
 });
 app.on('window-all-closed', () => {
-  const widgetKeepsHostAlive = Boolean(scheduleWidgetWindow && !scheduleWidgetWindow.isDestroyed()) || store?.getSettings().todayWidgetEnabled === true;
-  if (process.platform !== 'darwin' && (isQuitting || (!store?.getSettings().closeToTray && !widgetKeepsHostAlive) || !tray)) {
+  if (process.platform !== 'darwin' && (isQuitting || (!store?.getSettings().closeToTray) || !tray)) {
     isQuitting = true;
     app.quit();
   }

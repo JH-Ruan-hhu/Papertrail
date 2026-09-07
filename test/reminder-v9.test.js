@@ -24,3 +24,15 @@ test('normalizes todo reminder payload with the real title and safe preview', ()
     overdue: true
   });
 });
+
+test('a due-time reminder is not relabeled overdue by renderer latency', () => {
+  const payload = normalizeReminderPayload({
+    id: 'todo-due-now',
+    title: '准时提交',
+    dueAt: '2000-01-01T00:00:00.000Z',
+    priority: 'high',
+    status: 'open'
+  }, 'todo', 'reminder');
+  assert.equal(payload.level, 'reminder');
+  assert.equal(payload.overdue, false);
+});

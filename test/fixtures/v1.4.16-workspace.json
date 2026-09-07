@@ -1,0 +1,144 @@
+{
+  "version": 11,
+  "settings": {
+    "autoRefresh": true,
+    "refreshOnStartup": true,
+    "refreshMinutes": 360,
+    "notifications": true,
+    "closeToTray": true,
+    "startAtLogin": false,
+    "autoCheckUpdates": true,
+    "scheduleWidgetEnabled": false,
+    "todayWidgetEnabled": false,
+    "widgetShowSchedules": true,
+    "widgetShowTodos": true,
+    "widgetShowCompletedTodos": false,
+    "appearanceTheme": "liquid-glass",
+    "homeBannerImageMode": "bing",
+    "homeBannerBingInitialized": true,
+    "homeBannerFetchedOn": "",
+    "homeBannerImageCredit": "",
+    "eventNotifications": true,
+    "todoNotifications": true,
+    "defaultEventReminderMinutes": 10,
+    "defaultTodoReminderMode": "at-due",
+    "quickCaptureShortcut": "CommandOrControl+Shift+Space",
+    "stickyNoteShortcut": "CommandOrControl+Alt+N"
+  },
+  "papers": [
+    {
+      "id": "paper-fixture",
+      "paperKey": "fixture",
+      "trackingSecret": "synthetic-encrypted-fixture",
+      "addedAt": "2026-09-05T01:15:00.000Z",
+      "snapshot": {
+        "title": "Synthetic migration paper",
+        "journal": "Fixture Journal",
+        "status": {
+          "raw": 3,
+          "label": "审稿中"
+        },
+        "events": []
+      },
+      "history": [],
+      "details": {
+        "manuscriptId": "TEST-001",
+        "handlingEditor": null,
+        "currentContact": null,
+        "dispositionNote": null,
+        "notes": null
+      },
+      "archivedAt": null,
+      "journeyId": null,
+      "lastAttemptAt": "2026-09-05T01:15:00.000Z",
+      "lastSuccessfulAt": "2026-09-05T01:15:00.000Z",
+      "failureStreak": 0,
+      "nextRetryAt": null,
+      "lastError": null,
+      "importantUpdates": [],
+      "tasks": [],
+      "revisionRounds": []
+    }
+  ],
+  "schedules": [
+    {
+      "id": "schedule-fixture",
+      "title": "旧十五分钟日程",
+      "startAt": "2026-09-05T01:15:00.000Z",
+      "endAt": "2026-09-05T02:45:00.000Z",
+      "priority": "high",
+      "sourceRef": {
+        "kind": "todo",
+        "id": "todo-fixture"
+      },
+      "createdAt": "2026-09-05T01:15:00.000Z",
+      "updatedAt": "2026-09-05T01:15:00.000Z"
+    }
+  ],
+  "todos": [
+    {
+      "id": "todo-fixture",
+      "title": "无时间待办",
+      "dueAt": null,
+      "status": "open",
+      "createdAt": "2026-09-05T01:15:00.000Z",
+      "updatedAt": "2026-09-05T01:15:00.000Z"
+    }
+  ],
+  "notes": [
+    {
+      "id": "note-fixture",
+      "kind": "daily",
+      "dateKey": "2026-09-05",
+      "title": "实验记录",
+      "content": "<p><strong>保留格式</strong></p>",
+      "entries": [],
+      "attachments": [],
+      "metadata": {
+        "project": "PFAS"
+      },
+      "pinned": false,
+      "createdAt": "2026-09-05T01:15:00.000Z",
+      "updatedAt": "2026-09-05T01:15:00.000Z",
+      "revision": 3
+    }
+  ],
+  "jobApplications": [
+    {
+      "id": "job-fixture",
+      "company": "示例单位",
+      "role": "研究员",
+      "city": "南京",
+      "status": "active",
+      "deadline": "2026-09-08",
+      "workflow": {
+        "stages": [
+          {
+            "id": "apply",
+            "name": "投递"
+          },
+          {
+            "id": "custom",
+            "name": "学术报告"
+          }
+        ],
+        "currentStageId": "custom",
+        "timeline": [
+          {
+            "stageId": "apply",
+            "date": "2026-09-01"
+          }
+        ]
+      },
+      "createdAt": "2026-09-05T01:15:00.000Z",
+      "updatedAt": "2026-09-05T01:15:00.000Z"
+    }
+  ],
+  "countdowns": [],
+  "metadataFields": [],
+  "attendance": [],
+  "focusSessions": [],
+  "extensionFixture": {
+    "preserve": true
+  }
+}

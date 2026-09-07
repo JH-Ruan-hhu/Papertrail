@@ -1,0 +1,26 @@
+/* Shared shell and controls for the single Yanji design system. */
+body { background: var(--app-bg); color: var(--text); }
+.window-titlebar, .sidebar { background: var(--sidebar-bg); border-color: var(--border); }
+.sidebar::after, .settings-liquid-filters { display: none; }
+.workspace { padding: clamp(20px,2.2vw,40px); max-width: var(--yanji-content-max); width: 100%; margin-inline: auto; }
+.brand-mark rect { fill: var(--primary); }
+.brand-mark path { stroke: white; fill: none; stroke-width: 2; }
+.brand-mark { background: transparent; box-shadow: none; }
+.brand-mark img { display: block; width: 40px; height: 40px; }
+.nav-item, .settings-entry { border: 1px solid transparent; border-radius: var(--radius-control); }
+.nav-item.active, .settings-entry.active { color: var(--primary); background: var(--primary-soft); border-color: var(--border-strong); box-shadow: none; }
+.nav-item b { background: var(--surface); color: var(--text-muted); }
+.side-nav .nav-item[data-workbench-page="jobs-applications"] { margin-left: 24px; width: calc(100% - 24px); padding-left: 16px; font-size: 13px; }
+.side-nav .nav-item[data-workbench-page="jobs-applications"] .nav-icon { width: 16px; height: 16px; }
+.button.primary { background: var(--primary); border-color: var(--primary); color: white; }
+.button.primary:hover { background: var(--primary-hover); }
+.button.secondary { background: var(--surface); border: 1px solid var(--border-strong); }
+input, select, textarea, button { border-radius: var(--radius-control); }
+.modal { border-radius: var(--radius-modal); background: var(--surface); box-shadow: var(--shadow-lg); max-height: calc(100vh - 40px); }
+:is(.home-next-event-card,.home-today-card,.home-attendance-card,.home-schedule-panel,.focus-timer-panel,.home-jobs-panel,.home-notes-panel,.note-card,.paper-card,.todo-card,.job-summary-card,.schedule-board-shell) { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: var(--shadow-xs); backdrop-filter: none; }
+.home-progress-strip { background: linear-gradient(115deg,var(--primary-soft),var(--surface-soft)); border: 1px solid var(--border); border-radius: var(--radius-panel); box-shadow: none; }
+.home-progress-strip::before { background: none; }
+:is(h1,h2,h3,.next-event-content strong) { color: var(--text-strong); }
+.page-head-row h1 { font-size: clamp(26px,2vw,34px); }
+@media (max-height: 800px) { .sidebar { padding-block: 16px; } .brand { padding-bottom: 14px; } .nav-item { min-height: 38px; } .workspace { padding: 18px 24px; } }
+@media (prefers-contrast: more) { :root { --border: #8796ae; --text-muted: #344054; } }

@@ -5,13 +5,21 @@ const editor = document.getElementById('captureEditor');
 const result = document.getElementById('parseResult');
 const highlights = document.getElementById('captureHighlights');
 const tabs = [...document.querySelectorAll('[data-mode]')];
-const card = document.querySelector('.capture-card');
-let mode = 'schedule';
+const kinds = [...document.querySelectorAll('input[name="captureItemKind"]')];
+const kindPicker = document.getElementById('captureKinds');
+let mode = 'item';
+let itemKind = 'task';
 let parseSequence = 0;
 let parsedSchedule = null;
 let parsedTodo = null;
 let composing = false;
 let parseTimer = null;
+
+function updateResult(message, state = 'neutral') {
+  result.textContent = message;
+  result.classList.toggle('error', state === 'error');
+  document.body.dataset.captureState = state;
+}
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
@@ -19,6 +27,16 @@ function escapeHtml(value) {
 
 function plainText() {
   return editor.value.replace(/\u00a0/g, ' ');
+}
+
+function captureDirective(text = plainText()) {
+  const prefix = text.match(/^\s*[~～]\s*/)?.[0] || '';
+  return { content: text.slice(prefix.length), repeat: prefix ? 'daily' : null, prefixLength: prefix.length };
+}
+
+function directiveMatches(directive, matches = []) {
+  const shifted = matches.map((match) => ({ ...match, start: match.start + directive.prefixLength, end: match.end + directive.prefixLength }));
+  return directive.prefixLength ? [{ start: 0, end: directive.prefixLength, text: '~' }, ...shifted] : shifted;
 }
 
 function formatWhen(schedule) {
@@ -36,8 +54,8 @@ function formatWhen(schedule) {
 }
 
 function formatTodo(todo) {
-  if (!todo?.valid) return todo?.warning || '输入内容后自动识别截止日期；没有日期会进入收件箱';
-  if (!todo.dueAt) return `收件箱 · ${todo.title}`;
+  if (!todo?.valid) return todo?.warning || '输入内容后自动识别截止日期；没有具体时间会放到今天';
+  if (!todo.dueAt) return `今天 · 无具体时间 · ${todo.title}`;
   const due = new Date(todo.dueAt);
   const date = new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric', weekday: 'short' }).format(due);
   const time = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(due);
@@ -50,10 +68,18 @@ function placeCaretAtEnd() {
 }
 
 function renderHighlights(text, matches = []) {
+  const ranges = matches
+    .filter((match) => Number.isInteger(match.start) && Number.isInteger(match.end) && match.end > match.start)
+    .sort((left, right) => left.start - right.start || right.end - left.end)
+    .reduce((merged, match) => {
+      const previous = merged.at(-1);
+      if (previous && match.start <= previous.end) previous.end = Math.max(previous.end, match.end);
+      else merged.push({ start: match.start, end: match.end });
+      return merged;
+    }, []);
   let cursor = 0;
   let html = '';
-  for (const match of matches) {
-    if (match.start < cursor) continue;
+  for (const match of ranges) {
     html += escapeHtml(text.slice(cursor, match.start));
     html += `<mark>${escapeHtml(text.slice(match.start, match.end))}</mark>`;
     cursor = match.end;
@@ -68,7 +94,9 @@ function syncScroll() {
 }
 
 function activeMatches() {
-  return mode === 'schedule' ? parsedSchedule?.matches : mode === 'todo' ? parsedTodo?.matches : [];
+  if (mode !== 'item') return [];
+  if (itemKind === 'event') return parsedSchedule?.matches || [];
+  return parsedTodo?.meta?.explicitTime && parsedSchedule?.valid ? parsedSchedule.matches : parsedTodo?.matches || [];
 }
 
 function queueParse(delay = 120) {
@@ -80,57 +108,74 @@ function queueParse(delay = 120) {
 async function parseInput() {
   const sequence = ++parseSequence;
   const text = plainText();
-  result.classList.remove('error');
-  if (!text.trim()) {
+  const directive = captureDirective(text);
+  if (!directive.content.trim()) {
     parsedSchedule = null;
     parsedTodo = null;
     renderHighlights(text);
-    result.textContent = mode === 'note' ? '笔记保留原文，不解析时间' : mode === 'todo' ? '自动识别截止日期；没有日期会进入收件箱' : '自动识别时间；#1 红、#2 黄、#3 绿，默认绿色';
+    updateResult(mode === 'note' ? '笔记保留原文，不解析时间' : itemKind === 'event' ? '自动识别事件时间；#1 红、#2 黄、#3 绿' : '有具体时段会同时安排时间；只有日期则作为截止日期');
     return;
   }
   try {
     if (mode === 'note') {
       parsedSchedule = null;
       parsedTodo = null;
-      result.textContent = '笔记保留原文，不解析时间';
+      updateResult('笔记保留原文，不解析时间');
       renderHighlights(text);
       return;
     }
-    const parsed = mode === 'todo' ? await api.parseTodo(text) : await api.parseSchedule(text);
+    if (itemKind === 'event') {
+      const parsed = await api.parseSchedule(directive.content);
+      if (sequence !== parseSequence) return;
+      parsedSchedule = parsed;
+      parsedTodo = null;
+      updateResult(`${formatWhen(parsed)}${directive.repeat ? ' · 每天重复' : ''}`, parsed?.valid ? 'ready' : 'neutral');
+      renderHighlights(text, directiveMatches(directive, parsed.matches));
+      return;
+    }
+    const [todo, schedule] = await Promise.all([api.parseTodo(directive.content), api.parseSchedule(directive.content)]);
     if (sequence !== parseSequence) return;
-    parsedSchedule = mode === 'schedule' ? parsed : null;
-    parsedTodo = mode === 'todo' ? parsed : null;
-    result.textContent = mode === 'todo' ? formatTodo(parsed) : mode === 'schedule' ? formatWhen(parsed) : '笔记保留原文，不解析时间';
-    renderHighlights(text, parsed.matches);
+    parsedTodo = todo;
+    parsedSchedule = schedule;
+    const hasTimeBlock = Boolean(todo?.meta?.explicitTime && schedule?.valid && schedule?.meta?.explicitTime);
+    updateResult(`${hasTimeBlock ? `${formatWhen(schedule)} · 同时建立待办` : formatTodo(todo)}${directive.repeat ? ' · 每天重复' : ''}`, todo?.valid ? 'ready' : 'neutral');
+    renderHighlights(text, directiveMatches(directive, hasTimeBlock ? schedule.matches : todo.matches));
   } catch (error) {
-    result.textContent = error.message || '暂时无法解析时间';
-    result.classList.add('error');
+    updateResult(error.message || '暂时无法解析时间', 'error');
   }
 }
 
 function setMode(nextMode) {
   mode = nextMode;
-  tabs.forEach((tab) => tab.classList.toggle('active', tab.dataset.mode === mode));
-  editor.placeholder = mode === 'schedule'
-    ? '例如：明天下午 3 点到 5 点组会 #1'
-    : mode === 'todo'
-      ? '例如：周五前提交论文修改稿 #1'
-      : '随手记录想法…（Ctrl + Enter 保存）';
-  document.getElementById('submitHint').innerHTML = mode === 'schedule'
-    ? '<kbd>Enter</kbd> 创建'
-    : mode === 'todo' ? '<kbd>Enter</kbd> 创建' : '<kbd>Ctrl Enter</kbd> 保存';
+  tabs.forEach((tab) => {
+    const active = tab.dataset.mode === mode;
+    tab.classList.toggle('active', active);
+    tab.setAttribute('aria-selected', String(active));
+  });
+  document.body.dataset.captureMode = mode;
+  kindPicker.hidden = mode === 'note';
+  editor.placeholder = mode === 'note'
+    ? '随手记录想法…（Ctrl + Enter 保存）'
+    : itemKind === 'event' ? '例如：明天下午 3 点到 5 点组会 #1' : '例如：明天下午 3 点到 5 点修改论文 #1';
+  document.getElementById('submitHint').innerHTML = mode === 'note' ? '<kbd>Ctrl Enter</kbd> 保存' : '<kbd>Enter</kbd> 创建';
   renderHighlights(plainText());
   placeCaretAtEnd();
   queueParse(0);
 }
 
+function setItemKind(nextKind) {
+  itemKind = nextKind;
+  kinds.forEach((input) => { input.checked = input.value === itemKind; });
+  setMode('item');
+}
+
 async function submit() {
-  const content = plainText().trim();
+  const directive = captureDirective();
+  const content = directive.content.trim();
   if (!content) return;
   try {
-    result.classList.remove('error');
-    result.textContent = '正在保存…';
-    await api.submitCapture({ mode, content });
+    updateResult('正在保存…', 'busy');
+    await api.submitCapture({ mode, itemKind, content, repeat: directive.repeat });
     editor.value = '';
     renderHighlights('');
     api.setCaptureContentState(false);
@@ -138,12 +183,12 @@ async function submit() {
     parsedTodo = null;
     await api.hideCapture();
   } catch (error) {
-    result.textContent = error.message || '保存失败';
-    result.classList.add('error');
+    updateResult(error.message || '保存失败', 'error');
   }
 }
 
 tabs.forEach((tab) => tab.addEventListener('click', () => setMode(tab.dataset.mode)));
+kinds.forEach((input) => input.addEventListener('change', () => setItemKind(input.value)));
 editor.addEventListener('input', () => {
   const text = plainText();
   api.setCaptureContentState(Boolean(text.trim()));
@@ -164,24 +209,26 @@ editor.addEventListener('compositionend', () => {
 editor.addEventListener('scroll', syncScroll, { passive: true });
 document.addEventListener('keydown', (event) => {
   if (event.isComposing || composing || event.keyCode === 229) return;
-  if (mode === 'note' && window.YanjiListEditing?.applyListEditing(editor, event)) {
+  if (event.key === 'Tab') {
     event.preventDefault();
-  } else if (event.key === 'Tab') {
-    event.preventDefault();
-    const modes = ['schedule', 'todo', 'note'];
+    const modes = ['item', 'note'];
     setMode(modes[(modes.indexOf(mode) + (event.shiftKey ? modes.length - 1 : 1)) % modes.length]);
   } else if (event.key === 'Escape') {
-    if (!plainText().trim()) api.hideCapture();
-    else {
-      card.classList.remove('shake');
-      requestAnimationFrame(() => card.classList.add('shake'));
-      result.textContent = '内容尚未保存；清空后再按 Esc 关闭';
-      result.classList.add('error');
-    }
-  } else if (event.key === 'Enter' && (mode === 'schedule' || mode === 'todo') && !event.shiftKey) {
+    event.preventDefault();
+    clearTimeout(parseTimer);
+    parseSequence += 1;
+    editor.value = '';
+    parsedSchedule = null;
+    parsedTodo = null;
+    renderHighlights('');
+    api.setCaptureContentState(false);
+    api.hideCapture();
+  } else if (event.key === 'Enter' && mode === 'note' && (event.ctrlKey || event.metaKey)) {
     event.preventDefault();
     submit();
-  } else if (event.key === 'Enter' && mode === 'note' && (event.ctrlKey || event.metaKey)) {
+  } else if (event.key === 'Enter' && !event.shiftKey && window.YanjiListEditing?.applyListEditing(editor, event)) {
+    event.preventDefault();
+  } else if (event.key === 'Enter' && mode === 'item' && !event.shiftKey) {
     event.preventDefault();
     submit();
   }

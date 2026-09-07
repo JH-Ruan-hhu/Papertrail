@@ -173,11 +173,19 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
     company: cleanText(input.company, 200) || '未命名单位',
     role: cleanText(input.role, 300) || '未命名岗位',
     companyType: cleanText(input.companyType, 160) || null,
+    ...(hasOwn(input,'jobType')?{jobType:cleanText(input.jobType,160)||null}:{}),
     city,
     // Keep the v1.3.1 field name as a read/write alias for existing exports.
     location: city,
     deadline: isoDate(input.deadline ?? input.deadlineAt),
+    deadlineReminderSentAt: isoDate(input.deadlineReminderSentAt),
     priority: JOB_PRIORITIES.includes(input.priority) ? input.priority : 'medium',
+    pinned: input.pinned === true,
+    ...(hasOwn(input,'favorite')?{favorite:input.favorite===true}:{}),
+    ...(hasOwn(input,'matchScore')?{matchScore:input.matchScore!=null&&input.matchScore!==''&&Number.isFinite(Number(input.matchScore))?Math.max(0,Math.min(100,Number(input.matchScore))):null}:{}),
+    ...(hasOwn(input,'tags')?{tags:[...new Set((Array.isArray(input.tags)?input.tags:[]).flatMap(t=>String(t).split(/[;；]/)).map(t=>cleanText(t,40)).filter(Boolean))].slice(0,20)}:{}),
+    ...(hasOwn(input,'resumeName')?{resumeName:cleanText(input.resumeName,200)||null}:{}),
+    ...(hasOwn(input,'jdText')?{jdText:cleanText(input.jdText,30000)||null}:{}),
     status: lifecycleStatusFor(input, rawStatus),
     nextFollowUpAt,
     nextActionAt: nextFollowUpAt,
@@ -219,15 +227,75 @@ function saveJobApplication(list, input, now = new Date().toISOString(), makeId 
     updatedAt: now,
     revision: Math.max(0, Number(existing?.revision) || 0) + 1
   }, 0, now);
+  if (existing && candidate.deadline !== existing.deadline) candidate.deadlineReminderSentAt = null;
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
     : [candidate, ...list];
+}
+
+function jobDeadlineReminderDue(job, now = new Date()) {
+  if (!job || job.status === 'closed' || job.deadlineReminderSentAt) return false;
+  const due = new Date(job.deadline);
+  const current = now instanceof Date ? now : new Date(now);
+  if (!Number.isFinite(due.getTime()) || !Number.isFinite(current.getTime())) return false;
+  const reminderDay = new Date(due.getFullYear(), due.getMonth(), due.getDate() - 1);
+  return current.getFullYear() === reminderDay.getFullYear()
+    && current.getMonth() === reminderDay.getMonth()
+    && current.getDate() === reminderDay.getDate();
 }
 
 function deleteJobApplication(list, id) {
   const target = list.find((item) => item.id === String(id || ''));
   if (!target) throw new Error('找不到这条求职记录。');
   return list.filter((item) => item.id !== target.id);
+}
+
+function comparableImportedJob(job) {
+  const { imported: _imported, ...comparable } = job;
+  return JSON.stringify(comparable);
+}
+
+function mergeImportedJobApplications(list, sourceList, now = new Date().toISOString(), makeId = () => `job-${Date.now()}`) {
+  if (!Array.isArray(list) || !Array.isArray(sourceList)) throw new Error('岗位导入数据格式不正确。');
+  let jobs = [...list];
+  let added = 0;
+  let updated = 0;
+  let skipped = 0;
+  sourceList.forEach((source, index) => {
+    if (!asObject(source)) throw new Error(`第 ${index + 1} 条求职记录格式无效。`);
+    const sourceId = cleanText(source.id, 200);
+    const incoming = normalizeJobApplication({
+      ...source,
+      id: sourceId || makeId(),
+      imported: true
+    }, index, now);
+    const existingIndex = jobs.findIndex((candidate) => candidate.id === incoming.id);
+    if (existingIndex < 0) {
+      jobs.push(incoming);
+      added += 1;
+      return;
+    }
+    const existing = normalizeJobApplication(jobs[existingIndex], existingIndex, now);
+    if (comparableImportedJob(existing) === comparableImportedJob(incoming)) {
+      skipped += 1;
+      return;
+    }
+    const incomingUpdatedAt = Date.parse(incoming.updatedAt);
+    const existingUpdatedAt = Date.parse(existing.updatedAt);
+    const incomingIsNewer = incomingUpdatedAt > existingUpdatedAt
+      || (incomingUpdatedAt === existingUpdatedAt && incoming.revision > existing.revision);
+    if (!incomingIsNewer) {
+      skipped += 1;
+      return;
+    }
+    jobs[existingIndex] = {
+      ...incoming,
+      id: existing.id,
+      revision: Math.max(existing.revision, incoming.revision)
+    };
+    updated += 1;
+  });
+  return { jobs, added, updated, skipped, count: sourceList.length };
 }
 
 function workflowStageIndex(workflow, stageId) {
@@ -282,7 +350,7 @@ function setWorkflowCurrentStage(workflow, stageId) {
   return normalizeWorkflow({ ...normalized, currentStageId: stageId });
 }
 
-module.exports = {
+const jobCoreApi = {
   DEFAULT_WORKFLOW_STAGES,
   JOB_LIFECYCLE_LABELS,
   JOB_LIFECYCLE_STATUSES,
@@ -292,6 +360,8 @@ module.exports = {
   defaultWorkflow,
   normalizeWorkflow,
   normalizeJobApplication,
+  jobDeadlineReminderDue,
+  mergeImportedJobApplications,
   saveJobApplication,
   deleteJobApplication,
   workflowStageIndex,
@@ -301,3 +371,6 @@ module.exports = {
   removeWorkflowStage,
   setWorkflowCurrentStage
 };
+
+if (typeof window !== 'undefined') window.YanjiJobCore = jobCoreApi;
+if (typeof module !== 'undefined' && module.exports) module.exports = jobCoreApi;
