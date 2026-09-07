@@ -80,9 +80,9 @@ body { color:var(--text); background:#eef5ff; -webkit-font-smoothing:antialiased
 .career-card-top>[data-career-favorite],.job-company-name>[data-career-favorite] { order:-1; }
 
 .job-page .career-job:hover { transform:none; }
-.job-page .job-table-head,.job-page .job-position-main { grid-template-columns:220px 90px 110px minmax(230px,1fr) 220px 140px; }
+.job-page .job-table-head,.job-page .job-position-main { grid-template-columns:minmax(180px,1.35fr) minmax(90px,.85fr) minmax(110px,1fr) minmax(230px,1.3fr) minmax(180px,1.4fr) minmax(120px,.9fr); }
 .job-page .job-table-head>:nth-child(2),.job-page .job-position-main>:nth-child(2) { text-align:center; justify-content:center; }
-.job-page .job-table-head>:last-child { text-align:right; justify-content:flex-end; }
+.job-page .job-table-head>span:last-child { text-align:right; justify-content:flex-end; }
 .job-page .job-position-actions { gap:17px; }
 .job-page .job-company-cell>span { font-size:14px; }
 .job-page .career-card-role { font-size:15px; }
