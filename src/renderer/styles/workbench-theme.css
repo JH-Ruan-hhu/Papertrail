@@ -90,3 +90,9 @@ body { color:var(--text); background:#eef5ff; -webkit-font-smoothing:antialiased
 .job-page .career-card-role,.job-page .job-company-cell>.career-row-role { display:flex; align-items:center; gap:5px; }
 .career-role-text { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .career-card-role .career-tool,.career-row-role .career-tool { width:22px; height:22px; padding:3px; }
+
+.settings-page .settings-panel { padding:24px 28px; }
+.settings-page .settings-panel>h2 { margin:0 0 20px; }
+.settings-page .settings-panel>h3 { margin:20px 0 10px; }
+.settings-page .settings-panel .settings-group { padding-inline:0; }
+@media(max-width:900px) { .settings-page .settings-panel { padding:20px; } }

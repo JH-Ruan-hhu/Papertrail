@@ -1678,23 +1678,12 @@ function toggleQuickCapture() {
 
 function registerWorkbenchShortcuts(settings = store?.getSettings(), { allowFallback = false } = {}) {
   globalShortcut.unregisterAll();
-  const registrations = [
-    ['quickCaptureShortcut', DEFAULT_QUICK_CAPTURE_SHORTCUT, toggleQuickCapture],
-  ];
-  const registered = {};
-  for (const [key, fallback, handler] of registrations) {
-    const requested = String(settings?.[key] || fallback).trim();
-    let shortcut = requested;
-    if (!globalShortcut.register(shortcut, handler)) {
-      if (!allowFallback || requested === fallback || !globalShortcut.register(fallback, handler)) {
-        globalShortcut.unregisterAll();
-        return null;
-      }
-      shortcut = fallback;
-    }
-    registered[key] = shortcut;
-  }
-  return registered;
+  const shortcut = require('./capture-shortcut').registerCaptureShortcut({
+    requested:String(settings?.quickCaptureShortcut || '').trim(), preferred:DEFAULT_QUICK_CAPTURE_SHORTCUT,
+    allowFallback, beta:APP_CHANNEL.appId.endsWith('.beta'),
+    register:(key,handler)=>globalShortcut.register(key,handler), handler:toggleQuickCapture
+  });
+  return shortcut ? {quickCaptureShortcut:shortcut} : null;
 }
 
 function showScheduleNotification(schedule) {
@@ -2828,7 +2817,7 @@ if (!gotLock) {
       if (registeredShortcuts) {
         const current = store.getSettings();
         const changed = Object.fromEntries(Object.entries(registeredShortcuts).filter(([key, value]) => current[key] !== value));
-        if (Object.keys(changed).length) store.updateSettings(changed);
+        if (Object.keys(changed).length) { store.updateSettings(changed); broadcastSettings(); }
       }
       await runNonCriticalStartup('自动更新', initializeUpdater);
       scheduler = setInterval(() => runScheduledWork().catch((error) => console.error('[scheduler]', error)), 60_000);
