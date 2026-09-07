@@ -78,3 +78,11 @@ body { color:var(--text); background:#eef5ff; -webkit-font-smoothing:antialiased
 .career-time-form input { display:block; box-sizing:border-box; min-width:0; margin:0; flex-shrink:0; }
 
 .career-card-top>[data-career-favorite],.job-company-name>[data-career-favorite] { order:-1; }
+
+.job-page .career-job:hover { transform:none; }
+.job-page .job-table-head,.job-page .job-position-main { grid-template-columns:220px 90px 110px minmax(230px,1fr) 220px 140px; }
+.job-page .job-table-head>:nth-child(2),.job-page .job-position-main>:nth-child(2) { text-align:center; justify-content:center; }
+.job-page .job-table-head>:last-child { text-align:right; justify-content:flex-end; }
+.job-page .job-position-actions { gap:17px; }
+.job-page .job-company-cell>span { font-size:14px; }
+.job-page .career-card-role { font-size:15px; }

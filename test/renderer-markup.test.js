@@ -234,9 +234,9 @@ test('installer uses the stock electron-builder wizard while retaining upgrade s
   const mainJs = readProjectFile('src', 'main.js');
   const indexHtml = readProjectFile('src', 'renderer', 'index.html');
   const appJs = readProjectFile('src', 'renderer', 'app.js');
-  assert.equal(packageJson.build.nsis.include, 'build/installer-beta.nsh');
+  assert.equal(packageJson.build.nsis.include, 'build/installer.nsh');
   assert.equal(packageJson.build.nsis.oneClick, false);
-  assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, false);
+  assert.equal(packageJson.build.nsis.allowToChangeInstallationDirectory, true);
   assert.match(mainJs, /autoUpdater\.installDirectory = path\.dirname\(process\.execPath\)/);
   assert.doesNotMatch(installer, /Page custom|nsDialogs|BrandingText|MUI_BGCOLOR|立即安装|YanjiInstallPageCreate/);
   assert.match(installer, /papertrail-desktop/);
@@ -363,7 +363,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(mainJs, /APP_ICON_PATH = process\.platform === 'win32'/);
   assert.match(mainJs, /nativeImage\.createFromPath\(APP_ICON_PATH\)/);
   assert.match(mainJs, /app\.setAppUserModelId\(APP_ID\)/);
-  assert.match(mainJs, /const TRAY_GUID = '[0-9a-f-]{36}'/);
+  assert.match(mainJs, /const TRAY_GUID = APP_CHANNEL.trayGuid/);
   assert.match(mainJs, /new Tray\(icon, process\.platform === 'win32' \? TRAY_GUID : undefined\)/);
   assert.match(mainJs, /if \(!mainWindow\.isMaximized\(\)\) mainWindow\.maximize\(\)/);
   assert.match(mainJs, /closeStaleAttendanceRecords/);
@@ -577,8 +577,8 @@ test('storage location changes require a restart and legacy user data remains di
   const mainJs = readProjectFile('src', 'main.js');
   const preloadJs = readProjectFile('src', 'preload.js');
   const appJs = readProjectFile('src', 'renderer', 'app.js');
-  assert.ok(mainJs.indexOf("app.setPath('userData'") < mainJs.indexOf("app.setName(TEST_CHANNEL.name)"));
-  assert.match(mainJs, /TEST_CHANNEL\.userData\(app\.getPath\('appData'\)\)/);
+  assert.ok(mainJs.indexOf("app.setPath('userData'") < mainJs.indexOf("app.setName(APP_CHANNEL.name)"));
+  assert.match(mainJs, /APP_CHANNEL\.userData\(app\.getPath\('appData'\)\)/);
   assert.match(mainJs, /restartRequired:\s*true/);
   assert.match(mainJs, /system:restart-app/);
   assert.match(preloadJs, /restartApp/);

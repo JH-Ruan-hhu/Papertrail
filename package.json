@@ -1,6 +1,6 @@
 {
-  "name": "yanji-beta",
-  "version": "1.5.0-beta.4",
+  "name": "papertrail-desktop",
+  "version": "1.5.0",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "Yanji contributors",
@@ -17,7 +17,8 @@
     "verify:package": "node scripts/verify-package.js",
     "test:server": "npm test --prefix server",
     "smoke:v15": "electron scripts/smoke-v15.js",
-    "brand:generate": "node scripts/generate-icon.js"
+    "brand:generate": "node scripts/generate-icon.js",
+    "dist:beta": "node scripts/package-beta.cjs"
   },
   "dependencies": {
     "electron-updater": "6.8.9",
@@ -30,8 +31,8 @@
     "electron-builder": "26.11.1"
   },
   "build": {
-    "appId": "io.papertrail.desktop.beta",
-    "productName": "研迹测试版",
+    "appId": "io.papertrail.desktop",
+    "productName": "研迹",
     "asar": true,
     "asarUnpack": [
       "build/icon.ico",
@@ -39,7 +40,7 @@
     ],
     "compression": "maximum",
     "directories": {
-      "output": "outputs-beta"
+      "output": "outputs"
     },
     "files": [
       "src/**/*",
@@ -48,7 +49,8 @@
       "package.json",
       "README.md",
       "LICENSE",
-      "THIRD_PARTY_NOTICES.md"
+      "THIRD_PARTY_NOTICES.md",
+      "!src/test-channel.js"
     ],
     "win": {
       "icon": "build/icon.ico",
@@ -62,17 +64,20 @@
       ]
     },
     "nsis": {
-      "artifactName": "Yanji-Beta-Setup-${version}-${arch}.${ext}",
+      "artifactName": "Yanji-Setup-${version}-${arch}.${ext}",
       "oneClick": false,
-      "include": "build/installer-beta.nsh",
-      "allowToChangeInstallationDirectory": false,
+      "include": "build/installer.nsh",
+      "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "研迹测试版",
-      "uninstallDisplayName": "研迹测试版",
-      "perMachine": false
+      "createStartMenuShortcut": true
     },
-    "publish": null,
-    "executableName": "Yanji-Beta"
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "JH-Ruan-hhu",
+        "repo": "Papertrail",
+        "releaseType": "release"
+      }
+    ]
   }
 }

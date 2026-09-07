@@ -23,7 +23,7 @@ const {
 const { createCloudClient } = require('./cloud-client');
 let cloudClient;
 let localWorkspacePath;
-const TEST_CHANNEL = require('./test-channel');
+const APP_CHANNEL = require('./app-channel');
 let autoUpdater = null;
 let updaterLoadError = null;
 try {
@@ -106,12 +106,12 @@ const {
   nextUpdateState
 } = require('./update-core');
 
-const APP_NAME = TEST_CHANNEL.name;
-const APP_ID = TEST_CHANNEL.appId;
+const APP_NAME = APP_CHANNEL.name;
+const APP_ID = APP_CHANNEL.appId;
 // Windows stores notification-area visibility against this identity. Keep it
 // stable across every release so an updater replacement does not look like a
 // brand-new tray icon and move Yanji back into the overflow menu.
-const TRAY_GUID = '6024ae13-b73a-48ae-8b20-9fef4dd0190b';
+const TRAY_GUID = APP_CHANNEL.trayGuid;
 const BUILD_DIR = app.isPackaged
   ? path.join(process.resourcesPath, 'app.asar.unpacked', 'build')
   : path.join(__dirname, '..', 'build');
@@ -141,7 +141,7 @@ function applyWindowsTaskbarIdentity(window) {
         appIconPath: APP_ICON_PATH,
         appIconIndex: 0,
         relaunchCommand: process.execPath,
-        relaunchDisplayName: TEST_CHANNEL.name
+        relaunchDisplayName: APP_CHANNEL.name
       });
     }
   } catch (error) {
@@ -159,7 +159,7 @@ const MAX_NOTE_ATTACHMENT_SIZE = 12 * 1024 * 1024;
 const MAX_NOTE_ATTACHMENTS_TOTAL = 50 * 1024 * 1024;
 const BACKUP_RETENTION_MS = 30 * 24 * 60 * 60_000;
 const RELEASES_URL = 'https://github.com/JH-Ruan-hhu/Papertrail/releases/latest';
-const DEFAULT_QUICK_CAPTURE_SHORTCUT = TEST_CHANNEL.shortcut;
+const DEFAULT_QUICK_CAPTURE_SHORTCUT = APP_CHANNEL.shortcut;
 const TITLE_BAR_NORMAL = Object.freeze({ color: '#eaf5fb', symbolColor: '#35566b', height: 38 });
 const TITLE_BAR_MODAL = Object.freeze({ color: '#9dabb6', symbolColor: '#f5fbfe', height: 38 });
 
@@ -575,7 +575,7 @@ function isPortableBuild() {
 }
 
 function updateStateForRenderer() {
-  if (!TEST_CHANNEL.updatesEnabled) return { ...createInitialUpdateState({ currentVersion: app.getVersion(), packaged: false }), message: '独立测试版不接收正式版更新，请手动安装后续测试包。' };
+  if (!APP_CHANNEL.updatesEnabled) return { ...createInitialUpdateState({ currentVersion: app.getVersion(), packaged: false }), message: '当前安装渠道不接收自动更新，请手动安装后续版本。' };
   if (!updateState) {
     updateState = createInitialUpdateState({
       currentVersion: app.getVersion(),
@@ -600,8 +600,8 @@ function setUpdateState(event, payload) {
 }
 
 function initializeUpdater() {
-  if (!TEST_CHANNEL.updatesEnabled) {
-    updateState = { ...createInitialUpdateState({currentVersion: app.getVersion(), packaged: false}), message: '独立测试版不接收正式版更新，请手动安装后续测试包。' };
+  if (!APP_CHANNEL.updatesEnabled) {
+    updateState = { ...createInitialUpdateState({currentVersion: app.getVersion(), packaged: false}), message: '当前安装渠道不接收自动更新，请手动安装后续版本。' };
     return;
   }
   if (updaterInitialized) return;
@@ -684,13 +684,13 @@ function installDownloadedUpdate() {
 }
 
 async function openUpdateReleasePage() {
-  if (!TEST_CHANNEL.updatesEnabled) return false;
+  if (!APP_CHANNEL.updatesEnabled) return false;
   await shell.openExternal(RELEASES_URL);
   return true;
 }
 
 async function chooseDataDirectory(request = {}) {
-  if (cloudClient?.state().user) throw new Error('请先退出账号再调整本机测试数据位置');
+  if (cloudClient?.state().user) throw new Error('请先退出账号再调整本机数据位置');
   let selectedDirectory;
   if (request?.confirmedExisting && request?.selectedDirectory) {
     selectedDirectory = path.resolve(String(request.selectedDirectory));
@@ -2510,9 +2510,9 @@ function initializeCloudClient() {
 }
 
 async function importBetaDataCopy() {
-  if (cloudClient.state().user) throw new Error('请先退出账号，导入到本机测试工作区后再选择同步');
+  if (cloudClient.state().user) throw new Error('请先退出账号，导入到本机工作区后再选择同步');
   const keys = ['papers','notes','schedules','todos','jobApplications','attendance','focusSessions','countdowns'];
-  if (keys.some(key => store.data[key]?.length)) throw new Error('为避免覆盖，导入副本需要空的本机测试工作区');
+  if (keys.some(key => store.data[key]?.length)) throw new Error('为避免覆盖，导入副本需要空的本机工作区');
   const selected = await dialog.showOpenDialog(mainWindow, { title: '选择旧版 JSON 数据副本', filters: [{ name: 'JSON', extensions: ['json'] }], properties: ['openFile'] });
   if (selected.canceled) return { canceled: true };
   const source = selected.filePaths[0];
@@ -2520,7 +2520,7 @@ async function importBetaDataCopy() {
   const { migrateData } = require('./paper-core');
   const next = migrateData(JSON.parse(fs.readFileSync(source, 'utf8')), DEFAULT_SETTINGS).data;
   delete next._cloud;
-  next.settings = { ...next.settings, autoCheckUpdates: false, startAtLogin: false, quickCaptureShortcut: TEST_CHANNEL.shortcut };
+  next.settings = { ...next.settings, autoCheckUpdates: false, startAtLogin: false, quickCaptureShortcut: APP_CHANNEL.shortcut };
   const attachments = path.join(path.dirname(source), 'attachments');
   const copies = [];
   for (const note of next.notes || []) for (const attachment of note.attachments || []) {
@@ -2535,7 +2535,8 @@ async function importBetaDataCopy() {
 }
 
 function registerIpc() {
-  ipcMain.handle('auth:get-session', () => cloudClient.state());
+  ipcMain.handle('auth:get-session', () => APP_CHANNEL.localOnly ? {status:'local',user:null,localOnly:true} : cloudClient.state());
+  if (!APP_CHANNEL.localOnly) {
   ipcMain.handle('auth:configure', (_e, url) => cloudClient.configure(url));
   ipcMain.handle('auth:login', async (_e, input) => { const result = await cloudClient.login(input); setTimeout(() => cloudClient.sync().catch(() => {}), 0); return result; });
   ipcMain.handle('auth:register', (_e, input) => cloudClient.register(input));
@@ -2548,6 +2549,7 @@ function registerIpc() {
   ipcMain.handle('sync:migrate', (_e, confirmed) => cloudClient.migrate(confirmed));
   ipcMain.handle('sync:resolve', (_e, input) => cloudClient.resolve(input));
   ipcMain.handle('beta:import-copy', () => importBetaDataCopy());
+  }
 
   ipcMain.handle('workspace:get', () => {
     reconcileStaleAttendance();
@@ -2769,7 +2771,7 @@ function registerIpc() {
 if (process.env.YANJI_QA_USER_DATA) {
   app.setPath('userData', path.resolve(process.env.YANJI_QA_USER_DATA));
 } else {
-  app.setPath('userData', TEST_CHANNEL.userData(app.getPath('appData')));
+  app.setPath('userData', APP_CHANNEL.userData(app.getPath('appData')));
 }
 
 if (isPackagedSmokeTest()) {
@@ -2782,7 +2784,7 @@ if (isPackagedSmokeTest()) {
 // Set the Windows identity before the single-instance lock and before any
 // BrowserWindow exists, so taskbar grouping resolves the packaged Yanji icon
 // instead of inheriting Electron's executable identity.
-app.setName(TEST_CHANNEL.name);
+app.setName(APP_CHANNEL.name);
 app.setAppUserModelId(APP_ID);
 
 const gotLock = isPackagedSmokeTest() || app.requestSingleInstanceLock();
@@ -2799,6 +2801,7 @@ if (!gotLock) {
         app.quit();
         return;
       }
+      require('./upgrade-backup').backupBeforeUpgrade(resolvedStorage.filePath, app.getPath('userData'), app.getVersion());
       store = new JsonStore(resolvedStorage.filePath);
       store.load();
       await runNonCriticalStartup('Windows Focus 恢复', recoverInterruptedFocusSessionOnStartup);
@@ -2809,7 +2812,7 @@ if (!gotLock) {
       });
       localWorkspacePath = store.filePath;
       initializeCloudClient();
-      await cloudClient.initialize();
+      if (!APP_CHANNEL.localOnly) await cloudClient.initialize();
       registerIpc();
       if (isPackagedSmokeTest()) {
         await runNonCriticalStartup('自动更新', initializeUpdater);

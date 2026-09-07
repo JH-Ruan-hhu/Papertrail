@@ -4,7 +4,7 @@ const channel=require('../src/test-channel');const manifest=require('../package.
 test('beta installation and local identity are isolated from stable v1.4.16',()=>{
  assert.notEqual(channel.appId,'io.papertrail.desktop');assert.equal(channel.updatesEnabled,false);
  assert.equal(channel.userData('C:/AppData'),path.join('C:/AppData','yanji-beta'));
- assert.equal(manifest.build.appId,channel.appId);assert.equal(manifest.build.productName,channel.name);
- assert.equal(manifest.build.publish,null);assert.equal(manifest.build.nsis.shortcutName,channel.name);
+ assert.equal(manifest.build.appId,'io.papertrail.desktop');assert.equal(manifest.build.productName,'研迹');
+ assert.equal(manifest.build.publish[0].repo,'Papertrail');assert.equal(require('../src/app-channel').localOnly,true);
  assert.doesNotMatch(fs.readFileSync('build/installer-beta.nsh','utf8'),/DeleteRegKey|ReadRegStr|ExecWait/);
 });
