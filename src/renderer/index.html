@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="styles/auth.css">
     <link rel="stylesheet" href="styles/applications.css">
     <link rel="stylesheet" href="styles/workbench-theme.css">
+    <link rel="stylesheet" href="styles/applications-v12.css">
   </head>
   <body>
     <div class="window-titlebar"><time id="topbarClock" aria-label="当前时间"></time></div>
@@ -229,7 +230,7 @@
           </section>
           <section class="job-table-shell" aria-label="岗位列表">
             <div id="careerKanban" class="career-kanban"></div>
-            <div class="job-table-scroll"><div class="job-table-head"><button type="button" data-career-sort="company" aria-label="按公司 / 岗位排序">公司 / 岗位 <i>↕</i></button><button type="button" data-career-sort="city" aria-label="按城市排序">城市 <i>↕</i></button><button type="button" data-career-sort="jobType" aria-label="按岗位类型排序">岗位类型 <i>↕</i></button><button type="button" data-career-sort="phaseTime" aria-label="按时间（可修改）排序">时间（可修改） <i>↕</i></button><button type="button" data-career-sort="tags" aria-label="按标签排序">标签 <i>↕</i></button><span>操作</span></div><div id="jobBoard" class="job-table-body" aria-live="polite"></div></div>
+            <div class="job-table-scroll"><div class="job-table-head"><span><input type="checkbox" id="careerSelectAll" aria-label="选择当前列表全部岗位"></span><button type="button" data-career-sort="company">公司 / 岗位 <i>↕</i></button><button type="button" data-career-sort="city">城市 <i>↕</i></button><button type="button" data-career-sort="jobType">岗位类型 <i>↕</i></button><button type="button" data-career-sort="tags">标签 <i>↕</i></button><button type="button" data-career-sort="phase">当前阶段 <i>↕</i></button><span>进度</span><button type="button" data-career-sort="stageDeadline">当前阶段截止时间 <i>↕</i></button><span>操作</span></div><div id="jobBoard" class="job-table-body" aria-live="polite"></div></div>
           </section>
 
         </section>
@@ -628,7 +629,7 @@
               <div class="field"><label for="jobAppliedAt">投递日期</label><input id="jobAppliedAt" type="date"></div>
               <div class="field full"><label for="jobContact">联系人 / 渠道</label><input id="jobContact" maxlength="300" placeholder="招聘平台、内推人或 HR"></div>
               <div class="field full"><label for="jobSourceUrl">岗位链接</label><input id="jobSourceUrl" type="url" maxlength="2000" placeholder="https://"></div>
-              <div class="field"><label for="jobResumeName">简历名称</label><input id="jobResumeName" maxlength="200" placeholder="选填"></div>
+              <div class="field"><label for="jobOutcome">投递状态</label><select id="jobOutcome"><option value="active">进行中</option><option value="rejected">被拒绝</option><option value="withdrawn">已放弃</option><option value="offer-declined">Offer 已拒绝</option><option value="closed">已结束</option></select></div>
               <div class="field full"><label for="jobTags">标签</label><input id="jobTags" maxlength="1000" placeholder="用分号分隔，例如：技术岗；云计算；解决方案"></div><div class="field full"><label for="jobJdText">岗位描述 / JD</label><textarea id="jobJdText" rows="3" maxlength="30000"></textarea></div>
               <div class="field full"><label for="jobNotes">备注</label><textarea id="jobNotes" rows="3" maxlength="10000" placeholder="岗位亮点、准备重点、反馈与下一步"></textarea></div>
             </div>
@@ -689,6 +690,8 @@
     <script src="career-data.js"></script>
     <script src="career.js"></script>
     <script src="workbench.js"></script>
+    <script src="deadline-parser.js"></script>
+    <script src="application-content.js"></script>
     <script src="auth-validation.js"></script>
     <script src="auth.js"></script>
   </body>

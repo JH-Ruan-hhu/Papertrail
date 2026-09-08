@@ -25,22 +25,46 @@
     return { total:jobs.length,submitted:jobs.filter(j=>applied(j)).length,interview:jobs.filter(j=>j.status!=='closed' && ['first','second','hr'].includes(bucket(j))).length,offers:jobs.filter(j=>bucket(j)==='offer').length,trend,
       deadlines:jobs.filter(j=>j.status!=='closed' && j.deadline && key(j.deadline)>=today && key(j.deadline)<=key(end)).sort((a,b)=>key(a.deadline).localeCompare(key(b.deadline))),events:events(jobs)};
   }
+  const outcomeLabel = job => job.status==='closed' ? ({rejected:'被拒绝',withdrawn:'已放弃','offer-declined':'Offer 已拒绝'}[job.closureReason]||'已结束') : current(job)?.name||'已投递';
+  function transition(job,action,now=new Date().toISOString()) {
+    if(!['rejected','withdrawn','offer-declined','reopened'].includes(action))throw new Error('不支持的投递状态');
+    if(action==='offer-declined'&&category(current(job)?.name||'')!=='offer')throw new Error('请先记录 Offer 阶段，再标记 Offer 已拒绝');
+    if(action==='reopened'&&job.status!=='closed')return JSON.parse(JSON.stringify(job));
+    if(action!=='reopened'&&job.status==='closed'&&job.closureReason===action)return JSON.parse(JSON.stringify(job));
+    return {...JSON.parse(JSON.stringify(job)),status:action==='reopened'?'active':'closed',closureReason:action==='reopened'?null:action,
+      stageHistory:[...(job.stageHistory||[]),{action,stageId:current(job)?.id||'',stageName:current(job)?.name||'',occurredAt:now}]};
+  }
+  function advance(job,stageId,now=new Date().toISOString()) {
+    const next=JSON.parse(JSON.stringify(job));const stage=next.workflow.stages.find(s=>s.id===stageId);
+    if(!stage)throw new Error('招聘阶段不存在');
+    if(next.status==='closed')throw new Error('请先恢复进行中，再推进阶段');
+    next.workflow.currentStageId=stageId;next.status='active';next.closureReason=null;
+    next.workflow.timeline ||= [];
+    if(!next.workflow.timeline.some(t=>t.stageId===stageId&&t.date))next.workflow.timeline.push({stageId,date:now});
+    next.stageHistory=[...(next.stageHistory||[]),{action:'advanced',stageId,stageName:stage.name,occurredAt:now}];return next;
+  }
   function move(job, target, today=key(new Date())) {
-    if(target==='offer-declined') {
-      if(category(current(job)?.name || '')!=='offer') throw new Error('只有 Offer 阶段可以拒绝 Offer');
-      return {...JSON.parse(JSON.stringify(job)),status:'closed',closureReason:'offer-declined'};
-    }
+    if(['rejected','withdrawn','offer-declined','reopened'].includes(target))return transition(job,target,new Date(today).toISOString());
+    if(target==='closed')return transition(job,'rejected',new Date(today).toISOString());
     if(!stages.some(([id])=>id===target)) throw new Error('不支持的阶段');
-    const next=JSON.parse(JSON.stringify(job)); next.workflow ||= {stages:[],timeline:[]};
+    const next=job.status==='closed'?transition(job,'reopened',new Date(today).toISOString()):JSON.parse(JSON.stringify(job)); next.workflow ||= {stages:[],timeline:[]};
     if(target==='preparing' || target==='closed'){ next.status=target;return next; }
     next.status='active'; next.closureReason=null;
     let stage=next.workflow.stages.find(s=>category(s.name)===target);
     if(!stage){stage={id:`career-${target}`,name:stages.find(([id])=>id===target)[1]};next.workflow.stages.push(stage);}
+    if(next.workflow.currentStageId!==stage.id)next.stageHistory=[...(next.stageHistory||[]),{action:'advanced',stageId:stage.id,stageName:stage.name,occurredAt:new Date(today).toISOString()}];
     next.workflow.currentStageId=stage.id;
     next.workflow.timeline ||= [];
     if(!next.workflow.timeline.some(t=>t.stageId===stage.id && t.date)) next.workflow.timeline.push({stageId:stage.id,date:today});
     if(target==='apply' && !next.appliedAt) next.appliedAt=today;
     return next;
+  }
+  function deadline(job) {const stage=current(job);const mapped=job.workflow?.deadlines||{};return {stageId:stage?.id,label:(stage?.name||'投递')+'截止',value:Object.prototype.hasOwnProperty.call(mapped,stage?.id)?mapped[stage.id]:(category(stage?.name||'投递')==='apply'?job.deadline||null:null)};}
+  function withDeadline(job,value) {if(value&&!Number.isFinite(Date.parse(value)))throw new Error('截止时间无效');const next=JSON.parse(JSON.stringify(job)),info=deadline(next);if(!info.stageId)throw new Error('请先设置招聘阶段');next.workflow.deadlines={...(next.workflow.deadlines||{}),[info.stageId]:value||null};if(category(current(next)?.name||'')==='apply')next.deadline=value||null;return next;}
+  function nextEvent(job,now=new Date()) {
+    if(job.status==='closed')return {value:null,label:'下次时间',kind:'next'};
+    const events=[...(job.nextFollowUpAt?[{value:job.nextFollowUpAt,label:'跟进',kind:'next'}]:[]),...(job.workflow?.timeline||[]).map(t=>({value:t.date,label:job.workflow.stages.find(s=>s.id===t.stageId)?.name||'阶段',kind:'stage:'+t.stageId})),...(job.deadline?[{value:job.deadline,label:'截止',kind:'deadline'}]:[])].filter(e=>Date.parse(e.value)>=new Date(now).getTime()).sort((a,b)=>Date.parse(a.value)-Date.parse(b.value));
+    return events[0]||{value:null,label:'下次时间',kind:'next'};
   }
   function time(job) {
     const stage=current(job), stageId=stage?.id, phase=bucket(job);
@@ -59,6 +83,6 @@
     if(bucket(next)==='apply')next.appliedAt=value||null;
     return next;
   }
-  const api={time,withTime,key,stages,category,current,bucket,applied,events,overview,move};
+  const api={deadline,withDeadline,nextEvent,transition,advance,outcomeLabel,time,withTime,key,stages,category,current,bucket,applied,events,overview,move};
   if(typeof module!=='undefined')module.exports=api;else root.YanjiCareerData=api;
 }(globalThis));

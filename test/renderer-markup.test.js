@@ -773,7 +773,7 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
   assert.match(indexHtml, /优先级：不限/);
   assert.match(indexHtml, /城市：不限/);
   assert.match(indexHtml, /class="job-table-head"[\s\S]*岗位类型/);
-  assert.match(indexHtml, /class="job-table-head"[\s\S]*时间（可修改）/);
+  assert.match(indexHtml, /class="job-table-head"[\s\S]*当前阶段[\s\S]*进度[\s\S]*当前阶段截止时间/);
   assert.match(indexHtml, /id="jobDeadline"/);
   assert.match(indexHtml, /id="jobSettingsButton"[\s\S]*<circle cx="12" cy="12" r="3"/);
   assert.match(readProjectFile('src', 'renderer', 'career.js'), /function careerTableRow/);

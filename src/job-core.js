@@ -144,6 +144,7 @@ function normalizeWorkflow(value, legacyStatus = null, fallbackStageDate = null)
   return {
     stages,
     currentStageId,
+    ...(asObject(source.deadlines)?{deadlines:Object.fromEntries(Object.entries(source.deadlines).filter(([id,date])=>stageIds.has(id)&&(date===null||isoDate(date))).map(([id,date])=>[id,date===null?null:isoDate(date)]))}:{}),
     timeline: stages.filter((stage) => timelineByStage.has(stage.id)).map((stage) => timelineByStage.get(stage.id))
   };
 }
@@ -187,7 +188,9 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
     ...(hasOwn(input,'resumeName')?{resumeName:cleanText(input.resumeName,200)||null}:{}),
     ...(hasOwn(input,'jdText')?{jdText:cleanText(input.jdText,30000)||null}:{}),
     status: lifecycleStatusFor(input, rawStatus),
-    ...(hasOwn(input, 'closureReason') ? { closureReason: lifecycleStatusFor(input, rawStatus) === 'closed' && input.closureReason === 'offer-declined' ? 'offer-declined' : null } : {}),
+    ...(hasOwn(input, 'companyId') ? {companyId: cleanText(input.companyId,120)} : {}),
+    ...(hasOwn(input, 'closureReason') ? { closureReason: lifecycleStatusFor(input, rawStatus) === 'closed' && ['rejected','withdrawn','offer-declined'].includes(input.closureReason) ? input.closureReason : null } : {}),
+    ...(Array.isArray(input.stageHistory) ? {stageHistory: input.stageHistory.filter(x=>x && ['advanced','rejected','withdrawn','offer-declined','reopened'].includes(x.action) && isoDate(x.occurredAt)).map(x=>({action:x.action,stageId:cleanText(x.stageId,120),stageName:cleanText(x.stageName,120),occurredAt:isoDate(x.occurredAt)}))} : {}),
     nextFollowUpAt,
     nextActionAt: nextFollowUpAt,
     notes: cleanText(input.notes, 10_000) || null,
@@ -228,15 +231,22 @@ function saveJobApplication(list, input, now = new Date().toISOString(), makeId 
     updatedAt: now,
     revision: Math.max(0, Number(existing?.revision) || 0) + 1
   }, 0, now);
-  if (existing && candidate.deadline !== existing.deadline) candidate.deadlineReminderSentAt = null;
+  if (existing && (currentJobDeadline(candidate) !== currentJobDeadline(existing) || candidate.workflow.currentStageId !== existing.workflow?.currentStageId)) candidate.deadlineReminderSentAt = null;
   return existing
     ? list.map((item) => item.id === candidate.id ? candidate : item)
     : [candidate, ...list];
 }
 
+function currentJobDeadline(job) {
+  const map=job?.workflow?.deadlines;
+  if(!map)return job?.deadline||null;
+  const id=job.workflow.currentStageId;
+  if(Object.prototype.hasOwnProperty.call(map,id))return map[id];
+  return /投递/.test(job.workflow.stages.find(s=>s.id===id)?.name||'')?job.deadline||null:null;
+}
 function jobDeadlineReminderDue(job, now = new Date()) {
   if (!job || job.status === 'closed' || job.deadlineReminderSentAt) return false;
-  const due = new Date(job.deadline);
+  const due = new Date(currentJobDeadline(job));
   const current = now instanceof Date ? now : new Date(now);
   if (!Number.isFinite(due.getTime()) || !Number.isFinite(current.getTime())) return false;
   const reminderDay = new Date(due.getFullYear(), due.getMonth(), due.getDate() - 1);
@@ -361,6 +371,7 @@ const jobCoreApi = {
   defaultWorkflow,
   normalizeWorkflow,
   normalizeJobApplication,
+  currentJobDeadline,
   jobDeadlineReminderDue,
   mergeImportedJobApplications,
   saveJobApplication,

@@ -1,0 +1,60 @@
+'use strict';
+// Real main process, preload, IPC and JsonStore; only automatic smoke shutdown is held.
+const {app,BrowserWindow,nativeImage,dialog}=require('electron');
+const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),assert=require('node:assert/strict');
+const qaRoot=process.env.YANJI_APPLICATION_QA_DIR||fs.mkdtempSync(path.join(os.tmpdir(),'yanji-applications-v12-'));
+process.env.YANJI_QA_USER_DATA=qaRoot;process.argv.push('--smoke-test');app.quit=()=>{};
+const screenshots=path.join(__dirname,'../work/application-v12');fs.mkdirSync(screenshots,{recursive:true});
+require('../src/main');
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+app.whenReady().then(async()=>{try{
+ let win;for(let i=0;i<100;i++){win=BrowserWindow.getAllWindows().find(w=>w.yanjiLoadPromise);if(win)break;await delay(100);}assert.ok(win,'real main window');win.webContents.on('console-message',event=>console.log('RENDERER '+event.message));await win.yanjiLoadPromise;await delay(800);
+ const setup=await win.webContents.executeJavaScript(`(async()=>{
+ const existing=await paperTrail.getWorkspace();
+ if(!existing.jobApplications.length){for(const [i,company] of ['安克创新','长江存储','安克创新','环境工程研究所','北方水务'].entries())await paperTrail.saveJobApplication({company,role:['区域销售经理','环境研发工程师','产品运营专员','水处理研究员','工艺工程师'][i],status:'active',city:i===3?'':'北京',jobType:'科研岗',tags:['环境研发','校招','水处理','研发'],resumeName:'旧简历仅保留数据',appliedAt:new Date().toISOString(),workflow:{stages:[{id:'apply',name:'投递'},{id:'test',name:'笔试'},{id:'interview',name:'面试'},{id:'offer',name:'Offer'}],currentStageId:i===1?'offer':i===3?'interview':'apply',timeline:[{stageId:'apply',date:new Date().toISOString()},...(i===1?[{stageId:'offer',date:new Date().toISOString()}]:[])]}});}
+ await refreshWorkspace();switchWorkbenchPage('jobs-applications');closeDailyPlanDialog();await refreshApplicationCompanies();return wb.workspace.jobApplications.map(j=>({id:j.id,companyId:j.companyId,company:j.company}));})()`);
+ assert.equal(setup.find(j=>j.company==='安克创新').companyId,setup.filter(j=>j.company==='安克创新')[1].companyId);
+ // Exercise native decoding, manual selection, shared cache and the real manual-logo IPC.
+ const logoFile=path.join(qaRoot,'qa-logo.png');const rgba=Buffer.alloc(80*40*4,220);const logo=nativeImage.createFromBitmap(rgba,{width:80,height:40});fs.writeFileSync(logoFile,logo.toPNG());
+ dialog.showOpenDialog=async()=>({canceled:false,filePaths:[logoFile]});
+ await win.webContents.executeJavaScript(`paperTrail.setCompanyLogo(${JSON.stringify(setup[0].companyId)})`);
+ const result=await win.webContents.executeJavaScript(`(async()=>{
+ const check=(v,m)=>{if(!v)throw Error(m)},pause=()=>new Promise(r=>setTimeout(r,180));
+ const job=wb.workspace.jobApplications.find(j=>j.workflow.currentStageId==='apply'&&j.status!=='closed')||wb.workspace.jobApplications[0];
+ if(job.status==='closed')await saveCareerPatch(job.id,j=>YanjiCareerData.transition(j,'reopened'));
+ renderJobs();const initial=structuredClone(wb.workspace.jobApplications.find(j=>j.id===job.id));
+ document.querySelector('[data-career-job="'+job.id+'"] [data-application-stage]').click();
+ const d=document.getElementById('applicationActionDialog');d.querySelector('select').value='rejected';d.querySelector('form').requestSubmit();await pause();
+ let saved=(await paperTrail.getWorkspace()).jobApplications.find(j=>j.id===job.id);
+ check(saved.status==='closed'&&saved.closureReason==='rejected','real IPC rejection persisted');check(saved.workflow.currentStageId===initial.workflow.currentStageId,'stage retained');check(saved.stageHistory.at(-1).action==='rejected','terminal history saved');
+ check(document.querySelector('[data-career-stage="closed"] [data-career-job="'+job.id+'"]'),'closed column');
+ document.querySelector('[data-career-view="table"]').click();
+ for(const key of ['company','phase','stageDeadline']){document.querySelector('[data-career-sort="'+key+'"]').click();const rows=[...document.querySelectorAll('#jobBoard .application-row')];let ended=false;for(const row of rows){if(row.classList.contains('is-closed'))ended=true;else check(!ended,'ended records sink for '+key);}}
+ check(!document.querySelector('#jobBoard .career-workflow-step'),'no seven-stage text timeline');check(!document.querySelector('#jobResumeName'),'resume editor removed');
+ const row=document.querySelector('[data-job-id="'+job.id+'"]');check(row.textContent.includes('被拒绝'),'result label');check(!row.querySelector('[data-delete-job]'),'no permanent trash');
+ row.querySelector('[data-application-menu]').click();d.querySelector('[data-menu-action="reopened"]').click();await pause();
+ saved=(await paperTrail.getWorkspace()).jobApplications.find(j=>j.id===job.id);check(saved.status==='active'&&saved.stageHistory.at(-1).action==='reopened','restored through real IPC');
+ const originalAppliedAt=saved.appliedAt;openJobEditor(saved);check(!document.getElementById('jobDialog').textContent.includes('简历'),'editor resume absent');document.getElementById('jobOutcome').value='withdrawn';await saveJobFromEditor();
+ saved=(await paperTrail.getWorkspace()).jobApplications.find(j=>j.id===job.id);check(saved.status==='closed'&&saved.closureReason==='withdrawn','editor saves withdrawn');check(saved.appliedAt===originalAppliedAt,'editor preserves unchanged timestamp');check(saved.resumeName==='旧简历仅保留数据','legacy field preserved');
+ let offer=wb.workspace.jobApplications.find(j=>j.workflow.currentStageId==='offer');if(offer.status==='closed')await saveCareerPatch(offer.id,j=>YanjiCareerData.transition(j,'reopened'));renderJobs();
+ document.querySelector('[data-job-id="'+offer.id+'"] [data-application-stage]').click();d.querySelector('select').value='offer-declined';d.querySelector('form').requestSubmit();await pause();
+ offer=(await paperTrail.getWorkspace()).jobApplications.find(j=>j.id===offer.id);check(offer.closureReason==='offer-declined'&&offer.workflow.timeline.some(t=>t.stageId==='offer'),'offer rejection preserves history');
+ const capture=await paperTrail.submitCapture({mode:'item',itemKind:'task',content:'今天完成测试报告'});await refreshWorkspace();const linked=wb.workspace.schedules.filter(s=>s.sourceRef?.id===capture.item.id);check(linked.length===1&&linked[0].allDay,'capture has one all-day schedule');
+ const tomorrow=new Date();tomorrow.setDate(tomorrow.getDate()+1);check(!schedulesForDay(tomorrow).some(s=>s.id===linked[0].id),'capture no next day spill');
+ await refreshApplicationCompanies();check(document.querySelector('.company-logo img'),'manual image rendered');check(!document.querySelector('.application-card').textContent.match(/简历|未分类|未记录|未填写/),'card no field noise');
+ const active=wb.workspace.jobApplications.find(j=>j.status==='active');const startStage=active.workflow.currentStageId;
+ applicationDeadlineDialog(active);const input=d.querySelector('[name="deadlineText"]');input.value='72小时内';input.dispatchEvent(new Event('input',{bubbles:true}));check(d.querySelector('output').textContent.includes('截止于'),'relative preview');d.querySelector('form').requestSubmit();await pause();
+ let deadlineJob=(await paperTrail.getWorkspace()).jobApplications.find(j=>j.id===active.id);const firstDeadline=YanjiCareerData.deadline(deadlineJob).value;check(Math.abs(Date.parse(firstDeadline)-Date.now()-72*3600000)<2000,'72h saved through real IPC');
+ const otherStage=deadlineJob.workflow.stages.find(s=>s.id!==startStage).id;await saveCareerPatch(active.id,j=>YanjiCareerData.advance(j,otherStage));deadlineJob=wb.workspace.jobApplications.find(j=>j.id===active.id);check(YanjiCareerData.deadline(deadlineJob).value===null,'stage switch has independent deadline');
+ applicationDeadlineDialog(deadlineJob);d.querySelector('[name="deadlineText"]').value='2026-12-15 18:00';d.querySelector('[name="deadlineText"]').dispatchEvent(new Event('input',{bubbles:true}));d.querySelector('form').requestSubmit();await pause();
+ await saveCareerPatch(active.id,j=>YanjiCareerData.advance(j,startStage));check(YanjiCareerData.deadline(wb.workspace.jobApplications.find(j=>j.id===active.id)).value===firstDeadline,'prior stage deadline retained');
+ const editDeadlineJob=wb.workspace.jobApplications.find(j=>j.id===active.id);openJobEditor(editDeadlineJob);await saveJobFromEditor();check(YanjiCareerData.deadline(wb.workspace.jobApplications.find(j=>j.id===active.id)).value===firstDeadline,'editor remapping preserves stage deadlines');
+ return {records:wb.workspace.jobApplications.length,stageDeadlines:true,relativeDeadline:true,closures:true,resumeRemoved:true,companyShared:true,capture:true};})()`);
+ await win.webContents.executeJavaScript("closeDailyPlanDialog();document.querySelectorAll('dialog[open]').forEach(d=>d.close())");
+ win.showInactive();
+ for(const [width,height] of [[1366,768],[1920,1080]]){
+   win.setSize(width,height);for(const view of ['cards','table']){await win.webContents.executeJavaScript(`document.querySelector('[data-career-view="${view}"]').click()`);await delay(600);if(view==='table')await win.webContents.executeJavaScript(`(()=>{const head=document.querySelector('.job-table-head>:nth-child(7)').getBoundingClientRect();for(const progress of document.querySelectorAll('.application-row .application-progress')){if(Number(getComputedStyle(progress.parentElement.parentElement).opacity)<.99)continue;const dots=[...progress.children],first=dots[0].getBoundingClientRect(),last=dots.at(-1).getBoundingClientRect();if(Math.abs((first.left+last.right)/2-(head.left+head.right)/2)>1){console.log('MISALIGNED '+JSON.stringify({parentStyle:{transform:getComputedStyle(progress.parentElement.parentElement).transform,left:progress.parentElement.getBoundingClientRect().left,headLeft:document.querySelector('.job-table-head').getBoundingClientRect().left,padding:getComputedStyle(progress.parentElement).padding,headPadding:getComputedStyle(document.querySelector('.job-table-head')).padding},grid:getComputedStyle(progress.parentElement).gridTemplateColumns,headGrid:getComputedStyle(document.querySelector('.job-table-head')).gridTemplateColumns,progress:{left:progress.getBoundingClientRect().left,right:progress.getBoundingClientRect().right},head:{left:head.left,right:head.right},first:{left:first.left,right:first.right},last:{left:last.left,right:last.right}}));throw Error('progress is not centered');}}return true;})()`);fs.writeFileSync(path.join(screenshots,`${view}-${width}.png`),(await win.webContents.capturePage()).toPNG());}
+ }
+ const files=fs.readdirSync(qaRoot).filter(f=>f.endsWith('.json'));const database=files.map(f=>path.join(qaRoot,f)).find(f=>{try{return Array.isArray(JSON.parse(fs.readFileSync(f)).jobApplications);}catch{return false;}});assert.ok(database,'persisted workspace found');const reload=new (require('../src/store').JsonStore)(database);reload.load();assert.ok(reload.listJobApplications().some(j=>j.closureReason==='offer-declined'));assert.ok(reload.data.companies.some(c=>c.logoSource==='manual'));assert.ok(reload.listJobApplications().some(j=>j.stageHistory?.some(h=>h.action==='rejected')));
+ console.log('YANJI_APPLICATION_V12_OK '+JSON.stringify({...result,qaRoot,diskReload:true,screenshots}));app.exit(0);
+}catch(error){console.error(error.stack);app.exit(1);}});

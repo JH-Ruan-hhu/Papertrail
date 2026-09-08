@@ -19,8 +19,12 @@ test('v1.4.16 records survive load, settings write and reopen without losing bus
   const reopened = new JsonStore(file);
   reopened.load();
   for (const key of ['schedules', 'todos', 'notes', 'jobApplications', 'papers', 'countdowns', 'metadataFields', 'attendance', 'focusSessions', 'extensionFixture']) {
-    assert.deepEqual(reopened.data[key], fixture[key], key);
+    const actual=key==='jobApplications'?reopened.data[key].map(({companyId,...job})=>job):reopened.data[key];
+    assert.deepEqual(actual, fixture[key], key);
   }
+  assert.equal(reopened.data.companySchemaVersion,1);
+  assert.ok(reopened.data.companies.some(c=>c.id===reopened.listJobApplications()[0].companyId));
+  assert.ok(fs.readdirSync(dir).some(name=>name.includes('.pre-v11.')));
   assert.equal(reopened.listTodos()[0].dueAt, null);
   assert.equal(reopened.listNotes()[0].revision, 3);
   assert.equal(reopened.listJobApplications()[0].workflow.stages[1].name, '学术报告');

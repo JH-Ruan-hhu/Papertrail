@@ -552,7 +552,7 @@ function workflowForStagePicker(value) {
   const mappedCurrentId = remappedIds.get(source.currentStageId) || source.currentStageId;
   const timeline = source.timeline.map((item) => ({ ...item, stageId: remappedIds.get(item.stageId) || item.stageId }))
     .filter((item, index, list) => stageIds.has(item.stageId) && list.findIndex((candidate) => candidate.stageId === item.stageId) === index);
-  return { stages, currentStageId: stageIds.has(mappedCurrentId) ? mappedCurrentId : stages[0].id, timeline };
+  return { stages, currentStageId: stageIds.has(mappedCurrentId) ? mappedCurrentId : stages[0].id, timeline, ...(source.deadlines?{deadlines:Object.fromEntries(Object.entries(source.deadlines).map(([id,date])=>[remappedIds.get(id)||id,date]).filter(([id])=>stageIds.has(id)))}:{}) };
 }
 
 function jobWorkflowStageIndex(job) {
@@ -662,6 +662,8 @@ function sortJobs(jobs) {
     else if (wb.jobSort === 'phase') comparison=window.YanjiCareerData.stages.findIndex(([id])=>id===window.YanjiCareerData.bucket(left))-window.YanjiCareerData.stages.findIndex(([id])=>id===window.YanjiCareerData.bucket(right));
     else if (wb.jobSort === 'phaseTime') comparison=dateValue(window.YanjiCareerData.time(left).value)-dateValue(window.YanjiCareerData.time(right).value);
     else if (wb.jobSort === 'matchScore') comparison=(left.matchScore??-1)-(right.matchScore??-1);
+    else if (wb.jobSort === 'stageDeadline') comparison = dateValue(window.YanjiCareerData.deadline(left).value) - dateValue(window.YanjiCareerData.deadline(right).value);
+    else if (wb.jobSort === 'appliedAt') comparison = dateValue(window.YanjiCareerData.applied(left)) - dateValue(window.YanjiCareerData.applied(right));
     else if (wb.jobSort === 'createdAt') comparison = dateValue(left.createdAt) - dateValue(right.createdAt);
     else if (wb.jobSort === 'deadline') comparison = dateValue(left.deadline) - dateValue(right.deadline);
     else if (wb.jobSort === 'annualSalaryWan') comparison = Number(left.annualSalaryWan || 0) - Number(right.annualSalaryWan || 0);
@@ -803,11 +805,13 @@ function readWorkflowEditor() {
     if (!row.querySelector('[data-workflow-stage-enabled]')?.checked) return;
     const stage = { id: row.dataset.stageId, name: row.dataset.stageName };
     stages.push(stage);
-    const date = dateInputToIso(row.querySelector('[data-workflow-stage-date]')?.value);
+    const dateValue=row.querySelector('[data-workflow-stage-date]')?.value;
+    const previousDate=jobTimelineDate(wb.editingJobWorkflow,stage.id);
+    const date = dateValue===localDateInputValue(previousDate)?previousDate:dateInputToIso(dateValue);
     if (date) timeline.push({ stageId: stage.id, date });
     if (row.querySelector('[data-workflow-set-current]')?.checked) currentStageId = stage.id;
   });
-  const workflow = { stages, currentStageId: currentStageId || stages[0]?.id, timeline };
+  const workflow = { stages, currentStageId: currentStageId || stages[0]?.id, timeline, ...(wb.editingJobWorkflow?.deadlines?{deadlines:Object.fromEntries(Object.entries(wb.editingJobWorkflow.deadlines).filter(([id])=>stages.some(s=>s.id===id)))}:{}) };
   wb.editingJobWorkflow = workflow;
   return workflow;
 }
@@ -833,7 +837,8 @@ function openJobEditor(job = null, initialStatus = 'active') {
   document.getElementById('jobAppliedAt').value = localDateInputValue(job?.appliedAt);
   document.getElementById('jobContact').value = job?.contact || '';
   document.getElementById('jobNotes').value = job?.notes || '';
-  for (const [id,key] of [['jobSourceUrl','sourceUrl'],['jobResumeName','resumeName'],['jobJdText','jdText']]) document.getElementById(id).value=job?.[key]??'';
+  for (const [id,key] of [['jobSourceUrl','sourceUrl'],['jobJdText','jdText']]) document.getElementById(id).value=job?.[key]??'';
+  document.getElementById('jobOutcome').value=job?.status==='closed'?(job.closureReason||'closed'):'active';
   document.getElementById('jobTags').value=(job?.tags||[]).join('；');
   document.getElementById('jobError').textContent = '';
   document.getElementById('deleteJobButton').hidden = !job;
@@ -858,24 +863,29 @@ async function saveJobFromEditor() {
     jobType: document.getElementById('jobType').value,
     city,
     location: city,
-    deadline: dateInputToIso(document.getElementById('jobDeadline').value),
+    deadline: document.getElementById('jobDeadline').value===localDateInputValue(existing?.deadline)?existing?.deadline:dateInputToIso(document.getElementById('jobDeadline').value),
     priority: document.getElementById('jobPriority').value,
     status: existing?.status === 'closed' ? 'closed' : (document.getElementById('jobDialog').dataset.initialStatus || 'active'),
     annualSalaryWan: document.getElementById('jobAnnualSalaryWan').value,
-    appliedAt: dateInputToIso(document.getElementById('jobAppliedAt').value),
+    appliedAt: document.getElementById('jobAppliedAt').value===localDateInputValue(existing?.appliedAt)?existing?.appliedAt:dateInputToIso(document.getElementById('jobAppliedAt').value),
     nextFollowUpAt,
     nextActionAt: nextFollowUpAt,
     workflow: readWorkflowEditor(),
     contact: document.getElementById('jobContact').value,
     notes: document.getElementById('jobNotes').value,
     sourceUrl: document.getElementById('jobSourceUrl').value,
-    resumeName: document.getElementById('jobResumeName').value,
     jdText: document.getElementById('jobJdText').value,
     tags: document.getElementById('jobTags').value.split(/[;；,，]/),
     revision: document.getElementById('jobDialog').dataset.revision || undefined
   };
   try {
-    const saved = await workbenchApi.saveJobApplication(payload);
+    const outcome=document.getElementById('jobOutcome').value;
+    let prepared={...existing,...payload};
+    if(outcome==='active' && existing?.status==='closed')prepared=window.YanjiCareerData.transition(prepared,'reopened');
+    else if(['rejected','withdrawn','offer-declined'].includes(outcome) && (existing?.status!=='closed'||existing.closureReason!==outcome))prepared=window.YanjiCareerData.transition(prepared,outcome);
+    else if(outcome==='closed')prepared.status='closed';
+    if(prepared.status!=='closed' && existing && prepared.workflow.currentStageId!==(canonicalJobStage(jobCurrentStage(existing))?.id||existing.workflow.currentStageId))prepared=window.YanjiCareerData.advance(prepared,prepared.workflow.currentStageId);
+    const saved = await workbenchApi.saveJobApplication(prepared);
     wb.workspace.jobApplications = [saved, ...wb.workspace.jobApplications.filter((item) => item.id !== saved.id)];
     wb.editingJobWorkflow = null;
     closeWorkbenchDialog(document.getElementById('jobDialog'));

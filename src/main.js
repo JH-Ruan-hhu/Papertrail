@@ -46,7 +46,7 @@ const { normalizeCaptureInput } = require('./capture-core');
 const { deleteCountdown, saveCountdown } = require('./countdown-core');
 const { collectReminderCandidates, normalizeReminderPayload, reminderPresentation } = require('./reminder-core');
 const { parseNaturalLanguageTodo } = require('./todo-core');
-const { deleteJobApplication, jobDeadlineReminderDue, mergeImportedJobApplications, normalizeJobApplication, saveJobApplication } = require('./job-core');
+const { deleteJobApplication, currentJobDeadline, jobDeadlineReminderDue, mergeImportedJobApplications, normalizeJobApplication, saveJobApplication } = require('./job-core');
 const { resolveStableUserDataPath } = require('./user-data-path');
 const {
   parseTrackingInput,
@@ -924,6 +924,11 @@ function deleteWorkspaceNoteIfEmpty(id) {
   return true;
 }
 
+let companyLogoService;
+function getCompanyLogoService() {
+  if (!companyLogoService || companyLogoService.store !== store) companyLogoService = new (require('./company-logo-service').CompanyLogoService)({store,directory:path.join(store.attachmentsDirectory,'company-logos'),nativeImage,onChanged:id=>{for(const win of BrowserWindow.getAllWindows())win.webContents.send('companies:changed',id);}});
+  return companyLogoService;
+}
 function saveWorkspaceJobApplication(input) {
   const requested = input && typeof input === 'object' ? { ...input } : {};
   const jobs = store.listJobApplications();
@@ -936,8 +941,11 @@ function saveWorkspaceJobApplication(input) {
   const savedJobs = saveJobApplication(jobs, requested, now, () => crypto.randomUUID());
   const saved = savedJobs.find((item) => item.id === String(requested.id || savedJobs[0].id)) || savedJobs[0];
   store.setJobApplications(savedJobs);
+  const persisted=store.listJobApplications().find(job=>job.id===saved.id);
   broadcastWorkspace();
-  return saved;
+  const logos=getCompanyLogoService();
+  setImmediate(()=>{try{logos.ensure(persisted.companyId).catch(()=>{});}catch{ /* Logo retrieval must not affect a saved job. */ }});
+  return persisted;
 }
 
 function deleteWorkspaceJobApplication(id) {
@@ -2210,7 +2218,7 @@ function runJobDeadlineReminders(now = new Date()) {
       title: `${job.company} · ${job.role} 明天截止`,
       notes: job.notes || '请及时完成岗位申请。',
       priority: 'high',
-      startAt: job.deadline
+      startAt: currentJobDeadline(job)
     }, 'schedule');
   }
   const dueIds = new Set(dueJobs.map((job) => job.id));
@@ -2570,6 +2578,25 @@ function registerIpc() {
   ipcMain.handle('notes:add-attachment', (_event, id) => addNoteAttachment(String(id)));
   ipcMain.handle('notes:get-attachment', (_event, id, attachmentId) => getNoteAttachment(String(id), String(attachmentId)));
   ipcMain.handle('notes:delete-attachment', (_event, id, attachmentId) => deleteNoteAttachment(String(id), String(attachmentId)));
+  ipcMain.handle('companies:get', (_event,id) => getCompanyLogoService().snapshot(id));
+  ipcMain.handle('companies:list', () => {
+    const service=getCompanyLogoService();
+    const companies=(store.data.companies||[]).map(c=>service.snapshot(c.id));
+    setImmediate(()=>{for(const c of companies)service.ensure(c.id).catch(()=>{});});
+    return companies;
+  });
+  ipcMain.handle('companies:configure', (_event,id,input={}) => {
+    const service=getCompanyLogoService();service.company(id);
+    const website=input.website?require('./company-logo-service').safeUrl(String(input.website)).href:null;
+    service.update(id,{website,domain:website?new URL(website).hostname:null,shortName:String(input.shortName||'').trim().slice(0,12)});
+    service.ensure(id,true).catch(()=>{});return service.snapshot(id);
+  });
+  ipcMain.handle('companies:refresh', (_event,id) => getCompanyLogoService().ensure(id,true));
+  ipcMain.handle('companies:manual', async (_event,id) => {
+    const service=getCompanyLogoService();service.company(id);
+    const chosen=await dialog.showOpenDialog(mainWindow,{title:'设置公司 Logo',properties:['openFile'],filters:[{name:'图片',extensions:['png','jpg','jpeg','webp','ico']}]});
+    return chosen.canceled?null:service.manual(id,chosen.filePaths[0]);
+  });
   ipcMain.handle('jobs:save', (_event, input) => saveWorkspaceJobApplication(input));
   ipcMain.handle('jobs:delete', (_event, id) => deleteWorkspaceJobApplication(String(id)));
   ipcMain.handle('jobs:import', () => importWorkspaceJobApplications());
