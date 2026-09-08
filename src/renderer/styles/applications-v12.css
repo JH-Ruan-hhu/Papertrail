@@ -147,7 +147,7 @@ select:focus-visible { outline:2px solid #81A8FF; outline-offset:2px; }
 /* Future stages are intentionally quiet; color indicates reached stages only. */
 .application-progress button { color:#D7DDE5; opacity:1; font-size:10px; }
 .application-progress button.reached { color:var(--stage-color); }
-.job-page .application-time.soon,.job-page .application-time.urgent,.job-page .application-time.overdue { border-radius:8px; padding:6px 8px; background:#FFF0F0; border-left:3px solid #D92D20; color:#B42318; }
+.job-page .application-row .application-time.soon,.job-page .application-row .application-time.urgent,.job-page .application-row .application-time.overdue { border-radius:8px; padding:6px 8px; background:#FFF0F0; border-left:3px solid #D92D20; color:#B42318; }
 .job-page .application-time.soon time,.job-page .application-time.urgent time,.job-page .application-time.overdue time { color:#B42318; font-weight:700; }
 .application-row .application-time.soon::after,.application-row .application-time.urgent::after,.application-row .application-time.overdue::after { content:'即将截止'; font-size:11px; }
 .application-row .application-time.overdue::after { content:'已截止'; }
