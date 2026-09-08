@@ -77,3 +77,28 @@
 
 .job-page .job-table-head>:nth-child(7) { text-align:center; justify-content:center; }
 .job-page .application-row .application-progress { justify-content:center; width:100%; }
+
+/* Native keyboard and form behavior, with rounded controls and popup surfaces. */
+select { border-radius:10px !important; }
+select:focus-visible { outline:2px solid #81A8FF; outline-offset:2px; }
+@supports (appearance:base-select) {
+ select,select::picker(select) { appearance:base-select; }
+ select { align-items:center; gap:8px; }
+ select::picker(select) { border:1px solid #DCE5F3; border-radius:12px; background:#fff; color:#344054; padding:5px; box-shadow:0 8px 24px #23395B24; }
+ select option { border-radius:7px; padding:8px 10px; min-height:32px; cursor:pointer; }
+ select option:checked { background:#EDF3FF; color:#245FDB; }
+ select option:hover,select option:focus { background:#F2F6FC; }
+ select::picker-icon { color:currentColor; }
+}
+.job-page .application-row .application-time { font-size:14px; font-weight:500; font-variant-numeric:tabular-nums; }
+.application-row .application-stage { width:100%; max-width:100%; min-width:0; }
+.job-page .application-card.is-collapsed { gap:8px; padding:12px; }
+.application-card.is-collapsed .company-logo { width:22px; height:22px; flex-basis:22px; border-radius:6px; }
+.application-card.is-collapsed .company-logo img { max-width:20px; max-height:20px; }
+.job-page .application-card.is-collapsed .application-role { font-size:15px; font-weight:500; }
+.application-card.is-collapsed .application-times { padding:2px 6px; }
+.application-card.is-collapsed .application-shortcuts { display:flex; justify-content:flex-end; }
+.application-card.is-collapsed .application-shortcuts button { padding:3px 8px; font-size:12px; }
+.application-row .application-edit { width:auto; padding:3px; font-size:12px; }
+
+.application-logo-preview { display:flex; align-items:center; gap:12px; font-size:12px; overflow-wrap:anywhere; }

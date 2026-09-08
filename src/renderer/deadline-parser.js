@@ -2,11 +2,11 @@
 (function(root){
   const digits={零:0,一:1,二:2,两:2,三:3,四:4,五:5,六:6,七:7,八:8,九:9};
   function number(text){if(/^\d+(\.\d+)?$/.test(text))return Number(text);if(text.includes('十')){const [a,b]=text.split('十');return (a?digits[a]:1)*10+(b?digits[b]:0);}return digits[text];}
-  function localValue(value){const d=new Date(value);return Number.isFinite(d.getTime())?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:'';}
+  function localValue(value){if(value==null||String(value).trim()==='')return '';const d=new Date(value);return Number.isFinite(d.getTime())?`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`:'';}
   function parse(value,now=new Date()){
     const text=String(value||'').trim(),base=new Date(now);if(!text)return {valid:true,value:null,label:'清除当前阶段截止时间'};
     if(!Number.isFinite(base.getTime()))return {valid:false,error:'起算时间无效'};
-    const relative=text.match(/(\d+(?:\.\d+)?|[零一二两三四五六七八九十]+)\s*(小时|分钟|天|周)\s*(?:以内|之内|内|后)/);
+    const relative=text.match(/(?<![\d.\-])(\d+(?:\.\d+)?|[零一二两三四五六七八九十]+)\s*(小时|分钟|天|周)(?:\s*(?:以内|之内|内|后)|$)/);
     if(relative){const n=number(relative[1]),unit={小时:3600000,分钟:60000,天:86400000,周:604800000}[relative[2]];if(!Number.isFinite(n)||n<0||n*unit>10*365*86400000)return {valid:false,error:'时间范围无效'};const d=new Date(base.getTime()+n*unit);return {valid:true,value:d.toISOString(),label:localValue(d),relative:true,baseAt:base.toISOString()};}
     let date=new Date(base.getFullYear(),base.getMonth(),base.getDate()),explicit=false;
     const absolute=text.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})(?:[ T]|$)/),monthDay=text.match(/^(\d{1,2})月(\d{1,2})[日号]?/),day=text.match(/今天|明天|后天/);

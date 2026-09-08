@@ -67,10 +67,10 @@ function candidates(html, base) {
     try{const visit=(obj,depth=0)=>{if(!obj||typeof obj!=='object'||depth>12)return;if(obj.hiringOrganization?.logo)add(typeof obj.hiringOrganization.logo==='string'?obj.hiringOrganization.logo:obj.hiringOrganization.logo.url,'job_source',0);for(const value of Object.values(obj))visit(value,depth+1);};visit(JSON.parse(script[1]));}catch{}
   }
   for(const tag of html.matchAll(/<(?:img|link|meta)\b[^>]*>/gi)) {
-    const attrs={};for(const a of tag[0].matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)')/g))attrs[a[1].toLowerCase()]=a[2]??a[3];
-    if(/logo|brand/i.test([attrs.class,attrs.id,attrs.alt].join(' '))&&attrs.src)add(attrs.src,'official_site',1);
-    if(/icon/i.test(attrs.rel||'')&&attrs.href)add(attrs.href,'favicon',2);
-    if(attrs.property==='og:image'&&attrs.content)add(attrs.content,'official_site',3);
+    const attrs={};for(const a of tag[0].matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g))attrs[a[1].toLowerCase()]=a[2]??a[3]??a[4];
+    if(/logo|brand/i.test([attrs.class,attrs.id,attrs.alt].join(' '))&&attrs.src)add(attrs.src,'official_site',2);
+    if(/icon/i.test(attrs.rel||'')&&attrs.href)add(attrs.href,'favicon',1);
+    // Social previews often depict the homepage or a banner, not a company icon.
   }
   return result.sort((a,b)=>a.rank-b.rank).filter((x,i,all)=>all.findIndex(y=>x.url===y.url)===i).slice(0,12);
 }

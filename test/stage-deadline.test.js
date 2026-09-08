@@ -2,8 +2,9 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const P=require('../src/renderer/deadline-parser'),D=require('../src/renderer/career-data'),J=require('../src/job-core');
 test('relative deadlines resolve from the fixed editing anchor without drifting',()=>{
+ for(const empty of [null,undefined,'','   '])assert.equal(P.localValue(empty),'');
  const now=new Date(2026,8,8,14,35,0);
- for(const [text,hours] of [['72小时内',72],['请在48小时以内完成测评',48],['3天内',72],['两天内',48],['三十六小时后',36],['90分钟内',1.5]]){const result=P.parse(text,now);assert.equal(result.valid,true,text);assert.equal(Date.parse(result.value)-now.getTime(),hours*3600000,text);}
+ for(const [text,hours] of [['72小时',72],['48小时',48],['2天',48],['90分钟',1.5],['72小时内',72],['请在48小时以内完成测评',48],['3天内',72],['两天内',48],['三十六小时后',36],['90分钟内',1.5]]){const result=P.parse(text,now);assert.equal(result.valid,true,text);assert.equal(Date.parse(result.value)-now.getTime(),hours*3600000,text);}
  assert.equal(new Date(P.parse('明天下午5点',now).value).getHours(),17);assert.equal(new Date(P.parse('明天下午5点',now).value).getDate(),9);
  assert.equal(P.localValue(P.parse('2026-09-12 18:30',now).value),'2026-09-12 18:30');assert.equal(P.parse('2026-02-30 18:00',now).valid,false);assert.equal(P.parse('明天25点',now).valid,false);assert.equal(P.parse('不知道',now).valid,false);assert.equal(P.parse('',now).value,null);
 });
