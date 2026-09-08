@@ -2587,7 +2587,7 @@ function registerIpc() {
   });
   ipcMain.handle('companies:configure', (_event,id,input={}) => {
     const service=getCompanyLogoService();service.company(id);
-    const website=input.website?require('./company-logo-service').safeUrl(String(input.website)).href:null;
+    const website=input.website?require('./company-logo-service').safeUrl(/^https?:\/\//i.test(String(input.website).trim())?String(input.website).trim():'https://'+String(input.website).trim()).href:null;
     service.update(id,{website,domain:website?new URL(website).hostname:null,shortName:String(input.shortName||'').trim().slice(0,12)});
     service.ensure(id,true).catch(()=>{});return service.snapshot(id);
   });

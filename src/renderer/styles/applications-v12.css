@@ -25,7 +25,7 @@
 .application-advance .application-stage { width:100%; min-height:37px; border-radius:10px; background:#2F6BEE; color:white; border-color:#2F6BEE; font-size:14px; }
 .application-stage.ended,.application-advance .application-stage.ended { background:#FFF3F3; color:#C76A6A; border-color:#F3DADA; }
 .application-stage.withdrawn,.application-advance .application-stage.withdrawn { background:#F3F4F6; color:#8B95A5; border-color:#E2E6EC; }
-.job-page .job-table-head,.job-page .application-row .job-position-main { display:grid; grid-template-columns:28px minmax(180px,1fr) minmax(90px,1fr) minmax(100px,1fr) minmax(130px,1fr) minmax(110px,1fr) minmax(90px,1fr) minmax(180px,1fr) 100px; min-width:1200px; gap:12px; align-items:center; }
+.job-page .job-table-head,.job-page .application-row .job-position-main { display:grid; grid-template-columns:minmax(180px,1fr) minmax(90px,1fr) minmax(100px,1fr) minmax(130px,1fr) minmax(110px,1fr) minmax(90px,1fr) minmax(180px,1fr) 150px; min-width:1200px; gap:12px; align-items:center; }
 .job-page .job-table-head { padding:12px 16px; }
 .job-page .job-table-head>button { padding:0; text-align:left; justify-content:flex-start; }
 .job-page .application-row .job-position-main { height:72px; min-height:72px; padding:6px 16px; font-size:13px; }
@@ -48,9 +48,6 @@
 .job-page .application-row .job-position-actions { gap:6px; }
 .application-row .application-tags { max-height:52px; overflow:hidden; }
 .job-page .job-closed-divider { display:block; font-size:11px; color:#98A2B3; padding:7px 16px; background:#FAFBFD; }
-#applicationSelection { display:flex; align-items:center; gap:12px; padding:10px; font-size:13px; }
-#applicationSelection[hidden] { display:none; }
-#applicationSelection button { border:1px solid #E5EAF2; border-radius:8px; padding:5px 8px; background:white; color:#667085; cursor:pointer; }
 #applicationActionDialog { width:min(460px,90vw); max-height:85vh; overflow:auto; border:1px solid #E5EAF2; border-radius:16px; padding:24px; box-shadow:0 20px 60px #20385D25; color:#344054; }
 #applicationActionDialog::backdrop { background:#1D29394D; }
 #applicationActionDialog header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:18px; }
@@ -69,13 +66,13 @@
 .application-logo-actions { display:flex; gap:8px; flex-wrap:wrap; }
 @media(prefers-reduced-motion:reduce) { .job-page .application-card:hover { transform:none; } }
 
-.job-page .application-row .job-position-main>:nth-child(2),.job-page .job-table-head>:nth-child(2) { text-align:left; justify-content:flex-start; }
+.job-page .application-row .job-position-main>:nth-child(1),.job-page .job-table-head>:nth-child(1) { text-align:left; justify-content:flex-start; }
 .job-page .application-card .application-company { text-overflow:ellipsis; overflow:hidden; white-space:nowrap; }
 
 .application-deadline-preview { display:block; padding:12px; background:#F5F8FF; color:#3564C3; border-radius:10px; font-size:14px; }
 .application-deadline-form footer { display:flex; justify-content:flex-end; gap:8px; }
 
-.job-page .job-table-head>:nth-child(7) { text-align:center; justify-content:center; }
+.job-page .job-table-head>:nth-child(6) { text-align:center; justify-content:center; }
 .job-page .application-row .application-progress { justify-content:center; width:100%; }
 
 /* Native keyboard and form behavior, with rounded controls and popup surfaces. */
@@ -102,3 +99,47 @@ select:focus-visible { outline:2px solid #81A8FF; outline-offset:2px; }
 .application-row .application-edit { width:auto; padding:3px; font-size:12px; }
 
 .application-logo-preview { display:flex; align-items:center; gap:12px; font-size:12px; overflow-wrap:anywhere; }
+
+.job-page .application-card .application-times.urgent { background:#FFF0F0; border:1px solid #F29C9C; border-left:4px solid #D92D20; }
+.job-page .application-card .urgent .application-time,.job-page .application-card .urgent .application-time time { color:#B42318; font-weight:700; }
+.application-times.urgent::before { content:'即将截止'; display:block; color:#B42318; font-size:12px; font-weight:700; padding-top:4px; }
+.application-times.overdue::before { content:'已截止'; }
+.application-progress button { color:var(--stage-color); opacity:.35; font-size:15px; position:relative; }
+.application-progress button.reached,.is-closed .application-progress button.reached { color:var(--stage-color); opacity:1; }
+.application-progress button.stopped { color:#C95050; opacity:1; }
+.application-progress button:hover,.application-progress button:focus-visible { opacity:1; }
+.application-progress button::after { content:attr(data-stage-name); position:absolute; bottom:100%; left:50%; transform:translateX(-50%); padding:5px 8px; background:#23334D; color:#fff; border-radius:6px; font-size:12px; white-space:nowrap; pointer-events:none; visibility:hidden; z-index:20; }
+.application-progress button:hover::after,.application-progress button:focus-visible::after { visibility:visible; }
+
+.application-progress [data-stage-color="0"] { --stage-color:hsl(210 68% 43%); }
+.application-progress [data-stage-color="1"] { --stage-color:hsl(277 68% 43%); }
+.application-progress [data-stage-color="2"] { --stage-color:hsl(344 68% 43%); }
+.application-progress [data-stage-color="3"] { --stage-color:hsl(51 68% 43%); }
+.application-progress [data-stage-color="4"] { --stage-color:hsl(118 68% 43%); }
+.application-progress [data-stage-color="5"] { --stage-color:hsl(185 68% 43%); }
+.application-progress [data-stage-color="6"] { --stage-color:hsl(252 68% 43%); }
+.application-progress [data-stage-color="7"] { --stage-color:hsl(319 68% 43%); }
+.application-progress [data-stage-color="8"] { --stage-color:hsl(26 68% 43%); }
+.application-progress [data-stage-color="9"] { --stage-color:hsl(93 68% 43%); }
+.application-progress [data-stage-color="10"] { --stage-color:hsl(160 68% 43%); }
+.application-progress [data-stage-color="11"] { --stage-color:hsl(227 68% 43%); }
+.application-progress [data-stage-color="12"] { --stage-color:hsl(294 68% 43%); }
+.application-progress [data-stage-color="13"] { --stage-color:hsl(1 68% 43%); }
+.application-progress [data-stage-color="14"] { --stage-color:hsl(68 68% 43%); }
+.application-progress [data-stage-color="15"] { --stage-color:hsl(135 68% 43%); }
+.application-progress [data-stage-color="16"] { --stage-color:hsl(202 68% 43%); }
+.application-progress [data-stage-color="17"] { --stage-color:hsl(269 68% 43%); }
+.application-progress [data-stage-color="18"] { --stage-color:hsl(336 68% 43%); }
+.application-progress [data-stage-color="19"] { --stage-color:hsl(43 68% 43%); }
+.application-progress [data-stage-color="20"] { --stage-color:hsl(110 68% 43%); }
+.application-progress [data-stage-color="21"] { --stage-color:hsl(177 68% 43%); }
+.application-progress [data-stage-color="22"] { --stage-color:hsl(244 68% 43%); }
+.application-progress [data-stage-color="23"] { --stage-color:hsl(311 68% 43%); }
+.application-progress [data-stage-color="24"] { --stage-color:hsl(18 68% 43%); }
+.application-progress [data-stage-color="25"] { --stage-color:hsl(85 68% 43%); }
+.application-progress [data-stage-color="26"] { --stage-color:hsl(152 68% 43%); }
+.application-progress [data-stage-color="27"] { --stage-color:hsl(219 68% 43%); }
+.application-progress [data-stage-color="28"] { --stage-color:hsl(286 68% 43%); }
+.application-progress [data-stage-color="29"] { --stage-color:hsl(353 68% 43%); }
+.application-progress [data-stage-color="30"] { --stage-color:hsl(60 68% 43%); }
+.application-progress [data-stage-color="31"] { --stage-color:hsl(127 68% 43%); }
