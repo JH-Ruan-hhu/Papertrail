@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { DATA_VERSION, migrateData } = require('./paper-core');
 const { migrateCompanies } = require('./company-core');
+const { syncJobSchedules } = require('./job-schedule-core');
 
 const DEFAULT_SETTINGS = Object.freeze({
   autoRefresh: true,
@@ -73,7 +74,9 @@ class JsonStore {
     if (repairedCaptures || (companyMigration.changed && (parsed.jobApplications || []).length)) this.createMigrationBackup(Number(parsed.version || 1));
     migrated.data = companyMigration.data;
     migrated.changed ||= companyMigration.changed || repairedCaptures;
-    this.data = migrated.data;
+    const linked=syncJobSchedules(migrated.data);
+    if(JSON.stringify(linked.schedules)!==JSON.stringify(migrated.data.schedules)){this.createMigrationBackup(Number(parsed.version||1));migrated.changed=true;}
+    this.data = linked;
     const sourceVersion = Number(parsed.version || 1);
     if (migrated.changed) {
       if (sourceVersion < DATA_VERSION) this.createMigrationBackup(sourceVersion);
@@ -100,7 +103,7 @@ class JsonStore {
   }
 
   save(nextData = this.data) {
-    nextData = migrateCompanies(nextData).data;
+    nextData = syncJobSchedules(migrateCompanies(nextData).data);
     fs.mkdirSync(path.dirname(this.filePath), { recursive: true });
     const tempPath = `${this.filePath}.tmp`;
     fs.writeFileSync(tempPath, JSON.stringify(nextData, null, 2), 'utf8');

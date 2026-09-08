@@ -270,6 +270,7 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
       const next = saveSchedule(workspace.schedules, prepared, timestamp, makeScheduleId);
       saved = next.find((schedule) => schedule.id === (existing?.id || id || next[0].id));
       workspace.schedules = next;
+      if(existing?.legacy?.managedByJobDeadline){require('./job-schedule-core').updateLinkedDeadline(workspace,existing,saved.startAt,timestamp);saved.legacy={...saved.legacy,...existing.legacy};}
       const linkedTodo = saved.sourceRef?.type === 'todo'
         ? workspace.todos.find((todo) => todo.id === saved.sourceRef.id)
         : null;
@@ -299,7 +300,8 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
     const id = safeId(idValue, '日程');
     commit(store, (workspace) => {
       ensureCollections(workspace);
-      findById(workspace.schedules, id, '日程');
+      const linked=findById(workspace.schedules, id, '日程');
+      require('./job-schedule-core').updateLinkedDeadline(workspace,linked,null,getNow());
       workspace.schedules = workspace.schedules.filter((schedule) => schedule.id !== id);
       return workspace;
     });
