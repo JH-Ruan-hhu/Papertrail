@@ -1,6 +1,6 @@
 {
   "name": "papertrail-desktop",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Local-first research workbench with schedules, notes, and manuscript tracking for Windows",
   "main": "src/main.js",
   "author": "Yanji contributors",
@@ -75,7 +75,7 @@
       {
         "provider": "github",
         "owner": "JH-Ruan-hhu",
-        "repo": "Papertrail",
+        "repo": "Yan_ji",
         "releaseType": "release"
       }
     ]

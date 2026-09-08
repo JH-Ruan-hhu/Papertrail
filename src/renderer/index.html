@@ -16,6 +16,7 @@
     <link rel="stylesheet" href="styles/applications.css">
     <link rel="stylesheet" href="styles/workbench-theme.css">
     <link rel="stylesheet" href="styles/applications-v12.css">
+    <link rel="stylesheet" href="styles/update-center.css">
   </head>
   <body>
     <div class="window-titlebar"><time id="topbarClock" aria-label="当前时间"></time></div>
@@ -391,15 +392,15 @@
             </section>
 
             <section class="settings-panel" data-settings-panel="updates" role="tabpanel" hidden>
-              <div class="update-section-heading"><div><p class="eyebrow">RELEASE CENTER</p><h2>更新中心</h2><p>在这里完成检查、下载与安装，过程清晰可控</p></div><span class="update-safety-pill">本地数据不受影响</span></div>
+              <div class="update-section-heading"><div><h2>更新中心</h2><p>在这里完成检查、下载与安装，过程清晰可控</p></div><span class="update-safety-pill">本地数据不受影响</span></div>
               <div class="settings-group update-group" data-update-status="idle">
                 <div class="update-hero">
                   <span class="update-app-mark" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 4v10"/><path d="m8.5 10.5 3.5 3.5 3.5-3.5"/><path d="M5 17.5h14"/></svg><i></i></span>
-                  <div class="update-copy"><span class="update-kicker">YANJI DESKTOP</span><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
+                  <div class="update-copy"><span class="update-kicker">研迹 · 正式版</span><strong id="updateStatusTitle">检查研迹更新</strong><small id="updateStatusText">仅在你点击检查时连接 GitHub Releases。</small></div>
                   <div class="update-controls"><span class="update-version-badge" id="updateVersionBadge" hidden></span><button class="button primary" id="updateActionButton" type="button">检查更新</button></div>
                 </div>
                 <div class="update-version-overview" aria-label="版本信息">
-                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.4.11</span></strong><small>正在使用</small></div>
+                  <div class="update-version-card"><span>当前版本</span><strong>v<span id="currentVersion">1.5.1</span></strong><small>正在使用</small></div>
                   <span class="update-version-arrow" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></svg></span>
                   <div class="update-version-card target"><span>可用版本</span><strong id="updateTargetVersion">等待检查</strong><small>来自 GitHub Release</small></div>
                 </div>

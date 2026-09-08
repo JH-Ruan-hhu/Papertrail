@@ -250,7 +250,7 @@ test('installer uses the stock electron-builder wizard while retaining upgrade s
   assert.match(installer, /!insertmacro GetDParameter \$R0/);
   assert.match(installer, /StrCpy \$INSTDIR "\$YanjiLegacyInstallRoot\\papertrail-desktop"/);
   assert.match(installer, /stock electron-builder NSIS wizard/);
-  assert.match(indexHtml, /RELEASE CENTER/);
+  assert.match(indexHtml, /更新中心/);
   assert.match(indexHtml, /id="autoCheckUpdates"/);
   assert.match(indexHtml, /class="update-journey"/);
   assert.match(appJs, /updateGroup\.dataset\.updateStatus = status/);
@@ -536,7 +536,7 @@ test('daily document renderer no longer exposes the legacy entry editor', () => 
 test('update center shows current and available versions with a local-data safety boundary', () => {
   const indexHtml = readProjectFile('src', 'renderer', 'index.html');
   const appJs = readProjectFile('src', 'renderer', 'app.js');
-  assert.match(indexHtml, /RELEASE CENTER/);
+  assert.match(indexHtml, /更新中心/);
   assert.match(indexHtml, /id="updateTargetVersion"/);
   assert.match(indexHtml, /只替换程序文件，不移动日程、笔记、投稿或求职数据/);
   assert.match(appJs, /updateTargetVersion\.textContent/);

@@ -1,0 +1,35 @@
+
+/* Update center shares the application palette, typography and corner sizes. */
+.settings-page .update-group { background:#fff; border:1px solid #E5EAF2; border-radius:14px; box-shadow:none; }
+.update-section-heading h2 { font-size:20px; color:#1D2939; }
+.update-section-heading>div>p:last-child { font-size:13px; color:#667085; }
+.update-safety-pill { border-radius:8px; background:#F2F5FA; border-color:#E5EAF2; color:#667085; font-size:12px; font-weight:500; }
+.update-hero { min-height:116px; padding:24px; gap:16px; }
+.update-app-mark { background:#EFF4FF; color:#2F6BEE; border:1px solid #DCE7FF; border-radius:12px; box-shadow:none; }
+.update-app-mark i { border-color:#fff; background:#2F6BEE; }
+.update-copy .update-kicker { color:#667085; font-size:12px; font-weight:500; letter-spacing:0; }
+.update-copy strong { color:#1D2939; font-size:20px; font-weight:600; }
+.update-copy small { color:#667085; font-size:13px; line-height:1.6; }
+.update-controls .button { border-radius:10px; box-shadow:none; min-height:38px; }
+.update-version-overview { padding:0 24px 24px; }
+.update-version-card,.update-version-card.target { background:#F8FAFD; border:1px solid #E5EAF2; border-radius:10px; min-height:82px; }
+.update-version-card>span { color:#667085; font-size:12px; }
+.update-version-card>strong { color:#344054; font-size:20px; }
+.update-version-card>small { color:#98A2B3; font-size:12px; }
+.update-version-card.target>strong { color:#2F6BEE; }
+.update-version-arrow { background:#F2F5FA; color:#98A2B3; }
+.update-journey { background:#F8FAFD; border-color:#E5EAF2; padding:16px 24px; }
+.update-journey>span { color:#667085; }
+.update-journey i { background:#EAF0F8; color:#667085; }
+.update-journey b { font-size:12px; font-weight:500; }
+.update-journey em { background:#E5EAF2; }
+.update-preferences { background:#fff; padding:20px 24px; }
+.update-preferences strong { color:#344054; font-size:13px; }
+.update-preferences small,.update-preferences label { color:#667085; font-size:12px; }
+.update-group[data-update-status="error"] .update-app-mark { color:#B42318; background:#FFF3F2; border-color:#F9D7D3; }
+.update-group[data-update-status="error"] .update-app-mark i { background:#D92D20; }
+.update-group[data-update-status="error"] .update-copy small { color:#B42318; }
+.update-group:is([data-update-status="available"],[data-update-status="downloaded"]) .update-app-mark { background:#EFF4FF; color:#2F6BEE; }
+.update-group .update-progress { background:#EDF2FA; }
+.update-group .update-progress>span { background:#2F6BEE; }
+@media(max-width:760px){.update-hero{grid-template-columns:48px minmax(0,1fr);padding:18px}.update-controls{grid-column:1/-1;justify-content:flex-end}.update-version-overview{padding:0 18px 18px}.update-version-card{grid-template-columns:1fr}.update-version-card>strong{grid-row:auto;grid-column:auto}.update-preferences{flex-wrap:wrap;gap:16px}}
