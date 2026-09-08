@@ -96,3 +96,10 @@ body { color:var(--text); background:#eef5ff; -webkit-font-smoothing:antialiased
 .settings-page .settings-panel>h3 { margin:20px 0 10px; }
 .settings-page .settings-panel .settings-group { padding-inline:0; }
 @media(max-width:900px) { .settings-page .settings-panel { padding:20px; } }
+
+/* Closed applications retain readable history with reduced visual emphasis. */
+.job-page .job-position.is-closed,.career-job.is-closed { background:var(--surface-soft); box-shadow:none; }
+.job-position.is-closed .job-company-name,.job-position.is-closed .career-row-role,.career-job.is-closed .career-card-company { color:var(--text-muted); }
+.job-position.is-closed .career-workflow { filter:grayscale(1); opacity:.65; }
+.career-closure-badge { color:var(--text-muted); font-size:12px; }
+.career-decline-offer { justify-self:start; color:var(--text-muted); background:var(--surface); border:1px solid var(--border); border-radius:6px; padding:4px 8px; cursor:pointer; }

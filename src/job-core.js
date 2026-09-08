@@ -187,6 +187,7 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
     ...(hasOwn(input,'resumeName')?{resumeName:cleanText(input.resumeName,200)||null}:{}),
     ...(hasOwn(input,'jdText')?{jdText:cleanText(input.jdText,30000)||null}:{}),
     status: lifecycleStatusFor(input, rawStatus),
+    ...(hasOwn(input, 'closureReason') ? { closureReason: lifecycleStatusFor(input, rawStatus) === 'closed' && input.closureReason === 'offer-declined' ? 'offer-declined' : null } : {}),
     nextFollowUpAt,
     nextActionAt: nextFollowUpAt,
     notes: cleanText(input.notes, 10_000) || null,

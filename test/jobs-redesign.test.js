@@ -6,3 +6,12 @@ test('job detail extensions survive saved edits and normalization without invent
 test('closing an offer actually moves it to the closed column',()=>{const job={status:'active',workflow:{stages:[{id:'offer',name:'Offer'}],currentStageId:'offer',timeline:[]}};assert.equal(D.bucket(D.move(job,'closed')),'closed');});
 
 test('semicolon tags split before truncation and preserve separate chips',()=>{const job=J.normalizeJobApplication({company:'单位',role:'岗位',tags:['技术岗；云计算;解决方案',' 技术岗 ','；']});assert.deepEqual(job.tags,['技术岗','云计算','解决方案']);});
+
+test('declining an offer persists its reason, keeps history and can be reopened',()=>{
+ const job=J.normalizeJobApplication({id:'decline',company:'单位',role:'岗位',status:'active',pinned:true,workflow:{stages:[{id:'offer',name:'Offer'}],currentStageId:'offer',timeline:[{stageId:'offer',date:'2026-09-08'}]}});
+ const saved=J.saveJobApplication([job],D.move(job,'offer-declined'))[0];
+ assert.equal(saved.status,'closed'); assert.equal(saved.closureReason,'offer-declined');assert.equal(D.bucket(saved),'closed');assert.deepEqual(saved.workflow,job.workflow);
+ assert.equal(J.normalizeJobApplication(saved).closureReason,'offer-declined');
+ assert.equal(J.saveJobApplication([saved],{id:saved.id,company:saved.company,role:saved.role,notes:'备注'})[0].closureReason,'offer-declined');
+ const reopened=J.normalizeJobApplication(D.move(saved,'offer'));assert.equal(reopened.status,'active');assert.equal(reopened.closureReason,null);
+});

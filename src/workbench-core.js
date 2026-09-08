@@ -372,7 +372,12 @@ function normalizeSchedule(value, index = 0, fallbackAt = new Date(0).toISOStrin
   if (!asObject(value)) throw new Error(`第 ${index + 1} 条日程格式无效。`);
   const sourceStartAt = isoDate(value.startAt);
   const sourceEndAt = isoDate(value.endAt);
-  const allDay = Boolean(value.allDay);
+  // Repair legacy automatic date-only blocks while retaining their IDs and links.
+  const anchor = new Date(sourceStartAt);
+  const dateOnlyCapture = value.legacy?.managedByTodo && value.sourceRef?.type === 'todo'
+    && anchor.getHours() === 23 && anchor.getMinutes() === 59
+    && anchor.getSeconds() === 59 && anchor.getMilliseconds() === 999;
+  const allDay = Boolean(value.allDay || dateOnlyCapture);
   let startAt = sourceStartAt;
   let endAt = sourceEndAt;
   if (allDay && sourceStartAt) {

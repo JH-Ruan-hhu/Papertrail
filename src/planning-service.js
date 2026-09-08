@@ -121,7 +121,7 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
   function scheduleWindowForTodo(todo, timestamp, existingSchedule = null) {
     const anchor = new Date(todo.dueAt || timestamp);
     if (!Number.isFinite(anchor.getTime())) throw new Error('待办日期无效。');
-    if (!todo.dueAt) {
+    if (!todo.dueAt || (anchor.getHours() === 23 && anchor.getMinutes() === 59 && anchor.getSeconds() === 59 && anchor.getMilliseconds() === 999)) {
       const start = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
       return { startAt: start.toISOString(), endAt: new Date(start.getFullYear(), start.getMonth(), start.getDate() + 1).toISOString(), allDay: true };
     }
@@ -279,7 +279,9 @@ function createPlanningService({ store, makeId = () => crypto.randomUUID(), now 
           id: linkedTodo.id,
           title: saved.title,
           priority: saved.priority,
-          dueAt: managedByTodo ? saved.startAt : saved.endAt,
+          dueAt: managedByTodo && saved.allDay
+            ? (linkedTodo.dueAt ? new Date(Date.parse(saved.endAt) - 1).toISOString() : null)
+            : managedByTodo ? saved.startAt : saved.endAt,
           reminderMode: 'none',
           reminderAt: null,
           status: saved.completedAt ? 'completed' : linkedTodo.status === 'cancelled' ? 'cancelled' : 'open',

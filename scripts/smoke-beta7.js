@@ -1,0 +1,25 @@
+'use strict';
+const {app,BrowserWindow}=require('electron'),fs=require('node:fs'),path=require('node:path');app.disableHardwareAcceleration();for(const x of ['disable-gpu','disable-gpu-compositing','in-process-gpu'])app.commandLine.appendSwitch(x);app.setPath('userData',path.join(__dirname,'../work/jobs-redesign-ui'));app.on('window-all-closed',()=>{});
+app.whenReady().then(async()=>{let win;try{for(const [width,height] of [[1366,768],[1920,1080]]){win=new BrowserWindow({width,height,show:false,webPreferences:{preload:path.join(__dirname,'smoke-preload.js'),contextIsolation:true,nodeIntegration:false,sandbox:false}});win.setSize(width,height);await win.loadFile(path.join(__dirname,'../src/renderer/index.html'));await new Promise(r=>setTimeout(r,600));
+const result=await win.webContents.executeJavaScript(`(async()=>{
+ const check=(v,m)=>{if(!v)throw Error(m)};
+ switchWorkbenchPage('jobs-applications');
+ const job=wb.workspace.jobApplications[0];
+ Object.assign(job,window.YanjiCareerData.move(job,'offer'));renderJobs();
+ document.querySelector('[data-career-job="'+job.id+'"] [data-target-stage="offer-declined"]').click();
+ await new Promise(r=>setTimeout(r,250));
+ const saved=wb.workspace.jobApplications.find(j=>j.id===job.id);
+ check(saved.status==='closed'&&saved.closureReason==='offer-declined','decline persists');
+ check(document.querySelector('[data-career-stage="closed"] [data-career-job="'+job.id+'"].is-closed'),'closed column');
+ document.querySelector('[data-career-view="table"]').click();
+ const row=document.querySelector('[data-job-id="'+job.id+'"]');
+ check(row.classList.contains('is-closed'),'table muted');
+ check(row.textContent.includes('Offer 已拒绝'),'closure label');
+ check(getComputedStyle(row.querySelector('.career-workflow')).filter==='grayscale(1)','muted history');
+ const rows=[...document.querySelectorAll('#jobBoard [data-job-id]')];
+ const index=rows.indexOf(row);check(rows.slice(index+1).every(r=>r.classList.contains('is-closed')),'closed rows sink');
+ const start=new Date();start.setHours(0,0,0,0);const end=new Date(start);end.setDate(end.getDate()+1);
+ wb.workspace.schedules=[{id:'date-only',title:'完成报告',startAt:start.toISOString(),endAt:end.toISOString(),allDay:true}];
+ check(schedulesForDay(start).length===1,'today one occurrence');check(schedulesForDay(end).length===0,'tomorrow no duplicate');
+ return {width:innerWidth,declined:true,dateOnly:true};
+})()`);console.log('YANJI_BETA7_UI_OK '+JSON.stringify(result));win.destroy();win=null;}app.exit(0);}catch(e){console.error(e.stack);if(win)win.destroy();app.exit(1);}});

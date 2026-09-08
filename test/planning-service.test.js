@@ -151,3 +151,26 @@ test('converting a todo to a schedule removes the outcome and unlinks its existi
   assert.equal(store.data.schedules.length, 2);
   assert.equal(store.data.schedules.filter((item) => item.sourceRef).length, 0);
 });
+
+test('date-only captures occupy only their requested day, including after reload', () => {
+  const {parseNaturalLanguageTodo}=require('../src/todo-core');
+  const {normalizeSchedule}=require('../src/workbench-core');
+  const now=new Date(2026,8,8,10),store=makeStore(); let id=0;
+  const service=createPlanningService({store,makeId:()=> 'date-'+(++id),now:()=>now});
+  for(const [text,day] of [['今天完成报告',8],['明天完成报告',9]]) {
+    const todo=service.saveTodoWithSchedule(parseNaturalLanguageTodo(text,now));
+    const schedule=store.data.schedules.find(s=>s.sourceRef.id===todo.id);
+    assert.equal(schedule.allDay,true);
+    assert.equal(new Date(schedule.startAt).getDate(),day);
+    assert.equal(new Date(schedule.startAt).getHours(),0);
+    assert.equal(Date.parse(schedule.endAt),new Date(2026,8,day+1).getTime());
+    const old={...schedule,allDay:false,startAt:todo.dueAt,endAt:new Date(Date.parse(todo.dueAt)+3600000).toISOString()};
+    const repaired=normalizeSchedule(old);
+    assert.deepEqual(repaired,schedule);
+    service.saveSchedule({...schedule,title:'完成报告终稿'});
+    assert.equal(store.data.todos.find(t=>t.id===todo.id).dueAt,todo.dueAt);
+    const manual=normalizeSchedule({...old,legacy:{},sourceRef:null});
+    assert.equal(manual.allDay,false);
+  }
+  assert.equal(store.data.schedules.length,2);
+});

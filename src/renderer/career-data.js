@@ -26,10 +26,14 @@
       deadlines:jobs.filter(j=>j.status!=='closed' && j.deadline && key(j.deadline)>=today && key(j.deadline)<=key(end)).sort((a,b)=>key(a.deadline).localeCompare(key(b.deadline))),events:events(jobs)};
   }
   function move(job, target, today=key(new Date())) {
+    if(target==='offer-declined') {
+      if(category(current(job)?.name || '')!=='offer') throw new Error('只有 Offer 阶段可以拒绝 Offer');
+      return {...JSON.parse(JSON.stringify(job)),status:'closed',closureReason:'offer-declined'};
+    }
     if(!stages.some(([id])=>id===target)) throw new Error('不支持的阶段');
     const next=JSON.parse(JSON.stringify(job)); next.workflow ||= {stages:[],timeline:[]};
     if(target==='preparing' || target==='closed'){ next.status=target;return next; }
-    next.status='active';
+    next.status='active'; next.closureReason=null;
     let stage=next.workflow.stages.find(s=>category(s.name)===target);
     if(!stage){stage={id:`career-${target}`,name:stages.find(([id])=>id===target)[1]};next.workflow.stages.push(stage);}
     next.workflow.currentStageId=stage.id;
