@@ -944,7 +944,7 @@ function saveWorkspaceJobApplication(input) {
   const persisted=store.listJobApplications().find(job=>job.id===saved.id);
   broadcastWorkspace();
   const logos=getCompanyLogoService();
-  setImmediate(()=>{try{logos.ensure(persisted.companyId).catch(()=>{});}catch{ /* Logo retrieval must not affect a saved job. */ }});
+  setImmediate(()=>{try{logos.ensure(persisted.companyId,Boolean(persisted.sourceUrl&&persisted.sourceUrl!==existing?.sourceUrl)).catch(()=>{});}catch{ /* Logo retrieval must not affect a saved job. */ }});
   return persisted;
 }
 

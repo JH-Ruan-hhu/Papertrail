@@ -322,7 +322,7 @@ test('research workbench exposes home, rolling schedule board, metadata notes an
   assert.match(workbenchJs, /addEventListener\('wheel',[\s\S]*event\.ctrlKey[\s\S]*applyScheduleZoom/);
   assert.match(workbenchJs, /is-brief[\s\S]*is-compact-block[\s\S]*is-expanded-block/);
   assert.match(layoutCss, /grid-template-columns:\s*54px repeat\(7, minmax\(118px, 1fr\)\)/);
-  assert.match(layoutCss, /grid-template-rows:\s*54px 44px var\(--schedule-track-height\)/);
+  assert.match(layoutCss, /grid-template-rows:\s*54px var\(--schedule-all-day-height,44px\) var\(--schedule-track-height\)/);
   assert.match(layoutCss, /is-detailed-scale[^}]*time\.is-half-hour\s*\{[^}]*display:\s*block/);
   assert.match(mainJs, /todos:create-scheduled/);
   assert.match(indexHtml, /id="attendanceGanttRows"/);
@@ -463,7 +463,7 @@ test('job dashboard uses independent lifecycle states and selectable standard wo
   assert.match(indexHtml, /id="jobWorkflowEditor"/);
   assert.match(indexHtml, /id="jobAnnualSalaryWan"/);
   assert.doesNotMatch(indexHtml, /job-upcoming-panel|jobUpcomingCount|>近期日程</);
-  assert.match(indexHtml, /投递与 Offer 固定为起终点；测评和各轮面试可按岗位自由选择/);
+  assert.match(indexHtml, /投递与 Offer 固定为起终点；AI 面、测评和各轮面试/);
   assert.doesNotMatch(indexHtml, /value="pending">待投递/);
   assert.match(workbenchJs, /function renderJobQuickFilters\(jobs/);
   assert.match(workbenchJs, /function readWorkflowEditor\(\)/);
@@ -774,7 +774,7 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
   assert.match(indexHtml, /城市：不限/);
   assert.match(indexHtml, /class="job-table-head"[\s\S]*岗位类型/);
   assert.match(indexHtml, /class="job-table-head"[\s\S]*当前阶段[\s\S]*进度[\s\S]*当前阶段截止时间/);
-  assert.match(indexHtml, /id="jobDeadline"/);
+  assert.doesNotMatch(indexHtml, /id="jobDeadline"/);
   assert.match(indexHtml, /id="jobSettingsButton"[\s\S]*<circle cx="12" cy="12" r="3"/);
   assert.match(readProjectFile('src', 'renderer', 'career.js'), /function careerTableRow/);
   assert.match(workbenchJs, /const closedDifference = Number\(left\.status === 'closed'\) - Number\(right\.status === 'closed'\);[\s\S]*if \(closedDifference\) return closedDifference;/);

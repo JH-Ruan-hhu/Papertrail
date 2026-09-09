@@ -8,3 +8,7 @@ Local Windows x64 NSIS release. GitHub publishing canceled at user request.
 - Corrects future update feed and release-page links to Yan_ji. No online 1.5.1 release created.
 
 Validation: 214 tests passed; real Electron job-type persistence and update-center states checked. Package verification, packaged smoke, storage recovery and source/ASAR comparison passed. Stable data compatibility checked on a temporary copy: Schema 11 retained; 29 jobs, 30 todos, 2 notes and 1 paper preserved; schedules 16 to 19 due to deadline backfill. Original data unmodified.
+
+## September 9 local revision
+
+Adds AI 面 before assessment, wider job actions, per-stage deadline editing and preservation of hidden legacy contact/notes. Refreshes icon discovery after source-link changes, with source-page favicon fallback and ICO PNG/32-bit frame decoding. All-day lanes expand up to four rows then scroll. Linked deadline events default to 30 minutes, capped at local midnight. Validation: 215 unit tests, real IPC AI selection/deadline save and 30-minute calendar duration, three all-day rows visible, package checks and source/ASAR match passed.

@@ -519,6 +519,7 @@ function canonicalJobStage(stage) {
   const name = String(stage?.name || '').trim();
   const aliases = {
     'stage-apply': /^(投递|申请)$/,
+    'stage-ai-interview': /^AI\s*面(?:试)?$/i,
     'stage-assessment': /^(测评|网测|笔试|在线测评)$/,
     'stage-first-interview': /^(一面|初面|第一轮面试)$/,
     'stage-second-interview': /^(二面|第二轮面试)$/,
@@ -526,7 +527,7 @@ function canonicalJobStage(stage) {
     'stage-final-interview': /^(终面|最终面试)$/,
     'stage-offer': /^offer$/i
   };
-  if (id === 'stage-online-test') return DEFAULT_JOB_WORKFLOW_STAGES[1];
+  if (id === 'stage-online-test') return DEFAULT_JOB_WORKFLOW_STAGES.find(s=>s.id==='stage-assessment');
   return DEFAULT_JOB_WORKFLOW_STAGES.find((candidate) => candidate.id === id || aliases[candidate.id]?.test(name)) || null;
 }
 
@@ -774,6 +775,7 @@ function renderWorkflowEditor(workflow = wb.editingJobWorkflow) {
   const selectedStages = wb.editingJobWorkflow.stages;
   const unselectedStages = DEFAULT_JOB_WORKFLOW_STAGES.slice(1, -1).filter((stage) => !selectedById.has(stage.id));
   const options = [selectedStages[0], ...selectedStages.slice(1, -1), ...unselectedStages, selectedStages.at(-1)].filter(Boolean);
+  const aiIndex=options.findIndex(s=>s.id==='stage-ai-interview');const assessmentIndex=options.findIndex(s=>s.id==='stage-assessment');if(aiIndex>=0&&assessmentIndex>=0&&!selectedById.has('stage-ai-interview')){const [ai]=options.splice(aiIndex,1);options.splice(options.findIndex(s=>s.id==='stage-assessment'),0,ai);}
   editor.innerHTML = options.map((stage) => {
     const selected = selectedById.has(stage.id);
     const required = ['stage-apply', 'stage-offer'].includes(stage.id);
@@ -783,7 +785,7 @@ function renderWorkflowEditor(workflow = wb.editingJobWorkflow) {
     const selectedIndex = selectedStages.findIndex((candidate) => candidate.id === stage.id);
     const canMoveUp = selected && selectedIndex > 1;
     const canMoveDown = selected && selectedIndex > 0 && selectedIndex < selectedStages.length - 2;
-    return `<div class="job-stage-option${selected ? ' is-selected' : ''}${legacy ? ' is-legacy' : ''}" data-workflow-stage-option data-stage-id="${wbEscape(stage.id)}" data-stage-name="${wbEscape(stage.name)}"><label class="job-stage-toggle"><input data-workflow-stage-enabled type="checkbox"${selected ? ' checked' : ''}${required ? ' disabled' : ''}><span aria-hidden="true">${selected ? '✓' : ''}</span><strong>${wbEscape(stage.name)}</strong>${required ? '<small>固定</small>' : (legacy ? '<small>旧版阶段</small>' : '<small>可选</small>')}</label><div class="job-stage-order" aria-label="调整 ${wbEscape(stage.name)} 顺序"><button type="button" data-move-workflow-stage="up"${canMoveUp ? '' : ' disabled'} aria-label="上移 ${wbEscape(stage.name)}">↑</button><button type="button" data-move-workflow-stage="down"${canMoveDown ? '' : ' disabled'} aria-label="下移 ${wbEscape(stage.name)}">↓</button></div><label class="job-stage-date"><span>日期</span><input data-workflow-stage-date type="date" value="${wbEscape(localDateInputValue(date))}"${selected ? '' : ' disabled'}></label><label class="job-stage-current"><input data-workflow-set-current type="radio" name="jobCurrentStage"${current ? ' checked' : ''}${selected ? '' : ' disabled'}><span>${current ? '当前阶段' : '设为当前'}</span></label></div>`;
+    return `<div class="job-stage-option${selected ? ' is-selected' : ''}${legacy ? ' is-legacy' : ''}" data-workflow-stage-option data-stage-id="${wbEscape(stage.id)}" data-stage-name="${wbEscape(stage.name)}"><label class="job-stage-toggle"><input data-workflow-stage-enabled type="checkbox"${selected ? ' checked' : ''}${required ? ' disabled' : ''}><span aria-hidden="true">${selected ? '✓' : ''}</span><strong>${wbEscape(stage.name)}</strong>${required ? '<small>固定</small>' : (legacy ? '<small>旧版阶段</small>' : '<small>可选</small>')}</label><div class="job-stage-order" aria-label="调整 ${wbEscape(stage.name)} 顺序"><button type="button" data-move-workflow-stage="up"${canMoveUp ? '' : ' disabled'} aria-label="上移 ${wbEscape(stage.name)}">↑</button><button type="button" data-move-workflow-stage="down"${canMoveDown ? '' : ' disabled'} aria-label="下移 ${wbEscape(stage.name)}">↓</button></div><label class="job-stage-date"><span>日期</span><input data-workflow-stage-date type="date" value="${wbEscape(localDateInputValue(date))}"${selected ? '' : ' disabled'}></label><label class="job-stage-deadline"><span>截止时间</span><input data-workflow-stage-deadline type="datetime-local" value="${wbEscape(window.YanjiDeadlineParser.localValue(wb.editingJobWorkflow.deadlines?.[stage.id]).replace(' ','T'))}"${selected ? '' : ' disabled'}></label><label class="job-stage-current"><input data-workflow-set-current type="radio" name="jobCurrentStage"${current ? ' checked' : ''}${selected ? '' : ' disabled'}><span>${current ? '当前阶段' : '设为当前'}</span></label></div>`;
   }).join('');
 }
 
@@ -800,6 +802,7 @@ function readWorkflowEditor() {
   const rows = [...document.querySelectorAll('#jobWorkflowEditor [data-workflow-stage-option]')];
   const stages = [];
   const timeline = [];
+  const deadlines={};
   let currentStageId = null;
   rows.forEach((row) => {
     if (!row.querySelector('[data-workflow-stage-enabled]')?.checked) return;
@@ -809,9 +812,10 @@ function readWorkflowEditor() {
     const previousDate=jobTimelineDate(wb.editingJobWorkflow,stage.id);
     const date = dateValue===localDateInputValue(previousDate)?previousDate:dateInputToIso(dateValue);
     if (date) timeline.push({ stageId: stage.id, date });
+    const input=row.querySelector('[data-workflow-stage-deadline]')?.value||'';const previous=wb.editingJobWorkflow.deadlines?.[stage.id];deadlines[stage.id]=input===window.YanjiDeadlineParser.localValue(previous).replace(' ','T')?(previous||null):input?new Date(input).toISOString():null;
     if (row.querySelector('[data-workflow-set-current]')?.checked) currentStageId = stage.id;
   });
-  const workflow = { stages, currentStageId: currentStageId || stages[0]?.id, timeline, ...(wb.editingJobWorkflow?.deadlines?{deadlines:Object.fromEntries(Object.entries(wb.editingJobWorkflow.deadlines).filter(([id])=>stages.some(s=>s.id===id)))}:{}) };
+  const workflow = { stages, currentStageId: currentStageId || stages[0]?.id, timeline, deadlines };
   wb.editingJobWorkflow = workflow;
   return workflow;
 }
@@ -833,10 +837,7 @@ function openJobEditor(job = null, initialStatus = 'active') {
   dialog.dataset.initialStatus = job?.status || (['preparing', 'active', 'closed'].includes(initialStatus) ? initialStatus : 'active');
   document.getElementById('jobPriority').value = job?.priority || 'medium';
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
-  document.getElementById('jobDeadline').value = localDateInputValue(job?.deadline);
   document.getElementById('jobAppliedAt').value = localDateInputValue(job?.appliedAt);
-  document.getElementById('jobContact').value = job?.contact || '';
-  document.getElementById('jobNotes').value = job?.notes || '';
   for (const [id,key] of [['jobSourceUrl','sourceUrl'],['jobJdText','jdText']]) document.getElementById(id).value=job?.[key]??'';
   document.getElementById('jobOutcome').value=job?.status==='closed'?(job.closureReason||'closed'):'active';
   document.getElementById('jobTags').value=(job?.tags||[]).join('；');
@@ -844,6 +845,7 @@ function openJobEditor(job = null, initialStatus = 'active') {
   document.getElementById('deleteJobButton').hidden = !job;
   dialog.dataset.revision = String(job?.revision ?? '');
   wb.editingJobWorkflow = cloneJobWorkflow(job?.workflow || defaultJobWorkflow());
+  if(job?.deadline){const apply=wb.editingJobWorkflow.stages.find(s=>/投递/.test(s.name));if(apply&&!Object.hasOwn(wb.editingJobWorkflow.deadlines||{},apply.id))wb.editingJobWorkflow.deadlines={...wb.editingJobWorkflow.deadlines,[apply.id]:job.deadline};}
   renderWorkflowEditor(wb.editingJobWorkflow);
   openWorkbenchDialog(dialog);
   requestAnimationFrame(() => document.getElementById('jobCompany').focus());
@@ -863,7 +865,7 @@ async function saveJobFromEditor() {
     jobType: document.getElementById('jobType').value,
     city,
     location: city,
-    deadline: document.getElementById('jobDeadline').value===localDateInputValue(existing?.deadline)?existing?.deadline:dateInputToIso(document.getElementById('jobDeadline').value),
+    deadline: existing?.deadline || null,
     priority: document.getElementById('jobPriority').value,
     status: existing?.status === 'closed' ? 'closed' : (document.getElementById('jobDialog').dataset.initialStatus || 'active'),
     annualSalaryWan: document.getElementById('jobAnnualSalaryWan').value,
@@ -871,8 +873,8 @@ async function saveJobFromEditor() {
     nextFollowUpAt,
     nextActionAt: nextFollowUpAt,
     workflow: readWorkflowEditor(),
-    contact: document.getElementById('jobContact').value,
-    notes: document.getElementById('jobNotes').value,
+    contact: existing?.contact || '',
+    notes: existing?.notes || '',
     sourceUrl: document.getElementById('jobSourceUrl').value,
     jdText: document.getElementById('jobJdText').value,
     tags: document.getElementById('jobTags').value.split(/[;；,，]/),
@@ -1133,6 +1135,7 @@ function renderTimeline() {
     return `<section class="schedule-board-column ${sameDay(date, new Date()) ? 'today' : ''} ${sameDay(date, selected) ? 'selected' : ''}" data-board-date="${dateKey}"><button class="schedule-board-heading" data-select-schedule-date="${dateKey}" type="button"><span>${new Intl.DateTimeFormat('zh-CN', { weekday: 'short' }).format(date)}</span><strong>${new Intl.DateTimeFormat('zh-CN', { month: 'numeric', day: 'numeric' }).format(date)}</strong><b>${events.length}</b></button><div class="schedule-all-day-lane">${allDayCards || '<span>—</span>'}</div><div class="schedule-time-track">${timedCards}</div></section>`;
   }).join('');
   document.getElementById('scheduleBoard').innerHTML = `${timeAxis}${dayColumns}`;
+  const lanes=[...document.querySelectorAll('#scheduleBoard .schedule-all-day-lane')];const count=Math.max(1,...lanes.map(l=>l.querySelectorAll('.schedule-board-card').length));document.getElementById('scheduleBoard').style.setProperty('--schedule-all-day-height',(10+Math.min(count,4)*36)+'px');
   applyScheduleZoom();
   document.querySelectorAll('#scheduleBoard [data-schedule-top]').forEach((card) => {
     card.style.top = `${Number(card.dataset.scheduleTop)}%`;

@@ -2059,7 +2059,7 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   min-width: 0;
   min-height: calc(98px + var(--schedule-track-height));
   display: grid;
-  grid-template-rows: 54px 44px var(--schedule-track-height);
+  grid-template-rows: 54px var(--schedule-all-day-height,44px) var(--schedule-track-height);
   overflow: visible;
   background: rgba(255,255,255,.58);
   border: 0;
@@ -2264,3 +2264,6 @@ html[data-viewport-density="ultra-compact"] .home-attendance-content .focus-cloc
   .home-command-grid > .home-attendance-card { grid-column: auto; }
   .home-countdown-card .home-deadline-title { padding-inline: 5px 30px; font-size: 13px; }
 }
+
+.schedule-all-day-lane { overflow-x:hidden; overflow-y:auto; scrollbar-width:thin; display:flex; flex-direction:column; gap:4px; }
+.schedule-all-day-lane .schedule-board-card.is-all-day { flex:0 0 32px; margin:0; }

@@ -12,7 +12,7 @@ function syncJobSchedules(workspace,now=new Date().toISOString()){
  for(const job of workspace.jobApplications||[])for(const entry of deadlineEntries(job)){
   const old=existing.get(job.id+'\0'+entry.stageId),startAt=new Date(entry.value).toISOString(),changed=old?.startAt!==startAt;
   const boundary=new Date(startAt);boundary.setHours(24,0,0,0);
-  const schedule={...old,id:old?.id||'job-due-'+crypto.createHash('sha256').update(job.id+'\0'+entry.stageId).digest('hex').slice(0,32),title:`${job.company} · ${job.role} · ${entry.label}截止`,startAt,endAt:new Date(Math.min(Date.parse(startAt)+60000,boundary.getTime())).toISOString(),allDay:false,priority:'high',reminderMinutesBefore:null,reminderSentAt:changed?null:old?.reminderSentAt||null,repeat:null,sourceRef:null,completedAt:job.status==='closed'?(old?.completedAt||now):null,createdAt:old?.createdAt||now,updatedAt:old?.updatedAt||now,legacy:{...old?.legacy,managedByJobDeadline:true,jobId:job.id,stageId:entry.stageId}};
+  const schedule={...old,id:old?.id||'job-due-'+crypto.createHash('sha256').update(job.id+'\0'+entry.stageId).digest('hex').slice(0,32),title:`${job.company} · ${job.role} · ${entry.label}截止`,startAt,endAt:new Date(Math.min(Date.parse(startAt)+30*60000,boundary.getTime())).toISOString(),allDay:false,priority:'high',reminderMinutesBefore:null,reminderSentAt:changed?null:old?.reminderSentAt||null,repeat:null,sourceRef:null,completedAt:job.status==='closed'?(old?.completedAt||now):null,createdAt:old?.createdAt||now,updatedAt:old?.updatedAt||now,legacy:{...old?.legacy,managedByJobDeadline:true,jobId:job.id,stageId:entry.stageId}};
   if(old&&JSON.stringify({...schedule,updatedAt:old.updatedAt})!==JSON.stringify(old))schedule.updatedAt=now;
   schedules.push(schedule);
  }

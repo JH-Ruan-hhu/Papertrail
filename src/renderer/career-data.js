@@ -1,8 +1,8 @@
 'use strict';
 (function(root) {
   const key = d => { const v = new Date(d); return Number.isFinite(v.getTime()) ? `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}` : null; };
-  const stages = Object.freeze([['apply','已投递'],['assessment','笔试'],['first','一面'],['second','二面'],['hr','HR 面'],['offer','Offer'],['closed','已拒绝 / 结束']]);
-  const category = name => /offer/i.test(name) ? 'offer' : /HR|三面|终面/i.test(name) ? 'hr' : /二面/.test(name) ? 'second' : /一面|面试/.test(name) ? 'first' : /测评|笔试|网测/.test(name) ? 'assessment' : /投递/.test(name) ? 'apply' : 'custom';
+  const stages = Object.freeze([['apply','已投递'],['ai','AI 面'],['assessment','测评'],['first','一面'],['second','二面'],['hr','HR 面'],['offer','Offer'],['closed','已拒绝 / 结束']]);
+  const category = name => /AI\s*面/i.test(name) ? 'ai' : /offer/i.test(name) ? 'offer' : /HR|三面|终面/i.test(name) ? 'hr' : /二面/.test(name) ? 'second' : /一面|面试/.test(name) ? 'first' : /测评|笔试|网测/.test(name) ? 'assessment' : /投递/.test(name) ? 'apply' : 'custom';
   const current = job => job.workflow?.stages?.find(s=>s.id===job.workflow.currentStageId);
   const bucket = job => job.status === 'preparing' ? 'apply' : job.status === 'closed' ? 'closed' : category(current(job)?.name || '投递');
   const applied = job => job.workflow?.timeline?.find(t=>category(job.workflow.stages.find(s=>s.id===t.stageId)?.name || '')==='apply' && t.date)?.date || job.appliedAt;

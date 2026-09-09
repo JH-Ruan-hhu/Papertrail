@@ -80,7 +80,7 @@ document.addEventListener('click',event=>{
  if(target.dataset.careerFavorite)saveCareerPatch(target.dataset.careerFavorite,j=>({pinned:!careerPinned(j),favorite:false}));
  if(target.dataset.careerNext)saveCareerPatch(target.dataset.careerNext,j=>window.YanjiCareerData.move(j,target.dataset.targetStage,new Date().toISOString()));
  if(target.dataset.careerTime)openCareerTime(target.dataset.careerTime);
- if(target.dataset.careerSummary){openJobEditor(wb.workspace.jobApplications.find(j=>j.id===target.dataset.careerSummary));requestAnimationFrame(()=>document.getElementById('jobNotes').focus());}
+ if(target.dataset.careerSummary){openJobEditor(wb.workspace.jobApplications.find(j=>j.id===target.dataset.careerSummary));}
  if(target.dataset.careerPage){careerPages.set(target.dataset.careerPage,(careerPages.get(target.dataset.careerPage)||0)+Number(target.dataset.delta));renderJobs();}
  if(target.dataset.careerScroll)document.querySelector(career.view==='cards'?'#careerKanban':'.job-table-scroll').scrollBy({left:Number(target.dataset.careerScroll)*300,behavior:'smooth'});
 });

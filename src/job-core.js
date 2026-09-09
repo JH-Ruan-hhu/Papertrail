@@ -29,6 +29,7 @@ const LEGACY_STATUS_STAGE_NAMES = Object.freeze({
 
 const DEFAULT_WORKFLOW_STAGES = Object.freeze([
   Object.freeze({ id: 'stage-apply', name: '投递' }),
+  Object.freeze({ id: 'stage-ai-interview', name: 'AI 面' }),
   Object.freeze({ id: 'stage-assessment', name: '测评' }),
   Object.freeze({ id: 'stage-first-interview', name: '一面' }),
   Object.freeze({ id: 'stage-second-interview', name: '二面' }),

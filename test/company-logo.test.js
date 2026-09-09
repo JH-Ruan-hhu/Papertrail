@@ -43,3 +43,5 @@ test('website icon wins over page previews and HTML is never cached as an image'
  service.update(id,{website:'https://company.example/'});await service.ensure(id,true);const saved=service.snapshot(id);assert.equal(saved.logoRemoteUrl,'https://company.example/site-icon.png');assert.equal(saved.logoSource,'favicon');assert.ok(saved.logoData.startsWith('data:image/png;base64,'));assert.deepEqual(requests,['https://company.example/','https://company.example/site-icon.png']);
  assert.equal(candidates('<meta property="og:image" content="/homepage.png">','https://company.example').length,0);
 });
+
+test('ICO PNG frame is decoded and malformed directories are bounded',()=>{const {decodeIcon}=require('../src/company-logo-service');const png=Buffer.from('89504e470d0a1a0a00000000','hex'),ico=Buffer.alloc(22+png.length);ico.writeUInt16LE(1,2);ico.writeUInt16LE(1,4);ico.writeUInt32LE(png.length,14);ico.writeUInt32LE(22,18);png.copy(ico,22);const image={isEmpty:()=>false};let seen;const native={createFromBuffer:b=>{seen=b;return image;}};assert.equal(decodeIcon(ico,native),image);assert.deepEqual(seen,png);});
