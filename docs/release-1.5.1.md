@@ -18,3 +18,5 @@ Adds AI 面 before assessment, wider job actions, per-stage deadline editing and
 Excludes closed applications from assessment/interview/offer counts and their drill-down filters while keeping submitted totals cumulative. Today todos include unfinished overdue tasks; completed tasks no longer show an overdue label on Home. Application tags use eight consistent pastel colors across card and table views.
 
 Validation: 217 tests passed, real Electron UI checks passed, package verification and packaged startup/storage recovery passed, and changed renderer files match the packaged ASAR. Adding a job with a source URL automatically discovers and stores its favicon; the form-to-IPC-to-image-decoding flow was verified with a controlled HTTP fixture, not a guarantee of retrieval from every live website. Local 1.5.1 only; no GitHub upload.
+
+Moves the table Logo action into the More menu as 公司 Logo. Verified menu access, saving and dialog closure in Electron; rebuilt local 1.5.1 passed package/startup checks and ASAR source comparison.
