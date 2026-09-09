@@ -48,6 +48,7 @@ function careerTypeSelect(job) {
  return '<select class="career-type-select" data-career-type="'+wbEscape(job.id)+'" aria-label="'+wbEscape(job.company)+'岗位类型"><option value="">未分类</option>'+types.map(type=>'<option value="'+wbEscape(type)+'"'+(job.jobType===type?' selected':'')+'>'+wbEscape(type)+'</option>').join('')+'</select>';
 }
 function careerTableRow(job) {
+ job={...job,workflow:{...job.workflow,stages:(job.workflow?.stages||[]).map(stage=>({...stage,name:stage.name==='终面'?'HR面':stage.name}))}};
  const id=wbEscape(job.id),D=window.YanjiCareerData;
  return `<article class="job-position application-row${job.status==='closed'?' is-closed':''}${careerPinned(job)?' is-pinned':''}" data-job-id="${id}" tabindex="0" aria-label="${wbEscape(job.company)} ${wbEscape(job.role)}"><div class="job-position-main"><div class="application-company-cell">${companyLogo(job)}<div><button type="button" data-edit-job="${id}">${wbEscape(job.company)}</button><p>${wbEscape(job.role)} ${careerFavorite(job)}</p></div></div><div>${wbEscape(job.city||job.location||'—')}</div><div>${careerTypeSelect(job)}</div><div>${applicationTags(job)||'—'}</div><div>${applicationStage(job)}</div>${applicationProgress(job)}<div>${applicationTimeButton(job,'stage-deadline',D.deadline(job).value,D.deadline(job).label)}</div><div class="job-position-actions">${applicationActions(job)}</div></div></article>`;
 }
