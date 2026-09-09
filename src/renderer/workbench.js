@@ -328,6 +328,7 @@ function homeItemsForDay(date) {
       items.push({ kind: 'event', event, sortAt: Date.parse(event.startAt) });
       continue;
     }
+    if(todo.status==='cancelled')continue;
     const group = linkedTasks.get(todo.id) || { kind: 'task', todo, events: [], sortAt: Date.parse(event.startAt) };
     group.events.push(event);
     group.sortAt = Math.min(group.sortAt, Date.parse(event.startAt));
@@ -362,9 +363,9 @@ function homeDayItemHtml(item, date) {
   }
   const completed = item.todo.status === 'completed';
   const scheduleId = item.events[0]?.id;
-  const timeLabel = item.events.length
+  const timeLabel = completed ? '已完成' : item.events.length
     ? item.events.map((event) => event.allDay ? '全天' : formatTime(event.startAt)).join('、')
-    : !item.todo.dueAt ? '无具体时间' : Date.parse(item.todo.dueAt) < new Date(date).setHours(0, 0, 0, 0) ? '逾期' : formatTime(item.todo.dueAt);
+    : !item.todo.dueAt ? '无具体时间' : item.todo.status==='open' && Date.parse(item.todo.dueAt) < Date.now() ? '逾期' : formatTime(item.todo.dueAt);
   const time = scheduleId
     ? `<button class="day-mini-time" data-edit-schedule="${wbEscape(scheduleId)}" type="button">${wbEscape(timeLabel)}</button>`
     : `<span class="day-mini-time">${wbEscape(timeLabel)}</span>`;
@@ -582,11 +583,12 @@ function jobLifecycleCounts(jobs) {
 }
 
 function jobReachedFunnelStage(job, category) {
+  if(job?.status==='preparing'||(category!=='submitted'&&job?.status==='closed'))return false;
   const workflow = clientJobWorkflow(job?.workflow);
   const reached = workflow.stages.slice(0, jobWorkflowStageIndex({ ...job, workflow }) + 1);
   if (category === 'submitted') return reached.some((stage) => /投递|申请/.test(stage.name));
   if (category === 'assessment') return reached.some((stage) => /测评|网测|笔试/.test(stage.name));
-  if (category === 'interview') return reached.some((stage) => /面试|[一二三四五六七八九终]面/.test(stage.name));
+  if (category === 'interview') return reached.some((stage) => /面试|[一二三四五六七八九终]面|(?:AI|HR)\s*面/i.test(stage.name));
   if (category === 'offer') return reached.some((stage) => /offer/i.test(stage.name));
   return true;
 }

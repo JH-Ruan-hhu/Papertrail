@@ -23,7 +23,7 @@
     const now = new Date();
     const query = state.query.trim().toLocaleLowerCase('zh-CN');
     const all = (state.workspace.todos || []).filter((todo) => !query || `${todo.title}\n${todo.notes || ''}`.toLocaleLowerCase('zh-CN').includes(query));
-    if (state.view === 'today') return all.filter((todo) => todo.status === 'open' && (!todo.dueAt || isToday(todo, now)));
+    if (state.view === 'today') return all.filter((todo) => todo.status === 'open' && (!todo.dueAt || isToday(todo, now) || isOverdue(todo, now)));
     if (state.view === 'upcoming') return all.filter((todo) => isUpcoming(todo, now));
     if (state.view === 'completed') return all.filter((todo) => todo.status === 'completed').sort((a, b) => Date.parse(b.completedAt || 0) - Date.parse(a.completedAt || 0));
     if (state.view === 'cancelled') return all.filter((todo) => todo.status === 'cancelled').sort((a, b) => Date.parse(b.updatedAt || 0) - Date.parse(a.updatedAt || 0));
@@ -58,7 +58,7 @@
     const now = new Date();
     const todos = state.workspace.todos || [];
     const counts = {
-      today: todos.filter((todo) => todo.status === 'open' && (!todo.dueAt || isToday(todo, now))).length,
+      today: todos.filter((todo) => todo.status === 'open' && (!todo.dueAt || isToday(todo, now) || isOverdue(todo, now))).length,
       upcoming: todos.filter((todo) => isUpcoming(todo, now)).length,
       completed: todos.filter((todo) => todo.status === 'completed').length,
       cancelled: todos.filter((todo) => todo.status === 'cancelled').length

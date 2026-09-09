@@ -158,3 +158,13 @@ select:focus-visible { outline:2px solid #81A8FF; outline-offset:2px; }
 .job-stage-deadline { display:flex; flex-direction:column; gap:4px; font-size:11px; color:#667085; }
 .job-stage-deadline input { width:100%; min-width:0; height:30px; font-size:11px; padding:3px 5px; }
 @media(max-width:1000px){.job-editor-modal .job-stage-option{grid-template-columns:minmax(110px,1fr) 52px 140px 82px}.job-stage-deadline{grid-column:1/-1;flex-direction:row;align-items:center}.job-stage-deadline input{width:210px}}
+
+/* Stable pastel colors by tag text, shared by cards and table. */
+.application-tags span[data-tag-color="0"] { background:#EAF2FF; color:#315EA8; }
+.application-tags span[data-tag-color="1"] { background:#F0EAFE; color:#7050A0; }
+.application-tags span[data-tag-color="2"] { background:#FCE9F0; color:#A3446D; }
+.application-tags span[data-tag-color="3"] { background:#FFF0E1; color:#985A23; }
+.application-tags span[data-tag-color="4"] { background:#E4F4EE; color:#28745B; }
+.application-tags span[data-tag-color="5"] { background:#E3F3F8; color:#276F86; }
+.application-tags span[data-tag-color="6"] { background:#FFF6D9; color:#856713; }
+.application-tags span[data-tag-color="7"] { background:#ECEEFC; color:#5359A3; }

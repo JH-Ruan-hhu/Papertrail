@@ -5,6 +5,9 @@ const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),asse
 const qaRoot=process.env.YANJI_APPLICATION_QA_DIR||fs.mkdtempSync(path.join(os.tmpdir(),'yanji-applications-v12-'));
 process.env.YANJI_QA_USER_DATA=qaRoot;process.argv.push('--smoke-test');app.quit=()=>{};
 const screenshots=path.join(__dirname,'../work/application-v12');fs.mkdirSync(screenshots,{recursive:true});
+// Mock only the fixture website; retain the real logo service and native decoder.
+const logoModule=require('../src/company-logo-service'),OriginalLogoService=logoModule.CompanyLogoService;
+logoModule.CompanyLogoService=class extends OriginalLogoService{constructor(options){super({...options,request:async(url,opts)=>{if(new URL(url).hostname==='icon-fixture.example'){return url.endsWith('.png')?{body:fs.readFileSync(path.join(__dirname,'../build/icon.png')),type:'image/png',url}:{body:Buffer.from('<html><head><link rel="icon" href="/tab-icon.png"></head></html>'),type:'text/html',url};}return logoModule.fetchPublic(url,opts);}});}};
 require('../src/main');
 const delay=ms=>new Promise(r=>setTimeout(r,ms));
 app.whenReady().then(async()=>{try{
@@ -20,6 +23,8 @@ app.whenReady().then(async()=>{try{
  await win.webContents.executeJavaScript(`paperTrail.setCompanyLogo(${JSON.stringify(setup[0].companyId)})`);
  const result=await win.webContents.executeJavaScript(`(async()=>{
  const check=(v,m)=>{if(!v)throw Error(m)},pause=()=>new Promise(r=>setTimeout(r,180));
+ openJobEditor(null);document.getElementById('jobCompany').value='自动图标验证';document.getElementById('jobRole').value='测试岗位';document.getElementById('jobSourceUrl').value='https://icon-fixture.example/job';await saveJobFromEditor();const iconJob=(await paperTrail.getWorkspace()).jobApplications.find(j=>j.company==='自动图标验证');check(iconJob,'job created through editor');let automaticIcon;for(let n=0;n<40;n++){automaticIcon=await paperTrail.getCompany(iconJob.companyId);if(automaticIcon.logoData)break;await pause();}check(automaticIcon.logoRemoteUrl==='https://icon-fixture.example/tab-icon.png'&&automaticIcon.logoData,'new job automatically downloads favicon');await paperTrail.deleteJobApplication(iconJob.id);await refreshWorkspace();
+ const late=await paperTrail.saveTodo({title:'逾期待办一致性验证',dueAt:new Date(Date.now()-2*86400000).toISOString(),priority:'medium',reminderMode:'none'});await refreshWorkspace();switchWorkbenchPage('todos');document.querySelector('[data-todo-view="today"]').click();check(document.querySelector('[data-todo-card="'+late.id+'"]'),'past-due task visible in Today');await paperTrail.completeTodo(late.id);await refreshWorkspace();const completedHome=homeItemsForDay(new Date()).find(i=>i.todo?.id===late.id);check(completedHome&&homeDayItemHtml(completedHome,new Date()).includes('>已完成</span>'),'completed task no overdue home label');switchWorkbenchPage('jobs-applications');
  const job=wb.workspace.jobApplications.find(j=>j.workflow.currentStageId==='apply'&&j.status!=='closed')||wb.workspace.jobApplications[0];
  if(job.status==='closed')await saveCareerPatch(job.id,j=>YanjiCareerData.transition(j,'reopened'));
  renderJobs();const initial=structuredClone(wb.workspace.jobApplications.find(j=>j.id===job.id));
@@ -27,7 +32,7 @@ app.whenReady().then(async()=>{try{
  const stage=document.querySelector('[data-career-job="'+job.id+'"] [data-application-stage-select]');stage.value='rejected';stage.dispatchEvent(new Event('change',{bubbles:true}));await pause();
  const d=applicationDialog('QA','');d.close();
  let saved=(await paperTrail.getWorkspace()).jobApplications.find(j=>j.id===job.id);
- check(saved.status==='closed'&&saved.closureReason==='rejected','real IPC rejection persisted');check(saved.workflow.currentStageId===initial.workflow.currentStageId,'stage retained');check(saved.stageHistory.at(-1).action==='rejected','terminal history saved');
+ check(saved.status==='closed'&&saved.closureReason==='rejected','real IPC rejection persisted');check(!jobReachedFunnelStage(saved,'interview')&&!jobMatchesQuickFilter(saved,'funnel-interview'),'closed jobs excluded from home count and filter');check(saved.workflow.currentStageId===initial.workflow.currentStageId,'stage retained');check(saved.stageHistory.at(-1).action==='rejected','terminal history saved');
  check(document.querySelector('[data-career-stage="closed"] [data-career-job="'+job.id+'"]'),'closed column');
  document.querySelector('[data-career-view="table"]').click();
  for(const key of ['company','phase','stageDeadline']){document.querySelector('[data-career-sort="'+key+'"]').click();const rows=[...document.querySelectorAll('#jobBoard .application-row')];let ended=false;for(const row of rows){if(row.classList.contains('is-closed'))ended=true;else check(!ended,'ended records sink for '+key);}}

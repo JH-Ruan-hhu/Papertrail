@@ -12,3 +12,9 @@ Validation: 214 tests passed; real Electron job-type persistence and update-cent
 ## September 9 local revision
 
 Adds AI 面 before assessment, wider job actions, per-stage deadline editing and preservation of hidden legacy contact/notes. Refreshes icon discovery after source-link changes, with source-page favicon fallback and ICO PNG/32-bit frame decoding. All-day lanes expand up to four rows then scroll. Linked deadline events default to 30 minutes, capped at local midnight. Validation: 215 unit tests, real IPC AI selection/deadline save and 30-minute calendar duration, three all-day rows visible, package checks and source/ASAR match passed.
+
+## Home consistency and tag colors
+
+Excludes closed applications from assessment/interview/offer counts and their drill-down filters while keeping submitted totals cumulative. Today todos include unfinished overdue tasks; completed tasks no longer show an overdue label on Home. Application tags use eight consistent pastel colors across card and table views.
+
+Validation: 217 tests passed, real Electron UI checks passed, package verification and packaged startup/storage recovery passed, and changed renderer files match the packaged ASAR. Adding a job with a source URL automatically discovers and stores its favicon; the form-to-IPC-to-image-decoding flow was verified with a controlled HTTP fixture, not a guarantee of retrieval from every live website. Local 1.5.1 only; no GitHub upload.
