@@ -20,3 +20,5 @@ Excludes closed applications from assessment/interview/offer counts and their dr
 Validation: 217 tests passed, real Electron UI checks passed, package verification and packaged startup/storage recovery passed, and changed renderer files match the packaged ASAR. Adding a job with a source URL automatically discovers and stores its favicon; the form-to-IPC-to-image-decoding flow was verified with a controlled HTTP fixture, not a guarantee of retrieval from every live website. Local 1.5.1 only; no GitHub upload.
 
 Moves the table Logo action into the More menu as 公司 Logo. Verified menu access, saving and dialog closure in Electron; rebuilt local 1.5.1 passed package/startup checks and ASAR source comparison.
+
+Publication target confirmed as JH-Ruan-hhu/Papertrail. Updated packaged update feed and release-page URL to this repository and rebuilt the stable installer for publication.
