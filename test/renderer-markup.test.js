@@ -777,7 +777,7 @@ test('v1.4.9 job table and portable export use the simplified columns without lo
   assert.doesNotMatch(indexHtml, /id="jobDeadline"/);
   assert.match(indexHtml, /id="jobSettingsButton"[\s\S]*<circle cx="12" cy="12" r="3"/);
   assert.match(readProjectFile('src', 'renderer', 'career.js'), /function careerTableRow/);
-  assert.match(workbenchJs, /const closedDifference = Number\(left\.status === 'closed'\) - Number\(right\.status === 'closed'\);[\s\S]*if \(closedDifference\) return closedDifference;/);
+  assert.match(workbenchJs, /const closedDifference = groupRank\(left\) - groupRank\(right\);[\s\S]*if \(closedDifference\) return closedDifference;/);
   assert.match(workbenchJs, /class="job-closed-divider"[^>]*><span>已结束 · 保留记录<\/span>/);
   assert.match(readProjectFile('src', 'renderer', 'v11-layout.css'), /\.job-position\.job-row-status-closed[\s\S]*background:\s*#fafafa/);
   assert.match(mainJs, /<span>预估年薪<\/span><span>截止日期<\/span><span>状态<\/span>/);

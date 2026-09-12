@@ -30,6 +30,7 @@ test('download failures keep old cache; manual images win; format, size and deco
  const png=Buffer.from('89504e470d0a1a0a00000000','hex');let requests=0;
  const nativeImage={createFromBuffer:()=>({isEmpty:()=>false,getSize:()=>({width:1024,height:512}),resize:options=>{assert.deepEqual(options,{width:512});return {toPNG:()=>png};},toPNG:()=>png})};
  const service=new CompanyLogoService({store,directory:path.join(dir,'logos'),nativeImage,request:async()=>{requests++;throw Error('offline');}});
+ assert.deepEqual(service.normalize(png,'image/x-icon'),png);assert.deepEqual(service.normalize(png,'image/vnd.microsoft.icon'),png);
  service.write(id,png,'image/png','official_site');const old=service.snapshot(id).logoData;await service.ensure(id,true);assert.equal(service.snapshot(id).logoData,old);assert.equal(service.snapshot(id).logoStatus,'ready');
  assert.throws(()=>service.normalize(png,'text/html'),/格式/);assert.throws(()=>service.normalize(Buffer.alloc(5*1024*1024+1),'image/png'),/大小/);assert.throws(()=>service.normalize(Buffer.from('<script>'),'image/png'),/格式/);
  service.nativeImage={createFromBuffer:()=>({isEmpty:()=>true})};assert.throws(()=>service.normalize(png,'image/png'),/解码/);service.nativeImage=nativeImage;
@@ -39,7 +40,7 @@ test('download failures keep old cache; manual images win; format, size and deco
 test('website icon wins over page previews and HTML is never cached as an image',async t=>{
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yanji-icon-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const store=new JsonStore(path.join(dir,'data.json'));store.load();store.setJobApplications([{id:'icon-job',company:'Icon Test'}]);const id=store.data.companies[0].id;
  const png=Buffer.from('89504e470d0a1a0a00000000','hex'),requests=[];
- const service=new CompanyLogoService({store,directory:path.join(dir,'logos'),nativeImage:{createFromBuffer:()=>({isEmpty:()=>false,getSize:()=>({width:32,height:32}),toPNG:()=>png})},request:async url=>{requests.push(url);return url.endsWith('/site-icon.png')?{body:png,type:'image/png',url}:{body:Buffer.from('<meta property="og:image" content="/homepage-preview.png"><img class="logo" src="/brand.png"><link rel=icon href=/site-icon.png>'),type:'text/html',url};}});
+ const service=new CompanyLogoService({store,directory:path.join(dir,'logos'),nativeImage:{createFromBuffer:()=>({isEmpty:()=>false,getSize:()=>({width:32,height:32}),toPNG:()=>png})},request:async url=>{requests.push(url);return url.endsWith('/site-icon.png')?{body:png,type:'image/x-icon',url}:{body:Buffer.from('<meta property="og:image" content="/homepage-preview.png"><img class="logo" src="/brand.png"><link rel=icon href=/site-icon.png>'),type:'text/html',url};}});
  service.update(id,{website:'https://company.example/'});await service.ensure(id,true);const saved=service.snapshot(id);assert.equal(saved.logoRemoteUrl,'https://company.example/site-icon.png');assert.equal(saved.logoSource,'favicon');assert.ok(saved.logoData.startsWith('data:image/png;base64,'));assert.deepEqual(requests,['https://company.example/','https://company.example/site-icon.png']);
  assert.equal(candidates('<meta property="og:image" content="/homepage.png">','https://company.example').length,0);
 });
