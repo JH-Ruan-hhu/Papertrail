@@ -2585,11 +2585,13 @@ function registerIpc() {
     setImmediate(()=>{for(const c of companies)service.ensure(c.id).catch(()=>{});});
     return companies;
   });
-  ipcMain.handle('companies:configure', (_event,id,input={}) => {
+  ipcMain.handle('companies:configure', async (_event,id,input={}) => {
     const service=getCompanyLogoService();service.company(id);
+    if(service.pending.has(id))await service.pending.get(id);
+    const previous=service.company(id);
     const website=input.website?require('./company-logo-service').safeUrl(/^https?:\/\//i.test(String(input.website).trim())?String(input.website).trim():'https://'+String(input.website).trim()).href:null;
-    service.update(id,{website,domain:website?new URL(website).hostname:null,shortName:String(input.shortName||'').trim().slice(0,12)});
-    service.ensure(id,true).catch(()=>{});return service.snapshot(id);
+    service.update(id,{website,domain:website?new URL(website).hostname:null,shortName:String(input.shortName||'').trim().slice(0,12),...(website&&website!==previous.website?{logoSource:null}:{})});
+    return await service.ensure(id,true);
   });
   ipcMain.handle('companies:refresh', (_event,id) => getCompanyLogoService().ensure(id,true));
   ipcMain.handle('companies:manual', async (_event,id) => {

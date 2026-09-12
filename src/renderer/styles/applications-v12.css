@@ -169,3 +169,8 @@ select:focus-visible { outline:2px solid #81A8FF; outline-offset:2px; }
 .application-tags span[data-tag-color="5"] { background:#E3F3F8; color:#276F86; }
 .application-tags span[data-tag-color="6"] { background:#FFF6D9; color:#856713; }
 .application-tags span[data-tag-color="7"] { background:#ECEEFC; color:#5359A3; }
+
+button.company-logo,.application-company-cell>button.company-logo { padding:0; cursor:pointer; background:#F0F5FF; border:1px solid #E5EAF2; }
+button.company-logo:hover { border-color:#96B7F2; }
+.application-stage.in-pool { color:#2563A6; background:#EFF6FF; border-color:#BFDBFE; }
+.job-page .job-talent-pool-divider { color:#35618C; background:#F0F7FF; }

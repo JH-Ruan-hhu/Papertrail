@@ -647,7 +647,7 @@ function sortJobs(jobs) {
     return Number.isFinite(timestamp) ? timestamp : 0;
   };
   sorted.sort((left, right) => {
-    const groupRank = job => job.status !== 'closed' ? 0 : job.closureReason === 'talent-pool' ? 2 : 1;
+    const groupRank = job => job.status !== 'closed' ? 0 : job.closureReason === 'talent-pool' ? 1 : 2;
     const closedDifference = groupRank(left) - groupRank(right);
     if (closedDifference) return closedDifference;
     const pinnedDifference = Number(Boolean(right.pinned)) - Number(Boolean(left.pinned));
@@ -759,10 +759,10 @@ function renderJobs() {
       const previous = visible[index - 1];
       const inTalentPool = job.status === 'closed' && job.closureReason === 'talent-pool';
       const entersTalentPool = inTalentPool && previous?.closureReason !== 'talent-pool';
-      const entersClosedGroup = job.status === 'closed' && !inTalentPool && previous?.status !== 'closed';
+      const entersClosedGroup = job.status === 'closed' && !inTalentPool && (previous?.status !== 'closed' || previous?.closureReason === 'talent-pool');
       const leavesActivePinnedGroup = job.status !== 'closed' && previous?.status !== 'closed' && previous?.pinned && !job.pinned;
       const divider = entersTalentPool
-        ? '<div class="job-closed-divider job-talent-pool-divider" role="separator"><span>进入人才库 · 保留记录</span></div>'
+        ? '<div class="job-closed-divider job-talent-pool-divider" role="separator"><span>进入人才库 · 等待后续机会</span></div>'
         : entersClosedGroup
         ? '<div class="job-closed-divider" role="separator"><span>已结束 · 保留记录</span></div>'
         : (leavesActivePinnedGroup ? '<div class="job-pin-divider" role="separator"><span>其他岗位</span></div>' : '');
