@@ -525,7 +525,7 @@ function canonicalJobStage(stage) {
     'stage-first-interview': /^(一面|初面|第一轮面试)$/,
     'stage-second-interview': /^(二面|第二轮面试)$/,
     'stage-third-interview': /^(三面|第三轮面试)$/,
-    'stage-final-interview': /^(终面|最终面试)$/,
+    'stage-final-interview': /^(终面|最终面试|HR\s*面)$/i,
     'stage-offer': /^offer$/i
   };
   if (id === 'stage-online-test') return DEFAULT_JOB_WORKFLOW_STAGES.find(s=>s.id==='stage-assessment');
@@ -841,7 +841,7 @@ function openJobEditor(job = null, initialStatus = 'active') {
   document.getElementById('jobAnnualSalaryWan').value = job?.annualSalaryWan || '';
   document.getElementById('jobAppliedAt').value = localDateInputValue(job?.appliedAt);
   for (const [id,key] of [['jobSourceUrl','sourceUrl'],['jobJdText','jdText']]) document.getElementById(id).value=job?.[key]??'';
-  document.getElementById('jobOutcome').value=job?.status==='closed'?(job.closureReason||'closed'):'active';
+  document.getElementById('jobOutcome').value=job?.status==='closed'?(job.closureReason==='talent-pool'?'closed':job.closureReason||'closed'):'active';
   document.getElementById('jobTags').value=(job?.tags||[]).join('；');
   document.getElementById('jobError').textContent = '';
   document.getElementById('deleteJobButton').hidden = !job;

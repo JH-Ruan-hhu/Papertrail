@@ -34,7 +34,7 @@ const DEFAULT_WORKFLOW_STAGES = Object.freeze([
   Object.freeze({ id: 'stage-first-interview', name: '一面' }),
   Object.freeze({ id: 'stage-second-interview', name: '二面' }),
   Object.freeze({ id: 'stage-third-interview', name: '三面' }),
-  Object.freeze({ id: 'stage-final-interview', name: '终面' }),
+  Object.freeze({ id: 'stage-final-interview', name: 'HR面' }),
   Object.freeze({ id: 'stage-offer', name: 'Offer' })
 ]);
 
@@ -112,6 +112,7 @@ function normalizeWorkflow(value, legacyStatus = null, fallbackStageDate = null)
   const stages = rawStages.map((rawStage, index) => {
     const stage = asObject(rawStage) || {};
     let name = cleanText(stage.name, 120) || `阶段 ${index + 1}`;
+    if (/^(终面|最终面试|HR\s*面)$/i.test(name)) name = 'HR面';
     // Keep the pre-v1.3.1 meaning visible for old interview records while
     // leaving the new default workflow's "一面" label intact.
     if (!hasCustomStages && legacyStatus === 'interview' && index === 2) name = '面试';
@@ -190,8 +191,8 @@ function normalizeJobApplication(value, index = 0, fallbackAt = new Date(0).toIS
     ...(hasOwn(input,'jdText')?{jdText:cleanText(input.jdText,30000)||null}:{}),
     status: lifecycleStatusFor(input, rawStatus),
     ...(hasOwn(input, 'companyId') ? {companyId: cleanText(input.companyId,120)} : {}),
-    ...(hasOwn(input, 'closureReason') ? { closureReason: lifecycleStatusFor(input, rawStatus) === 'closed' && ['rejected','withdrawn','offer-declined'].includes(input.closureReason) ? input.closureReason : null } : {}),
-    ...(Array.isArray(input.stageHistory) ? {stageHistory: input.stageHistory.filter(x=>x && ['advanced','rejected','withdrawn','offer-declined','reopened'].includes(x.action) && isoDate(x.occurredAt)).map(x=>({action:x.action,stageId:cleanText(x.stageId,120),stageName:cleanText(x.stageName,120),occurredAt:isoDate(x.occurredAt)}))} : {}),
+    ...(hasOwn(input, 'closureReason') ? { closureReason: lifecycleStatusFor(input, rawStatus) === 'closed' && ['rejected','withdrawn','offer-declined','talent-pool'].includes(input.closureReason) ? input.closureReason : null } : {}),
+    ...(Array.isArray(input.stageHistory) ? {stageHistory: input.stageHistory.filter(x=>x && ['advanced','rejected','withdrawn','offer-declined','talent-pool','reopened'].includes(x.action) && isoDate(x.occurredAt)).map(x=>({action:x.action,stageId:cleanText(x.stageId,120),stageName:cleanText(x.stageName,120),occurredAt:isoDate(x.occurredAt)}))} : {}),
     nextFollowUpAt,
     nextActionAt: nextFollowUpAt,
     notes: cleanText(input.notes, 10_000) || null,

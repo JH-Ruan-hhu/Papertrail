@@ -7,6 +7,7 @@
 .application-card header { display:flex; gap:8px; align-items:center; }
 .application-company { min-width:0; flex:1; text-align:left; font-size:14px; font-weight:600; color:#475467; }
 .application-company,.application-role,.application-company-cell button { background:none; border:0; padding:0; cursor:pointer; }
+.application-company,.job-page .application-role,.application-company-cell>div>button { border-radius:0; line-height:1.5; }
 .job-page .application-role { font-size:17px; line-height:1.4; font-weight:600; color:#1D2939; text-align:left; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
 .application-meta { margin:0; color:#667085; font-size:13px; line-height:1.5; }
 .application-times { padding:7px 10px; background:#F5F8FF; border-radius:11px; }

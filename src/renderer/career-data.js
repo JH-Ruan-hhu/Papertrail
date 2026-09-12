@@ -1,7 +1,7 @@
 'use strict';
 (function(root) {
   const key = d => { const v = new Date(d); return Number.isFinite(v.getTime()) ? `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}` : null; };
-  const stages = Object.freeze([['apply','已投递'],['ai','AI 面'],['assessment','测评'],['first','一面'],['second','二面'],['hr','HR 面'],['offer','Offer'],['closed','已拒绝 / 结束']]);
+  const stages = Object.freeze([['apply','已投递'],['ai','AI 面'],['assessment','测评'],['first','一面'],['second','二面'],['hr','HR面'],['offer','Offer'],['closed','已拒绝 / 结束']]);
   const category = name => /AI\s*面/i.test(name) ? 'ai' : /offer/i.test(name) ? 'offer' : /HR|三面|终面/i.test(name) ? 'hr' : /二面/.test(name) ? 'second' : /一面|面试/.test(name) ? 'first' : /测评|笔试|网测/.test(name) ? 'assessment' : /投递/.test(name) ? 'apply' : 'custom';
   const current = job => job.workflow?.stages?.find(s=>s.id===job.workflow.currentStageId);
   const bucket = job => job.status === 'preparing' ? 'apply' : job.status === 'closed' ? 'closed' : category(current(job)?.name || '投递');
@@ -25,9 +25,9 @@
     return { total:jobs.length,submitted:jobs.filter(j=>applied(j)).length,interview:jobs.filter(j=>j.status!=='closed' && ['first','second','hr'].includes(bucket(j))).length,offers:jobs.filter(j=>bucket(j)==='offer').length,trend,
       deadlines:jobs.filter(j=>j.status!=='closed' && j.deadline && key(j.deadline)>=today && key(j.deadline)<=key(end)).sort((a,b)=>key(a.deadline).localeCompare(key(b.deadline))),events:events(jobs)};
   }
-  const outcomeLabel = job => job.status==='closed' ? ({rejected:'被拒绝',withdrawn:'已放弃','offer-declined':'Offer 已拒绝'}[job.closureReason]||'已结束') : current(job)?.name||'已投递';
+  const outcomeLabel = job => job.status==='closed' ? ({'talent-pool':'进入人才库',rejected:'被拒绝',withdrawn:'已放弃','offer-declined':'Offer 已拒绝'}[job.closureReason]||'已结束') : current(job)?.name||'已投递';
   function transition(job,action,now=new Date().toISOString()) {
-    if(!['rejected','withdrawn','offer-declined','reopened'].includes(action))throw new Error('不支持的投递状态');
+    if(!['rejected','withdrawn','offer-declined','talent-pool','reopened'].includes(action))throw new Error('不支持的投递状态');
     if(action==='offer-declined'&&category(current(job)?.name||'')!=='offer')throw new Error('请先记录 Offer 阶段，再标记 Offer 已拒绝');
     if(action==='reopened'&&job.status!=='closed')return JSON.parse(JSON.stringify(job));
     if(action!=='reopened'&&job.status==='closed'&&job.closureReason===action)return JSON.parse(JSON.stringify(job));
@@ -44,7 +44,7 @@
     next.stageHistory=[...(next.stageHistory||[]),{action:'advanced',stageId,stageName:stage.name,occurredAt:now}];return next;
   }
   function move(job, target, today=key(new Date())) {
-    if(['rejected','withdrawn','offer-declined','reopened'].includes(target))return transition(job,target,new Date(today).toISOString());
+    if(['rejected','withdrawn','offer-declined','talent-pool','reopened'].includes(target))return transition(job,target,new Date(today).toISOString());
     if(target==='closed')return transition(job,'rejected',new Date(today).toISOString());
     if(!stages.some(([id])=>id===target)) throw new Error('不支持的阶段');
     const next=job.status==='closed'?transition(job,'reopened',new Date(today).toISOString()):JSON.parse(JSON.stringify(job)); next.workflow ||= {stages:[],timeline:[]};

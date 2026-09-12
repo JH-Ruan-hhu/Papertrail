@@ -69,7 +69,7 @@ test('maps legacy stage statuses without forcing a startup rewrite', () => {
   }
   const empty = normalizeJobApplication({ company: '单位', role: '岗位', workflow: { stages: [], currentStageId: 'missing' } });
   assert.deepEqual(empty.workflow.stages, DEFAULT_WORKFLOW_STAGES);
-  assert.deepEqual(DEFAULT_WORKFLOW_STAGES.map((stage) => stage.name), ['投递', 'AI 面', '测评', '一面', '二面', '三面', '终面', 'Offer']);
+  assert.deepEqual(DEFAULT_WORKFLOW_STAGES.map((stage) => stage.name), ['投递', 'AI 面', '测评', '一面', '二面', '三面', 'HR面', 'Offer']);
   assert.equal(empty.workflow.currentStageId, DEFAULT_WORKFLOW_STAGES[0].id);
 });
 
