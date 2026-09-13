@@ -74,3 +74,10 @@ test('manual logo retry moves ahead of the background queue',async()=>{
  const companies=Array.from({length:5},(_,i)=>({id:'c'+i}));const service=new CompanyLogoService({store:{data:{companies}},directory:'unused',nativeImage:{}});const releases=new Map(),started=[];service.resolve=id=>{started.push(id);return new Promise(resolve=>releases.set(id,resolve));};
  const tasks=companies.map(c=>service.ensure(c.id));const retry=service.ensure('c4',true);releases.get('c0')({});await tasks[0];assert.equal(started[3],'c4');releases.get('c1')({});await tasks[1];for(const id of ['c2','c3','c4'])releases.get(id)({});await Promise.all([...tasks,retry]);assert.equal(service.pending.size,0);
 });
+
+test('JPEG and WebP favicons with ICO content type use actual file signatures',()=>{
+ const buffers=[Buffer.from('ffd8ffe10000000000000000','hex'),Buffer.from('524946460000000057454250','hex')];
+ const service=new CompanyLogoService({store:{},directory:'unused',nativeImage:{createFromBuffer:body=>({isEmpty:()=>false,getSize:()=>({width:32,height:32}),toPNG:()=>body})}});
+ for(const body of buffers){for(const type of ['image/x-icon','image/vnd.microsoft.icon'])assert.deepEqual(service.normalize(body,type),body);assert.throws(()=>service.normalize(body,'text/html'),/格式/);}
+ assert.throws(()=>service.normalize(Buffer.from('<html>error</html>'),'image/x-icon'),/格式/);
+});
