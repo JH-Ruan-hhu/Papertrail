@@ -26,15 +26,15 @@
 .application-advance .application-stage { width:100%; min-height:37px; border-radius:10px; background:#2F6BEE; color:white; border-color:#2F6BEE; font-size:14px; }
 .application-stage.ended,.application-advance .application-stage.ended { background:#FFF3F3; color:#C76A6A; border-color:#F3DADA; }
 .application-stage.withdrawn,.application-advance .application-stage.withdrawn { background:#F3F4F6; color:#8B95A5; border-color:#E2E6EC; }
-.job-page .job-table-head,.job-page .application-row .job-position-main { display:grid; grid-template-columns:minmax(180px,1fr) minmax(90px,1fr) minmax(100px,1fr) minmax(130px,1fr) minmax(110px,1fr) minmax(90px,1fr) minmax(180px,1fr) 180px; min-width:1230px; gap:12px; align-items:center; }
+.job-page .job-table-head,.job-page .application-row .job-position-main { display:grid; grid-template-columns:minmax(260px,2fr) minmax(80px,.7fr) minmax(90px,.8fr) minmax(110px,1fr) minmax(110px,1fr) minmax(90px,.8fr) 150px 160px; min-width:1230px; gap:12px; align-items:center; }
 .job-page .job-table-head { padding:12px 16px; }
 .job-page .job-table-head>button { padding:0; text-align:left; justify-content:flex-start; }
-.job-page .application-row .job-position-main { height:72px; min-height:72px; padding:6px 16px; font-size:13px; }
+.job-page .application-row .job-position-main { min-height:72px; padding:6px 16px; font-size:13px; }
 .job-page .application-row { padding:0; border-radius:0; margin:0; background:#fff; border:0; border-bottom:1px solid #EEF1F5; box-shadow:none; }
 .application-company-cell { display:flex; gap:10px; align-items:center; min-width:0; }
-.application-company-cell>div { min-width:0; }
+.application-company-cell>div { min-width:0; flex:1; }
 .application-company-cell>div>button { display:block; max-width:100%; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:#344054; font-size:14px; font-weight:600; text-align:left; }
-.application-company-cell p { display:flex; align-items:center; gap:4px; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#667085; font-size:13px; margin:3px 0 0; }
+.application-company-cell p { display:flex; align-items:center; gap:4px; max-width:100%; white-space:normal; overflow:visible; overflow-wrap:anywhere; color:#667085; font-size:13px; line-height:1.4; margin:3px 0 0; }
 .application-row .application-time { display:flex; flex-direction:column; align-items:flex-start; gap:2px; font-size:11px; }
 .application-row .application-time>span { display:none; }
 .application-progress { display:flex; align-items:center; gap:3px; }

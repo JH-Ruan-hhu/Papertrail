@@ -2587,7 +2587,7 @@ function registerIpc() {
   });
   ipcMain.handle('companies:configure', async (_event,id,input={}) => {
     const service=getCompanyLogoService();service.company(id);
-    if(service.pending.has(id))await service.pending.get(id);
+    if(service.pending.has(id))await service.ensure(id,true);
     const previous=service.company(id);
     const website=input.website?require('./company-logo-service').safeUrl(/^https?:\/\//i.test(String(input.website).trim())?String(input.website).trim():'https://'+String(input.website).trim()).href:null;
     service.update(id,{website,domain:website?new URL(website).hostname:null,shortName:String(input.shortName||'').trim().slice(0,12),...(website&&website!==previous.website?{logoSource:null}:{})});

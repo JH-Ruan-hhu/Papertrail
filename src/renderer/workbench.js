@@ -651,7 +651,7 @@ function sortJobs(jobs) {
     const closedDifference = groupRank(left) - groupRank(right);
     if (closedDifference) return closedDifference;
     const pinnedDifference = Number(Boolean(right.pinned)) - Number(Boolean(left.pinned));
-    if (pinnedDifference) return pinnedDifference;
+    if (pinnedDifference && wb.jobSort !== 'phase') return pinnedDifference;
     if (wb.jobSort === 'priorityProgress') {
       const priority = (jobPriorityRanks[left.priority] ?? 1) - (jobPriorityRanks[right.priority] ?? 1);
       if (priority) return wb.jobSortDirection === 'desc' ? priority : -priority;
@@ -663,7 +663,7 @@ function sortJobs(jobs) {
     let comparison = 0;
     if (wb.jobSort === 'company') comparison = textValue(left).localeCompare(textValue(right), 'zh-CN');
     else if (['city','jobType','resumeName','tags'].includes(wb.jobSort)) comparison=String(left[wb.jobSort]||'').localeCompare(String(right[wb.jobSort]||''),'zh-CN');
-    else if (wb.jobSort === 'phase') comparison=window.YanjiCareerData.stages.findIndex(([id])=>id===window.YanjiCareerData.bucket(left))-window.YanjiCareerData.stages.findIndex(([id])=>id===window.YanjiCareerData.bucket(right));
+    else if (wb.jobSort === 'phase') {const rank=job=>{const stage=canonicalJobStage(jobCurrentStage(job));const index=DEFAULT_JOB_WORKFLOW_STAGES.findIndex(s=>s.id===stage?.id);return index<0?DEFAULT_JOB_WORKFLOW_STAGES.length:index;};comparison=rank(left)-rank(right)||String(jobCurrentStage(left).name).localeCompare(String(jobCurrentStage(right).name),'zh-CN');}
     else if (wb.jobSort === 'phaseTime') comparison=dateValue(window.YanjiCareerData.time(left).value)-dateValue(window.YanjiCareerData.time(right).value);
     else if (wb.jobSort === 'matchScore') comparison=(left.matchScore??-1)-(right.matchScore??-1);
     else if (wb.jobSort === 'stageDeadline') comparison = dateValue(window.YanjiCareerData.deadline(left).value) - dateValue(window.YanjiCareerData.deadline(right).value);
@@ -673,7 +673,7 @@ function sortJobs(jobs) {
     else if (wb.jobSort === 'annualSalaryWan') comparison = Number(left.annualSalaryWan || 0) - Number(right.annualSalaryWan || 0);
     else if (wb.jobSort === 'nextFollowUpAt') comparison = dateValue(left.nextFollowUpAt) - dateValue(right.nextFollowUpAt);
     else comparison = dateValue(left.updatedAt) - dateValue(right.updatedAt);
-    return comparison ? comparison * direction : textValue(left).localeCompare(textValue(right), 'zh-CN');
+    return comparison ? comparison * direction : pinnedDifference || textValue(left).localeCompare(textValue(right), 'zh-CN');
   });
   return sorted;
 }
@@ -760,7 +760,7 @@ function renderJobs() {
       const inTalentPool = job.status === 'closed' && job.closureReason === 'talent-pool';
       const entersTalentPool = inTalentPool && previous?.closureReason !== 'talent-pool';
       const entersClosedGroup = job.status === 'closed' && !inTalentPool && (previous?.status !== 'closed' || previous?.closureReason === 'talent-pool');
-      const leavesActivePinnedGroup = job.status !== 'closed' && previous?.status !== 'closed' && previous?.pinned && !job.pinned;
+      const leavesActivePinnedGroup = wb.jobSort !== 'phase' && job.status !== 'closed' && previous?.status !== 'closed' && previous?.pinned && !job.pinned;
       const divider = entersTalentPool
         ? '<div class="job-closed-divider job-talent-pool-divider" role="separator"><span>进入人才库 · 等待后续机会</span></div>'
         : entersClosedGroup
@@ -2824,7 +2824,7 @@ function bindWorkbenchEvents() {
     const deleteJobTarget = event.target.closest('[data-delete-job]');
     if (deleteJobTarget) return deleteJobById(deleteJobTarget.dataset.deleteJob);
     const sourceJobTarget = event.target.closest('[data-open-job-source]');
-    if (sourceJobTarget) return workbenchApi.openExternal(sourceJobTarget.dataset.openJobSource);
+    if (sourceJobTarget) {if(!sourceJobTarget.dataset.openJobSource)return showWorkbenchToast('尚未填写岗位链接，请在编辑岗位中添加。','info');return workbenchApi.openExternal(sourceJobTarget.dataset.openJobSource);}
     const editJobTarget = event.target.closest('[data-edit-job]');
     if (editJobTarget) return openJobEditor(wb.workspace.jobApplications.find((item) => item.id === editJobTarget.dataset.editJob));
     const selectedDateTarget = event.target.closest('[data-select-schedule-date]');

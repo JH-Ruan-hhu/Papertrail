@@ -57,3 +57,20 @@ test('SVG favicon is rasterized before caching as PNG',async t=>{
  const service=new CompanyLogoService({store,directory:dir,nativeImage:{createFromBuffer:()=>({isEmpty:()=>false,getSize:()=>({width:32,height:32}),toPNG:()=>png})},svgToPng:async body=>{assert.deepEqual(body,svg);rasterized=true;return png;},request:async url=>url.endsWith('.svg')?{body:svg,type:'image/svg+xml',url}:{body:Buffer.from('<link rel="icon" href="/logo.svg">'),type:'text/html',url}});
  service.update(id,{website:'https://company.example/'});const result=await service.ensure(id,true);assert.equal(rasterized,true);assert.equal(result.logoStatus,'ready');assert.equal(result.logoRemoteUrl,'https://company.example/logo.svg');assert.ok(result.logoData.startsWith('data:image/png;base64,'));
 });
+
+test('logo parent container identifies an opaque image filename',()=>{
+ const items=candidates('<div class="header-logo"><a href="/"><img src="/uploads/hash.png" alt=""></a></div>','https://company.example/');assert.equal(items[0].url,'https://company.example/uploads/hash.png');
+});
+test('explicit website skips job sources and recovers logo from a module asset',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yanji-module-logo-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const store=new JsonStore(path.join(dir,'data.json'));store.load();store.setJobApplications([{id:'j',company:'Test',sourceUrl:'https://jobs.example/slow'}]);const id=store.data.companies[0].id,png=Buffer.from('89504e470d0a1a0a00000000','hex'),seen=[];
+ const service=new CompanyLogoService({store,directory:dir,nativeImage:{createFromBuffer:()=>({isEmpty:()=>false,getSize:()=>({width:32,height:32}),toPNG:()=>png})},request:async url=>{seen.push(url);if(url.endsWith('/'))return {body:Buffer.from('<script type="module" src="/assets/index.js"></script>'),type:'text/html',url};if(url.endsWith('.js'))return {body:Buffer.from('const logo="/assets/nav_logo.png";'),type:'application/javascript',url};if(url.endsWith('.png'))return {body:png,type:'image/png',url};throw Error('404');}});
+ service.update(id,{website:'https://company.example/'});const saved=await service.ensure(id,true);assert.equal(saved.logoStatus,'ready');assert.equal(saved.logoRemoteUrl,'https://company.example/assets/nav_logo.png');assert.ok(!seen.some(url=>url.includes('jobs.example')));
+});
+test('unresponsive logo request resolves with an error and releases queue',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yanji-logo-timeout-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const store=new JsonStore(path.join(dir,'data.json'));store.load();store.setJobApplications([{id:'j',company:'Test'}]);const id=store.data.companies[0].id;
+ const service=new CompanyLogoService({store,directory:dir,resolutionTimeoutMs:30,nativeImage:{},request:()=>new Promise(()=>{})});service.update(id,{website:'https://company.example/'});const saved=await service.ensure(id,true);assert.equal(saved.logoStatus,'failed');assert.match(saved.logoError,/超时/);assert.equal(service.pending.size,0);assert.equal(service.running,0);
+});
+test('manual logo retry moves ahead of the background queue',async()=>{
+ const companies=Array.from({length:5},(_,i)=>({id:'c'+i}));const service=new CompanyLogoService({store:{data:{companies}},directory:'unused',nativeImage:{}});const releases=new Map(),started=[];service.resolve=id=>{started.push(id);return new Promise(resolve=>releases.set(id,resolve));};
+ const tasks=companies.map(c=>service.ensure(c.id));const retry=service.ensure('c4',true);releases.get('c0')({});await tasks[0];assert.equal(started[3],'c4');releases.get('c1')({});await tasks[1];for(const id of ['c2','c3','c4'])releases.get(id)({});await Promise.all([...tasks,retry]);assert.equal(service.pending.size,0);
+});
