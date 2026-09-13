@@ -6,6 +6,7 @@ const dns = require('node:dns').promises;
 const net = require('node:net');
 const http = require('node:http');
 const https = require('node:https');
+const {rasterizeSvg}=require('./svg-logo');
 const MAX_BYTES = 5 * 1024 * 1024;
 const TTL = 30 * 86400000;
 function publicAddress(ip) {
@@ -68,7 +69,7 @@ function candidates(html, base) {
   }
   for(const tag of html.matchAll(/<(?:img|link|meta)\b[^>]*>/gi)) {
     const attrs={};for(const a of tag[0].matchAll(/([\w:-]+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/g))attrs[a[1].toLowerCase()]=a[2]??a[3]??a[4];
-    if(/logo|brand/i.test([attrs.class,attrs.id,attrs.alt].join(' '))&&attrs.src)add(attrs.src,'official_site',2);
+    if(/logo|brand/i.test([attrs.class,attrs.id,attrs.alt,attrs.src,attrs['data-src']].join(' '))&&(attrs.src||attrs['data-src']))add(attrs.src||attrs['data-src'],'official_site',2);
     if(/icon/i.test(attrs.rel||'')&&attrs.href)add(attrs.href,'favicon',1);
     // Social previews often depict the homepage or a banner, not a company icon.
   }
@@ -92,7 +93,7 @@ function decodeIcon(body,nativeImage){
  return nativeImage.createFromBuffer(body);
 }
 class CompanyLogoService {
-  constructor({store,directory,nativeImage,request=fetchPublic,onChanged=()=>{}}) {Object.assign(this,{store,directory,nativeImage,request,onChanged});this.pending=new Map();this.queue=[];this.running=0;}
+  constructor({store,directory,nativeImage,request=fetchPublic,svgToPng=rasterizeSvg,onChanged=()=>{}}) {Object.assign(this,{store,directory,nativeImage,request,svgToPng,onChanged});this.pending=new Map();this.queue=[];this.running=0;}
   company(id){if(!/^[A-Za-z0-9_-]{1,120}$/.test(String(id)))throw new Error('公司 ID 无效。');const c=(this.store.data.companies||[]).find(c=>c.id===id);if(!c)throw new Error('公司不存在。');return c;}
   update(id,patch){this.store.updateWorkspace(w=>{w.companies=w.companies.map(c=>c.id===id?{...c,...patch,updatedAt:new Date().toISOString()}:c);return w;});this.onChanged(id);}
   snapshot(id){const c=this.company(id);let logoData=null;if(c.logoPath&&/^[\w-]+\.png$/.test(c.logoPath)){try{logoData='data:image/png;base64,'+fs.readFileSync(path.join(this.directory,c.logoPath)).toString('base64');}catch{}}return {...c,logoData};}
@@ -105,9 +106,9 @@ class CompanyLogoService {
     const jobs=this.store.listJobApplications().filter(j=>j.companyId===id);const sites=[...new Set(jobs.map(j=>j.sourceUrl).filter(Boolean))].slice(0,3);
     const options=[],sourceIcons=[];let website=original.website,lastError='';
     for(const site of sites){try{const page=await this.request(site);if(page.type==='text/html'){const html=page.body.toString('utf8');options.push(...candidates(html,page.url||site).filter(c=>c.source==='job_source'));sourceIcons.push(...candidates(html,page.url||site).filter(c=>c.source==='favicon'),{url:new URL('/favicon.ico',page.url||site).href,source:'favicon'});website ||= employerWebsite(html,page.url||site);if(!website){const title=html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]||'';const name=String(original.name||'').replace(/股份有限公司|有限公司|科技有限公司/g,'').trim();const host=new URL(page.url||site).hostname;if(name.length>=2&&title.includes(name)&&!/(zhipin|liepin|51job|zhaopin|yingjiesheng|nowcoder|mokahr|feishu|metahr|myworkdayjobs)\./i.test(host)){website=new URL(page.url||site).origin;options.push(...candidates(html,page.url||site));}}}}catch{}}
-    if(website){if(!original.website)this.update(id,{website,domain:new URL(website).hostname});try{const page=await this.request(website);if(page.type==='text/html')options.push(...candidates(page.body.toString('utf8'),page.url||website));else if(imageSignature(page.body))options.push({url:page.url||website,source:'official_site'});}catch(error){lastError=error.message;}options.push({url:new URL('/favicon.ico',website).href,source:'favicon'});}
+    if(website){if(!original.website)this.update(id,{website,domain:new URL(website).hostname});try{const page=await this.request(website);if(page.type==='text/html')options.push(...candidates(page.body.toString('utf8'),page.url||website));else if(imageSignature(page.body)||page.type==='image/svg+xml')options.push({url:page.url||website,source:'official_site'});}catch(error){lastError=error.message;}options.push({url:new URL('/favicon.ico',website).href,source:'favicon'});}
     options.push(...sourceIcons);
-    for(const option of options){try{const image=await this.request(option.url);if(this.company(id).logoSource==='manual')return this.snapshot(id);return this.write(id,image.body,image.type,option.source,image.url||option.url);}catch(error){lastError=error.message;}}
+    for(const option of options){try{const image=await this.request(option.url);if(this.company(id).logoSource==='manual')return this.snapshot(id);if(image.type==='image/svg+xml'){const png=await this.svgToPng(image.body);if(this.company(id).logoSource==='manual')return this.snapshot(id);return this.write(id,png,'image/png',option.source,image.url||option.url);}return this.write(id,image.body,image.type,option.source,image.url||option.url);}catch(error){lastError=error.message;}}
     throw new Error(website?(lastError||'网站未提供可解码的图标，请粘贴 PNG/JPG 图标链接或选择图片。'):'未能识别公司官网，请填写官网域名或图标链接。');
   }catch(error){if(this.company(id).logoSource!=='manual')this.update(id,{logoStatus:original.logoPath?'ready':'failed',logoError:error.message,logoLastCheckedAt:new Date().toISOString()});return this.snapshot(id);}}
 }

@@ -46,3 +46,14 @@ test('website icon wins over page previews and HTML is never cached as an image'
 });
 
 test('ICO PNG frame is decoded and malformed directories are bounded',()=>{const {decodeIcon}=require('../src/company-logo-service');const png=Buffer.from('89504e470d0a1a0a00000000','hex'),ico=Buffer.alloc(22+png.length);ico.writeUInt16LE(1,2);ico.writeUInt16LE(1,4);ico.writeUInt32LE(png.length,14);ico.writeUInt32LE(22,18);png.copy(ico,22);const image={isEmpty:()=>false};let seen;const native={createFromBuffer:b=>{seen=b;return image;}};assert.equal(decodeIcon(ico,native),image);assert.deepEqual(seen,png);});
+
+test('logo filename identifies the ATL image without selecting unrelated images',()=>{
+ const items=candidates('<a class="logo"><img src="/static/images/icon/logo.png" alt="ATL"></a><img src="/banner.png">','https://www.atlbattery.com/zh/about.html');
+ assert.deepEqual(items.map(x=>x.url),['https://www.atlbattery.com/static/images/icon/logo.png']);
+});
+test('SVG favicon is rasterized before caching as PNG',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'yanji-svg-'));t.after(()=>fs.rmSync(dir,{recursive:true,force:true}));const store=new JsonStore(path.join(dir,'data.json'));store.load();store.setJobApplications([{id:'svg-job',company:'SVG Test'}]);const id=store.data.companies[0].id;
+ const png=Buffer.from('89504e470d0a1a0a00000000','hex'),svg=Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32"/>');let rasterized=false;
+ const service=new CompanyLogoService({store,directory:dir,nativeImage:{createFromBuffer:()=>({isEmpty:()=>false,getSize:()=>({width:32,height:32}),toPNG:()=>png})},svgToPng:async body=>{assert.deepEqual(body,svg);rasterized=true;return png;},request:async url=>url.endsWith('.svg')?{body:svg,type:'image/svg+xml',url}:{body:Buffer.from('<link rel="icon" href="/logo.svg">'),type:'text/html',url}});
+ service.update(id,{website:'https://company.example/'});const result=await service.ensure(id,true);assert.equal(rasterized,true);assert.equal(result.logoStatus,'ready');assert.equal(result.logoRemoteUrl,'https://company.example/logo.svg');assert.ok(result.logoData.startsWith('data:image/png;base64,'));
+});
